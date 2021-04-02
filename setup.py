@@ -1,8 +1,9 @@
 import sys
 from os import path
 
-import versioneer
 from setuptools import find_packages, setup
+
+import versioneer
 
 min_version = (3, 6)
 
@@ -57,7 +58,7 @@ setup(
     url="https://github.com/pcdshub/atef",  # noqa
     entry_points={
         "console_scripts": [
-            # 'atef=atef.__main__:main',  # noqa
+            'atef=atef.bin.main:main',
         ],
     },
     include_package_data=True,
