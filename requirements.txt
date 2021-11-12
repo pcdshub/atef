@@ -2,3 +2,4 @@ bluesky
 ophyd
 numpy
 ipython
+git+https://github.com/dls-controls/aapy
