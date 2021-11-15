@@ -4,25 +4,20 @@ import copy
 import datetime
 import functools
 import inspect
-import itertools
 import logging
-import numbers
-import time
-from typing import Any, ClassVar, Dict, List, Optional
+import threading
+from types import SimpleNamespace
+from typing import (Any, ClassVar, Dict, Iterable, List, Literal, NoReturn,
+                    Optional, Tuple, Type, Union)
 
 import aa
 import ophyd
-import pcdsdevices
-# from ophyd import FormattedComponent as FCpt
 from ophyd import Component as Cpt
 from ophyd import Device
 from ophyd import DynamicDeviceComponent as DDCpt
-from ophyd import EpicsSignal, EpicsSignalRO, EpicsSignalWithRBV, Signal
-from ophyd.sim import SynSignal, SynSignalRO
-from ophyd.utils import LimitError
-from pcdsdevices.signal import (EpicsSignalEditMD, EpicsSignalROEditMD,
-                                PytmcSignal, PytmcSignalRO, PytmcSignalRW,
-                                SignalEditMD)
+from ophyd._dispatch import EventDispatcher, wrap_callback
+from ophyd.signal import EpicsSignalBase
+from typing_extensions import Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +87,10 @@ class ArchiverHelper:
 
 
 class ArchivedDevice:
+    _date_and_time_: datetime.datetime = datetime.datetime.now()
+
     def time_slip(self, dt: datetime.datetime):
+        self._date_and_time_ = dt
         result = {}
         for cpt_name in self.component_names:
             obj = getattr(self, cpt_name)
@@ -101,17 +99,75 @@ class ArchivedDevice:
         return result
 
 
-def make_archived_device(cls):
+class ArchiveControlLayer:
+    thread_class = threading.Thread
+    pv_form = "time"
+    name = "archive"
+
+    _pvs: Dict[str, List[ArchivedPV]]
+
+    def __init__(self):
+        self._pvs = {}
+
+    def setup(self, logger):
+        ...
+
+    def caget(self, pvname, **kwargs):
+        raise NotImplementedError()
+        try:
+            return self.get_pv(pvname).get(**kwargs)
+        finally:
+            self.release_pvs(pvname)
+
+    def caput(self, *args, **kwargs):
+        logger.warning("This is archived mode; no putting is allowed.")
+
+    def get_pv(self, pvname: str, connection_callback=None, **kwargs) -> ArchivedPV:
+        if connection_callback is None:
+            raise RuntimeError("Only EpicsSignal supported for now (no connection cb?)")
+
+        # Yeah, so we're going to use the knowledge of how EpicsSignal uses
+        # connection callback to find who's referring to this PV.  Add it to
+        # the pile of bad stuff we do.
+        try:
+            referrer = connection_callback.__self__
+        except AttributeError:
+            raise RuntimeError("Only EpicsSignal supported for now (no method?)")
+
+        pv = ArchivedPV(
+            pvname,
+            dispatcher=self.get_dispatcher(),
+            connection_callback=connection_callback,
+            referrer=referrer,
+            **kwargs,
+        )
+        if pvname not in self._pvs:
+            self._pvs[pvname] = []
+        self._pvs[pvname].append(pv)
+        return pv
+
+    def release_pvs(self, *pvs: str):
+        for pvname in pvs:
+            try:
+                _ = self._pvs[pvname]
+            except KeyError:
+                continue
+
+    def get_dispatcher(self):
+        return ophyd.get_cl().get_dispatcher()
+
+
+def switch_control_layer(
+    cls: Device,
+    control_layer: SimpleNamespace,
+    component_classes: Iterable[Type[Device]],
+    *,
+    cache: Dict[Type[Device], Type[Device]],
+    class_prefix: str = "",
+    new_bases: Optional[Iterable[type]] = None,
+) -> Device:
     """
     Inspect cls and construct an archived device that has the same structure.
-
-    This works by replacing EpicsSignal with ArchivedEpicsSignal and
-    EpicsSignalRO with ArchivedEpicsSignalRO. Then archived class will be a
-    subclass of the real class.
-
-    This assumes that EPICS connections are done entirely in EpicsSignal and
-    EpicsSignalRO subcomponents. If this is not true, this will fail silently
-    on class construction and loudly when manipulating an object.
 
     Parameters
     ----------
@@ -122,737 +178,358 @@ def make_archived_device(cls):
     Returns
     -------
     archived_device : type[Device]
-        The resulting archived Device class
+        The resulting archived Device class.
     """
-    if cls not in archived_device_cache:
-        if not issubclass(cls, Device):
-            # Ignore non-devices and non-epics-signals
-            logger.debug("Ignore cls=%s, bases are %s", cls, cls.__bases__)
-            archived_device_cache[cls] = cls
-            return cls
-        archived_dict = {}
-        # Update all the components recursively
-        for cpt_name in cls.component_names:
-            cpt = getattr(cls, cpt_name)
-            if isinstance(cpt, DDCpt):
-                # Make a regular Cpt out of the DDC, as it already has
-                # been generated
-                archived_cpt = Cpt(
-                    cls=cpt.cls,
-                    suffix=cpt.suffix,
-                    lazy=cpt.lazy,
-                    trigger_value=cpt.trigger_value,
-                    kind=cpt.kind,
-                    add_prefix=cpt.add_prefix,
-                    doc=cpt.doc,
-                    **cpt.kwargs,
-                )
-            else:
-                archived_cpt = copy.copy(cpt)
+    if cls in cache:
+        return cache[cls]
+    if not issubclass(cls, Device):
+        cache[cls] = cls
+        return cls
 
-            archived_cpt.cls = make_archived_device(cpt.cls)
-            logger.debug("switch cpt_name=%s to cls=%s", cpt_name, archived_cpt.cls)
+    component_classes = tuple(component_classes)
+    new_bases = tuple(new_bases)
 
-            archived_dict[cpt_name] = archived_cpt
-        archived_class = type(
-            "Archived{}".format(cls.__name__), (cls, ArchivedDevice), archived_dict
-        )
-        archived_device_cache[cls] = archived_class
-        logger.debug("archived_device_cache[%s] = %s", cls, archived_class)
-    return archived_device_cache[cls]
+    clsdict = {}
+    # Update all the components recursively
+    for cpt_name in cls.component_names:
+        cpt = getattr(cls, cpt_name)
+        if "cl" in cpt.kwargs or (
+            inspect.isclass(cpt.cls) and issubclass(cpt.cls, component_classes)
+        ):
+            cpt.kwargs["cl"] = control_layer
+            logger.debug("Control layer set on %s.%s", cls.__name__, cpt_name)
 
-
-def clear_archived_device(
-    dev: Device, *, default_value=0, default_string_value="", ignore_exceptions=False
-):
-    """
-    Clear an archived device by setting all signals to a specific value.
-
-    Parameters
-    ----------
-    dev : Device
-        The archived device
-    default_value : any, optional
-        The value to put to non-string components
-    default_string_value : any, optional
-        The value to put to components determined to be strings
-    ignore_exceptions : bool, optional
-        Ignore any exceptions raised by `sim_put`
-
-    Returns
-    -------
-    all_values : list
-        List of all (signal_instance, value) that were set
-    """
-
-    all_values = []
-    for walk in dev.walk_signals(include_lazy=True):
-        sig = walk.item
-        if not hasattr(sig, "sim_put"):
-            continue
-
-        try:
-            string = getattr(sig, "as_string", False)
-            value = default_string_value if string else default_value
-            sig.sim_put(value)
-        except Exception:
-            if not ignore_exceptions:
-                raise
+        if not isinstance(cpt, DDCpt):
+            replacement_cpt = copy.copy(cpt)
         else:
-            all_values.append((sig, value))
+            # Make a regular Cpt out of the DDC, as it already has been
+            # generated
+            replacement_cpt = Cpt(
+                cls=cpt.cls,
+                suffix=cpt.suffix,
+                lazy=cpt.lazy,
+                trigger_value=cpt.trigger_value,
+                kind=cpt.kind,
+                add_prefix=cpt.add_prefix,
+                doc=cpt.doc,
+                **cpt.kwargs,
+            )
 
-    return all_values
+        replacement_cpt.cls = switch_control_layer(
+            cls=replacement_cpt.cls,
+            control_layer=control_layer,
+            component_classes=component_classes,
+            cache=cache,
+            class_prefix=class_prefix,
+            new_bases=new_bases,
+        )
+
+        clsdict[cpt_name] = replacement_cpt
+    new_class = type(f"{class_prefix}{cls.__name__}", (cls, *new_bases), clsdict)
+    cache[cls] = new_class
+    logger.debug("cache[%s] = %s", cls, new_class)
+    return new_class
 
 
-def instantiate_archived_device(
-    dev_cls, *, name=None, prefix="_prefix", **specified_kw
-):
+class PyepicsMonitorCallback(Protocol):
+    def __call__(self, value: Any, timestamp: Any, **kwargs) -> NoReturn:
+        ...
+
+
+class PyepicsConnectionCallback(Protocol):
+    def __call__(self, *, pvname: str, conn: bool, pv: ArchivedPV) -> NoReturn:
+        ...
+
+
+class PyepicsAccessCallback(Protocol):
+    def __call__(self, read_access: bool, write_access: bool, *, pv: ArchivedPV) -> NoReturn:
+        ...
+
+
+PyepicsForm = Literal["time", "ctrl", "native"]
+
+
+class ArchivedPV:
     """
-    Instantiate an archived device, optionally specifying some initializer
-    kwargs
-
-    If unspecified, all initializer keyword arguments will default to the
-    string f"_{argument_name}_".
-
-    Parameters
-    ----------
-    dev_cls : class
-        The device class to instantiate. This is allowed to be a regular
-        device, as `make_archived_device` will be called on it first.
-    name : str, optional
-        The instantiated device name
-    prefix : str, optional
-        The instantiated device prefix
-    **specified_kw :
-        Keyword arguments to override with a specific value
-
-    Returns
-    -------
-    dev : dev_cls instance
-        The instantiated fake device
+    epics.PV API compatibility layer for accessing Archiver Appliance data.
     """
-    dev_cls = make_archived_device(dev_cls)
-    sig = inspect.signature(dev_cls)
-    ignore_kw = {
-        "kind",
-        "read_attrs",
-        "configuration_attrs",
-        "parent",
-        "args",
-        "name",
-        "prefix",
-    }
-
-    def get_kwarg(name, param):
-        default = param.default
-        if default == param.empty:
-            # NOTE: could check param.annotation here
-            default = "_{}_".format(param.name)
-        return specified_kw.get(name, default)
-
-    kwargs = {
-        name: get_kwarg(name, param)
-        for name, param in sig.parameters.items()
-        if param.kind != param.VAR_KEYWORD and name not in ignore_kw
-    }
-    kwargs["name"] = name if name is not None else dev_cls.__name__
-    kwargs["prefix"] = prefix
-    return dev_cls(**kwargs)
-
-
-class _PVStandin:
-    def __init__(self, pvname):
-        self.pvname = pvname
-        self._ctrlvars = {}
-
-    def get_ctrlvars(self):
-        return self._ctrlvars
-
-    def get_timevars(self):
-        return {}
-
-
-class ArchivedEpicsSignal(SynSignal):
-    """
-    Archived version of EpicsSignal that's really just a SynSignal.
-
-    Wheras SynSignal is generally used to test plans, ArchivedEpicsSignal is
-    generally used in conjunction with make_archived_device to test any logic
-    inside of a Device subclass.
-
-    Unlike in SynSignal, this class is generally instantiated inside of a
-    subcomponent generated automatically by make_archived_device. This means we
-    need extra hooks for modifying the signal's properties after the class
-    instantiates.
-
-    We can emulate EpicsSignal features here. We currently emulate the put
-    limits and some enum handling.
-    """
-
-    _metadata_keys = EpicsSignal._metadata_keys
+    _args: Dict[str, Any]
+    _dispatcher: EventDispatcher
+    _reference_count: int  # used externally by EpicsSignal, ew
+    _referrer: EpicsSignalBase
+    _user_max_count: Optional[int]
+    access_callbacks: List[PyepicsAccessCallback]
+    auto_monitor: Optional[Union[int, bool]]
+    as_string: bool
+    callbacks: Dict[int, Tuple[PyepicsMonitorCallback, dict]]
+    connected: bool
+    connection_callbacks: List[PyepicsConnectionCallback]
+    connection_timeout: float
+    form: str = PyepicsForm
+    pvname: str
+    verbose: bool
+    _fields: ClassVar[Tuple[str, ...]] = (
+        'access',
+        'char_value',
+        'chid',
+        'count',
+        'enum_strs',
+        'ftype',
+        'host',
+        'lower_alarm_limit',
+        'lower_ctrl_limit'
+        'lower_disp_limit',
+        'lower_warning_limit',
+        'nanoseconds',
+        'posixseconds',
+        'precision',
+        'pvname',
+        'read_access',
+        'severity',
+        'status',
+        'timestamp',
+        'units',
+        'upper_alarm_limit',
+        'upper_ctrl_limit',
+        'upper_disp_limit',
+        'upper_warning_limit',
+        'value',
+        'write_access',
+    )
 
     def __init__(
         self,
-        read_pv,
-        write_pv=None,
+        pvname: str,
+        callback: Optional[
+            Union[PyepicsMonitorCallback, List[PyepicsMonitorCallback],
+                  Tuple[PyepicsMonitorCallback, ...]]
+            ] = None,
+        form: PyepicsForm = "time",
+        verbose: bool = False,
+        auto_monitor: Optional[Union[int, bool]] = None,
+        count: Optional[int] = None,
+        connection_callback: Optional[PyepicsConnectionCallback] = None,
+        connection_timeout: Optional[float] = None,
+        access_callback: Optional[PyepicsAccessCallback] = None,
         *,
-        put_complete=False,
-        string=False,
-        limits=False,
-        auto_monitor=False,
-        name=None,
-        **kwargs,
+        dispatcher: EventDispatcher,
+        referrer: EpicsSignalBase,
     ):
-        self.as_string = string
-        self._enum_strs = None
-        super().__init__(name=name, **kwargs)
-        self._use_limits = limits
-        self._put_func = None
-        self._limits = None
-        self._metadata.update(
-            connected=False,
+        self.pvname = pvname
+        self.callbacks = {}
+        self.verbose = verbose
+        self.form = form
+        self.auto_monitor = auto_monitor
+        self._user_max_count = count
+        self._args = {}.fromkeys(self._fields)
+        self._args.update(
+            pvname=self.pvname,
+            count=count,
+            nelm=-1,
+            type="unknown",
+            typefull="unknown",
+            access="unknown",
         )
-        self.pvname = read_pv
-        self.setpoint_pvname = write_pv or read_pv
+        self._dispatcher = dispatcher
+        self._reference_count = 0
+        self._referrer = referrer
+        self.access_callbacks = []
+        self.as_string = referrer.as_string
+        self.callbacks = {}
+        self.connected = False
+        self.connection_callbacks = []
+        self.connection_timeout = connection_timeout or 1.0
 
-        self._read_pv = _PVStandin(read_pv)
-        self._write_pv = _PVStandin(write_pv)
-        self._metadata_key_map = {read_pv: EpicsSignal._read_pv_metadata_key_map}
-        if read_pv != write_pv:
-            self._metadata_key_map = {
-                write_pv: EpicsSignal._write_pv_metadata_key_map,
-                read_pv: {
-                    key: value
-                    for key, value in self._metadata_key_map[read_pv].items()
-                    if key not in ("lower_ctrl_limit", "upper_ctrl_limit")
-                },
+        if isinstance(callback, (tuple, list)):
+            self.callbacks = {
+                i: (wrap_callback(self._dispatcher, "monitor", cb), {})
+                for i, cb in enumerate(callback)
+                if callable(cb)
             }
-
-    def _get_metadata_from_kwargs(
-        self, pvname, cl_metadata, *, require_timestamp=False
-    ):
-        "Metadata from the control layer -> metadata for this Signal"
-
-        def fix_value(fixer_function, value):
-            return (
-                fixer_function(value)
-                if fixer_function is not None and value is not None
-                else value
+        elif callable(callback):
+            self.callbacks[0] = (
+                wrap_callback(self._dispatcher, "monitor", callback),
+                {}
             )
 
-        metadata = {
-            md_key: fix_value(fixer_function, cl_metadata[cl_key])
-            for cl_key, (md_key, fixer_function) in self._metadata_key_map[
-                pvname
-            ].items()
-            if cl_metadata.get(cl_key, None) is not None
-        }
+        if connection_callback is not None:
+            self.connection_callbacks.append(
+                wrap_callback(
+                    self._dispatcher, "metadata", connection_callback
+                )
+            )
 
-        if require_timestamp and metadata.get("timestamp", None) is None:
-            metadata["timestamp"] = time.time()
-        return metadata
+        if access_callback is not None:
+            self.access_callbacks.append(
+                wrap_callback(self._dispatcher, "metadata", access_callback)
+            )
 
-    def _metadata_changed(
-        self, pvname, cl_metadata, *, from_monitor, update, require_timestamp=False
-    ):
-        metadata = self._get_metadata_from_kwargs(
-            pvname, cl_metadata, require_timestamp=require_timestamp
-        )
-        if update:
-            self._metadata.update(**metadata)
-        return metadata
-
-    def time_slip(self, dt: datetime.datetime) -> Any:
         helper = ArchiverHelper.instance()
-        readback = helper.get_pv_at_time(self.pvname, dt)
+        wrap_callback(self._dispatcher, "metadata", self._connect)()
 
-        if self.pvname != self.setpoint_pvname:
-            setpoint = helper.get_pv_at_time(self.setpoint_pvname, dt)
-        else:
-            setpoint = readback
-        if not isinstance(self, ArchivedEpicsSignalRO):
-            ...
+    def _connect(self):
+        _ = self.get_with_metadata()
+        self.connected = True
+        for cb in self.connection_callbacks:
+            cb(pvname=self.pvname, conn=self.connected, pv=self)
 
-        if readback.value is None:
-            value = "" if self.as_string else 0.0
-        else:
-            value = readback.value[0] if len(readback.value) == 1 else readback.value
-        if readback.has_enum_options:
-            # if self.as_string:
-            #     value = readback.enum_string
-            self.sim_set_enum_strs(tuple(readback.enum_options.values()))
+        for cb in self.access_callbacks:
+            cb(True, False, pv=self)
 
-        for standin in (self._read_pv, self._write_pv):
-            standin._ctrlvars.update(
-                timestamp=readback.timestamp,
-                severity=readback.severity,
-                value=value,
-            )
+    def run_callbacks(self):
+        for index in sorted(list(self.callbacks)):
+            self.run_callback(index)
 
-        self.sim_put(
-            value=value,
-            timestamp=readback.timestamp,
-            severity=readback.severity,
-            status=0,
-        )
-        if self.pvname != self.setpoint_pvname:
-            return readback, setpoint
-        return readback
+    def run_callback(self, index: int):
+        try:
+            fcn, kwargs = self.callbacks[index]
+        except KeyError:
+            return
 
-    def describe(self):
-        desc = super().describe()
-        if self._enum_strs is not None:
-            desc[self.name]["enum_strs"] = self.enum_strs
-        return desc
+        if callable(fcn):
+            kwd = self._args.copy()
+            kwd.update(kwargs)
+            kwd["cb_info"] = (index, self)
+            fcn(**kwd)
 
-    def sim_set_putter(self, putter):
-        """
-        Define arbirary behavior on signal put.
+    def add_callback(
+        self, callback=None, index=None, run_now=False, with_ctrlvars=True, **kwargs
+    ):
+        if not callable(callback):
+            return
 
-        This can be used to emulate basic IOC behavior.
-        """
-        self._put_func = putter
+        callback = wrap_callback(self._dispatcher, "monitor", callback)
+        if index is None:
+            index = 1
+            if len(self.callbacks) > 0:
+                index = 1 + max(self.callbacks.keys())
+        self.callbacks[index] = (callback, kwargs)
 
-    def get(self, *, as_string=None, connection_timeout=1.0, **kwargs):
-        """
-        Implement getting as enum strings
-        """
-        if as_string is None:
-            as_string = self.as_string
+        if run_now and self.connected:
+            self.run_callback(index)
+        return index
 
-        value = super().get()
+    def _getarg(self, arg):
+        return self._args.get(arg, None)
 
-        if as_string:
-            if self.enum_strs is not None and isinstance(value, int):
-                return self.enum_strs[value]
-            elif value is not None:
-                return str(value)
-        return value
+    def get_all_metadata_blocking(self, timeout):
+        self.get_ctrlvars()
+        md = self._args.copy()
+        md.pop("value", None)
+        return md
+
+    def get_all_metadata_callback(self, callback, *, timeout):
+        def get_metadata_thread(pvname):
+            md = self.get_all_metadata_blocking(timeout=timeout)
+            callback(pvname, md)
+
+        self._dispatcher.schedule_utility_task(get_metadata_thread, pvname=self.pvname)
+
+    def clear_callbacks(self):
+        super().clear_callbacks()
+        self.access_callbacks.clear()
+        self.connection_callbacks.clear()
 
     def put(
         self,
         value,
-        *args,
-        connection_timeout=0.0,
+        wait=False,
+        timeout=30.0,
+        use_complete=False,
         callback=None,
-        use_complete=None,
-        timeout=0.0,
-        wait=True,
-        **kwargs,
+        callback_data=None,
     ):
-        """
-        Implement putting as enum strings and put functions
-
-        Notes
-        -----
-        ArchivedEpicsSignal varies in subtle ways from the real class.
-
-        * put-completion callback will _not_ be called.
-        * connection_timeout, use_complete, wait, and timeout are ignored.
-        """
-        if self.enum_strs is not None:
-            if value in self.enum_strs:
-                value = self.enum_strs.index(value)
-            elif isinstance(value, str):
-                err = "{} not in enum strs {}".format(value, self.enum_strs)
-                raise ValueError(err)
-        if self._put_func is not None:
-            return self._put_func(value, *args, **kwargs)
-        return super().put(value, *args, **kwargs)
-
-    def sim_put(self, *args, **kwargs):
-        """
-        Update the read-only signal's value.
-
-        Implement here instead of ArchivedEpicsSignalRO so you can call it with
-        every fake signal.
-        """
-        force = kwargs.pop("force", True)
-        self._metadata["connected"] = True
-        # The following will emit SUB_VALUE:
-        ret = Signal.put(self, *args, force=force, **kwargs)
-        # Also, ensure that SUB_META has been emitted:
-        self._run_subs(sub_type=self.SUB_META, **self._metadata)
-        return ret
-
-    @property
-    def enum_strs(self):
-        """
-        Simulated enum strings.
-
-        Use sim_set_enum_strs during setup to set the enum strs.
-        """
-        return self._enum_strs
-
-    def sim_set_enum_strs(self, enums):
-        """
-        Set the enum_strs for a fake device
-
-        Parameters
-        ----------
-        enums: list or tuple of str
-            The enums will be accessed by array index, e.g. the first item in
-            enums will be 0, the next will be 1, etc.
-        """
-        self._enum_strs = tuple(enums)
-        self._metadata["enum_strs"] = tuple(enums)
-        self._run_subs(sub_type=self.SUB_META, **self._metadata)
-
-    @property
-    def limits(self):
-        return self._limits
-
-    def sim_set_limits(self, limits):
-        """
-        Set the fake signal's limits.
-        """
-        self._limits = limits
-
-    def check_value(self, value):
-        """
-        Implement some of the checks from EpicsSignal
-        """
-        super().check_value(value)
-        if value is None:
-            raise ValueError("Cannot write None to EPICS PVs")
-        if self._use_limits and self._limits:
-            if not self.limits[0] <= value <= self.limits[1]:
-                raise LimitError(f"value={value} not within limits {self.limits}")
-
-
-class ArchivedEpicsSignalRO(SynSignalRO, ArchivedEpicsSignal):
-    """
-    Read-only ArchivedEpicsSignal
-    """
-
-    _metadata_keys = EpicsSignalRO._metadata_keys
-
-
-class ArchivedEpicsSignalWithRBV(ArchivedEpicsSignal):
-    """
-    ArchivedEpicsSignal with PV and PV_RBV; used in the AreaDetector PV naming
-    scheme
-    """
-
-    _metadata_keys = EpicsSignalWithRBV._metadata_keys
-
-    def __init__(self, prefix, **kwargs):
-        super().__init__(prefix + "_RBV", write_pv=prefix, **kwargs)
-
-
-class ArchivedPytmcSignal(ArchivedEpicsSignal):
-    """A suitable fake class for PytmcSignal."""
-
-    def __new__(cls, prefix, io=None, **kwargs):
-        new_cls = pcdsdevices.signal.select_pytmc_class(
-            io=io,
-            prefix=prefix,
-            write_cls=ArchivedPytmcSignalRW,
-            read_only_cls=ArchivedPytmcSignalRO,
-        )
-        return super().__new__(new_cls)
-
-    def __init__(self, prefix, io=None, **kwargs):
-        super().__init__(prefix + "_RBV", **kwargs)
-
-
-class ArchivedPytmcSignalRW(ArchivedPytmcSignal, ArchivedEpicsSignal):
-    def __init__(self, prefix, **kwargs):
-        super().__init__(prefix, write_pv=prefix, **kwargs)
-
-
-class ArchivedPytmcSignalRO(ArchivedPytmcSignal, ArchivedEpicsSignalRO):
-    pass
-
-
-class ArchivedEpicsSignalEditMD(ArchivedEpicsSignal, SignalEditMD):
-    """
-    EpicsSignal variant which allows for user correction of various metadata.
-
-    Parameters
-    ----------
-    enum_strings : list of str, optional
-        List of enum strings to replace the EPICS originals.  May not be
-        used in conjunction with the dynamic ``enum_attrs``.
-
-    enum_attrs : list of str, optional
-        List of signal attribute names, relative to the parent device.  That is
-        to say a given attribute is assumed to be a sibling of this signal
-        instance.  Attribute names may be ``None`` in the case where the
-        original enum string should be passed through.
-
-    See Also
-    ---------
-    `ophyd.signal.EpicsSignal` for further parameter information.
-    """
-
-    _enum_attrs: list[Optional[str]]
-    _enum_count: int
-    _enum_strings: list[str]
-    _original_enum_strings: list[str]
-    _enum_signals: list[Optional[ophyd.ophydobj.OphydObject]]
-    _enum_string_override: bool
-    _enum_subscriptions: dict[ophyd.ophydobj.OphydObject, int]
-    _pending_signals: set[ophyd.ophydobj.OphydObject]
-
-    def __init__(
-        self,
-        *args,
-        enum_attrs: Optional[list[Optional[str]]] = None,
-        enum_strs: Optional[list[str]] = None,
-        **kwargs,
-    ):
-        self._enum_attrs = list(enum_attrs or [])
-        self._pending_signals = set()
-        self._original_enum_strings = []
-        self._enum_signals = []
-        self._enum_subscriptions = {}
-        self._enum_count = 0
-        self._metadata_override = {}
-
-        super().__init__(*args, **kwargs)
-
-        if enum_attrs and enum_strs:
-            raise ValueError("enum_attrs OR enum_strs may be set, but not both")
-
-        self._enum_string_override = bool(enum_attrs or enum_strs)
-        if self._enum_string_override:
-            # We need to control 'connected' status based on other signals
-            self._metadata_override["connected"] = False
-
-        if enum_attrs:
-            # Override by way of other signals
-            self._enum_strings = [""] * len(self.enum_attrs)
-            # The following magic is provided by EpicsSignalBaseEditMD.
-            # The end result is:
-            # -> self.metadata["enum_strs"] => self._enum_strings
-            self._metadata_override["enum_strs"] = self._enum_strings
-            if self.parent is None:
-                raise RuntimeError(
-                    "This signal {self.name!r} must be used in a "
-                    "Device/Component hierarchy."
-                )
-
-            self._subscribe_enum_attrs()
-
-        elif enum_strs:
-            # Override with strings
-            self._enum_strings = list(enum_strs)
-            self._metadata_override["enum_strs"] = self._enum_strings
-
-    def destroy(self):
-        super().destroy()
-        for sig, sub in self._enum_subscriptions.items():
-            if sig is not None:
-                sig.unsubscribe(sub)
-        self._enum_subscriptions.clear()
-
-    def _subscribe_enum_attrs(self):
-        """Subscribe to enum signals by attribute name."""
-        for attr in self.enum_attrs:
-            if attr is None:
-                # Opt-out for a specific signal
-                self._enum_signals.append(None)
-                continue
-
-            try:
-                obj = getattr(self.parent, attr)
-            except AttributeError as ex:
-                raise RuntimeError(
-                    f"Attribute {attr!r} specified in enum list appears to be "
-                    f"invalid for the device {self.parent.name}."
-                ) from ex
-
-            if obj is self:
-                raise RuntimeError(
-                    f"Recursively specified {self.name!r} in the enum_attrs "
-                    "list.  Don't do that."
-                )
-            self._enum_signals.append(obj)
-            self._pending_signals.add(obj)
-            self._enum_subscriptions[obj] = obj.subscribe(
-                self._enum_string_updated, run=True
-            )
-
-    # Switch out _metadata for metadata where appropriate
-    @property
-    def enum_strs(self) -> list[str]:
-        """
-        List of enum strings.
-
-        For an EpicsSignalEditMD, this could be one of:
-
-        1. The original enum strings from the PV
-        2. The strings found from the respective signals referenced by
-            ``enum_attrs``.
-        3. The user-provided strings in ``enum_strs``.
-        """
-        if self._enum_string_override:
-            return list(self._enum_strings)[: self._enum_count]
-        return self.metadata["enum_strs"]
-
-    @property
-    def precision(self):
-        """The PV precision as reported by EPICS (or EpicsSignalEditMD)."""
-        return self.metadata["precision"]
-
-    @precision.setter
-    def precision(self, value):
-        # TODO: archive-specific for synsignal
-        self._metadata_override["precision"] = value
-
-    @property
-    def limits(self) -> tuple[numbers.Real, numbers.Real]:
-        """The PV limits as reported by EPICS (or EpicsSignalEditMD)."""
-        return (self.metadata["lower_ctrl_limit"], self.metadata["upper_ctrl_limit"])
-
-    def describe(self):
-        """
-        Return the signal description as a dictionary.
-
-        Units, limits, precision, and enum strings may be overridden.
-
-        Returns
-        -------
-        dict
-            Dictionary of name and formatted description string
-        """
-        desc = super().describe()
-        desc[self.name]["units"] = self.metadata["units"]
-        return desc
-
-    @property
-    def enum_attrs(self) -> list[str]:
-        """Enum attribute names - the source of each enum string."""
-        return list(self._enum_attrs)
-
-    def _enum_string_updated(
-        self, value: str, obj: ophyd.ophydobj.OphydObject, **kwargs
-    ):
-        """
-        A single Signal from ``enum_signals`` updated its value.
-
-        This is a ``SUB_VALUE`` subscription callback from that signal.
-
-        Parameters
-        ----------
-        value : str
-            The value of that enum index.
-
-        obj : ophyd.ophydobj.OphydObject
-            The ophyd object with the value.
-
-        **kwargs :
-            Additional metadata from ``self._metadata``.
-        """
-        if value is None:
-            # The callback may run before it's connected
-            return
-
-        try:
-            idx = self._enum_signals.index(obj)
-        except IndexError:
-            return
-
-        self._enum_strings[idx] = str(value)
-        self.log.debug(
-            "Got enum %s [%d] = %s from %s",
-            self.name,
-            idx,
+        logger.warning(
+            "This is archived mode; no puts are allowed. "
+            "Attempted to change %r to %r",
+            self.pvname,
             value,
-            getattr(obj, "pvname", "(no pvname)"),
         )
-        try:
-            self._pending_signals.remove(obj)
-        except KeyError:
-            ...
+        if callback:
+            callback = wrap_callback(self._dispatcher, "get_put", callback)
+            if isinstance(callback_data, dict):
+                callback(**callback_data)
+            else:
+                callback(data=callback_data)
 
-        if not self._pending_signals:
-            # We're probably connected!
-            self._run_metadata_callbacks()
+    def get_ctrlvars(self, **kwargs):
+        return self._args.copy()
 
-    @property
-    def connected(self) -> bool:
-        """Is the signal connected and ready to use?"""
-        return (
-            self._metadata["connected"]
-            and not self._destroyed
-            and not len(self._pending_signals)
+    def get_timevars(self, **kwargs):
+        return self._args.copy()
+
+    def get_timestamp_from_referrer(self):
+        device: ArchivedDevice = self._referrer.parent
+        return device._date_and_time_
+
+    def get(
+        self,
+        count=None,
+        as_string=None,
+        as_numpy=True,
+        timeout=None,
+        with_ctrlvars=False,
+        use_monitor=True,
+    ):
+        return self.get_with_metadata(count=count, as_string=as_string)["value"]
+
+    def get_with_metadata(self, as_string=None, **kwargs):
+        as_string = as_string if as_string is not None else self.as_string
+        helper = ArchiverHelper.instance()
+        data = helper.get_pv_at_time(self.pvname, self.get_timestamp_from_referrer())
+        if data.value is None:
+            value = "" if as_string else 0.0
+            # self.connected = False
+        else:
+            value = data.value[0] if len(data.value) == 1 else data.value
+        self._args.update(
+            value=value,
+            timestamp=data.timestamp,
+            severity=data.severity,
         )
+        if data.enum_options:
+            self._args["enum_strs"] = list(data.enum_options.values())
+        return self._args.copy()
 
-    def _check_signal_metadata(self):
-        """Check the original enum strings to compare the attributes."""
-        self._original_enum_strings = self._metadata.get("enum_strs", None) or []
-        if not self._original_enum_strings:
-            self.log.error(
-                "No enum strings on %r; was %r used inappropriately?",
-                self.pvname,
-                type(self).__name__,
-            )
-            return
-
-        if self._enum_count == 0:
-            self._enum_count = len(self._original_enum_strings)
-
-            # Only update ones that have yet to be populated;  this can
-            # be a race for who connects first:
-            updated_enums = [
-                existing or original
-                for existing, original in itertools.zip_longest(
-                    self._enum_strings, self._original_enum_strings, fillvalue=""
-                )
-            ]
-            self._enum_strings[:] = updated_enums
-
-    def _run_metadata_callbacks(self):
-        """Hook for metadata callbacks, mostly run by superclasses."""
-        self._metadata_override["connected"] = self.connected
-        if self._metadata["connected"]:
-            # The underlying PV has connected - check its enum_strs:
-            self._check_signal_metadata()
-        super()._run_metadata_callbacks()
+    def wait_for_connection(self, *args, **kwargs):
+        self.get_with_metadata()
+        return True
 
 
-class ArchivedEpicsSignalROEditMD(ArchivedEpicsSignalEditMD):
-    def __init__(self, prefix, **kwargs):
-        super().__init__(prefix, write_pv=prefix, **kwargs)
-
-
-archived_device_cache = {
-    EpicsSignal: ArchivedEpicsSignal,
-    EpicsSignalRO: ArchivedEpicsSignalRO,
-    EpicsSignalWithRBV: ArchivedEpicsSignalWithRBV,
-    EpicsSignalEditMD: ArchivedEpicsSignalEditMD,
-    EpicsSignalROEditMD: ArchivedEpicsSignalROEditMD,
-    PytmcSignal: ArchivedPytmcSignal,
-    PytmcSignalRO: ArchivedPytmcSignalRO,
-    PytmcSignalRW: ArchivedPytmcSignalRW,
-}
+_archived_device_cache = {}
 
 
 def test():
     global at1k4
     global display
+    import pcdsdevices  # noqa
     import pcdsdevices.tests.conftest  # noqa
 
     pcdsdevices.tests.conftest.find_all_device_classes()
     for cls in pcdsdevices.tests.conftest.find_all_device_classes():
-        make_archived_device(cls)
+        switch_control_layer(
+            cls,
+            control_layer=ArchiveControlLayer(),
+            component_classes=(EpicsSignalBase,),
+            cache=_archived_device_cache,
+            class_prefix="Archived",
+            new_bases=(ArchivedDevice,),
+        )
 
     helper = ArchiverHelper.instance()
-    at1k4 = archived_device_cache[pcdsdevices.attenuator.AT1K4](
+    at1k4 = _archived_device_cache[pcdsdevices.attenuator.AT1K4](
         prefix="AT1K4:L2SI", calculator_prefix="AT1K4:CALC", name="at1k4"
     )
 
     at1k4.time_slip(datetime.datetime.now())
 
-    import PyQt5  # noqa
-    import typhos  # noqa
+    # import PyQt5  # noqa
+    # import typhos  # noqa
 
-    app = PyQt5.QtWidgets.QApplication([])
-    display = typhos.suite.TyphosDeviceDisplay.from_device(at1k4)
-    display.show()
-    app.exec_()
+    # app = PyQt5.QtWidgets.QApplication([])
+    # display = typhos.suite.TyphosDeviceDisplay.from_device(at1k4)
+    # display.show()
+    # app.exec_()
 
 
 if __name__ == "__main__":
