@@ -25,7 +25,7 @@ ARCHIVE_CACHE_SIZE = 20_000
 
 
 class ArchiverHelper:
-    _instance_: ClassVar[ArchiverHelper] = None
+    _instance_: ClassVar[ArchiverHelper]
     pv_to_appliance: Dict[str, aa.fetcher.Fetcher]
     appliances: List[aa.fetcher.Fetcher]
 
@@ -62,7 +62,8 @@ class ArchiverHelper:
 
     @staticmethod
     def instance() -> ArchiverHelper:
-        if ArchiverHelper._instance_ is None:
+        """Access the process-global ArchiveHelper singleton."""
+        if not hasattr(ArchiverHelper, "_instance_"):
             ArchiverHelper._instance_ = ArchiverHelper()
         return ArchiverHelper._instance_
 
@@ -86,7 +87,10 @@ class ArchiverHelper:
 
 
 class ArchivedDevice:
+    # TODO: discuss if this mixin should exist; and if not, where the datetime
+    # information should be stored
     _date_and_time_: datetime.datetime = datetime.datetime.now()
+    component_names: List[str]
 
     def time_slip(self, dt: datetime.datetime):
         self._date_and_time_ = dt
