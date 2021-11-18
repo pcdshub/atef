@@ -86,7 +86,7 @@ class ArchiverHelper:
         return fetcher
 
 
-class ArchivedDevice:
+class ArchiverDevice:
     # TODO: discuss if this mixin should exist; and if not, where the datetime
     # information should be stored
     _date_and_time_: datetime.datetime = datetime.datetime.now()
@@ -102,15 +102,23 @@ class ArchivedDevice:
         return result
 
 
-class ArchiveControlLayer:
+class ArchiverControlLayer:
     thread_class = threading.Thread
     pv_form = "time"
     name = "archive"
 
-    _pvs: Dict[str, List[ArchivedPV]]
+    _instance_: ClassVar[ArchiverControlLayer]
+    _pvs: Dict[str, List[ArchiverPV]]
 
     def __init__(self):
         self._pvs = {}
+
+    @staticmethod
+    def instance() -> ArchiverControlLayer:
+        """Access the process-global ArchiverControlLayer singleton."""
+        if not hasattr(ArchiverControlLayer, "_instance_"):
+            ArchiverControlLayer._instance_ = ArchiverControlLayer()
+        return ArchiverControlLayer._instance_
 
     def setup(self, logger):
         ...
@@ -130,7 +138,7 @@ class ArchiveControlLayer:
         pvname: str,
         connection_callback: Optional[PyepicsConnectionCallback] = None,
         **kwargs
-    ) -> ArchivedPV:
+    ) -> ArchiverPV:
         if connection_callback is None:
             raise RuntimeError(
                 "Only EpicsSignal supported for now (no connection cb?)"
@@ -146,7 +154,7 @@ class ArchiveControlLayer:
                 "Only EpicsSignal supported for now (no method?)"
             )
 
-        pv = ArchivedPV(
+        pv = ArchiverPV(
             pvname,
             dispatcher=self.get_dispatcher(),
             connection_callback=connection_callback,
@@ -169,15 +177,47 @@ class ArchiveControlLayer:
         return ophyd.get_cl().get_dispatcher()
 
 
+def make_archived_device(cls: Type[Device]) -> Type[ArchiverDevice]:
+    """
+    Make an alternate device class that uses the ArchiveControlLayer.
+
+    The new class will:
+    1. Inherit from :class:`ArchiverDevice`
+    2. Switch the control layer of all components that are subclasses of
+       EpicsSignalBase.
+    3. Have a name like f"Archiver{cls.__name__}".
+
+    Converted classes will be cached in ``_archived_device_cache``.
+
+    Parameters
+    ----------
+    cls : ophyd.Device subclass
+        The class to convert.
+
+    Returns
+    -------
+    cls : subclass of (cls, ArchiverDevice)
+        The converted class.
+    """
+    return switch_control_layer(
+        cls,
+        control_layer=ArchiverControlLayer.instance(),
+        component_classes=(EpicsSignalBase,),
+        cache=_archived_device_cache,
+        class_prefix="Archiver",
+        new_bases=(ArchiverDevice,),
+    )
+
+
 def switch_control_layer(
-    cls: Device,
+    cls: Type[Device],
     control_layer: SimpleNamespace,
     component_classes: Iterable[Type[Device]],
     *,
     cache: Dict[Type[Device], Type[Device]],
     class_prefix: str = "",
     new_bases: Optional[Iterable[type]] = None,
-) -> Device:
+) -> Type[ArchiverDevice]:
     """
     Inspect cls and construct an archived device that has the same structure.
 
@@ -248,7 +288,7 @@ def switch_control_layer(
     return new_class
 
 
-class ArchivedPV(PyepicsPvCompatibility):
+class ArchiverPV(PyepicsPvCompatibility):
     def _make_connection(self):
         _ = self.get_with_metadata()
         super()._mark_as_connected()
@@ -278,7 +318,7 @@ class ArchivedPV(PyepicsPvCompatibility):
         )
 
     def get_timestamp_from_referrer(self):
-        device: ArchivedDevice = self._referrer.parent
+        device: ArchiverDevice = self._referrer.parent
         return device._date_and_time_
 
     def get_with_metadata(self, as_string=None, **kwargs):
@@ -306,27 +346,15 @@ _archived_device_cache = {}
 
 
 def test():
-    global at1k4
+    global at1l0
     global display
-    import pcdsdevices  # noqa
-    import pcdsdevices.tests.conftest  # noqa
+    import pcdsdevices.attenuator  # noqa
 
-    pcdsdevices.tests.conftest.find_all_device_classes()
-    for cls in pcdsdevices.tests.conftest.find_all_device_classes():
-        switch_control_layer(
-            cls,
-            control_layer=ArchiveControlLayer(),
-            component_classes=(EpicsSignalBase,),
-            cache=_archived_device_cache,
-            class_prefix="Archived",
-            new_bases=(ArchivedDevice,),
-        )
-
-    at1k4 = _archived_device_cache[pcdsdevices.attenuator.AT1K4](
-        prefix="AT1K4:L2SI", calculator_prefix="AT1K4:CALC", name="at1k4"
+    at1l0 = make_archived_device(pcdsdevices.attenuator.FeeAtt)(
+        prefix="SATT:FEE1:320", name="at1l0"
     )
 
-    at1k4.time_slip(datetime.datetime.now())
+    at1l0.time_slip(datetime.datetime.now())
 
     # import PyQt5  # noqa
     # import typhos  # noqa
