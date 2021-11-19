@@ -29,21 +29,22 @@ ARCHIVE_CACHE_SIZE = 20_000
 class ArchivedValue:
     pvname: str
     value: Optional[Any]
-    timestamp: float
+    timestamp: datetime.datetime
     status: int
     severity: int
     enum_strs: Optional[Tuple[str, ...]] = None
 
     @classmethod
-    def from_archapp(cls, **data):
-        return cls(**data)
+    def from_archapp(cls, val=None, nanos=None, secs=None, **data):
+        timestamp = datetime.datetime.fromtimestamp(secs + 1e-9 * nanos)
+        return cls(value=val, timestamp=timestamp, **data)
 
     @classmethod
     def from_missing_data(cls, pvname: str, timestamp: datetime.datetime):
         return ArchivedValue(
-            pv=pvname,
+            pvname=pvname,
             value=None,
-            timestamp=timestamp.timestamp(),
+            timestamp=timestamp,
             status=3,
             severity=3,
             enum_strs=None,
@@ -58,7 +59,7 @@ class ArchiverHelper:
     def __init__(self):
         self.pv_to_appliance = {}
         self.appliances = []
-        self.add_appliance("localhost", 17668)
+        self.add_appliance("localhost")
 
     @functools.lru_cache(maxsize=ARCHIVE_CACHE_SIZE)
     def get_pv_at_time(
@@ -66,24 +67,22 @@ class ArchiverHelper:
     ) -> ArchivedValue:
         appliance = self.pv_to_appliance.get(pvname, None)
         if appliance is not None:
-            return appliance.get_event_at(pvname, dt)
-
-        for appliance in self.appliances:
-            try:
-                event = appliance.get_snapshot(pvname, at=dt)
-            except ValueError:
-                ...
-            else:
-                if not event:
-                    # Empty event indicates there are no results
-                    continue
-                self.pv_to_appliance[pvname] = appliance
-                return ArchivedValue.from_archapp(**event)
-        # raise ValueError(f"{pvname!r} not available in archiver(s)")
-        return ArchivedValue.from_missing_data(
-            pvname=pvname,
-            timestamp=dt,
-        )
+            event = appliance.get_event_at(pvname, dt)
+        else:
+            for appliance in self.appliances:
+                try:
+                    event = appliance.get_snapshot(pvname, at=dt)
+                except ValueError:
+                    ...
+                else:
+                    if event:
+                        break
+        if not event:
+            return ArchivedValue.from_missing_data(
+                pvname=pvname,
+                timestamp=dt,
+            )
+        return ArchivedValue.from_archapp(pvname=pvname, **event[pvname])
 
     @staticmethod
     def instance() -> ArchiverHelper:
@@ -355,10 +354,10 @@ class ArchiverPV(PyepicsPvCompatibility):
             value = "" if as_string else 0.0
             # self.connected = False
         else:
-            value = data.value[0] if len(data.value) == 1 else data.value
+            value = data.value
         self._args.update(
             value=value,
-            timestamp=data.timestamp,
+            timestamp=data.timestamp.timestamp(),
             severity=data.severity,
         )
         if data.enum_strs:
