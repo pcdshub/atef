@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import collections
 import copy
 import dataclasses
 import datetime
-import functools
 import inspect
 import logging
 import threading
 from types import SimpleNamespace
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
+from typing import (Any, ClassVar, Deque, Dict, Generator, Iterable, List,
+                    Optional, Tuple, Type)
 
 import archapp
 import ophyd
@@ -22,7 +23,7 @@ from .pyepics_compat import PyepicsConnectionCallback, PyepicsPvCompatibility
 logger = logging.getLogger(__name__)
 
 
-ARCHIVE_CACHE_SIZE = 20_000
+PER_PV_CACHE = 100
 
 
 @dataclasses.dataclass(frozen=True)
@@ -32,12 +33,35 @@ class ArchivedValue:
     timestamp: datetime.datetime
     status: int
     severity: int
+    appliance: Optional[archapp.EpicsArchive] = None
     enum_strs: Optional[Tuple[str, ...]] = None
 
     @classmethod
-    def from_archapp(cls, val=None, nanos=None, secs=None, **data):
+    def from_archapp(
+        cls,
+        pvname: str,
+        appliance: archapp.EpicsArchive,
+        /,
+        val: Any = None,
+        nanos: int = 0,
+        secs: int = 0,
+        **data,
+    ):
         timestamp = datetime.datetime.fromtimestamp(secs + 1e-9 * nanos)
-        return cls(value=val, timestamp=timestamp, **data)
+        kwargs = {
+            kw: data[kw]
+            for kw in ("status", "severity", "enum_strs")
+            if kw in data
+        }
+        # TODO: archiver appliance API refactor will add more kwargs here
+        # but they are undefined as of yet
+        return cls(
+            pvname=pvname,
+            appliance=appliance,
+            value=val,
+            timestamp=timestamp,
+            **kwargs
+        )
 
     @classmethod
     def from_missing_data(cls, pvname: str, timestamp: datetime.datetime):
@@ -48,41 +72,212 @@ class ArchivedValue:
             status=3,
             severity=3,
             enum_strs=None,
+            appliance=None,
         )
+
+
+@dataclasses.dataclass
+class ArchivedValueStore:
+    """
+    Archived value cache entry.
+
+    Attributes
+    ----------
+    pvname : str
+        The PV name.
+
+    appliance : archapp.EpicsArchive
+        The appliance that sources the PV's data.
+
+    data : deque[ArchivedValue]
+        Length-limited deque of historical data.
+
+    timestamp_aliases : dict[datetime, datetime]
+        The requested timestamp is not always equal to that which the archiver
+        responds with.  The archived values may not change as frequently as
+        those in the control system due to PV configuration or archiver
+        configuration, so many requested values may map onto a single archiver
+        appliance data value.  This dictionary is implicitly kept up-to-date on
+        access of ``by_timestamp``.
+    """
+    pvname: str
+    appliance: archapp.EpicsArchive
+    data: Deque[ArchivedValue] = dataclasses.field(
+        default_factory=lambda: collections.deque(maxlen=PER_PV_CACHE)
+    )
+    timestamp_aliases: Dict[datetime.datetime, datetime.datetime] = dataclasses.field(
+        default_factory=dict
+    )
+
+    @property
+    def by_timestamp(self) -> Dict[datetime.datetime, ArchivedValue]:
+        result = {
+            data.timestamp: data
+            for data in self.data
+        }
+        for from_, to in list(self.timestamp_aliases.items()):
+            try:
+                result[from_] = result[to]
+            except KeyError:
+                self.timestamp_aliases.pop(to)
+        return result
 
 
 class ArchiverHelper:
     _instance_: ClassVar[ArchiverHelper]
-    pv_to_appliance: Dict[str, archapp.EpicsArchive]
     appliances: List[archapp.EpicsArchive]
+    cache: Dict[str, ArchivedValueStore]
 
     def __init__(self):
-        self.pv_to_appliance = {}
         self.appliances = []
         self.add_appliance("localhost")
+        self.cache = {}
 
-    @functools.lru_cache(maxsize=ARCHIVE_CACHE_SIZE)
+    def match_pvs_to_appliance(
+        self,
+        *pvnames: str,
+        dt: datetime.datetime
+    ) -> Tuple[Dict[str, ArchivedValue], Dict[archapp.EpicsArchive, List[str]], List[str]]:
+        """
+        Match PVs to the Archiver Appliance that holds their data.
+
+        Parameters
+        ----------
+        *pvnames : str
+            The PV names to look for.
+
+        dt : datetime.datetime
+            The timestamp to be used for cache checks / the search query.
+
+        Returns
+        -------
+        cached : dict[str, ArchivedValue]
+            Cached entries by pvname for the given timestamp.  Because this is
+            a cache hit, interacting with the archive appliance is not
+            necessary after this.
+
+        by_appliance : dict[str, archapp.EpicsArchive]
+            Dictionary of PV name to archiver appliance instance.  Each of
+            these items represents a cache miss, and further interaction with
+            the archiver appliance will be required.
+
+        unknown : list[str]
+            PV names not found in any configured archivers.
+        """
+        if dt is None:
+            dt = datetime.datetime.now()
+
+        by_appliance = collections.defaultdict(list)
+        cached = {}
+        to_find = []
+        for pvname in set(pvnames):
+            cache_item = self.cache.get(pvname, None)
+            if cache_item is None:
+                to_find.append(pvname)
+            else:
+                try:
+                    cached[pvname] = cache_item.by_timestamp[dt]
+                except KeyError:
+                    by_appliance[cache_item.appliance].append(pvname)
+
+        to_find = list(sorted(to_find))
+        for appliance in self.appliances:
+            if not to_find:
+                break
+
+            try:
+                event = appliance.get_snapshot(*to_find, at=dt)
+            except ValueError:
+                ...
+            else:
+                for pvname, data in event.items():
+                    value = ArchivedValue.from_archapp(
+                        pvname, appliance, **data
+                    )
+                    cached[pvname] = value
+                    self.add_to_cache(pvname, value, dt)
+                    to_find.remove(pvname)
+
+        return cached, dict(by_appliance), to_find
+
+    def add_to_cache(self, pvname: str, value: ArchivedValue, dt: datetime.datetime):
+        """Add an ArchivedValue to the cache for the given pvname."""
+        if pvname not in self.cache:
+            self.cache[pvname] = ArchivedValueStore(
+                pvname=pvname,
+                appliance=value.appliance,
+            )
+        cache_item = self.cache[pvname]
+        cache_item.data.append(value)
+        if dt != value.timestamp:
+            cache_item.timestamp_aliases[dt] = value.timestamp
+
+    def get_pvs_at_time(
+        self, *pvnames: str, dt: datetime.datetime
+    ) -> Dict[str, ArchivedValue]:
+        """
+        Bulk request many PVs at the given timestamp.
+
+        PVs are matched to the appropriate archiver appliance, if available.
+        Missing PVs are initialized with stub values.
+
+        Parameters
+        ----------
+        *pvs : str
+            PV names.
+
+        dt : datetime.datetime
+            The timestamp at which to get a snapshot of the PVs.
+
+        Returns
+        -------
+        archive_data : dict[str, ArchivedValue]
+            PV name to ArchivedValue.
+        """
+        data, by_appliance, missing = self.match_pvs_to_appliance(*pvnames, dt=dt)
+        for appliance, appliance_pvs in by_appliance.items():
+            try:
+                event = appliance.get_snapshot(*appliance_pvs, at=dt)
+            except ValueError:
+                ...
+            else:
+                missing.extend(list(set(appliance_pvs) - set(event)))
+                for pvname, per_pv_data in event.items():
+                    value = ArchivedValue.from_archapp(
+                        pvname, appliance, **per_pv_data
+                    )
+                    data[pvname] = value
+                    self.add_to_cache(pvname, value, dt)
+
+        for pv in missing:
+            data[pv] = ArchivedValue.from_missing_data(
+                pvname=pv,
+                timestamp=dt,
+            )
+
+        return data
+
     def get_pv_at_time(
         self, pvname: str, dt: datetime.datetime
     ) -> ArchivedValue:
-        appliance = self.pv_to_appliance.get(pvname, None)
-        if appliance is not None:
-            event = appliance.get_event_at(pvname, dt)
-        else:
-            for appliance in self.appliances:
-                try:
-                    event = appliance.get_snapshot(pvname, at=dt)
-                except ValueError:
-                    ...
-                else:
-                    if event:
-                        break
-        if not event:
-            return ArchivedValue.from_missing_data(
-                pvname=pvname,
-                timestamp=dt,
-            )
-        return ArchivedValue.from_archapp(pvname=pvname, **event[pvname])
+        """
+        Request PV data at the given timestamp.
+
+        Convenience method wrapper around `get_pvs_at_time`.
+
+        Parameters
+        ----------
+        pv : str
+            PV name.
+
+        dt : datetime.datetime
+            The timestamp at which to get a snapshot of the PV.
+
+        Returns
+        -------
+        archive_data : ArchivedValue
+        """
+        return self.get_pvs_at_time(pvname, dt=dt)[pvname]
 
     @staticmethod
     def instance() -> ArchiverHelper:
@@ -109,20 +304,32 @@ class ArchiverHelper:
         self.appliances.append(archiver)
 
 
-class ArchiverDevice:
+class ArchiverDevice(Device):
     # TODO: discuss if this mixin should exist; and if not, where the datetime
     # information should be stored
-    _date_and_time_: datetime.datetime = datetime.datetime.now()
     component_names: List[str]
+    archive_timestamp: datetime.datetime = datetime.datetime.now()
+
+    def _find_archiver_pvs(self) -> Generator[Tuple[str, ArchiverPV], None, None]:
+        for walk in self.walk_signals(include_lazy=True):
+            if isinstance(walk.item, EpicsSignalBase):
+                read_pv = getattr(walk.item, "_read_pv", None)
+                write_pv = getattr(walk.item, "_write_pv", None)
+                if read_pv is write_pv:
+                    write_pv = None
+
+                yield walk.dotted_name, read_pv
+                if write_pv is not None:
+                    yield walk.dotted_name, write_pv
 
     def time_slip(self, dt: datetime.datetime):
-        self._date_and_time_ = dt
-        result = {}
-        for cpt_name in self.component_names:
-            obj = getattr(self, cpt_name)
-            if hasattr(obj, "time_slip") and callable(obj.time_slip):
-                result[cpt_name] = obj.time_slip(dt)
-        return result
+        pv_to_attr = collections.defaultdict(list)
+        for attr, instance in self._find_archiver_pvs():
+            instance.archive_timestamp = dt
+            pv_to_attr[instance.pvname].append(attr)
+        helper = ArchiverHelper.instance()
+        self.archive_timestamp = dt
+        return helper.get_pvs_at_time(*list(pv_to_attr), dt=dt)
 
 
 class ArchiverControlLayer:
@@ -312,6 +519,17 @@ def switch_control_layer(
 
 
 class ArchiverPV(PyepicsPvCompatibility):
+    """
+    An epics.PV-like interface to archiver appliance data.
+
+    Notes
+    -----
+    There is a 1-to-1 correspondence of :class:`ArchiverPV` to Component,
+    whereas normally :class:`epics.PV` can be shared.
+    """
+
+    archive_timestamp: datetime.datetime = datetime.datetime.now()
+
     def _make_connection(self):
         _ = self.get_with_metadata()
         super()._mark_as_connected()
@@ -340,16 +558,10 @@ class ArchiverPV(PyepicsPvCompatibility):
             callback_data=callback_data,
         )
 
-    def get_timestamp_from_referrer(self):
-        device: ArchiverDevice = self._referrer.parent
-        return device._date_and_time_
-
     def get_with_metadata(self, as_string=None, **kwargs):
         as_string = as_string if as_string is not None else self.as_string
         helper = ArchiverHelper.instance()
-        data = helper.get_pv_at_time(
-            self.pvname, self.get_timestamp_from_referrer()
-        )
+        data = helper.get_pv_at_time(self.pvname, self.archive_timestamp)
         if data.value is None:
             value = "" if as_string else 0.0
             # self.connected = False
@@ -379,8 +591,8 @@ def test():
 
     at1l0.time_slip(datetime.datetime.now())
 
-    import PyQt5  # noqa
-    import typhos  # noqa
+    # import PyQt5  # noqa
+    # import typhos  # noqa
 
     # app = PyQt5.QtWidgets.QApplication([])
     # display = typhos.suite.TyphosDeviceDisplay.from_device(at1l0)
