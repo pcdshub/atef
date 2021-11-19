@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import datetime
 import functools
 import inspect
 import logging
 import threading
 from types import SimpleNamespace
-from typing import ClassVar, Dict, Iterable, List, Optional, Type
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
 
-import aa
+import archapp
 import ophyd
 from ophyd import Component as Cpt
 from ophyd import Device
@@ -24,10 +25,35 @@ logger = logging.getLogger(__name__)
 ARCHIVE_CACHE_SIZE = 20_000
 
 
+@dataclasses.dataclass(frozen=True)
+class ArchivedValue:
+    pvname: str
+    value: Optional[Any]
+    timestamp: float
+    status: int
+    severity: int
+    enum_strs: Optional[Tuple[str, ...]] = None
+
+    @classmethod
+    def from_archapp(cls, **data):
+        return cls(**data)
+
+    @classmethod
+    def from_missing_data(cls, pvname: str, timestamp: datetime.datetime):
+        return ArchivedValue(
+            pv=pvname,
+            value=None,
+            timestamp=timestamp.timestamp(),
+            status=3,
+            severity=3,
+            enum_strs=None,
+        )
+
+
 class ArchiverHelper:
     _instance_: ClassVar[ArchiverHelper]
-    pv_to_appliance: Dict[str, aa.fetcher.Fetcher]
-    appliances: List[aa.fetcher.Fetcher]
+    pv_to_appliance: Dict[str, archapp.EpicsArchive]
+    appliances: List[archapp.EpicsArchive]
 
     def __init__(self):
         self.pv_to_appliance = {}
@@ -37,28 +63,27 @@ class ArchiverHelper:
     @functools.lru_cache(maxsize=ARCHIVE_CACHE_SIZE)
     def get_pv_at_time(
         self, pvname: str, dt: datetime.datetime
-    ) -> aa.data.ArchiveEvent:
-        dt = dt.astimezone()  # TODO: aapy raising without this
-        if pvname not in self.pv_to_appliance:
-            for fetcher in self.appliances:
-                try:
-                    event = fetcher.get_event_at(pvname, dt)
-                except ValueError:
-                    ...
-                else:
-                    self.pv_to_appliance[pvname] = fetcher
-                    return event
-            # raise ValueError(f"{pvname!r} not available in archiver(s)")
-            return aa.data.ArchiveEvent(
-                pv=pvname,
-                value=None,
-                timestamp=dt.timestamp(),
-                severity=3,
-                enum_options={},
-            )
+    ) -> ArchivedValue:
+        appliance = self.pv_to_appliance.get(pvname, None)
+        if appliance is not None:
+            return appliance.get_event_at(pvname, dt)
 
-        fetcher = self.pv_to_appliance[pvname]
-        return fetcher.get_event_at(pvname, dt)
+        for appliance in self.appliances:
+            try:
+                event = appliance.get_snapshot(pvname, at=dt)
+            except ValueError:
+                ...
+            else:
+                if not event:
+                    # Empty event indicates there are no results
+                    continue
+                self.pv_to_appliance[pvname] = appliance
+                return ArchivedValue.from_archapp(**event)
+        # raise ValueError(f"{pvname!r} not available in archiver(s)")
+        return ArchivedValue.from_missing_data(
+            pvname=pvname,
+            timestamp=dt,
+        )
 
     @staticmethod
     def instance() -> ArchiverHelper:
@@ -67,23 +92,22 @@ class ArchiverHelper:
             ArchiverHelper._instance_ = ArchiverHelper()
         return ArchiverHelper._instance_
 
-    def add_fetcher(self, fetcher: aa.fetcher.Fetcher):
-        self.appliances.append(fetcher)
-
     def add_appliance(
-        self, host: str, port: int, method: str = "pb"
-    ) -> aa.fetcher.Fetcher:
-        if method == "pb":
-            fetcher = aa.pb.PbFetcher(host, port)
-        elif method == "pb_file":
-            fetcher = aa.pb.PbFileFetcher(host, port)
-        elif method == "json":
-            fetcher = aa.json.JsonFetcher(host, port)
-        else:
-            raise ValueError(f"Unknown aapy fetcher method {method!r}")
-
-        self.add_fetcher(fetcher)
-        return fetcher
+        self,
+        host: str,
+        data_port: int = 17668,
+        management_port: int = 17665
+    ) -> archapp.EpicsArchive:
+        """
+        Add an archiver appliance to check.  Multiple may be added and will be
+        checked in the order of addition.
+        """
+        archiver = archapp.EpicsArchive(
+            hostname=host,
+            data_port=data_port,
+            mgmt_port=management_port,
+        )
+        self.appliances.append(archiver)
 
 
 class ArchiverDevice:
@@ -337,8 +361,8 @@ class ArchiverPV(PyepicsPvCompatibility):
             timestamp=data.timestamp,
             severity=data.severity,
         )
-        if data.enum_options:
-            self._args["enum_strs"] = list(data.enum_options.values())
+        if data.enum_strs:
+            self._args["enum_strs"] = list(data.enum_strs)
         return self._args.copy()
 
 
@@ -356,11 +380,11 @@ def test():
 
     at1l0.time_slip(datetime.datetime.now())
 
-    # import PyQt5  # noqa
-    # import typhos  # noqa
+    import PyQt5  # noqa
+    import typhos  # noqa
 
     # app = PyQt5.QtWidgets.QApplication([])
-    # display = typhos.suite.TyphosDeviceDisplay.from_device(at1k4)
+    # display = typhos.suite.TyphosDeviceDisplay.from_device(at1l0)
     # display.show()
     # app.exec_()
 
