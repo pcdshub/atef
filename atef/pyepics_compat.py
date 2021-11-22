@@ -44,8 +44,8 @@ class PyepicsPvCompatibility:
     _referrer: EpicsSignalBase
     _user_max_count: Optional[int]
     access_callbacks: List[PyepicsAccessCallback]
-    auto_monitor: Optional[Union[int, bool]]
     as_string: bool
+    auto_monitor: Optional[Union[int, bool]]
     callbacks: Dict[int, Tuple[PyepicsMonitorCallback, dict]]
     connected: bool
     connection_callbacks: List[PyepicsConnectionCallback]
@@ -81,6 +81,11 @@ class PyepicsPvCompatibility:
         'value',
         'write_access',
     )
+
+    # PyepicsPvCompatibility-specific:
+    # `_make_connection` below will be in the main thread if False,
+    # in the "metadata" dispatcher thread if True.
+    _connect_in_thread: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -149,10 +154,13 @@ class PyepicsPvCompatibility:
                 wrap_callback(self._dispatcher, "metadata", access_callback)
             )
 
-        wrap_callback(self._dispatcher, "metadata", self._make_connection)()
+        if self._connect_in_thread:
+            wrap_callback(self._dispatcher, "metadata", self._make_connection)()
+        else:
+            self._make_connection()
 
-    def _mark_as_connected(self, connected: bool = True):
-        self.connected = True
+    def _change_connection_status(self, connected: bool):
+        self.connected = connected
         for cb in self.connection_callbacks:
             cb(pvname=self.pvname, conn=self.connected, pv=self)
 
@@ -161,7 +169,7 @@ class PyepicsPvCompatibility:
 
     def _make_connection(self):
         # Subclass should reimplement me
-        self._mark_as_connected()
+        self._change_connection_status(connected=True)
 
     def run_callbacks(self):
         for index in sorted(list(self.callbacks)):

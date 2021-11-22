@@ -7,15 +7,17 @@ import datetime
 import inspect
 import logging
 import threading
+import time
 from types import SimpleNamespace
-from typing import (Any, ClassVar, Deque, Dict, Generator, Iterable, List,
-                    Optional, Tuple, Type)
+from typing import (Any, Callable, ClassVar, Deque, Dict, Generator, Iterable,
+                    List, Optional, Tuple, Type)
 
 import archapp
 import ophyd
 from ophyd import Component as Cpt
 from ophyd import Device
 from ophyd import DynamicDeviceComponent as DDCpt
+from ophyd._dispatch import wrap_callback as _wrap_callback
 from ophyd.signal import EpicsSignalBase
 
 from .pyepics_compat import PyepicsConnectionCallback, PyepicsPvCompatibility
@@ -24,6 +26,16 @@ logger = logging.getLogger(__name__)
 
 
 PER_PV_CACHE = 100
+
+
+def get_dispatcher():
+    """Get the ophyd-configured dispatcher (pyepics_shim, etc.)."""
+    return ophyd.get_cl().get_dispatcher()
+
+
+def wrap_callback(event_type: str, callback: Callable):
+    """Wrap a callback to have it run in a specific ophyd dispatcher thread."""
+    return _wrap_callback(get_dispatcher(), event_type, callback)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -46,7 +58,7 @@ class ArchivedValue:
         nanos: int = 0,
         secs: int = 0,
         **data,
-    ):
+    ) -> ArchivedValue:
         timestamp = datetime.datetime.fromtimestamp(secs + 1e-9 * nanos)
         kwargs = {
             kw: data[kw]
@@ -64,7 +76,9 @@ class ArchivedValue:
         )
 
     @classmethod
-    def from_missing_data(cls, pvname: str, timestamp: datetime.datetime):
+    def from_missing_data(
+        cls, pvname: str, timestamp: datetime.datetime
+    ) -> ArchivedValue:
         return ArchivedValue(
             pvname=pvname,
             value=None,
@@ -123,15 +137,24 @@ class ArchivedValueStore:
         return result
 
 
+ArchiverCallback = Callable[[ArchivedValue], None]
+
+
 class ArchiverHelper:
     _instance_: ClassVar[ArchiverHelper]
     appliances: List[archapp.EpicsArchive]
     cache: Dict[str, ArchivedValueStore]
+    search_loop_rate: ClassVar[float] = 0.2
+    _pv_to_callbacks: Dict[datetime.datetime, Dict[str, List[ArchiverCallback]]]
 
     def __init__(self):
         self.appliances = []
         self.add_appliance("localhost")
         self.cache = {}
+        self._callback_lock = threading.Lock()
+        self._pv_to_callbacks = {}
+        self.thread = threading.Thread(target=self._search_thread_loop, daemon=True)
+        self.thread.start()
 
     def match_pvs_to_appliance(
         self,
@@ -278,6 +301,67 @@ class ArchiverHelper:
         archive_data : ArchivedValue
         """
         return self.get_pvs_at_time(pvname, dt=dt)[pvname]
+
+    def _search_thread_loop(self):
+        """
+        Thread which searches for new PVs in bulk.
+        """
+        while True:
+            time.sleep(self.search_loop_rate)
+            if not self._pv_to_callbacks:
+                continue
+
+            with self._callback_lock:
+                to_update = copy.deepcopy(self._pv_to_callbacks)
+                self._pv_to_callbacks.clear()
+
+            for dt, pv_to_callback in to_update.items():
+                try:
+                    data_by_pv = self.get_pvs_at_time(*pv_to_callback, dt=dt)
+                except Exception:
+                    logger.exception(
+                        "Fatal error when retrieving PVs from archiver; "
+                        "associated devices may not work. PVs: %s",
+                        list(pv_to_callback)
+                    )
+                    continue
+                for pvname, data in data_by_pv.items():
+                    for callback in pv_to_callback[pvname]:
+                        try:
+                            callback(data)
+                        except Exception:
+                            logger.exception(
+                                "Failed to run callback %s for PV %s with data %s",
+                                callback,
+                                pvname,
+                                data,
+                            )
+
+    def queue_pv(
+        self,
+        pvname: str,
+        dt: datetime.datetime,
+        callback: ArchiverCallback,
+        event_type: str = "metadata",
+    ):
+        """
+        Search for pvname in the background search thread.
+        """
+        # ophyd ensures the callback won't be wrapped twice - just in case
+        callback = wrap_callback(event_type, callback)
+        try:
+            cached_value = self.cache[pvname].by_timestamp[dt]
+        except KeyError:
+            ...
+        else:
+            # Queue the callback to be run in the appropriate thread
+            callback(cached_value)
+            return
+
+        with self._callback_lock:
+            if dt not in self._pv_to_callbacks:
+                self._pv_to_callbacks[dt] = {}
+            self._pv_to_callbacks[dt].setdefault(pvname, []).append(callback)
 
     @staticmethod
     def instance() -> ArchiverHelper:
@@ -528,11 +612,34 @@ class ArchiverPV(PyepicsPvCompatibility):
     whereas normally :class:`epics.PV` can be shared.
     """
 
+    # `_make_connection` below will be in the main thread
+    _connect_in_thread: ClassVar[bool] = False
+
     archive_timestamp: datetime.datetime = datetime.datetime.now()
 
     def _make_connection(self):
-        _ = self.get_with_metadata()
-        super()._mark_as_connected()
+        """PyepicsPvCompatibility hook at startup."""
+        helper = ArchiverHelper.instance()
+        helper.queue_pv(
+            pvname=self.pvname,
+            dt=self._referrer_timestamp,
+            callback=self._archiver_initial_data,
+        )
+
+    def _archiver_initial_data(self, data: ArchivedValue):
+        # found_in_archiver = data.appliance is not None
+        self._update_state_from_archiver(data)
+        self._change_connection_status(connected=True)
+
+    @property
+    def _referrer_timestamp(self) -> datetime.datetime:
+        try:
+            return self._referrer.root.archive_timestamp
+        except AttributeError:
+            try:
+                return self._referrer.parent.archive_timestamp
+            except AttributeError:
+                return self.archive_timestamp
 
     def put(
         self,
@@ -558,11 +665,9 @@ class ArchiverPV(PyepicsPvCompatibility):
             callback_data=callback_data,
         )
 
-    def get_with_metadata(self, as_string=None, **kwargs):
-        as_string = as_string if as_string is not None else self.as_string
-        helper = ArchiverHelper.instance()
-        data = helper.get_pv_at_time(self.pvname, self.archive_timestamp)
+    def _update_state_from_archiver(self, data: ArchivedValue, as_string=None):
         if data.value is None:
+            as_string = as_string if as_string is not None else self.as_string
             value = "" if as_string else 0.0
             # self.connected = False
         else:
@@ -574,7 +679,15 @@ class ArchiverPV(PyepicsPvCompatibility):
         )
         if data.enum_strs:
             self._args["enum_strs"] = list(data.enum_strs)
-        return self._args.copy()
+
+        self.run_callbacks()
+        return self._args
+
+    def get_with_metadata(self, as_string=None, **kwargs):
+        as_string = as_string if as_string is not None else self.as_string
+        helper = ArchiverHelper.instance()
+        data = helper.get_pv_at_time(self.pvname, self.archive_timestamp)
+        return self._update_state_from_archiver(data, as_string=as_string).copy()
 
 
 _archived_device_cache = {}
