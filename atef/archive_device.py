@@ -730,27 +730,3 @@ class ArchiverPV(PyepicsPvCompatibility):
 
 
 _archived_device_cache = {}
-
-
-def test():
-    global at1l0
-    global display
-    import pcdsdevices.attenuator  # noqa
-
-    at1l0 = make_archived_device(pcdsdevices.attenuator.FeeAtt)(
-        prefix="SATT:FEE1:320", name="at1l0"
-    )
-
-    at1l0.time_slip(datetime.datetime.now())
-
-    # import PyQt5  # noqa
-    # import typhos  # noqa
-
-    # app = PyQt5.QtWidgets.QApplication([])
-    # display = typhos.suite.TyphosDeviceDisplay.from_device(at1l0)
-    # display.show()
-    # app.exec_()
-
-
-if __name__ == "__main__":
-    test()
