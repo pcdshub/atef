@@ -6,6 +6,7 @@ import dataclasses
 import datetime
 import inspect
 import logging
+import math
 import threading
 import time
 from types import SimpleNamespace
@@ -46,7 +47,9 @@ class ArchivedValue:
     timestamp: datetime.datetime
     status: int
     severity: int
-    appliance: Optional[archapp.EpicsArchive] = None
+    appliance: Optional[archapp.EpicsArchive] = dataclasses.field(
+        default=None, repr=False
+    )
     enum_strs: Optional[Tuple[str, ...]] = None
 
     @classmethod
@@ -74,6 +77,24 @@ class ArchivedValue:
             value=val,
             timestamp=timestamp,
             **kwargs
+        )
+
+    def to_archapp(self) -> Dict[str, Any]:
+        """
+        Testing helper to convert an ArchivedValue back into what the appliance
+        API would respond with.
+        """
+        timestamp = self.timestamp.timestamp()
+        seconds = int(math.floor(timestamp))
+        nanoseconds = int((timestamp - seconds) * 1e9)
+        return dict(
+            # pvname=self.pvname,
+            val=self.value,
+            secs=seconds,
+            nanos=nanoseconds,
+            status=self.status,
+            severity=self.severity,
+            enum_strs=self.enum_strs,
         )
 
     @classmethod
