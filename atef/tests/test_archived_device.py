@@ -78,3 +78,5 @@ def test_at1l0():
         print(f"AT1L0 is: {at1l0}")
         for attr, value in at1l0.time_slip(datetime.datetime.now()).items():
             print(f"{attr} = {value}")
+
+        print("Get", at1l0.get())

@@ -654,12 +654,19 @@ class ArchiverPV(PyepicsPvCompatibility):
         )
 
     def _archiver_initial_data(self, data: ArchivedValue):
+        """ArchiverHelper.queue_pv callback."""
         # found_in_archiver = data.appliance is not None
         self._update_state_from_archiver(data)
         self._change_connection_status(connected=True)
 
     @property
     def _referrer_timestamp(self) -> datetime.datetime:
+        """
+        Timestamp from the referrer in the following order of precedence:
+        1. Timestamp from the _root_ device in the signal's device hierarchy.
+        2. The immediate parent device's timestamp.
+        3. This PV instance's timestamp (final fallback; should not be hit)
+        """
         try:
             return self._referrer.root.archive_timestamp
         except AttributeError:
@@ -677,6 +684,7 @@ class ArchiverPV(PyepicsPvCompatibility):
         callback: Optional[PyepicsPutCallback] = None,
         callback_data: Optional[Any] = None,
     ):
+        """Stub for pv.put. Callback will be run, but no change will be made."""
         logger.warning(
             "This is archived mode; no puts are allowed. "
             "Attempted to change %r to %r",
@@ -692,7 +700,10 @@ class ArchiverPV(PyepicsPvCompatibility):
             callback_data=callback_data,
         )
 
-    def _update_state_from_archiver(self, data: ArchivedValue, as_string=None):
+    def _update_state_from_archiver(
+        self, data: ArchivedValue, as_string=None
+    ) -> Dict[str, Any]:
+        """Update _args and run callbacks based on the ArchivedValue."""
         if data.value is None:
             as_string = as_string if as_string is not None else self.as_string
             value = "" if as_string else 0.0
@@ -710,10 +721,11 @@ class ArchiverPV(PyepicsPvCompatibility):
         self.run_callbacks()
         return self._args
 
-    def get_with_metadata(self, as_string=None, **kwargs):
+    def get_with_metadata(self, as_string=None, **kwargs) -> Dict[str, Any]:
+        """Query the ArchiverHelper to get the value at the referrer's timestamp."""
         as_string = as_string if as_string is not None else self.as_string
         helper = ArchiverHelper.instance()
-        data = helper.get_pv_at_time(self.pvname, self.archive_timestamp)
+        data = helper.get_pv_at_time(self.pvname, self._referrer_timestamp)
         return self._update_state_from_archiver(data, as_string=as_string).copy()
 
 
