@@ -20,7 +20,8 @@ from ophyd import DynamicDeviceComponent as DDCpt
 from ophyd._dispatch import wrap_callback as _wrap_callback
 from ophyd.signal import EpicsSignalBase
 
-from .pyepics_compat import PyepicsConnectionCallback, PyepicsPvCompatibility
+from .pyepics_compat import (PyepicsConnectionCallback, PyepicsPutCallback,
+                             PyepicsPvCompatibility)
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,11 @@ class ArchivedValueStore:
 
 
 ArchiverCallback = Callable[[ArchivedValue], None]
+MatchPVsResult = Tuple[
+    Dict[str, ArchivedValue],
+    Dict[archapp.EpicsArchive, List[str]],
+    List[str]
+]
 
 
 class ArchiverHelper:
@@ -160,7 +166,7 @@ class ArchiverHelper:
         self,
         *pvnames: str,
         dt: datetime.datetime
-    ) -> Tuple[Dict[str, ArchivedValue], Dict[archapp.EpicsArchive, List[str]], List[str]]:
+    ) -> MatchPVsResult:
         """
         Match PVs to the Archiver Appliance that holds their data.
 
@@ -643,12 +649,12 @@ class ArchiverPV(PyepicsPvCompatibility):
 
     def put(
         self,
-        value,
-        wait=False,
-        timeout=30.0,
-        use_complete=False,
-        callback=None,
-        callback_data=None,
+        value: Any,
+        wait: bool = False,
+        timeout: float = 30.0,
+        use_complete: bool = False,
+        callback: Optional[PyepicsPutCallback] = None,
+        callback_data: Optional[Any] = None,
     ):
         logger.warning(
             "This is archived mode; no puts are allowed. "

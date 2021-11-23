@@ -8,6 +8,19 @@ from ophyd.signal import EpicsSignalBase
 from typing_extensions import Protocol
 
 
+class PyepicsPutCallbackData(Protocol):
+    def __call__(self, data: Any) -> NoReturn:
+        ...
+
+
+class PyepicsPutCallbackKwargs(Protocol):
+    def __call__(self, **kwargs) -> NoReturn:
+        ...
+
+
+PyepicsPutCallback = Union[PyepicsPutCallbackData, PyepicsPutCallbackKwargs]
+
+
 class PyepicsMonitorCallback(Protocol):
     def __call__(self, value: Any, timestamp: Any, **kwargs) -> NoReturn:
         ...
@@ -232,19 +245,21 @@ class PyepicsPvCompatibility:
 
     def put(
         self,
-        value,
-        wait=False,
-        timeout=30.0,
-        use_complete=False,
-        callback=None,
-        callback_data=None,
+        value: Any,
+        wait: bool = False,
+        timeout: float = 30.0,
+        use_complete: bool = False,
+        callback: Optional[PyepicsPutCallback] = None,
+        callback_data: Optional[Any] = None,
     ):
-        if callback:
-            callback = wrap_callback(self._dispatcher, "get_put", callback)
-            if isinstance(callback_data, dict):
-                callback(**callback_data)
-            else:
-                callback(data=callback_data)
+        if not callback:
+            return
+
+        callback = wrap_callback(self._dispatcher, "get_put", callback)
+        if isinstance(callback_data, dict):
+            callback(**callback_data)
+        else:
+            callback(data=callback_data)
 
     def get_ctrlvars(self, **kwargs):
         return self._args.copy()
