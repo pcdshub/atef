@@ -5,7 +5,11 @@ from typing import (Any, ClassVar, Dict, List, Literal, NoReturn, Optional,
 
 from ophyd._dispatch import EventDispatcher, wrap_callback
 from ophyd.signal import EpicsSignalBase
-from typing_extensions import Protocol
+
+try:
+    from typing import Protocol  # Python 3.8+
+except ImportError:
+    from typing_extensions import Protocol
 
 
 class PyepicsPutCallbackData(Protocol):

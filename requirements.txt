@@ -3,3 +3,4 @@ ophyd
 numpy
 ipython
 archapp
+typing-extensions
