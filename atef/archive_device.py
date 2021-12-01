@@ -19,6 +19,7 @@ from ophyd import Component as Cpt
 from ophyd import Device
 from ophyd import DynamicDeviceComponent as DDCpt
 from ophyd._dispatch import wrap_callback as _wrap_callback
+from ophyd.ophydobj import OphydObject
 from ophyd.signal import EpicsSignalBase
 
 from .pyepics_compat import (PyepicsConnectionCallback, PyepicsPutCallback,
@@ -553,7 +554,7 @@ def make_archived_device(cls: Type[Device]) -> Type[ArchiverDevice]:
 def switch_control_layer(
     cls: Type[Device],
     control_layer: SimpleNamespace,
-    component_classes: Iterable[Type[Device]],
+    component_classes: Iterable[Type[OphydObject]],
     *,
     cache: Dict[Type[Device], Type[Device]],
     class_prefix: str = "",
@@ -567,6 +568,26 @@ def switch_control_layer(
     cls : type[Device]
         A real Device class to inspect and create an archived Device class
         from.
+
+    control_layer : SimpleNamespace
+        The control layer instance, with attributes such as ``get_pv`` and
+        ``setup``.
+
+    component_classes : iterable of OphydObject subclasses
+        Adjust the control layer of components that are subclasses of these.
+        That is, if ``EpicsSignalBase`` is specified as an option,
+        any components with a ``cls`` of ``EpicsSignal`` or ``EpicsSignalRO``
+        would be included.
+
+    cache : dict
+        Required dictionary of "actual device" to "modified device". Should be
+        consistent between calls to this function.
+
+    class_prefix : str, optional
+        The prefix to prepend to the newly created Device class.
+
+    new_bases : list of classes, optinoal
+        Base classes to use when creating the new class.
 
     Returns
     -------
