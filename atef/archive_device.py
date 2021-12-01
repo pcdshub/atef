@@ -586,12 +586,6 @@ def switch_control_layer(
     # Update all the components recursively
     for cpt_name in cls.component_names:
         cpt = getattr(cls, cpt_name)
-        if "cl" in cpt.kwargs or (
-            inspect.isclass(cpt.cls) and issubclass(cpt.cls, component_classes)
-        ):
-            cpt.kwargs["cl"] = control_layer
-            logger.debug("Control layer set on %s.%s", cls.__name__, cpt_name)
-
         if not isinstance(cpt, DDCpt):
             replacement_cpt = copy.copy(cpt)
         else:
@@ -607,6 +601,12 @@ def switch_control_layer(
                 doc=cpt.doc,
                 **cpt.kwargs,
             )
+
+        if "cl" in cpt.kwargs or (
+            inspect.isclass(cpt.cls) and issubclass(cpt.cls, component_classes)
+        ):
+            replacement_cpt.kwargs["cl"] = control_layer
+            logger.debug("Control layer set on %s.%s", cls.__name__, cpt_name)
 
         replacement_cpt.cls = switch_control_layer(
             cls=replacement_cpt.cls,
