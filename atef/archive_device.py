@@ -704,12 +704,19 @@ class ArchiverPV(PyepicsPvCompatibility):
         self, data: ArchivedValue, as_string=None
     ) -> Dict[str, Any]:
         """Update _args and run callbacks based on the ArchivedValue."""
+        as_string = as_string if as_string is not None else self.as_string
         if data.value is None:
-            as_string = as_string if as_string is not None else self.as_string
+            # Archiver has no data for this PV. What should we do?
+            # Guess as to whether or not it's a string and use a default
+            # value:
             value = "" if as_string else 0.0
+            # Alternatively, we could consider setting the device as
+            # disconnected, but this may annoyingly break devices more often
+            # than not:
             # self.connected = False
         else:
-            value = data.value
+            value = str(data.value) if as_string else data.value
+
         self._args.update(
             value=value,
             timestamp=data.timestamp.timestamp(),
