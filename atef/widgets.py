@@ -21,6 +21,34 @@ from .procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
 T = TypeVar("T")
 
 
+DEFAULT_STYLESHEET = """
+    QLabel#step_title {
+        font-weight: bold;
+    }
+
+    QLabel#step_description {
+        font-weight: normal;
+    }
+
+    QLabel#group_title {
+        font-weight: bold;
+    }
+
+    QLabel#group_description {
+        font-weight: normal;
+    }
+
+    QFrame#group_step_frame {
+        border-radius: 2px;
+        border-left: 2px solid darkgray;
+    }
+
+    #typhos_display {
+        border: 2px dotted black;
+    }
+"""
+
+
 def _create_vbox_layout(
     widget: Optional[QtWidgets.QWidget] = None, alignment: Qt.Alignment = Qt.AlignTop
 ) -> QtWidgets.QVBoxLayout:
@@ -32,7 +60,7 @@ def _create_vbox_layout(
     return layout
 
 
-class StepWidgetBase:
+class StepWidgetBase(QtWidgets.QWidget):
     def __init__(
         self,
         title: Optional[str] = None,
@@ -79,6 +107,7 @@ def _add_label(
 ) -> Optional[QtWidgets.QLabel]:
     """Create a QLabel with the given text and object name."""
     label = QtWidgets.QLabel(text)
+    label.setOpenExternalLinks(True)
     layout.addWidget(label)
     if object_name:
         label.setObjectName(object_name)
@@ -193,7 +222,7 @@ class ProcedureGroupWidget(StepWidgetBase, QtWidgets.QFrame):
     def _setup_ui(self, steps: Sequence[Union[ProcedureStep, ProcedureGroup]]):
         self._steps = list(steps)
         self._step_widgets = list(
-            _settings_to_widget_class[type(step)].from_settings(step)
+            procedure_step_to_widget(step)
             for step in self._steps
         )
 
@@ -256,97 +285,42 @@ class AtefProcedure(QtWidgets.QFrame):
         self._scroll_layout.addWidget(widget)
 
 
+def procedure_step_to_widget(step: ProcedureStep) -> StepWidgetBase:
+    """
+    Create a widget given the procedure step settings.
+
+    Parameters
+    ----------
+    step : ProcedureStep
+
+    Returns
+    -------
+    widget : StepWidgetBase
+    """
+    cls = type(step)
+    widget_cls = _settings_to_widget_class[cls]
+    return widget_cls.from_settings(step)
+
+
 if __name__ == "__main__":
-    group = ProcedureGroup(
-        title="Top-level procedure",
-        description="Procedure notes",
-        steps=[
-            DescriptionStep(
-                title="Introduction",
-                description=(
-                    "Introductory <strong>text</strong> can contain HTML "
-                    "<ol>"
-                    "<li>ListItem 1</li>"
-                    "<li>ListItem 2</li>"
-                    "<li>ListItem 3</li>"
-                    "</ol>"
-                ),
-            ),
-            TyphosDisplayStep(
-                title="Display 1",
-                description="Configure device before beginning",
-                devices={
-                    "at1k4": DisplayOptions(),
-                }
-            ),
-            PydmDisplayStep(
-                title="Display 2",
-                description="PyDM display",
-                display=pathlib.Path("pydm.ui"),
-                options=DisplayOptions(),
-            ),
-            ProcedureGroup(
-                title="Embedded group procedure",
-                description="Group procedure notes",
-                steps=[
-                    DescriptionStep(
-                        title="Introduction",
-                        description=(
-                            "Introductory <strong>text</strong> can contain HTML "
-                            "<ol>"
-                            "<li>ListItem 4</li>"
-                            "<li>ListItem 5</li>"
-                            "<li>ListItem 6</li>"
-                            "</ol>"
-                        ),
-                    ),
-                ]
-            ),
-        ]
+    step = DescriptionStep(
+        title="Introduction",
+        description=(
+            "Introductory <strong>text</strong> can contain HTML "
+            "<ol>"
+            "<li>ListItem 1</li>"
+            "<li>ListItem 2</li>"
+            "<li>ListItem 3</li>"
+            "<li><a target=_blank href=https://google.com>Link here!</a></li>"
+            "</ol>"
+        ),
     )
-    print(group)
-
-    import apischema
-    import yaml
-    serialized = apischema.serialize(group)
-    print(serialized)
-    print(apischema.deserialize(ProcedureGroup, serialized))
-    print(yaml.dump(serialized))
-
     app = QtWidgets.QApplication(sys.argv)
-    app.setStyleSheet(
-        """
-        QLabel#step_title {
-            font-weight: bold;
-        }
+    app.setStyleSheet(DEFAULT_STYLESHEET)
 
-        QLabel#step_description {
-            font-weight: normal;
-        }
-
-        QLabel#group_title {
-            font-weight: bold;
-        }
-
-        QLabel#group_description {
-            font-weight: normal;
-        }
-
-        QFrame#group_step_frame {
-            border-radius: 2px;
-            border-left: 2px solid darkgray;
-        }
-
-        #typhos_display {
-            border: 2px dotted black;
-        }
-        """
-    )
-
-    # window = DescriptionStepWidget.from_settings(group.steps[0])
-    group = ProcedureGroupWidget.from_settings(group)
-    group._expandable_frame.toggle_button.setChecked(True)
+    # group._expandable_frame.toggle_button.setChecked(True)
+    widget = procedure_step_to_widget(step)
     procedure = AtefProcedure()
-    procedure.add_widget(group)
+    procedure.add_widget(widget)
     procedure.show()
     sys.exit(app.exec_())
