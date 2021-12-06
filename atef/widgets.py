@@ -1,85 +1,24 @@
 from __future__ import annotations
 
-import dataclasses
-import datetime
 import pathlib
 import sys
-from dataclasses import field
-from typing import (Any, Dict, Generator, List, Optional, Sequence, Type,
-                    TypeVar, Union)
+from typing import (Dict, Generator, List, Optional, Sequence, Type, TypeVar,
+                    Union)
 
 import pydm
 import pydm.display
 import typhos
 import typhos.cli
 import typhos.display
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
-from .utils import as_tagged_union
+from .procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
+                        ProcedureStep, PydmDisplayStep, TyphosDisplayStep)
+
+# TODO:  CodeStep, PlanStep, ConfigurationCheckStep,
 
 T = TypeVar("T")
-
-
-@as_tagged_union
-@dataclasses.dataclass
-class ProcedureStep:
-    title: Optional[str]
-    description: str
-
-
-@dataclasses.dataclass
-class DescriptionStep(ProcedureStep):
-    ...
-
-
-@dataclasses.dataclass
-class CodeStep(ProcedureStep):
-    source_code: str
-    arguments: Dict[Any, Any]
-
-
-@dataclasses.dataclass
-class PlanStep(ProcedureStep):
-    plan: str
-    arguments: Dict[Any, Any]
-    fixed_arguments: Optional[Sequence[str]]
-
-
-@dataclasses.dataclass
-class DisplayOptions:
-    macros: Dict[str, str] = field(default_factory=dict)
-    template: str = "embedded_screen"
-    embed: bool = True
-
-
-@dataclasses.dataclass
-class DeviceConfiguration:
-    archiver_timestamp: Optional[datetime.datetime]
-    values: Dict[str, Any]
-
-
-@dataclasses.dataclass
-class ConfigurationCheckStep(ProcedureStep):
-    devices: Dict[str, DeviceConfiguration]
-
-
-@dataclasses.dataclass
-class TyphosDisplayStep(ProcedureStep):
-    devices: Dict[str, DisplayOptions]
-
-
-@dataclasses.dataclass
-class PydmDisplayStep(ProcedureStep):
-    display: pathlib.Path
-    options: DisplayOptions
-
-
-@dataclasses.dataclass
-class ProcedureGroup:
-    title: Optional[str]
-    description: str
-    steps: Sequence[Union[ProcedureStep, ProcedureGroup]]
 
 
 def _create_vbox_layout(
