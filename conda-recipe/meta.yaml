@@ -1,36 +1,45 @@
-
 {% set data = load_setup_py_data() %}
 
-
 package:
-    name    : atef
-
-    version : {{ data.get('version') }}
-
+  name: atef
+  version: {{ data.get('version') }}
 
 source:
-    path: ..
+  path: ..
 
 build:
-    number: 1
-    noarch: python
+  noarch: python
+  number: 0
+  script: "{{ PYTHON }} -m pip install . -vv"
 
 requirements:
-    build:
-      - python >=3.6
-      - setuptools
-
-    run:
-      - python >=3.6
+  build:
+    - python >=3.7
+    - pip
+  run:
+    - python >=3.7
+    - archapp
+    - bluesky
+    - ipython
+    - numpy
+    - ophyd
+    - typing-extensions  # [py<38]
 
 test:
     imports:
       - atef
-
     requires:
       - pytest
 
 about:
   home: https://github.com/pcdshub/atef
-  license: SLAC Open License
-  summary: Python Automated Test Execution Framework
+  license: LicenseRef-BSD-3-Clause-SLAC
+  summary: "Python Automated Test Execution Framework"
+  doc_url: https://pcdshub.github.io/atef/
+  dev_url: https://github.com/pcdshub/atef
+
+extra:
+  recipe-maintainers:
+    - klauer
+    - zllentz
+    - zrylettc

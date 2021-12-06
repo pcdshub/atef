@@ -2,3 +2,5 @@ bluesky
 ophyd
 numpy
 ipython
+archapp
+typing-extensions
