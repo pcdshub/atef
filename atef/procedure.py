@@ -6,11 +6,11 @@ import pathlib
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Sequence, Union
 
-from . import utils
+from . import serialization
 
 
 @dataclasses.dataclass
-@utils.as_tagged_union
+@serialization.as_tagged_union
 class ProcedureStep:
     """
     A basic step in an atef procedure.

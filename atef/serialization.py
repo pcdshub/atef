@@ -1,3 +1,8 @@
+"""
+Serialization helpers for apischema.
+"""
+# Largely based on issue discussions regarding tagged unions.
+
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 from types import new_class
