@@ -12,13 +12,15 @@ import pydm.display
 import typhos
 import typhos.cli
 import typhos.display
+from bluesky_widgets.qt.run_engine_client import QtRePlanEditor
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
-from .procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
-                        ProcedureStep, PydmDisplayStep, TyphosDisplayStep)
+from .procedure import (DescriptionStep, DisplayOptions, PlanOptions, PlanStep,
+                        ProcedureGroup, ProcedureStep, PydmDisplayStep,
+                        TyphosDisplayStep)
 
-# TODO:  CodeStep, PlanStep, ConfigurationCheckStep,
+# TODO:  CodeStep, ConfigurationCheckStep,
 
 T = TypeVar("T")
 
@@ -199,6 +201,19 @@ class PydmDisplayStepWidget(StepWidgetBase, QtWidgets.QFrame):
             self.toggle_button.toggled.connect(show_display)
 
 
+class PlanStepWidget(StepWidgetBase, QtWidgets.QFrame):
+    """A procedure step which allows one or more bluesky plans to be run."""
+
+    def _setup_ui(self, plans: Sequence[PlanOptions]):
+        layout = _create_vbox_layout(self)
+        self.title_widget = _add_label(layout, self.title, object_name="step_title")
+        self.description_widget = _add_label(
+            layout, self.description, object_name="step_description"
+        )
+        editor = QtRePlanEditor(model={})
+        layout.addWidget(editor)
+
+
 class TyphosDisplayStepWidget(StepWidgetBase, QtWidgets.QFrame):
     """A procedure step which opens one or more typhos displays."""
 
@@ -330,7 +345,7 @@ class ProcedureGroupWidget(StepWidgetBase, QtWidgets.QFrame):
                     title=step.title,
                     description=(
                         f"atef error: failed to load step {step.title!r} "
-                        f"({type(step).__name__}) due to:\n"
+                        f"({type(step).__name__}) due to:<br/>\n"
                         f"<strong>{ex.__class__.__name__}</strong>: {ex}"
                     )
                 )
@@ -367,9 +382,10 @@ class ProcedureGroupWidget(StepWidgetBase, QtWidgets.QFrame):
 
 _settings_to_widget_class = {
     DescriptionStep: DescriptionStepWidget,
+    PlanStep: PlanStepWidget,
+    ProcedureGroup: ProcedureGroupWidget,
     PydmDisplayStep: PydmDisplayStepWidget,
     TyphosDisplayStep: TyphosDisplayStepWidget,
-    ProcedureGroup: ProcedureGroupWidget,
 }
 
 

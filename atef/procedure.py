@@ -52,7 +52,7 @@ class PlanOptions:
 @dataclass
 class PlanStep(ProcedureStep):
     """A procedure step comprised of one or more bluesky plans."""
-    plan: Sequence[PlanOptions]
+    plans: Sequence[PlanOptions]
 
 
 @dataclass

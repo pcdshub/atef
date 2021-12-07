@@ -1,6 +1,8 @@
-bluesky
-ophyd
-numpy
-ipython
 archapp
+bluesky
+bluesky-queueserver
+bluesky-widgets
+ipython
+numpy
+ophyd
 typing-extensions
