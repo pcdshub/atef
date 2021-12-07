@@ -61,6 +61,10 @@ def _create_vbox_layout(
 
 
 class StepWidgetBase(QtWidgets.QWidget):
+    """
+    Base class for all procedure step widgets.
+    """
+
     def __init__(
         self,
         title: Optional[str] = None,
@@ -105,16 +109,37 @@ class StepWidgetBase(QtWidgets.QWidget):
 def _add_label(
     layout: QtWidgets.QLayout, text: Optional[str], object_name: Optional[str] = None
 ) -> Optional[QtWidgets.QLabel]:
-    """Create a QLabel with the given text and object name."""
+    """
+    Create a QLabel with the given text and object name in the given layout.
+
+    Configures the label to open external links.
+
+    Parameters
+    ----------
+    layout : `QtWidgets.QLayout`
+        The layout to add the label to.
+
+    text : str, optional
+        The initial text to set.
+
+    object_name : str, optional
+        The object name to set.
+
+    Returns
+    -------
+    `QtWidgets.QLabel`
+    """
+    text = text or ""
     label = QtWidgets.QLabel(text)
     label.setOpenExternalLinks(True)
     layout.addWidget(label)
-    if object_name:
-        label.setObjectName(object_name)
+    label.setObjectName(object_name or text.replace(" ", "_")[:20] or "label")
     return label
 
 
 class PydmDisplayStepWidget(StepWidgetBase, QtWidgets.QFrame):
+    """A procedure step which a opens or embeds a PyDM display."""
+
     def _setup_ui(self, display: pathlib.Path, options: DisplayOptions):
         layout = _create_vbox_layout(self)
         _add_label(layout, self.title, object_name="step_title")
@@ -131,6 +156,8 @@ class PydmDisplayStepWidget(StepWidgetBase, QtWidgets.QFrame):
 
 
 class TyphosDisplayStepWidget(StepWidgetBase, QtWidgets.QFrame):
+    """A procedure step which opens one or more typhos displays."""
+
     def _setup_ui(self, devices: Dict[str, DisplayOptions]):
         layout = _create_vbox_layout(self)
         _add_label(layout, self.title, object_name="step_title")
@@ -152,6 +179,8 @@ class TyphosDisplayStepWidget(StepWidgetBase, QtWidgets.QFrame):
 
 
 class DescriptionStepWidget(StepWidgetBase, QtWidgets.QFrame):
+    """A simple title or descriptive step in the procedure."""
+
     def _setup_ui(self):
         layout = _create_vbox_layout(self)
         _add_label(layout, self.title, object_name="step_title")
@@ -159,13 +188,27 @@ class DescriptionStepWidget(StepWidgetBase, QtWidgets.QFrame):
 
 
 class ExpandableFrame(QtWidgets.QFrame):
+    """
+    A `QtWidgets.QFrame` that can be toggled with a mouse clik.
+
+    Contains a QVBoxLayout layout which can have one or more user-provided
+    widgets.
+
+    Parameters
+    ----------
+    title : str
+        The title of the frame, shown on the toolbutton.
+
+    parent : QtWidgets.QWidget, optional
+        The parent widget.
+    """
+
     def __init__(self, title: str = "", parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
 
-        self._content_layout = None
-        self.toggle_button = QtWidgets.QToolButton(
-            text=title, checkable=True, checked=False
-        )
+        self.toggle_button = QtWidgets.QToolButton(text=title)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(False)
         self.toggle_button.setStyleSheet("QToolButton { border: none; }")
         self.toggle_button.setToolButtonStyle(
             QtCore.Qt.ToolButtonTextBesideIcon
@@ -180,6 +223,7 @@ class ExpandableFrame(QtWidgets.QFrame):
         self._size_hint = self.sizeHint()
 
     def add_widget(self, widget: QtWidgets.QWidget) -> None:
+        """Add a widget to the content layout."""
         self.layout().addWidget(widget)
         widget.setVisible(self.expanded)
 
@@ -190,6 +234,7 @@ class ExpandableFrame(QtWidgets.QFrame):
 
     @property
     def layout_widgets(self) -> Generator[QtWidgets.QWidget, None, None]:
+        """Find all user-provided widgets in the content layout."""
         for idx in range(self.layout().count()):
             item = self.layout().itemAt(idx)
             widget = item.widget()
@@ -198,6 +243,7 @@ class ExpandableFrame(QtWidgets.QFrame):
 
     @QtCore.Slot()
     def on_toggle(self):
+        """Toggle the content display."""
         expanded = self.expanded
         self.toggle_button.setArrowType(
             QtCore.Qt.DownArrow if expanded else QtCore.Qt.RightArrow
@@ -216,6 +262,8 @@ class ExpandableFrame(QtWidgets.QFrame):
 
 
 class ProcedureGroupWidget(StepWidgetBase, QtWidgets.QFrame):
+    """A group of procedure steps (or nested groups)."""
+
     _steps: List[Union[ProcedureStep, ProcedureGroup]]
     _step_widgets: List[Union[ProcedureGroupWidget, StepWidgetBase]]
 
@@ -261,6 +309,12 @@ _settings_to_widget_class = {
 
 
 class AtefProcedure(QtWidgets.QFrame):
+    """
+    Top-level ATEF procedure widget.
+
+    Contains a scroll area with one or more procedures embedded.
+    """
+
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
 
