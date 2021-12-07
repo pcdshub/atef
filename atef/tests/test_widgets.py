@@ -151,6 +151,7 @@ parametrized_groups = pytest.mark.parametrize(
 
 @parametrized_groups
 def test_serialization(group):
+    print("group is", group)
     serialized = apischema.serialize(group)
     print(serialized)
     print(apischema.deserialize(type(group), serialized))
