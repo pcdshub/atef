@@ -44,7 +44,9 @@ class PlanOptions:
     #: The plan name.
     plan: str
     #: Plan arguments dictionary - argument name to value.
-    arguments: Dict[Any, Any]
+    args: Sequence[Any]
+    #: Plan keyword  arguments dictionary - argument name to value.
+    kwargs: Dict[Any, Any]
     #: Arguments which should not be configurable.
     fixed_arguments: Optional[Sequence[str]]
 

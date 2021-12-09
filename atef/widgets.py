@@ -12,7 +12,6 @@ import pydm.display
 import typhos
 import typhos.cli
 import typhos.display
-from bluesky_widgets.qt.run_engine_client import QtRePlanEditor
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
@@ -210,7 +209,12 @@ class PlanStepWidget(StepWidgetBase, QtWidgets.QFrame):
         self.description_widget = _add_label(
             layout, self.description, object_name="step_description"
         )
-        editor = QtRePlanEditor(model={})
+        from .re_widgets import Model, QtRePlanEditor
+        model = Model()
+        model.run_engine.clear_connection_status()
+        model.run_engine.manager_connecting_ops()
+        # editor = QtRunEngineManager(model.run_engine)
+        editor = QtRePlanEditor(model.run_engine)
         layout.addWidget(editor)
 
 
