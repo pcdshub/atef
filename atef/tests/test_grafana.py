@@ -3,13 +3,14 @@ import json
 import apischema
 import pytest
 
-from ..grafana import AnyPanel, Dashboard
+from .. import grafana
+from . import conftest
 
 
 def test_basic():
-    print(
+    assert isinstance(
         apischema.deserialize(
-            AnyPanel,
+            grafana.AnyPanel,
             {
                 "collapsed": False,
                 "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
@@ -18,25 +19,27 @@ def test_basic():
                 "title": "LFE Vacuum",
                 "type": "row",
             },
-        )
+        ),
+        grafana.RowPanel
     )
 
-    print(
+    assert isinstance(
         apischema.deserialize(
-            AnyPanel,
+            grafana.AnyPanel,
             {
                 "type": "bargauge",
             },
-        )
+        ),
+        grafana.BarGaugePanel
     )
 
 
 @pytest.mark.parametrize(
     "dashboard_filename",
     [
-        "hxr_ebd_fee_checkout_helper.json",
+        conftest.TEST_PATH / "hxr_ebd_fee_checkout_helper.json",
     ]
 )
 def test_full_dashboard(dashboard_filename):
     json_doc = json.load(open(dashboard_filename))
-    print(apischema.deserialize(Dashboard, json_doc))
+    print(apischema.deserialize(grafana.Dashboard, json_doc))

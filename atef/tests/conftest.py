@@ -1,8 +1,11 @@
 import contextlib
 import datetime
+import pathlib
 from typing import Any, Dict, Optional
 
 from ..archive_device import ArchivedValue, ArchiverHelper
+
+TEST_PATH = pathlib.Path(__file__).parent.resolve()
 
 
 class MockEpicsArch:
