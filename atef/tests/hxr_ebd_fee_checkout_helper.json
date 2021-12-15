@@ -1,0 +1,4359 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 109,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 2,
+      "panels": [],
+      "title": "LFE Vacuum",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-red",
+                "value": null
+              },
+              {
+                "color": "dark-green",
+                "value": 1e-11
+              },
+              {
+                "color": "red",
+                "value": 1e-7
+              }
+            ]
+          },
+          "unit": "Torr"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": false,
+        "text": {}
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": true,
+          "strmCap": "",
+          "strmInt": "1m",
+          "target": "RTDSL0:PIP:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": true,
+          "strmCap": "",
+          "strmInt": "1m",
+          "target": "RTDSL0:PIP:02:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "C",
+          "regex": false,
+          "stream": true,
+          "strmCap": "",
+          "strmInt": "1m",
+          "target": "RTDSL0:PIP:03:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "D",
+          "regex": false,
+          "stream": true,
+          "strmCap": "",
+          "strmInt": "1m",
+          "target": "RTDSL0:PIP:04:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "E",
+          "regex": false,
+          "stream": true,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "RTDSL0:PIP:05:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "F",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV2L0:PIP:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "G",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV2L0:PIP:02:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "H",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV2L0:PIP:03:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "I",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SL1L0:POWER:PIN:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "J",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:SOLID:PIN:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "K",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SP1L0:KMONO:PIP:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "L",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "PA1L0:PIN:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "M",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "BT2L0:PLEG:PIP:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "N",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:PIP:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "O",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV3L0:PIP:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "P",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "ST1L0:XTES:PIP:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "Q",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV4L0:PIP:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "R",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV4L0:PIP:02:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "S",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:PIP:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "T",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:PIP:02:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "U",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:PIP:03:PRESS_RBV"
+        }
+      ],
+      "title": "Ion Pumps",
+      "type": "bargauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1e-12
+              },
+              {
+                "color": "red",
+                "value": 1e-7
+              }
+            ]
+          },
+          "unit": "Torr"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 79,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": false,
+        "text": {}
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": true,
+          "strmCap": "",
+          "strmInt": "1m",
+          "target": "TV1L0:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV2L0:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "D",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV2L0:GCC:02:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "E",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SL1L0:POWER:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "F",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:SOLID:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "P",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SP1L0:KMONO:GCC:01:PMON"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "C",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "PA1L0:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "G",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "H",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "BT2L0:PLEG:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "I",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "J",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "ST1L0:XTES:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "K",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV4L0:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "L",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV4L0:GCC:02:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "M",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:GCC:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "N",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:GCC:03:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "O",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "HX3:MON:GCC:01:PMON"
+        }
+      ],
+      "title": "Cold Cathodes",
+      "type": "bargauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Off "
+                },
+                "1": {
+                  "text": "On"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "VAC:EBD",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "lastSample",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "PLC:LFE:VAC:EBD:OVRDON_RBV"
+        },
+        {
+          "alias": "VAC:FEE",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "PLC:LFE:VAC:FEE:OVRDON_RBV"
+        },
+        {
+          "alias": "EM1L0:GEM:VAC",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "C",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "EM1L0:GEM:VAC:OVRDON_RBV"
+        },
+        {
+          "alias": "EM2L0:GEM:VAC",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "D",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "EM2L0:GEM:VAC:OVRDON_RBV"
+        },
+        {
+          "alias": "VAC:H1_1H1_2",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "E",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "PLC:LFE:VAC:H1_1H1_2:OVRDON_RBV"
+        }
+      ],
+      "title": "Overrides ",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "NOT OPEN"
+                },
+                "1": {
+                  "text": "OPEN"
+                },
+                "3": {
+                  "text": "VFS Open"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV1L0:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "IM1L0:XTES:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "C",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV2L0:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "D",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV2L0:VGC:02:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "E",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "EM1L0:GEM:VGC:10:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "F",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "EM2L0:GEM:VGC:70:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "G",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "PC1L0:XTES:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "H",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "PA1L0:VFS:01:POS_STATE_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "I",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "J",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "BT2L0:PLEG:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "K",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "L",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:VGC:02:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "M",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV3L0:VFS:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "N",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV4L0:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "O",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "P",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV6L0:VGC:01:OPN_DI_RBV"
+        }
+      ],
+      "title": "Gate Valves (EBD and FEE)",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "id": 10,
+      "panels": [],
+      "title": "GEMs",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 900,
+          "min": 700,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 700
+              }
+            ]
+          },
+          "unit": "volt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 17,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "241 Nominal 750 V",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "HVCH:FEE1:241:VoltageMeasure"
+        },
+        {
+          "alias": "242 Nominal 750 V",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "HVCH:FEE1:242:VoltageMeasure"
+        },
+        {
+          "alias": "361 Nominal 800 V",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "C",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "HVCH:FEE1:361:VoltageMeasure"
+        },
+        {
+          "alias": "362 Nominal 800 V",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "D",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "HVCH:FEE1:362:VoltageMeasure"
+        }
+      ],
+      "title": "GEM PMT HV",
+      "type": "gauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 9.11,
+          "min": 8.89,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 8.9
+              },
+              {
+                "color": "red",
+                "value": 9.1
+              }
+            ]
+          },
+          "unit": "Amps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 12,
+        "y": 16
+      },
+      "id": 19,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SMPS:FEE1:202:I"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SMPS:FEE1:201:I"
+        }
+      ],
+      "title": "Solenoid Current  (Nominal is 8.98 Amps) ",
+      "type": "gauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 2.09,
+          "min": 1.9,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1.94
+              },
+              {
+                "color": "green",
+                "value": 1.97
+              },
+              {
+                "color": "yellow",
+                "value": 2.02
+              },
+              {
+                "color": "red",
+                "value": 2.05
+              }
+            ]
+          },
+          "unit": "Torr"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 5,
+        "x": 18,
+        "y": 16
+      },
+      "id": 21,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "EM1L0 (Nominal 2 Torr) ",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "10s",
+          "target": "EM1L0:GEM:GCM:40:PRESS_RBV"
+        },
+        {
+          "alias": "EM2L0 (Nominal 1.99 Torr) ",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "10s",
+          "target": "EM2L0:GEM:GCM:40:PRESS_RBV"
+        }
+      ],
+      "title": "N2 Pressure ",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 12,
+      "panels": [],
+      "title": "OTR + Attenuation  + Slits + Kmono",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Out"
+                },
+                "1": {
+                  "text": "In"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 0,
+        "y": 24
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "RTDSL0:MPA:01:IN_RBV"
+        }
+      ],
+      "title": "RTDS Filter 1",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Out"
+                },
+                "1": {
+                  "text": "In"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 2,
+        "y": 24
+      },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "RTDSL0:MPA:02:IN_RBV"
+        }
+      ],
+      "title": "RTDS Filter 2",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 25,
+          "min": -2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-red",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 2
+              },
+              {
+                "color": "green",
+                "value": 2.5
+              },
+              {
+                "color": "yellow",
+                "value": 3.5
+              },
+              {
+                "color": "dark-red",
+                "value": 20
+              }
+            ]
+          },
+          "unit": "lengthmm"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 4,
+        "y": 24
+      },
+      "id": 23,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "SL1L0 X (Nominal 20 mm) ",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SL1L0:POWER:ACTUAL_XWIDTH_RBV"
+        },
+        {
+          "alias": "SL1L0 Y (Nominal 20 mm) ",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SL1L0:POWER:ACTUAL_YWIDTH_RBV"
+        }
+      ],
+      "title": "SL1L0 Power Slits ",
+      "type": "gauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": -0.2
+              },
+              {
+                "color": "#EAB839",
+                "value": 0.2
+              }
+            ]
+          },
+          "unit": "lengthmm"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 10,
+        "y": 24
+      },
+      "id": 40,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SP1L0:KMONO:MMS:XTAL_VERT.RBV"
+        }
+      ],
+      "title": "SP1L0:KMONO:MMS:XTAL_VERT.RBV",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": -0.2
+              },
+              {
+                "color": "green",
+                "value": 0.2
+              }
+            ]
+          },
+          "unit": "lengthmm"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 4,
+        "x": 14,
+        "y": 24
+      },
+      "id": 80,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "firstFill",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SP1L0:KMONO:MMS:XTAL_ANGLE.RBV"
+        }
+      ],
+      "title": "SP1L0:KMONO:MMS:XTAL_ANGLE.RBV",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": -1
+              },
+              {
+                "color": "#EAB839",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "lengthmm"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 3,
+        "x": 18,
+        "y": 24
+      },
+      "id": 42,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SP1L0:KMONO:MMS:RET_VERT.RBV"
+        }
+      ],
+      "title": "SP1L0:KMONO:MMS:RET_VERT.RBV",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 97
+              },
+              {
+                "color": "yellow",
+                "value": 99
+              }
+            ]
+          },
+          "unit": "lengthmm"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 3,
+        "x": 21,
+        "y": 24
+      },
+      "id": 44,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SP1L0:KMONO:MMS:DIODE_VERT.RBV"
+        }
+      ],
+      "title": "SP1L0:KMONO:MMS:DIODE_VERT.RBV",
+      "type": "stat"
+    },
+    {
+      "description": "Legacy Solid Attenuators",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Moving"
+                },
+                "1": {
+                  "text": "IN"
+                },
+                "2": {
+                  "text": "OUT"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 38,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "lastSample",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SATT:FEE1:321:STATE"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SATT:FEE1:322:STATE"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "C",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SATT:FEE1:323:STATE"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "D",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SATT:FEE1:324:STATE"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "E",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SATT:FEE1:325:STATE"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "F",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SATT:FEE1:326:STATE"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "G",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SATT:FEE1:327:STATE"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "H",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SATT:FEE1:328:STATE"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "I",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "SATT:FEE1:329:STATE"
+        }
+      ],
+      "title": "AT1L0 Solid",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 3,
+          "mappings": [
+            {
+              "options": {
+                "from": 0,
+                "result": {
+                  "text": "Full Transmission "
+                },
+                "to": 0
+              },
+              "type": "range"
+            },
+            {
+              "options": {
+                "from": 0,
+                "result": {
+                  "text": "Harmonic  Warning"
+                },
+                "to": 0.02
+              },
+              "type": "range"
+            }
+          ],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.02
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 3,
+        "x": 0,
+        "y": 36
+      },
+      "id": 48,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "lastSample",
+          "refId": "A",
+          "regex": false,
+          "stream": true,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:CALC:SYS:ActualTransmission_RBV"
+        }
+      ],
+      "title": "AT2L0 transmission ",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Moving"
+                },
+                "1": {
+                  "text": "OUT"
+                },
+                "2": {
+                  "text": "IN"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              },
+              {
+                "color": "#EAB839",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 21,
+        "x": 3,
+        "y": 36
+      },
+      "id": 46,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:02:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:03:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "C",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:04:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "D",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:05:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "E",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:06:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "F",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:07:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "G",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:08:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "H",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:09:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "I",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:10:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "J",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:11:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "K",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:12:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "L",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:13:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "M",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:14:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "N",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:15:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "O",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:16:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "P",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:17:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "Q",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:18:STATE:GET_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "R",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:19:STATE:GET_RBV"
+        }
+      ],
+      "title": "AT2L0 Solid",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 52,
+      "panels": [],
+      "title": "LFE Optics",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "from": 4000,
+                "result": {
+                  "text": "B4C"
+                },
+                "to": 6000
+              },
+              "type": "range"
+            },
+            {
+              "options": {
+                "from": -8000,
+                "result": {
+                  "text": "NI"
+                },
+                "to": -6000
+              },
+              "type": "range"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": -3800
+              },
+              {
+                "color": "green",
+                "value": 4900
+              },
+              {
+                "color": "red",
+                "value": 7000
+              }
+            ]
+          },
+          "unit": "um"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 0,
+        "y": 43
+      },
+      "id": 50,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:MMS:YUP.RBV"
+        }
+      ],
+      "title": "MR1L0 YUP",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Moving"
+                },
+                "1": {
+                  "text": "OUT"
+                },
+                "2": {
+                  "text": "IN"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              },
+              {
+                "color": "#EAB839",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 2,
+        "x": 3,
+        "y": 43
+      },
+      "id": 83,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "AT2L0:XTES:MMS:01:STATE:GET_RBV"
+        }
+      ],
+      "title": "AT2L0:XTES:MMS:01:STATE:GET_RBV",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 3,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "urad"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 8,
+        "y": 43
+      },
+      "id": 60,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "lastSample",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "lastSample",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:MMS:PITCH.RBV"
+        },
+        {
+          "alias": "mean",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "mean",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:MMS:PITCH.RBV"
+        },
+        {
+          "alias": "Std",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "std",
+          "refId": "C",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:MMS:PITCH.RBV"
+        }
+      ],
+      "title": "MR1L0 Pitch",
+      "type": "stat"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "urad"
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 10,
+        "y": 43
+      },
+      "hiddenSeries": false,
+      "id": 64,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.3.3",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "alias": "Mean",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:MMS:PITCH.RBV"
+        },
+        {
+          "alias": "last sample",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": true,
+          "operator": "lastSample",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:MMS:PITCH.RBV"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "MR1L0 Pitch",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:205",
+          "format": "urad",
+          "logBase": 1,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:206",
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 7000
+              }
+            ]
+          },
+          "unit": "urad"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 20,
+        "y": 43
+      },
+      "id": 68,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:MMS:YUP.RBV"
+        }
+      ],
+      "title": "MR1L0 YUP",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 99
+              },
+              {
+                "color": "#EAB839",
+                "value": 101
+              }
+            ]
+          },
+          "unit": "um"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 22,
+        "y": 43
+      },
+      "id": 70,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR1L0:HOMS:MMS:XUP.RBV"
+        }
+      ],
+      "title": "MR1L0 XUP",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 3,
+          "mappings": [],
+          "max": 15,
+          "min": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "green",
+                "value": 5.85
+              },
+              {
+                "color": "yellow",
+                "value": 5.89
+              },
+              {
+                "color": "green",
+                "value": 12.21
+              },
+              {
+                "color": "yellow",
+                "value": 12.25
+              },
+              {
+                "color": "red",
+                "value": 15
+              }
+            ]
+          },
+          "unit": "urad"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 2,
+        "y": 49
+      },
+      "id": 56,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "",
+          "url": "https://confluence.slac.stanford.edu/display/XBD/HXR+Alignment+Checkout+Procedure"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": true,
+          "strmCap": "",
+          "strmInt": "5s",
+          "target": "MR1L0:HOMS:MMS:PITCH.RBV"
+        }
+      ],
+      "title": "MR1L0 Pitch",
+      "type": "gauge"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "from": -5500,
+                "result": {
+                  "text": "B4C"
+                },
+                "to": -4500
+              },
+              "type": "range"
+            },
+            {
+              "options": {
+                "from": 3500,
+                "result": {
+                  "text": "Ni"
+                },
+                "to": 4500
+              },
+              "type": "range"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": -5005
+              },
+              {
+                "color": "yellow",
+                "value": -4995
+              },
+              {
+                "color": "green",
+                "value": 3950
+              },
+              {
+                "color": "yellow",
+                "value": 4050
+              }
+            ]
+          },
+          "unit": "um"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 0,
+        "y": 50
+      },
+      "id": 54,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:MMS:YUP.RBV"
+        }
+      ],
+      "title": "MR2L0 YUP",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 3,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "urad"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 8,
+        "y": 50
+      },
+      "id": 62,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "lastSample",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "lastSample",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "1s",
+          "target": "MR2L0:HOMS:MMS:PITCH.RBV"
+        },
+        {
+          "alias": "mean",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "mean",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:MMS:PITCH.RBV"
+        },
+        {
+          "alias": "std",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "std",
+          "refId": "C",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:MMS:PITCH.RBV"
+        }
+      ],
+      "title": "MR2L0 Pitch",
+      "type": "stat"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "urad"
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 10,
+        "y": 50
+      },
+      "hiddenSeries": false,
+      "id": 66,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.3.3",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "alias": "mean",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:MMS:PITCH.RBV"
+        },
+        {
+          "alias": "lastSample",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": true,
+          "operator": "lastSample",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:MMS:PITCH.RBV"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "MR2L0 Pitch",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:321",
+          "format": "urad",
+          "logBase": 1,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:322",
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 3900
+              },
+              {
+                "color": "red",
+                "value": 4100
+              }
+            ]
+          },
+          "unit": "urad"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 20,
+        "y": 50
+      },
+      "id": 72,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:MMS:YUP.RBV"
+        }
+      ],
+      "title": "MR2L0 YUP",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": -1
+              },
+              {
+                "color": "#EAB839",
+                "value": 0.5
+              }
+            ]
+          },
+          "unit": "um"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 2,
+        "x": 22,
+        "y": 50
+      },
+      "id": 74,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "mean",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "MR2L0:HOMS:MMS:XUP.RBV"
+        }
+      ],
+      "title": "MR2L0 XUP",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 3,
+          "mappings": [],
+          "max": 21.5,
+          "min": 17,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 17.5
+              },
+              {
+                "color": "green",
+                "value": 17.98
+              },
+              {
+                "color": "yellow",
+                "value": 18.09
+              },
+              {
+                "color": "orange",
+                "value": 18.5
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "green",
+                "value": 20.5
+              },
+              {
+                "color": "yellow",
+                "value": 20.6
+              },
+              {
+                "color": "red",
+                "value": 21
+              }
+            ]
+          },
+          "unit": "urad"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 2,
+        "y": 56
+      },
+      "id": 58,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "lastSample",
+          "refId": "A",
+          "regex": false,
+          "stream": true,
+          "strmCap": "",
+          "strmInt": "5s",
+          "target": "MR2L0:HOMS:MMS:PITCH.RBV"
+        }
+      ],
+      "title": "MR2L0 Pitch",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 63
+      },
+      "id": 25,
+      "panels": [],
+      "title": "Imager IM1L0",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Unknown"
+                },
+                "1": {
+                  "text": "OUT"
+                },
+                "2": {
+                  "text": "YAG"
+                },
+                "3": {
+                  "text": "Diamond"
+                },
+                "4": {
+                  "text": "RETICLE"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 4
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 2,
+        "x": 0,
+        "y": 64
+      },
+      "id": 27,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "IM1L0:XTES:MMS:STATE:GET_RBV"
+        }
+      ],
+      "title": "IM1L0 Target ",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 75
+              },
+              {
+                "color": "#EAB839",
+                "value": 77
+              }
+            ]
+          },
+          "unit": "%"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 2,
+        "x": 2,
+        "y": 64
+      },
+      "id": 31,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "IM1L0:XTES:CLF.RBV"
+        }
+      ],
+      "title": "Focus",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 28
+              },
+              {
+                "color": "yellow",
+                "value": 30
+              }
+            ]
+          },
+          "unit": "%"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 2,
+        "x": 4,
+        "y": 64
+      },
+      "id": 29,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "IM1L0:XTES:CLZ.RBV"
+        }
+      ],
+      "title": "Zoom ",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "6": {
+                  "text": "T100"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-red",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 6
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 2,
+        "x": 6,
+        "y": 64
+      },
+      "id": 76,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "IM1K0:XTES:MFW:GET_RBV"
+        }
+      ],
+      "title": "IM1L0 filter wheel",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "": {
+                  "text": ""
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 512
+              },
+              {
+                "color": "green",
+                "value": 1024
+              },
+              {
+                "color": "red",
+                "value": 1025
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 2,
+        "x": 8,
+        "y": 64
+      },
+      "id": 78,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.3.3",
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "IM1K0:XTES:CAM:MaxSizeX_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "IM1K0:XTES:CAM:MaxSizeY_RBV"
+        }
+      ],
+      "title": "IM1L0 Size (Pixels)",
+      "type": "stat"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 2,
+        "x": 14,
+        "y": 64
+      },
+      "hiddenSeries": false,
+      "id": 34,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "8.3.3",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "flyers",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "IM1L0:XTES:CLF:PLC:bHomeCmd_RBV"
+        }
+      ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Focus HOME",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "$$hashKey": "object:295",
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        },
+        {
+          "$$hashKey": "object:296",
+          "format": "short",
+          "logBase": 1,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 6,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineStyle": {
+              "dash": [
+                10,
+                10
+              ],
+              "fill": "dash"
+            },
+            "lineWidth": 1,
+            "pointSize": 9,
+            "scaleDistribution": {
+              "log": 10,
+              "type": "log"
+            },
+            "showPoints": "always",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 1e-12,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 23,
+        "x": 0,
+        "y": 72
+      },
+      "id": 82,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "operator": "lastFill",
+          "refId": "A",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV6L0:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "E",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV6L0:VGC:01:OPN_SW_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "F",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV6L0:VGC:01:CLS_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "G",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV6L0:VGC:01:POS_STATE_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "C",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "D",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV4L0:VGC:01:OPN_DI_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "B",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:GCC:03:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "H",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:GFS:01:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "I",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:GCC:02:PRESS_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "J",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:PIP:01:PMON"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "K",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:PIP:02:PMON"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "L",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV5L0:PIP:03:PMON"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "M",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV6L0:VGC:01:AT_VAC_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "N",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV6L0:VGC:01:STATE_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastFill",
+          "refId": "O",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "TV6L0:VGC:01:AT_VAC_SP_RBV"
+        },
+        {
+          "alias": "",
+          "aliasPattern": "",
+          "functions": [],
+          "hide": false,
+          "operator": "lastSample",
+          "refId": "P",
+          "regex": false,
+          "stream": false,
+          "strmCap": "",
+          "strmInt": "",
+          "target": "HX3:MON:GCC:01:PMON"
+        }
+      ],
+      "title": "Troubleshoot Oct 12th TV6L0 valve failure ",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 34,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "timezone": "",
+  "title": "HXR EBD FEE Checkout Helper Copy",
+  "uid": "1RzsdhXMz",
+  "version": 51,
+  "weekStart": ""
+}
