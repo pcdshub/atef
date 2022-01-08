@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass, field
 from numbers import Number
-from typing import Any, Callable, List, Optional, Sequence, Union
+from typing import Any, Callable, List, Optional, Sequence, Union, cast
 
 import numpy as np
 
@@ -52,6 +52,15 @@ class ReduceMethod(str, enum.Enum):
 class Result:
     severity: ResultSeverity = ResultSeverity.success
     reason: Optional[str] = None
+
+
+def _is_in_range(
+    value: Number, low: Number, high: Number, inclusive: bool = True
+) -> bool:
+    """Is `value` in the range of low to high?"""
+    if inclusive:
+        return low <= value <= high
+    return low < value < high
 
 
 success = Result()
@@ -251,10 +260,10 @@ class LessOrEqual(Comparison):
 
 @dataclass
 class Range(Comparison):
-    low: Number = None
-    high: Number = None
-    warn_low: Number = None
-    warn_high: Number = None
+    low: Optional[Number] = None
+    high: Optional[Number] = None
+    warn_low: Optional[Number] = None
+    warn_high: Optional[Number] = None
     inclusive: bool = True
 
     def describe(self) -> str:
@@ -270,19 +279,22 @@ class Range(Comparison):
 
     def _compare(self, value: Number) -> bool:
         if None not in (self.low, self.high):
-            if self.inclusive:
-                in_range = self.low <= value <= self.high
-            else:
-                in_range = self.low < value < self.high
-
+            in_range = _is_in_range(
+                value,
+                low=cast(Number, self.low),
+                high=cast(Number, self.high),
+                inclusive=self.inclusive,
+            )
             if not in_range:
                 return False
 
         if None not in (self.warn_low, self.warn_high):
-            if self.inclusive:
-                in_range = self.warn_low <= value <= self.warn_high
-            else:
-                in_range = self.warn_low < value < self.warn_high
+            in_range = _is_in_range(
+                value,
+                low=cast(Number, self.warn_low),
+                high=cast(Number, self.warn_high),
+                inclusive=self.inclusive,
+            )
 
             if not in_range:
                 raise ComparisonWarning(
