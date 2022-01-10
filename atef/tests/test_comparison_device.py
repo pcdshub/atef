@@ -77,15 +77,13 @@ config_and_severity = pytest.mark.parametrize(
 
 
 @config_and_severity
-def test_serializable(
-    device, config: check.DeviceConfiguration, severity: ResultSeverity
-):
+def test_serializable(config: check.DeviceConfiguration, severity: ResultSeverity):
     serialized = apischema.serialize(config)
     assert apischema.deserialize(check.DeviceConfiguration, serialized) == config
 
 
 @config_and_severity
-def test_basic(
+def test_result_severity(
     device, config: check.DeviceConfiguration, severity: ResultSeverity
 ):
     overall, _ = check.check_device(device=device, attr_to_checks=config.checks)
