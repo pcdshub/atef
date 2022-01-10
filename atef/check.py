@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from numbers import Number
 from typing import Any, Callable, List, Optional, Sequence, Union, cast
 
 import numpy as np
+
+Number = Union[int, float]
 
 
 class ComparisonError(Exception):
@@ -166,7 +167,7 @@ class Comparison:
 
 @dataclass
 class Equality(Comparison):
-    value: Optional[PrimitiveType] = None
+    value: PrimitiveType = 0
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
 
@@ -225,7 +226,7 @@ class AnyComparison(Comparison):
 
 @dataclass
 class Greater(Comparison):
-    value: Optional[Number] = None
+    value: Number = 0
 
     def describe(self) -> str:
         return f"> {self.value}"
@@ -236,7 +237,7 @@ class Greater(Comparison):
 
 @dataclass
 class GreaterOrEqual(Comparison):
-    value: Optional[Number] = None
+    value: Number = 0
 
     def describe(self) -> str:
         return f">= {self.value}"
@@ -247,7 +248,7 @@ class GreaterOrEqual(Comparison):
 
 @dataclass
 class Less(Comparison):
-    value: Optional[Number] = None
+    value: Number = 0
 
     def describe(self) -> str:
         return f"< {self.value}"
@@ -258,7 +259,7 @@ class Less(Comparison):
 
 @dataclass
 class LessOrEqual(Comparison):
-    value: Optional[Number] = None
+    value: Number = 0
 
     def describe(self) -> str:
         return f"<= {self.value}"
