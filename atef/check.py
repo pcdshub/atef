@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import enum
+import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Sequence, Union, cast
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, cast
 
 import numpy as np
+import ophyd
 
 Number = Union[int, float]
+
+logger = logging.getLogger(__name__)
 
 
 class ComparisonError(Exception):
@@ -81,6 +85,9 @@ class Comparison:
     #: Description tied to this comparison.
     description: Optional[str] = None
 
+    #: Device attribute(s) to be compared.
+    attrs: Union[str, List[str]] = field(default_factory=list)
+
     #: Invert the comparison's result.
     invert: bool = False
 
@@ -117,9 +124,15 @@ class Comparison:
         """
         raise NotImplementedError()
 
-    @property
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}({self.describe()})"
+        try:
+            desc = self.describe()
+        except Exception as ex:
+            desc = (
+                f"{self.__class__.__name__}.describe() failure "
+                f"({ex.__class__.__name__}: {ex})"
+            )
+        return f"{self.__class__.__name__}({desc})"
 
     def compare(self, value: Any) -> Result:
         """Compare the provided value using the comparator's settings."""
@@ -311,3 +324,69 @@ class Range(Comparison):
                     f"In warning range ({self.describe()})"
                 )
         return True
+
+
+def _single_attr_comparison(
+    device: ophyd.Device, attr: str, comparison: Comparison
+) -> Result:
+    try:
+        signal = getattr(device, attr)
+        try:
+            value = signal.get()
+        except TimeoutError:
+            return Result(
+                severity=comparison.if_disconnected,
+                reason=f"Signal disconnected when reading: {signal}"
+            )
+        return comparison.compare(value)
+    except Exception as ex:
+        return Result(
+            severity=ResultSeverity.internal_error,
+            reason=(
+                f"Checking attribute {attr!r} with {comparison} "
+                f"raised {ex.__class__.__name__}: {ex}"
+            ),
+        )
+
+
+def check_device(
+    device: ophyd.Device, comparisons: Sequence[Comparison]
+) -> Tuple[ResultSeverity, List[Result]]:
+    """
+    Check a given device using the list of comparisons.
+
+    Parameters
+    ----------
+    device : ophyd.Device
+        The device to check.
+
+    comparisons : sequence of Comparison
+        Comparisons to run on the given device.
+
+    Returns
+    -------
+    overall_severity : ResultSeverity
+        Maximum severity found when running comparisons.
+
+    results : list of Result
+        Individual comparison results.
+    """
+    overall = ResultSeverity.success
+    results = []
+    for comparison in comparisons:
+        attrs = tuple(
+            comparison.attrs
+            if isinstance(comparison.attrs, list)
+            else (comparison.attrs,)
+        )
+        for attr in attrs:
+            logger.debug(
+                "Checking %s.%s with comparison %s",
+                device.name, attr, comparison
+            )
+            result = _single_attr_comparison(device, attr, comparison)
+            if result.severity > overall:
+                overall = result.severity
+            results.append(result)
+
+    return overall, results
