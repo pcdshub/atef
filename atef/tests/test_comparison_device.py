@@ -1,5 +1,4 @@
-from typing import List
-
+import apischema
 import ophyd
 import pytest
 
@@ -18,50 +17,76 @@ def device():
     return Device()
 
 
-@pytest.mark.parametrize(
-    "comparisons, severity",
+config_and_severity = pytest.mark.parametrize(
+    "config, severity",
     [
         pytest.param(
-            [
-                check.Equality(
-                    attrs="sig1",
-                    value=1,
+            check.DeviceConfiguration(
+                checks=dict(
+                    sig1=check.Equality(value=1),
+                    sig2=check.Equality(value=2.5),
+                    sig3=check.Equality(value="abc"),
                 ),
-                check.Equality(
-                    attrs="sig2",
-                    value=2.5,
-                ),
-                check.Equality(
-                    attrs="sig3",
-                    value="abc",
-                ),
-            ],
+            ),
             ResultSeverity.success,
             id="all_good",
         ),
         pytest.param(
-            [
-                check.Equality(
-                    attrs="sig1",
-                    value=2,
-                    severity_on_failure=ResultSeverity.error
+            check.DeviceConfiguration(
+                checks={
+                    "sig1 sig2": check.Equality(value=1, atol=0),
+                },
+            ),
+            ResultSeverity.error,
+            id="multi_attr_no_tol",
+        ),
+        pytest.param(
+            check.DeviceConfiguration(
+                checks={
+                    "sig1 sig2": check.Equality(value=1, atol=2),
+                },
+            ),
+            ResultSeverity.success,
+            id="multi_attr_ok",
+        ),
+        pytest.param(
+            check.DeviceConfiguration(
+                checks={
+                    "sig1 sig2": [
+                        check.Equality(value=1, atol=2),
+                        check.Equality(value=3, atol=4),
+                    ],
+                },
+            ),
+            ResultSeverity.success,
+            id="multi_attr_multi_test",
+        ),
+        pytest.param(
+            check.DeviceConfiguration(
+                checks=dict(
+                    sig1=check.Equality(value=2),
+                    sig2=check.Equality(value=2.5),
+                    sig3=check.Equality(value="abc"),
                 ),
-                check.Equality(
-                    attrs="sig2",
-                    value=2.5,
-                ),
-                check.Equality(
-                    attrs="sig3",
-                    value="abc",
-                ),
-            ],
+            ),
             ResultSeverity.error,
             id="sig1_failure",
         ),
     ]
 )
-def test_basic(
-    device, comparisons: List[check.Comparison], severity: ResultSeverity
+
+
+@config_and_severity
+def test_serializable(
+    device, config: check.DeviceConfiguration, severity: ResultSeverity
 ):
-    overall, _ = check.check_device(device=device, comparisons=comparisons)
+    serialized = apischema.serialize(config)
+    assert apischema.deserialize(check.DeviceConfiguration, serialized) == config
+
+
+@config_and_severity
+def test_basic(
+    device, config: check.DeviceConfiguration, severity: ResultSeverity
+):
+    overall, _ = check.check_device(device=device, attr_to_checks=config.checks)
     assert overall == severity

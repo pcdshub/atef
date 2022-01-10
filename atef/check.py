@@ -3,10 +3,13 @@ from __future__ import annotations
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, cast
+from typing import (Any, Callable, Dict, List, Optional, Sequence, Tuple,
+                    Union, cast)
 
 import numpy as np
 import ophyd
+
+from . import serialization
 
 Number = Union[int, float]
 
@@ -77,6 +80,7 @@ PrimitiveType = Union[str, int, bool, float]
 
 
 @dataclass
+@serialization.as_tagged_union
 class Comparison:
     """
     Base class for all atef value comparisons.
@@ -84,9 +88,6 @@ class Comparison:
 
     #: Description tied to this comparison.
     description: Optional[str] = None
-
-    #: Device attribute(s) to be compared.
-    attrs: Union[str, List[str]] = field(default_factory=list)
 
     #: Invert the comparison's result.
     invert: bool = False
@@ -326,6 +327,21 @@ class Range(Comparison):
         return True
 
 
+AttrToChecks = Dict[
+    str,
+    Union[Comparison, Sequence[Comparison]],
+]
+
+
+@dataclass
+class DeviceConfiguration:
+    #: Description tied to this comparison.
+    description: Optional[str] = None
+
+    # TODO: default severity settings?
+    checks: AttrToChecks = field(default_factory=dict)
+
+
 def _single_attr_comparison(
     device: ophyd.Device, attr: str, comparison: Comparison
 ) -> Result:
@@ -350,7 +366,7 @@ def _single_attr_comparison(
 
 
 def check_device(
-    device: ophyd.Device, comparisons: Sequence[Comparison]
+    device: ophyd.Device, attr_to_checks: AttrToChecks
 ) -> Tuple[ResultSeverity, List[Result]]:
     """
     Check a given device using the list of comparisons.
@@ -360,7 +376,7 @@ def check_device(
     device : ophyd.Device
         The device to check.
 
-    comparisons : sequence of Comparison
+    attr_to_checks : dict of attribute to Comparison(s)
         Comparisons to run on the given device.
 
     Returns
@@ -373,20 +389,17 @@ def check_device(
     """
     overall = ResultSeverity.success
     results = []
-    for comparison in comparisons:
-        attrs = tuple(
-            comparison.attrs
-            if isinstance(comparison.attrs, list)
-            else (comparison.attrs,)
-        )
-        for attr in attrs:
-            logger.debug(
-                "Checking %s.%s with comparison %s",
-                device.name, attr, comparison
-            )
-            result = _single_attr_comparison(device, attr, comparison)
-            if result.severity > overall:
-                overall = result.severity
-            results.append(result)
+    for attrs, checks in attr_to_checks.items():
+        checks = tuple([checks] if isinstance(checks, Comparison) else checks)
+        for comparison in checks:
+            for attr in attrs.split():
+                logger.debug(
+                    "Checking %s.%s with comparison %s",
+                    device.name, attr, comparison
+                )
+                result = _single_attr_comparison(device, attr, comparison)
+                if result.severity > overall:
+                    overall = result.severity
+                results.append(result)
 
     return overall, results
