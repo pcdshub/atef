@@ -8,6 +8,10 @@ from typing import Any, Callable, List, Optional, Sequence, Union, cast
 import numpy as np
 
 
+class ComparisonError(Exception):
+    """Raise this exception to error out in a comparator."""
+
+
 class ComparisonWarning(Exception):
     """Raise this exception to warn in a comparator."""
 
@@ -126,10 +130,15 @@ class Comparison:
 
         try:
             passed = self._compare(value)
+        except ComparisonError as ex:
+            return Result(
+                severity=self.severity_on_failure,
+                reason=f"Value {value!r} errored: {ex}",
+            )
         except ComparisonWarning as ex:
             return Result(
                 severity=ResultSeverity.warning,
-                reason=f"Value {value!r} warned {ex}",
+                reason=f"Value {value!r} warned: {ex}",
             )
         except Exception as ex:
             return Result(
