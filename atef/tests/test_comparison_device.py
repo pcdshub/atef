@@ -3,7 +3,7 @@ import ophyd
 import pytest
 
 from .. import check
-from ..check import ResultSeverity
+from ..check import Severity
 
 
 @pytest.fixture(scope="function")
@@ -28,7 +28,7 @@ config_and_severity = pytest.mark.parametrize(
                     sig3=check.Equals(value="abc"),
                 ),
             ),
-            ResultSeverity.success,
+            Severity.success,
             id="all_good",
         ),
         pytest.param(
@@ -37,7 +37,7 @@ config_and_severity = pytest.mark.parametrize(
                     "sig1 sig2": check.Equals(value=1, atol=0),
                 },
             ),
-            ResultSeverity.error,
+            Severity.error,
             id="multi_attr_no_tol",
         ),
         pytest.param(
@@ -46,7 +46,7 @@ config_and_severity = pytest.mark.parametrize(
                     "sig1 sig2": check.Equals(value=1, atol=2),
                 },
             ),
-            ResultSeverity.success,
+            Severity.success,
             id="multi_attr_ok",
         ),
         pytest.param(
@@ -58,7 +58,7 @@ config_and_severity = pytest.mark.parametrize(
                     ],
                 },
             ),
-            ResultSeverity.success,
+            Severity.success,
             id="multi_attr_multi_test",
         ),
         pytest.param(
@@ -69,7 +69,7 @@ config_and_severity = pytest.mark.parametrize(
                     sig3=check.Equals(value="abc"),
                 ),
             ),
-            ResultSeverity.error,
+            Severity.error,
             id="sig1_failure",
         ),
     ]
@@ -77,14 +77,14 @@ config_and_severity = pytest.mark.parametrize(
 
 
 @config_and_severity
-def test_serializable(config: check.DeviceConfiguration, severity: ResultSeverity):
+def test_serializable(config: check.DeviceConfiguration, severity: Severity):
     serialized = apischema.serialize(config)
     assert apischema.deserialize(check.DeviceConfiguration, serialized) == config
 
 
 @config_and_severity
 def test_result_severity(
-    device, config: check.DeviceConfiguration, severity: ResultSeverity
+    device, config: check.DeviceConfiguration, severity: Severity
 ):
     overall, _ = check.check_device(device=device, attr_to_checks=config.checks)
     assert overall == severity
@@ -125,32 +125,32 @@ def at2l0(request):
 def test_at2l0_standin(at2l0):
     state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
     severity = {
-        0: ResultSeverity.error,
-        1: ResultSeverity.success,
-        2: ResultSeverity.warning,
-        3: ResultSeverity.error,
+        0: Severity.error,
+        1: Severity.success,
+        2: Severity.warning,
+        3: Severity.error,
     }[state1.get()]
     checks = {
         at2l0.state_attrs: [
             check.NotEquals(
                 description="Filter is moving",
                 value=0,
-                severity_on_failure=ResultSeverity.error,
+                severity_on_failure=Severity.error,
             ),
             check.NotEquals(
                 description="Filter is out of the beam",
                 value=1,
-                severity_on_failure=ResultSeverity.success,
+                severity_on_failure=Severity.success,
             ),
             check.NotEquals(
                 description="Filter is in the beam",
                 value=2,
-                severity_on_failure=ResultSeverity.warning,
+                severity_on_failure=Severity.warning,
             ),
             check.GreaterOrEqual(
                 description="Filter status unknown",
                 value=3,
-                severity_on_failure=ResultSeverity.error,
+                severity_on_failure=Severity.error,
                 invert=True,
             ),
         ],
@@ -164,10 +164,10 @@ def test_at2l0_standin(at2l0):
 def test_at2l0_standin_value_map(at2l0):
     state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
     value_to_severity = {
-        0: ResultSeverity.error,
-        1: ResultSeverity.success,
-        2: ResultSeverity.warning,
-        3: ResultSeverity.error,
+        0: Severity.error,
+        1: Severity.success,
+        2: Severity.warning,
+        3: Severity.error,
     }
 
     severity = value_to_severity[state1.get()]
@@ -178,17 +178,17 @@ def test_at2l0_standin_value_map(at2l0):
                     check.Value(
                         value=0,
                         description="Filter is moving",
-                        severity=ResultSeverity.error,
+                        severity=Severity.error,
                     ),
                     check.Value(
                         description="Filter is out of the beam",
                         value=1,
-                        severity=ResultSeverity.success,
+                        severity=Severity.success,
                     ),
                     check.Value(
                         description="Filter is in the beam",
                         value=2,
-                        severity=ResultSeverity.warning,
+                        severity=Severity.warning,
                     ),
                 ],
             )

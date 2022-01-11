@@ -24,7 +24,7 @@ class ComparisonWarning(Exception):
     """Raise this exception to warn in a comparator."""
 
 
-class ResultSeverity(enum.IntEnum):
+class Severity(enum.IntEnum):
     success = 0
     warning = 1
     error = 2
@@ -62,7 +62,7 @@ class ReduceMethod(str, enum.Enum):
 
 @dataclass(frozen=True)
 class Result:
-    severity: ResultSeverity = ResultSeverity.success
+    severity: Severity = Severity.success
     reason: Optional[str] = None
 
 
@@ -75,10 +75,10 @@ def _is_in_range(
     return low < value < high
 
 
-def _raise_for_severity(severity: ResultSeverity, reason: str):
-    if severity == ResultSeverity.success:
+def _raise_for_severity(severity: Severity, reason: str):
+    if severity == Severity.success:
         return True
-    if severity == ResultSeverity.warning:
+    if severity == Severity.warning:
         raise ComparisonWarning(reason)
     raise ComparisonError(reason)
 
@@ -99,7 +99,7 @@ class Value:
     #: Absolute tolerance value.
     atol: Optional[Number] = None
     #: Severity to set on a match (if applicable).
-    severity: ResultSeverity = ResultSeverity.success
+    severity: Severity = Severity.success
 
     def __str__(self) -> str:
         if self.rtol is not None or self.atol is not None:
@@ -139,7 +139,7 @@ class ValueRange:
     #: A description of what the value represents.
     description: str = ""
     #: Severity to set on a match (if applicable).
-    severity: ResultSeverity = ResultSeverity.success
+    severity: Severity = Severity.success
 
     def __str__(self) -> str:
         open_paren, close_paren = "[]" if self.inclusive else "()"
@@ -186,11 +186,11 @@ class Comparison:
     method: ReduceMethod = ReduceMethod.average
 
     #: If the comparison fails, use this result severity.
-    severity_on_failure: ResultSeverity = ResultSeverity.error
+    severity_on_failure: Severity = Severity.error
 
     #: If disconnected and unable to perform the comparison, set this
     #: result severity.
-    if_disconnected: ResultSeverity = ResultSeverity.error
+    if_disconnected: Severity = Severity.error
 
     def __call__(self, value: Any) -> Optional[Result]:
         return self.compare(value)
@@ -238,12 +238,12 @@ class Comparison:
             )
         except ComparisonWarning as ex:
             return Result(
-                severity=ResultSeverity.warning,
+                severity=Severity.warning,
                 reason=f"Value {value!r} warned: {ex}",
             )
         except Exception as ex:
             return Result(
-                severity=ResultSeverity.internal_error,
+                severity=Severity.internal_error,
                 reason=f"Value {value!r} raised {ex.__class__.__name__}: {ex}",
             )
 
@@ -443,7 +443,7 @@ class Range(Comparison):
                 description=self.description or "",
                 inclusive=self.inclusive,
                 in_range=True,
-                severity=ResultSeverity.warning,
+                severity=Severity.warning,
             )
             yield ValueRange(
                 low=self.warn_high,
@@ -451,7 +451,7 @@ class Range(Comparison):
                 description=self.description or "",
                 inclusive=self.inclusive,
                 in_range=True,
-                severity=ResultSeverity.warning,
+                severity=Severity.warning,
             )
 
     def describe(self) -> str:
@@ -495,7 +495,7 @@ def _single_attr_comparison(
         return comparison.compare(value)
     except Exception as ex:
         return Result(
-            severity=ResultSeverity.internal_error,
+            severity=Severity.internal_error,
             reason=(
                 f"Checking attribute {attr!r} with {comparison} "
                 f"raised {ex.__class__.__name__}: {ex}"
@@ -505,7 +505,7 @@ def _single_attr_comparison(
 
 def check_device(
     device: ophyd.Device, attr_to_checks: AttrToChecks
-) -> Tuple[ResultSeverity, List[Result]]:
+) -> Tuple[Severity, List[Result]]:
     """
     Check a given device using the list of comparisons.
 
@@ -519,13 +519,13 @@ def check_device(
 
     Returns
     -------
-    overall_severity : ResultSeverity
+    overall_severity : Severity
         Maximum severity found when running comparisons.
 
     results : list of Result
         Individual comparison results.
     """
-    overall = ResultSeverity.success
+    overall = Severity.success
     results = []
     for attrs, checks in attr_to_checks.items():
         checks = tuple([checks] if isinstance(checks, Comparison) else checks)

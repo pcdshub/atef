@@ -2,7 +2,7 @@ import pytest
 
 from .. import check
 from ..check import (Comparison, Equals, NotEquals, PrimitiveType, Result,
-                     ResultSeverity)
+                     Severity)
 
 
 def _parametrize(comparison, *value_and_result):
@@ -23,16 +23,16 @@ def _parametrize(comparison, *value_and_result):
     return wrapper
 
 
-success = Result(severity=ResultSeverity.success)
+success = Result(severity=Severity.success)
 
 
 @_parametrize(
     Equals(value=1),
-    [1, ResultSeverity.success],
-    [0, ResultSeverity.error],
+    [1, Severity.success],
+    [0, Severity.error],
 )
 def test_equality_basic(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
@@ -40,11 +40,11 @@ def test_equality_basic(
 
 @_parametrize(
     Equals(value=1, invert=True),
-    [0, ResultSeverity.success],
-    [1, ResultSeverity.error],
+    [0, Severity.success],
+    [1, Severity.error],
 )
 def test_equality_inverted(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
@@ -52,11 +52,11 @@ def test_equality_inverted(
 
 @_parametrize(
     NotEquals(value=1),
-    [1, ResultSeverity.error],
-    [0, ResultSeverity.success],
+    [1, Severity.error],
+    [0, Severity.success],
 )
 def test_not_equals_basic(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
@@ -64,13 +64,13 @@ def test_not_equals_basic(
 
 @_parametrize(
     Equals(value=1, atol=1),
-    [0, ResultSeverity.success],
-    [1, ResultSeverity.success],
-    [2, ResultSeverity.success],
-    [-1, ResultSeverity.error],
+    [0, Severity.success],
+    [1, Severity.success],
+    [2, Severity.success],
+    [-1, Severity.error],
 )
 def test_equality_with_atol(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
@@ -84,14 +84,14 @@ def test_equality_with_atol(
             check.Equals(value=3),
         ],
     ),
-    [0, ResultSeverity.error],
-    [1, ResultSeverity.success],
-    [2, ResultSeverity.success],
-    [3, ResultSeverity.success],
-    [4, ResultSeverity.error],
+    [0, Severity.error],
+    [1, Severity.success],
+    [2, Severity.success],
+    [3, Severity.success],
+    [4, Severity.error],
 )
 def test_any_comparison(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
@@ -101,14 +101,14 @@ def test_any_comparison(
     check.AnyValue(
         values=[1, 2, 3],
     ),
-    [0, ResultSeverity.error],
-    [1, ResultSeverity.success],
-    [2, ResultSeverity.success],
-    [3, ResultSeverity.success],
-    [4, ResultSeverity.error],
+    [0, Severity.error],
+    [1, Severity.success],
+    [2, Severity.success],
+    [3, Severity.success],
+    [4, Severity.error],
 )
 def test_any_value(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
@@ -116,13 +116,13 @@ def test_any_value(
 
 @_parametrize(
     check.Greater(value=2),
-    [1, ResultSeverity.error],
-    [2, ResultSeverity.error],
-    [3, ResultSeverity.success],
-    [4, ResultSeverity.success],
+    [1, Severity.error],
+    [2, Severity.error],
+    [3, Severity.success],
+    [4, Severity.success],
 )
 def test_greater(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
@@ -130,13 +130,13 @@ def test_greater(
 
 @_parametrize(
     check.GreaterOrEqual(value=2),
-    [1, ResultSeverity.error],
-    [2, ResultSeverity.success],
-    [3, ResultSeverity.success],
-    [4, ResultSeverity.success],
+    [1, Severity.error],
+    [2, Severity.success],
+    [3, Severity.success],
+    [4, Severity.success],
 )
 def test_greater_equal(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
@@ -145,17 +145,17 @@ def test_greater_equal(
 @_parametrize(
     # < 1 error, 1 ~ 3 warn, 5 ~ 6 warn, > 6 error
     check.Range(low=1, warn_low=3, warn_high=5, high=6, inclusive=True),
-    [0, ResultSeverity.error],
-    [1, ResultSeverity.warning],
-    [2, ResultSeverity.warning],
-    [3, ResultSeverity.warning],
-    [4, ResultSeverity.success],
-    [5, ResultSeverity.warning],
-    [6, ResultSeverity.warning],
-    [7, ResultSeverity.error],
+    [0, Severity.error],
+    [1, Severity.warning],
+    [2, Severity.warning],
+    [3, Severity.warning],
+    [4, Severity.success],
+    [5, Severity.warning],
+    [6, Severity.warning],
+    [7, Severity.error],
 )
 def test_range_inclusive(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
@@ -164,17 +164,51 @@ def test_range_inclusive(
 @_parametrize(
     # < 1 error, 1 ~ 3 warn, 5 ~ 6 warn, > 6 error
     check.Range(low=1, warn_low=3, warn_high=5, high=6, inclusive=False),
-    [0, ResultSeverity.error],
-    [1, ResultSeverity.error],
-    [2, ResultSeverity.warning],
-    [3, ResultSeverity.success],
-    [4, ResultSeverity.success],
-    [5, ResultSeverity.success],
-    [6, ResultSeverity.error],
-    [7, ResultSeverity.error],
+    [0, Severity.error],
+    [1, Severity.error],
+    [2, Severity.warning],
+    [3, Severity.success],
+    [4, Severity.success],
+    [5, Severity.success],
+    [6, Severity.error],
+    [7, Severity.error],
 )
 def test_range_exclusive(
-    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+    comparison: Comparison, value: PrimitiveType, result: Severity
+):
+    assert comparison(value).severity == result
+    print(comparison(value).reason)
+
+
+@_parametrize(
+    # < 1 error, 1 ~ 3 warn, 5 ~ 6 warn, > 6 error
+    check.ValueSet(
+        values=[
+            check.Value(
+                value=0,
+                description="Filter is moving",
+                severity=Severity.error,
+            ),
+            check.Value(
+                description="Filter is out of the beam",
+                value=1,
+                severity=Severity.success,
+            ),
+            check.Value(
+                description="Filter is in the beam",
+                value=2,
+                severity=Severity.warning,
+            ),
+        ],
+    ),
+    [-1, Severity.error],
+    [0, Severity.error],
+    [1, Severity.success],
+    [2, Severity.warning],
+    [3, Severity.error],
+)
+def test_value_set(
+    comparison: Comparison, value: PrimitiveType, result: Severity
 ):
     assert comparison(value).severity == result
     print(comparison(value).reason)
