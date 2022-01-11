@@ -90,16 +90,11 @@ def test_result_severity(
     assert overall == severity
 
 
-@pytest.mark.parametrize(
-    "value, severity",
-    [
-        (0, ResultSeverity.error),
-        (1, ResultSeverity.success),
-        (2, ResultSeverity.warning),
-        (3, ResultSeverity.error),
-    ]
+@pytest.fixture(
+    scope="function",
+    params=[0, 1, 2, 3],
 )
-def test_state_sample(value: int, severity: ResultSeverity):
+def at2l0(request):
     signals = {
         0: ophyd.Signal(value=0, name="moving"),
         1: ophyd.Signal(value=1, name="out"),
@@ -107,56 +102,99 @@ def test_state_sample(value: int, severity: ResultSeverity):
         3: ophyd.Signal(value=3, name="unknown"),
     }
 
-    class FakeDevice:
+    class FakeAT2L0:
         name: str = "fakedev"
+        state_attrs: str = (
+            "blade_01.state.state blade_02.state.state blade_03.state.state "
+            "blade_04.state.state blade_05.state.state blade_06.state.state "
+            "blade_07.state.state blade_08.state.state blade_09.state.state "
+            "blade_10.state.state blade_11.state.state blade_12.state.state "
+            "blade_13.state.state blade_14.state.state blade_15.state.state "
+            "blade_16.state.state blade_17.state.state blade_18.state.state "
+            "blade_19.state.state"
+        )
 
         def __getattr__(self, attr):
             if attr.startswith("blade_"):
-                return signals[value]
+                return signals[request.param]
             raise AttributeError(attr)
 
-    state_attrs = (
-        "blade_01.state.state blade_02.state.state blade_03.state.state "
-        "blade_04.state.state blade_05.state.state blade_06.state.state "
-        "blade_07.state.state blade_08.state.state blade_09.state.state "
-        "blade_10.state.state blade_11.state.state blade_12.state.state "
-        "blade_13.state.state blade_14.state.state blade_15.state.state "
-        "blade_16.state.state blade_17.state.state blade_18.state.state "
-        "blade_19.state.state"
-    )
+    return FakeAT2L0()
 
-    conf = check.DeviceConfiguration(
-        description="desc",
-        checks={
-            state_attrs: [
-                check.NotEquals(
-                    description="Filter is moving",
-                    value=0,
-                    severity_on_failure=ResultSeverity.error,
-                ),
-                check.NotEquals(
-                    description="Filter is out of the beam",
-                    value=1,
-                    severity_on_failure=ResultSeverity.success,
-                ),
-                check.NotEquals(
-                    description="Filter is in the beam",
-                    value=2,
-                    severity_on_failure=ResultSeverity.warning,
-                ),
-                check.GreaterOrEqual(
-                    description="Filter status unknown",
-                    value=3,
-                    severity_on_failure=ResultSeverity.error,
-                    invert=True,
-                ),
-            ],
-        }
-    )
 
-    dev = FakeDevice()
-    overall, results = check.check_device(dev, conf.checks)
-    for result in results:
-        if result.severity != ResultSeverity.success:
-            print(result)
+def test_at2l0_standin(at2l0):
+    state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
+    severity = {
+        0: ResultSeverity.error,
+        1: ResultSeverity.success,
+        2: ResultSeverity.warning,
+        3: ResultSeverity.error,
+    }[state1.get()]
+    checks = {
+        at2l0.state_attrs: [
+            check.NotEquals(
+                description="Filter is moving",
+                value=0,
+                severity_on_failure=ResultSeverity.error,
+            ),
+            check.NotEquals(
+                description="Filter is out of the beam",
+                value=1,
+                severity_on_failure=ResultSeverity.success,
+            ),
+            check.NotEquals(
+                description="Filter is in the beam",
+                value=2,
+                severity_on_failure=ResultSeverity.warning,
+            ),
+            check.GreaterOrEqual(
+                description="Filter status unknown",
+                value=3,
+                severity_on_failure=ResultSeverity.error,
+                invert=True,
+            ),
+        ],
+    }
+
+    overall, results = check.check_device(at2l0, checks)
+    print("\n".join(res.reason or "n/a" for res in results))
+    assert overall == severity
+
+
+def test_at2l0_standin_value_map(at2l0):
+    state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
+    value_to_severity = {
+        0: ResultSeverity.error,
+        1: ResultSeverity.success,
+        2: ResultSeverity.warning,
+        3: ResultSeverity.error,
+    }
+
+    severity = value_to_severity[state1.get()]
+    checks = {
+        at2l0.state_attrs: [
+            check.ValueSet(
+                values=[
+                    check.Value(
+                        value=0,
+                        description="Filter is moving",
+                        severity=ResultSeverity.error,
+                    ),
+                    check.Value(
+                        description="Filter is out of the beam",
+                        value=1,
+                        severity=ResultSeverity.success,
+                    ),
+                    check.Value(
+                        description="Filter is in the beam",
+                        value=2,
+                        severity=ResultSeverity.warning,
+                    ),
+                ],
+            )
+        ]
+    }
+
+    overall, results = check.check_device(at2l0, checks)
+    print("\n".join(res.reason or "n/a" for res in results))
     assert overall == severity

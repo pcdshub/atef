@@ -80,6 +80,44 @@ PrimitiveType = Union[str, int, bool, float]
 
 
 @dataclass
+class Value:
+    """A primitive value with optional metadata."""
+    #: The value for comparison.
+    value: PrimitiveType
+    #: A description of what the value represents.
+    description: str = ""
+    #: Relative tolerance value.
+    rtol: Optional[Number] = None
+    #: Absolute tolerance value.
+    atol: Optional[Number] = None
+    #: Severity to set on a match (if applicable).
+    severity: ResultSeverity = ResultSeverity.success
+
+    def __str__(self) -> str:
+        if self.rtol is not None or self.atol is not None:
+            rtol = f"rtol={self.rtol}" if self.rtol is not None else ""
+            atol = f"atol={self.atol}" if self.atol is not None else ""
+            tolerance = " within " + ", ".join(tol for tol in (rtol, atol) if tol)
+        else:
+            tolerance = ""
+
+        value_desc = f"{self.value}{tolerance} -> {self.severity.name}"
+        if self.description:
+            return f"{self.description} ({value_desc})"
+        return value_desc
+
+    def compare(self, value: PrimitiveType) -> bool:
+        """Compare the provided value with this one, using tolerance settings."""
+        if self.rtol is not None or self.atol is not None:
+            return np.isclose(
+                value, self.value,
+                rtol=(self.rtol or 0.0),
+                atol=(self.atol or 0.0)
+            )
+        return value == self.value
+
+
+@dataclass
 @serialization.as_tagged_union
 class Comparison:
     """
@@ -187,23 +225,22 @@ class Equals(Comparison):
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
 
+    @property
+    def _value(self) -> Value:
+        return Value(
+            value=self.value,
+            rtol=self.rtol,
+            atol=self.atol,
+            description=self.description or "",
+        )
+
     def describe(self) -> str:
         """Describe the equality comparison in words."""
-        comparison = "==" if not self.invert else "!="
-        if self.rtol is not None or self.atol is not None:
-            tolerance = f" within rtol={self.rtol}, atol={self.atol}"
-        else:
-            tolerance = ""
-        return f"{comparison} {self.value}{tolerance}"
+        comparison = "Equal to" if not self.invert else "Not equal to"
+        return f"{comparison} {self._value}"
 
     def _compare(self, value: PrimitiveType) -> bool:
-        if self.rtol is not None or self.atol is not None:
-            return np.isclose(
-                value, self.value,
-                rtol=(self.rtol or 0.0),
-                atol=(self.atol or 0.0)
-            )
-        return value == self.value
+        return self._value.compare(value)
 
 
 @dataclass
@@ -213,23 +250,50 @@ class NotEquals(Comparison):
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
 
+    @property
+    def _value(self) -> Value:
+        return Value(
+            value=self.value,
+            rtol=self.rtol,
+            atol=self.atol,
+            description=self.description or "",
+        )
+
     def describe(self) -> str:
         """Describe the equality comparison in words."""
-        comparison = "==" if self.invert else "!="
-        if self.rtol is not None or self.atol is not None:
-            tolerance = f" within rtol={self.rtol}, atol={self.atol}"
-        else:
-            tolerance = ""
-        return f"{comparison} {self.value}{tolerance}"
+        comparison = "Equal to" if self.invert else "Not equal to"
+        return f"{comparison} {self._value}"
 
     def _compare(self, value: PrimitiveType) -> bool:
-        if self.rtol is not None or self.atol is not None:
-            return not np.isclose(
-                value, self.value,
-                rtol=(self.rtol or 0.0),
-                atol=(self.atol or 0.0)
-            )
-        return value != self.value
+        return not self._value.compare(value)
+
+
+@dataclass
+class ValueSet(Comparison):
+    """A set of values with corresponding severities and descriptions."""
+    # Review: really a "value sequence"/list as the first ones have priority,
+    # but that sounds like a vector version of "Value" above; better ideas?
+    values: Sequence[Value] = field(default_factory=list)
+
+    def describe(self) -> str:
+        """Describe the equality comparison in words."""
+        values = "\n".join(
+            str(value)
+            for value in self.values
+        )
+        return f"Any of:\n{values}"
+
+    def _compare(self, value: PrimitiveType) -> bool:
+        for compare_value in self.values:
+            if compare_value.compare(value):
+                if compare_value.severity == ResultSeverity.success:
+                    return True
+
+                reason = f"== {compare_value}"
+                if compare_value.severity == ResultSeverity.warning:
+                    raise ComparisonWarning(reason)
+                raise ComparisonError(reason)
+        return False
 
 
 @dataclass
