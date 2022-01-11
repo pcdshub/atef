@@ -89,7 +89,9 @@ class Comparison:
     #: Description tied to this comparison.
     description: Optional[str] = None
 
-    #: Invert the comparison's result.
+    #: Invert the comparison's result.  Normally, a valid comparison - that is,
+    #: one that evaluates to True - is considered successful.  When `invert` is
+    #: set, such a comparison would be considered a failure.
     invert: bool = False
 
     #: Period over which the comparison will occur, where multiple samples
@@ -180,7 +182,7 @@ class Comparison:
 
 
 @dataclass
-class Equality(Comparison):
+class Equals(Comparison):
     value: PrimitiveType = 0
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
@@ -202,6 +204,32 @@ class Equality(Comparison):
                 atol=(self.atol or 0.0)
             )
         return value == self.value
+
+
+@dataclass
+class NotEquals(Comparison):
+    # Less confusing shortcut for `Equals(..., invert=True)`
+    value: PrimitiveType = 0
+    rtol: Optional[Number] = None
+    atol: Optional[Number] = None
+
+    def describe(self) -> str:
+        """Describe the equality comparison in words."""
+        comparison = "==" if self.invert else "!="
+        if self.rtol is not None or self.atol is not None:
+            tolerance = f" within rtol={self.rtol}, atol={self.atol}"
+        else:
+            tolerance = ""
+        return f"{comparison} {self.value}{tolerance}"
+
+    def _compare(self, value: PrimitiveType) -> bool:
+        if self.rtol is not None or self.atol is not None:
+            return not np.isclose(
+                value, self.value,
+                rtol=(self.rtol or 0.0),
+                atol=(self.atol or 0.0)
+            )
+        return value != self.value
 
 
 @dataclass
@@ -392,7 +420,7 @@ def check_device(
     for attrs, checks in attr_to_checks.items():
         checks = tuple([checks] if isinstance(checks, Comparison) else checks)
         for comparison in checks:
-            for attr in attrs.split():
+            for attr in attrs.strip().split():
                 logger.debug(
                     "Checking %s.%s with comparison %s",
                     device.name, attr, comparison

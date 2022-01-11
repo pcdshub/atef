@@ -1,7 +1,8 @@
 import pytest
 
 from .. import check
-from ..check import Comparison, Equality, PrimitiveType, Result, ResultSeverity
+from ..check import (Comparison, Equals, NotEquals, PrimitiveType, Result,
+                     ResultSeverity)
 
 
 def _parametrize(comparison, *value_and_result):
@@ -26,7 +27,7 @@ success = Result(severity=ResultSeverity.success)
 
 
 @_parametrize(
-    Equality(value=1),
+    Equals(value=1),
     [1, ResultSeverity.success],
     [0, ResultSeverity.error],
 )
@@ -38,7 +39,7 @@ def test_equality_basic(
 
 
 @_parametrize(
-    Equality(value=1, invert=True),
+    Equals(value=1, invert=True),
     [0, ResultSeverity.success],
     [1, ResultSeverity.error],
 )
@@ -50,7 +51,19 @@ def test_equality_inverted(
 
 
 @_parametrize(
-    Equality(value=1, atol=1),
+    NotEquals(value=1),
+    [1, ResultSeverity.error],
+    [0, ResultSeverity.success],
+)
+def test_not_equals_basic(
+    comparison: Comparison, value: PrimitiveType, result: ResultSeverity
+):
+    assert comparison(value).severity == result
+    print(comparison(value).reason)
+
+
+@_parametrize(
+    Equals(value=1, atol=1),
     [0, ResultSeverity.success],
     [1, ResultSeverity.success],
     [2, ResultSeverity.success],
@@ -66,9 +79,9 @@ def test_equality_with_atol(
 @_parametrize(
     check.AnyComparison(
         comparisons=[
-            check.Equality(value=1),
-            check.Equality(value=2),
-            check.Equality(value=3),
+            check.Equals(value=1),
+            check.Equals(value=2),
+            check.Equals(value=3),
         ],
     ),
     [0, ResultSeverity.error],
