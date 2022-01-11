@@ -148,9 +148,9 @@ def test_greater_equal(
     [0, ResultSeverity.error],
     [1, ResultSeverity.warning],
     [2, ResultSeverity.warning],
-    [3, ResultSeverity.success],
+    [3, ResultSeverity.warning],
     [4, ResultSeverity.success],
-    [5, ResultSeverity.success],
+    [5, ResultSeverity.warning],
     [6, ResultSeverity.warning],
     [7, ResultSeverity.error],
 )
@@ -167,9 +167,9 @@ def test_range_inclusive(
     [0, ResultSeverity.error],
     [1, ResultSeverity.error],
     [2, ResultSeverity.warning],
-    [3, ResultSeverity.warning],
+    [3, ResultSeverity.success],
     [4, ResultSeverity.success],
-    [5, ResultSeverity.warning],
+    [5, ResultSeverity.success],
     [6, ResultSeverity.error],
     [7, ResultSeverity.error],
 )

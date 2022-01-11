@@ -3,8 +3,8 @@ from __future__ import annotations
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import (Any, Callable, Dict, List, Optional, Sequence, Tuple,
-                    Union, cast)
+from typing import (Any, Callable, Dict, Generator, List, Optional, Sequence,
+                    Tuple, Union)
 
 import numpy as np
 import ophyd
@@ -75,6 +75,14 @@ def _is_in_range(
     return low < value < high
 
 
+def _raise_for_severity(severity: ResultSeverity, reason: str):
+    if severity == ResultSeverity.success:
+        return True
+    if severity == ResultSeverity.warning:
+        raise ComparisonWarning(reason)
+    raise ComparisonError(reason)
+
+
 success = Result()
 PrimitiveType = Union[str, int, bool, float]
 
@@ -115,6 +123,44 @@ class Value:
                 atol=(self.atol or 0.0)
             )
         return value == self.value
+
+
+@dataclass
+class ValueRange:
+    """A range of primitive values with optional metadata."""
+    #: The low value for comparison.
+    low: Number
+    #: The high value for comparison.
+    high: Number
+    #: Should the low and high values be included in the range?
+    inclusive: bool = True
+    #: Check if inside the range.
+    in_range: bool = True
+    #: A description of what the value represents.
+    description: str = ""
+    #: Severity to set on a match (if applicable).
+    severity: ResultSeverity = ResultSeverity.success
+
+    def __str__(self) -> str:
+        open_paren, close_paren = "[]" if self.inclusive else "()"
+        inside = "inside" if self.in_range else "outside"
+        range_desc = f"{inside} {open_paren}{self.low}, {self.high}{close_paren}"
+        value_desc = f"{range_desc} -> {self.severity.name}"
+        if self.description:
+            return f"{self.description} ({value_desc})"
+        return value_desc
+
+    def compare(self, value: Number) -> bool:
+        """Compare the provided value with this range."""
+        in_range = _is_in_range(
+            value, low=self.low, high=self.high, inclusive=self.inclusive
+        )
+        if self.in_range:
+            # Normal functionality - is value in the range?
+            return in_range
+
+        # Inverted - is value outside of the range?
+        return not in_range
 
 
 @dataclass
@@ -286,13 +332,10 @@ class ValueSet(Comparison):
     def _compare(self, value: PrimitiveType) -> bool:
         for compare_value in self.values:
             if compare_value.compare(value):
-                if compare_value.severity == ResultSeverity.success:
-                    return True
-
-                reason = f"== {compare_value}"
-                if compare_value.severity == ResultSeverity.warning:
-                    raise ComparisonWarning(reason)
-                raise ComparisonError(reason)
+                _raise_for_severity(
+                    compare_value.severity, reason=f"== {compare_value}"
+                )
+                return True
         return False
 
 
@@ -376,46 +419,49 @@ class LessOrEqual(Comparison):
 
 @dataclass
 class Range(Comparison):
-    low: Optional[Number] = None
-    high: Optional[Number] = None
+    low: Number = 0
+    high: Number = 0
     warn_low: Optional[Number] = None
     warn_high: Optional[Number] = None
     inclusive: bool = True
 
-    def describe(self) -> str:
-        checks = []
-        open_paren, close_paren = "[]" if self.inclusive else "()"
-        if None not in (self.low, self.high):
-            checks.append(f"Error if {open_paren}{self.low}, {self.high}{close_paren}")
-        if None not in (self.warn_low, self.warn_high):
-            checks.append(
-                f"Warn if {open_paren}{self.warn_low}, {self.warn_high}{close_paren}"
+    @property
+    def ranges(self) -> Generator[ValueRange, None, None]:
+        yield ValueRange(
+            low=self.low,
+            high=self.high,
+            description=self.description or "",
+            inclusive=self.inclusive,
+            in_range=False,
+            severity=self.severity_on_failure,
+        )
+
+        if self.warn_low is not None and self.warn_high is not None:
+            yield ValueRange(
+                low=self.low,
+                high=self.warn_low,
+                description=self.description or "",
+                inclusive=self.inclusive,
+                in_range=True,
+                severity=ResultSeverity.warning,
             )
-        return "\n".join(checks)
+            yield ValueRange(
+                low=self.warn_high,
+                high=self.high,
+                description=self.description or "",
+                inclusive=self.inclusive,
+                in_range=True,
+                severity=ResultSeverity.warning,
+            )
+
+    def describe(self) -> str:
+        return "\n".join(str(range_) for range_ in self.ranges)
 
     def _compare(self, value: Number) -> bool:
-        if None not in (self.low, self.high):
-            in_range = _is_in_range(
-                value,
-                low=cast(Number, self.low),
-                high=cast(Number, self.high),
-                inclusive=self.inclusive,
-            )
-            if not in_range:
-                return False
+        for range_ in self.ranges:
+            if range_.compare(value):
+                _raise_for_severity(range_.severity, str(range_))
 
-        if None not in (self.warn_low, self.warn_high):
-            in_range = _is_in_range(
-                value,
-                low=cast(Number, self.warn_low),
-                high=cast(Number, self.warn_high),
-                inclusive=self.inclusive,
-            )
-
-            if not in_range:
-                raise ComparisonWarning(
-                    f"In warning range ({self.describe()})"
-                )
         return True
 
 
