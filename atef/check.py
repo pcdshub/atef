@@ -419,10 +419,41 @@ class LessOrEqual(Comparison):
 
 @dataclass
 class Range(Comparison):
+    """
+    A range comparison.
+
+    Notes
+    -----
+    If the following inequality holds, the range comparison will succeed:
+
+        low < value < high  (inclusive=False)
+        low <= value <= high  (inclusive=True)
+
+    Additionally, warning levels may be specified.  These should be configured
+    such that:
+
+        low <= warn_low <= warn_high <= high
+
+    With these warning levels configured, a warning will be raised when the
+    value falls within the following ranges.  For ``inclusive=False``::
+
+        low < value < warn_low
+        warn_high < value < high
+
+    or, when ``inclusive=True``:
+
+        low <= value <= warn_low
+        warn_high <= value <= high
+    """
+    #: The low end of the range, which must be <= high.
     low: Number = 0
+    #: The high end of the range, which must be >= low.
     high: Number = 0
+    #: The low end of the warning range, which must be <= warn_high.
     warn_low: Optional[Number] = None
+    #: The high end of the warning range, which must be >= warn_low.
     warn_high: Optional[Number] = None
+    #: Should the low and high values be included in the range?
     inclusive: bool = True
 
     @property
@@ -515,7 +546,9 @@ def check_device(
         The device to check.
 
     attr_to_checks : dict of attribute to Comparison(s)
-        Comparisons to run on the given device.
+        Comparisons to run on the given device.  Multiple attributes may
+        share the same checks. To specify multiple attribute names, delimit
+        the names by spaces.
 
     Returns
     -------
