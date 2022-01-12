@@ -377,6 +377,7 @@ class AnyComparison(Comparison):
 
 @dataclass
 class Greater(Comparison):
+    """Comparison: value > self.value."""
     value: Number = 0
 
     def describe(self) -> str:
@@ -388,6 +389,7 @@ class Greater(Comparison):
 
 @dataclass
 class GreaterOrEqual(Comparison):
+    """Comparison: value >= self.value."""
     value: Number = 0
 
     def describe(self) -> str:
@@ -399,6 +401,7 @@ class GreaterOrEqual(Comparison):
 
 @dataclass
 class Less(Comparison):
+    """Comparison: value < self.value."""
     value: Number = 0
 
     def describe(self) -> str:
@@ -410,6 +413,7 @@ class Less(Comparison):
 
 @dataclass
 class LessOrEqual(Comparison):
+    """Comparison: value <= self.value."""
     value: Number = 0
 
     def describe(self) -> str:
