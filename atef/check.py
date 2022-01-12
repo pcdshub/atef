@@ -16,19 +16,26 @@ Number = Union[int, float]
 logger = logging.getLogger(__name__)
 
 
-class ComparisonError(Exception):
-    """Raise this exception to error out in a comparator."""
-
-
-class ComparisonWarning(Exception):
-    """Raise this exception to warn in a comparator."""
-
-
 class Severity(enum.IntEnum):
     success = 0
     warning = 1
     error = 2
     internal_error = 3
+
+
+class ComparisonException(Exception):
+    """Raise this exception to exit a comparator and set severity."""
+    severity = Severity.success
+
+
+class ComparisonError(ComparisonException):
+    """Raise this exception to error out in a comparator."""
+    severity = Severity.error
+
+
+class ComparisonWarning(ComparisonException):
+    """Raise this exception to warn in a comparator."""
+    severity = Severity.warning
 
 
 class ReduceMethod(str, enum.Enum):
@@ -231,15 +238,10 @@ class Comparison:
 
         try:
             passed = self._compare(value)
-        except ComparisonError as ex:
+        except ComparisonException as ex:
             return Result(
-                severity=self.severity_on_failure,
-                reason=f"Value {value!r} errored: {ex}",
-            )
-        except ComparisonWarning as ex:
-            return Result(
-                severity=Severity.warning,
-                reason=f"Value {value!r} warned: {ex}",
+                severity=ex.severity,
+                reason=f"Value {value!r} {ex.severity.name}: {ex}",
             )
         except Exception as ex:
             return Result(
