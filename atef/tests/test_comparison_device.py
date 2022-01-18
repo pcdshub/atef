@@ -1,5 +1,6 @@
 import apischema
 import ophyd
+import ophyd.sim
 import pytest
 
 from .. import check
@@ -198,3 +199,40 @@ def test_at2l0_standin_value_map(at2l0):
     overall, results = check.check_device(at2l0, checks)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == severity
+
+
+def test_pv_conversion():
+    dev = check.pvs_to_device(["pv1 pv2", "pv3"])
+    assert dev._pv_to_attr_ == {
+        # Due to sort order
+        "pv1": "attr_0",
+        "pv2": "attr_1",
+        "pv3": "attr_2",
+    }
+
+    # TODO: FakeEpicsSignal has no pvname attribute
+    # fake_dev = ophyd.sim.make_fake_device(dev)(name="test")
+    # assert fake_dev.attr_0.name == "pv1"
+    # assert fake_dev.attr_1.name == "pv2"
+    # assert fake_dev.attr_2.name == "pv3"
+
+
+def test_pv_config_to_device_config():
+    check1 = check.Equals(value=1)
+    check2 = check.Equals(value=2)
+
+    pv_config = check.PVConfiguration(
+        description="abc",
+        checks={
+            "pv1 pv2": check1,
+            "pv3": check2,
+        }
+    )
+
+    _, config = check.pv_config_to_device_config(pv_config)
+    assert list(config.checks) == [
+        "attr_0 attr_1",
+        "attr_2",
+    ]
+
+    assert config.description == pv_config.description

@@ -3,8 +3,8 @@ from __future__ import annotations
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import (Any, Callable, Dict, Generator, List, Optional, Sequence,
-                    Tuple, Union)
+from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
+                    Sequence, Tuple, Type, Union)
 
 import numpy as np
 import ophyd
@@ -506,19 +506,28 @@ class Range(Comparison):
         return True
 
 
-AttrToChecks = Dict[
+ItemToChecks = Dict[
     str,
     Union[Comparison, Sequence[Comparison]],
 ]
 
 
 @dataclass
-class DeviceConfiguration:
+class Configuration:
     #: Description tied to this comparison.
     description: Optional[str] = None
 
-    # TODO: default severity settings?
-    checks: AttrToChecks = field(default_factory=dict)
+
+@dataclass
+class DeviceConfiguration(Configuration):
+    #: Dictionary of attribute name to sequence of checks (or single check).
+    checks: ItemToChecks = field(default_factory=dict)
+
+
+@dataclass
+class PVConfiguration(Configuration):
+    #: Dictionary of PV name to sequence of checks (or single check).
+    checks: ItemToChecks = field(default_factory=dict)
 
 
 def _single_attr_comparison(
@@ -545,7 +554,7 @@ def _single_attr_comparison(
 
 
 def check_device(
-    device: ophyd.Device, attr_to_checks: AttrToChecks
+    device: ophyd.Device, attr_to_checks: ItemToChecks
 ) -> Tuple[Severity, List[Result]]:
     """
     Check a given device using the list of comparisons.
@@ -584,3 +593,60 @@ def check_device(
                 results.append(result)
 
     return overall, results
+
+
+class _PVDevice(ophyd.Device):
+    _pv_to_attr_: ClassVar[Dict[str, str]]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Set all signals to be just their PV name for now.
+        for attr in self.component_names:
+            sig = getattr(self, attr)
+            sig.name = getattr(sig, "pvname", sig.name)
+
+
+_pv_to_device_cache = {}
+
+
+def pvs_to_device(pvs: Sequence[str]) -> Type[_PVDevice]:
+    """Take PV-based items to check and make a device out of them."""
+    pv_names = tuple(
+        sum((item.strip().split() for item in sorted(pvs)), [])
+    )
+    if pv_names in _pv_to_device_cache:
+        return _pv_to_device_cache[pv_names]
+
+    pv_to_attr = {
+        pv: f"attr_{idx}"
+        for idx, pv in enumerate(pv_names)
+    }
+    components = {
+        attr: ophyd.device.Component(ophyd.EpicsSignalRO, pv, kind="config")
+        for pv, attr in pv_to_attr.items()
+    }
+    device = ophyd.device.create_device_from_components(
+        name="PVDevice",
+        base_class=_PVDevice,
+        **components
+    )
+    device._pv_to_attr_ = pv_to_attr
+    _pv_to_device_cache[pv_names] = device
+    return device
+
+
+def pv_config_to_device_config(
+    config: PVConfiguration,
+) -> Tuple[Type[_PVDevice], DeviceConfiguration]:
+    """Take PV-based items to check and make a device out of them."""
+    device = pvs_to_device(list(config.checks))
+    attr_checks: ItemToChecks = {}
+    for item, checks in sorted(config.checks.items()):
+        attrs = " ".join(device._pv_to_attr_[pv] for pv in item.strip().split())
+        attr_checks[attrs] = checks
+
+    return device, DeviceConfiguration(
+        description=config.description,
+        checks=attr_checks,
+    )
