@@ -192,6 +192,10 @@ class Comparison:
     #: Reduce collected samples by this method.
     method: ReduceMethod = ReduceMethod.average
 
+    #: If applicable, request and compare string values rather than the default
+    #: specified.
+    string: Optional[bool] = None
+
     #: If the comparison fails, use this result severity.
     severity_on_failure: Severity = Severity.error
 
