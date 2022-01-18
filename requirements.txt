@@ -1,6 +1,7 @@
-bluesky
-ophyd
-numpy
-ipython
 archapp
+bluesky
+ipython
+numpy
+ophyd
 typing-extensions
+pyyaml

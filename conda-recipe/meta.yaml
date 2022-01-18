@@ -23,6 +23,7 @@ requirements:
     - ipython
     - numpy
     - ophyd
+    - pyyaml
     - typing-extensions  # [py<38]
 
 test:

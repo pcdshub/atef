@@ -526,6 +526,9 @@ class DeviceConfiguration(Configuration):
 
 @dataclass
 class PVConfiguration(Configuration):
+    #: Name of this PV grouping.
+    name: Optional[str] = "PVConfig"
+
     #: Dictionary of PV name to sequence of checks (or single check).
     checks: ItemToChecks = field(default_factory=dict)
 
