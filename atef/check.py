@@ -530,6 +530,19 @@ class PVConfiguration(Configuration):
     checks: ItemToChecks = field(default_factory=dict)
 
 
+@dataclass
+class ConfigurationFile:
+    """
+    A configuration file comprised of a number of devices/PV configurations.
+    """
+
+    #: Dictionary of happi device name to DeviceConfiguration.
+    devices: Dict[str, DeviceConfiguration]
+
+    #: PVConfiguration devices.
+    pvs: List[PVConfiguration]
+
+
 def _single_attr_comparison(
     device: ophyd.Device, attr: str, comparison: Comparison
 ) -> Result:
@@ -639,7 +652,23 @@ def pvs_to_device(pvs: Sequence[str]) -> Type[_PVDevice]:
 def pv_config_to_device_config(
     config: PVConfiguration,
 ) -> Tuple[Type[_PVDevice], DeviceConfiguration]:
-    """Take PV-based items to check and make a device out of them."""
+    """
+    Take PVConfiguration and make a Device class and DeviceConfiguration.
+
+    Parameters
+    ----------
+    config : PVConfiguration
+        The PV name-based configuration.
+
+    Returns
+    -------
+    dev : _PVDevice subclass
+        A dynamically-generated ophyd Device for the configuration.
+
+    device_config : DeviceConfiguration
+        The attribute-based DeviceConfiguration, which works with the generated
+        device class above.
+    """
     device = pvs_to_device(list(config.checks))
     attr_checks: ItemToChecks = {}
     for item, checks in sorted(config.checks.items()):
