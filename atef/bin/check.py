@@ -13,6 +13,7 @@ import yaml
 
 from ..check import (Configuration, ConfigurationFile, Result, Severity,
                      check_device, pv_config_to_device_config)
+from ..util import ophyd_cleanup
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,4 @@ def main(
             logger.log(log_level, result.reason)
 
     if cleanup:
-        # Avoid teardown errors in ophyd
-        dispatcher = ophyd.cl.get_dispatcher()
-        if dispatcher is not None:
-            dispatcher.stop()
+        ophyd_cleanup()
