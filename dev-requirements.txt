@@ -12,3 +12,5 @@ sphinx_rtd_theme
 doctr
 docs-versions-menu
 recommonmark
+
+pcdsdevices

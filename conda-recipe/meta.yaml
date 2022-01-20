@@ -18,15 +18,21 @@ requirements:
     - pip
   run:
     - python >=3.7
+    - apischema
     - archapp
     - bluesky
     - bluesky-widgets
     - bluesky-queueserver
+    - happi
     - ipython
     - numpy
     - ophyd
+    - pydm
     - pyyaml
+    - qtpy
+    - pyqt
     - rich
+    - typhos
     - typing-extensions  # [py<38]
 
 test:

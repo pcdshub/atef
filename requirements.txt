@@ -1,10 +1,16 @@
+apischema
 archapp
 bluesky
 bluesky-queueserver
 bluesky-widgets
+happi
 ipython
 numpy
 ophyd
+pydm
+PyQt5
 pyyaml
+qtpy
 rich
+typhos
 typing-extensions
