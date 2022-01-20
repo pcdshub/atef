@@ -22,12 +22,9 @@ env:
     - CONDA_REQUIREMENTS="dev-requirements.txt"
 
 
-# jobs:
-#   allow_failures:
-#     # This makes the PIP based Python 3.6 optional for passing.
-#     # Remove this block if passing tests with PIP is mandatory for your
-#     # package
-#     - name: "Python - PIP"
+jobs:
+  allow_failures:
+    - name: "Python - PIP"
 
 import:
   - pcdshub/pcds-ci-helpers:travis/shared_configs/standard-python-conda.yml
