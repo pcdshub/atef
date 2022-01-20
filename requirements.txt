@@ -1,8 +1,10 @@
 archapp
 bluesky
+bluesky-queueserver
+bluesky-widgets
 ipython
 numpy
 ophyd
+pyyaml
 rich
 typing-extensions
-pyyaml

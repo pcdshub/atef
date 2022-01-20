@@ -3,6 +3,11 @@ import datetime
 import pathlib
 from typing import Any, Dict, Optional
 
+import pydm
+import pydm.exception
+import pytest
+from qtpy import QtWidgets
+
 from ..archive_device import ArchivedValue, ArchiverHelper
 
 TEST_PATH = pathlib.Path(__file__).parent.resolve()
@@ -52,3 +57,21 @@ class MockEpicsArch:
             yield
         finally:
             helper.appliances = orig
+
+
+@pytest.fixture(scope='session', autouse=True)
+def qapp(pytestconfig):
+    global application
+    application = QtWidgets.QApplication.instance()
+    if application is None:
+        application = pydm.PyDMApplication(use_main_window=False)
+    return application
+
+
+@pytest.fixture(scope='function', autouse=True)
+def non_interactive_qt_application(monkeypatch):
+    monkeypatch.setattr(QtWidgets.QApplication, 'exec_', lambda x: 1)
+    monkeypatch.setattr(QtWidgets.QApplication, 'exit', lambda x: 1)
+    monkeypatch.setattr(
+        pydm.exception, 'raise_to_operator', lambda *_, **__: None
+    )
