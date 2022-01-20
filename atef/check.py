@@ -116,7 +116,7 @@ class Value:
         else:
             tolerance = ""
 
-        value_desc = f"{self.value}{tolerance} -> {self.severity.name}"
+        value_desc = f"{self.value}{tolerance} results in {self.severity.name}"
         if self.description:
             return f"{self.description} ({value_desc})"
         return value_desc
@@ -232,25 +232,41 @@ class Comparison:
             )
         return f"{self.__class__.__name__}({desc})"
 
-    def compare(self, value: Any) -> Result:
-        """Compare the provided value using the comparator's settings."""
+    def compare(self, value: Any, identifier: Optional[str] = None) -> Result:
+        """
+        Compare the provided value using the comparator's settings.
+
+        Parameters
+        ----------
+        value :
+            The value to compare.
+
+        identifier : str, optional
+            An identifier that goes along with the provided value.  Used for
+            severity result descriptions.
+        """
         if value is None:
             return Result(
                 severity=self.if_disconnected,
                 reason="Value unset (i.e., disconnected)",
             )
 
+        identifier_prefix = f"{identifier} " if identifier else ""
+
         try:
             passed = self._compare(value)
         except ComparisonException as ex:
             return Result(
                 severity=ex.severity,
-                reason=f"Value {value!r} {ex.severity.name}: {ex}",
+                reason=f"{identifier_prefix}Value {value!r} {ex.severity.name}: {ex}",
             )
         except Exception as ex:
             return Result(
                 severity=Severity.internal_error,
-                reason=f"Value {value!r} raised {ex.__class__.__name__}: {ex}",
+                reason=(
+                    f"{identifier_prefix}Value {value!r} "
+                    f"raised {ex.__class__.__name__}: {ex}"
+                ),
             )
 
         if self.invert:
@@ -261,7 +277,9 @@ class Comparison:
 
         desc = self.describe()
         if self.description:
-            desc = f"{self.description} ({desc})"
+            desc = f"{identifier_prefix}{self.description} ({desc})"
+        else:
+            desc = f"{identifier_prefix}{desc}"
 
         return Result(
             severity=self.severity_on_failure,
@@ -288,7 +306,7 @@ class Equals(Comparison):
 
     def describe(self) -> str:
         """Describe the equality comparison in words."""
-        comparison = "Equal to" if not self.invert else "Not equal to"
+        comparison = "equal to" if not self.invert else "not equal to"
         return f"{comparison} {self._value}"
 
     def _compare(self, value: PrimitiveType) -> bool:
@@ -313,7 +331,7 @@ class NotEquals(Comparison):
 
     def describe(self) -> str:
         """Describe the equality comparison in words."""
-        comparison = "Equal to" if self.invert else "Not equal to"
+        comparison = "equal to" if self.invert else "not equal to"
         return f"{comparison} {self._value}"
 
     def _compare(self, value: PrimitiveType) -> bool:
@@ -353,7 +371,7 @@ class AnyValue(Comparison):
     def describe(self) -> str:
         """Describe the comparison in words."""
         values = ", ".join(str(value) for value in self.values)
-        return f"One of {values}"
+        return f"one of {values}"
 
     def _compare(self, value: PrimitiveType) -> bool:
         return value in self.values
@@ -370,7 +388,7 @@ class AnyComparison(Comparison):
             comparison.describe()
             for comparison in self.comparisons
         )
-        return f"Any of:\n{comparisons}"
+        return f"any of:\n{comparisons}"
 
     def _compare(self, value: PrimitiveType) -> bool:
         return any(
@@ -558,7 +576,12 @@ def _single_attr_comparison(
                 severity=comparison.if_disconnected,
                 reason=f"Signal disconnected when reading: {signal}"
             )
-        return comparison.compare(value)
+        identifier = (
+            signal.name
+            if signal.attr_name.startswith("attr_")
+            else signal.dotted_name
+        )
+        return comparison.compare(value, identifier=identifier)
     except Exception as ex:
         return Result(
             severity=Severity.internal_error,
