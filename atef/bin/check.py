@@ -9,6 +9,8 @@ from typing import Dict, Generator, List, Optional, Sequence, Tuple, Union
 import apischema
 import happi
 import ophyd
+import rich
+import rich.console
 import yaml
 
 from ..check import (ConfigurationFile, DeviceConfiguration, PVConfiguration,
@@ -127,6 +129,34 @@ def log_results(
         logger.log(log_level, result.reason)
 
 
+def log_results_rich(
+    console: rich.console.Console,
+    device: ophyd.Device,
+    severity: Severity,
+    config: Union[PVConfiguration, DeviceConfiguration],
+    results: List[Result],
+    *,
+    severity_to_rich: Optional[Dict[Severity, str]] = None,
+):
+    """Log check results to the module logger."""
+    severity_to_rich = severity_to_rich or default_severity_to_rich
+
+    desc = f" ({config.description}) " if config.description else ""
+    console.print(f"Device {device.name}{desc}", severity_to_rich[severity])
+    for result in results:
+        if result.severity > Severity.success:
+            console.print(
+                "  * ", severity_to_rich[result.severity], ": ", result.reason, sep=""
+            )
+
+
+default_severity_to_rich = {
+    Severity.success: "[bold green]Success",
+    Severity.warning: "[bold yellow]Warning",
+    Severity.error: "[bold red]Error",
+    Severity.internal_error: "[bold red]Internal error",
+}
+
 default_severity_to_log_level = {
     Severity.success: logging.DEBUG,
     Severity.warning: logging.WARNING,
@@ -144,16 +174,19 @@ def main(
     serialized_config = yaml.safe_load(open(filename))
     config = apischema.deserialize(ConfigurationFile, serialized_config)
 
+    console = rich.console.Console()
     try:
-        for dev, config, severity, results in check_config_file(
-            config, filtered_devices=filtered_devices
-        ):
-            log_results(
-                device=dev,
-                config=config,
-                severity=severity,
-                results=results,
-            )
+        with console.status("[bold green] Performing checks..."):
+            for dev, config, severity, results in check_config_file(
+                config, filtered_devices=filtered_devices
+            ):
+                log_results_rich(
+                    console,
+                    device=dev,
+                    config=config,
+                    severity=severity,
+                    results=results,
+                )
     finally:
         if cleanup:
             ophyd_cleanup()

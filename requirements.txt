@@ -3,5 +3,6 @@ bluesky
 ipython
 numpy
 ophyd
+rich
 typing-extensions
 pyyaml
