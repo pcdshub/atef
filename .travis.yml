@@ -27,7 +27,7 @@ jobs:
     - name: "Python - PIP"
 
 import:
-  - pcdshub/pcds-ci-helpers:travis/shared_configs/standard-python-conda.yml
+  - pcdshub/pcds-ci-helpers:travis/shared_configs/standard-python-conda-latest.yml
 
 # If not using the standard-python-conda above please uncomment the required
 # (language, os, dist and stages) and optional (import statements) entries from
