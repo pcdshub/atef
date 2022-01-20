@@ -116,7 +116,7 @@ class Value:
         else:
             tolerance = ""
 
-        value_desc = f"{self.value}{tolerance} results in {self.severity.name}"
+        value_desc = f"{self.value}{tolerance} (for a result of {self.severity.name})"
         if self.description:
             return f"{self.description} ({value_desc})"
         return value_desc
@@ -224,13 +224,13 @@ class Comparison:
 
     def __str__(self) -> str:
         try:
-            desc = self.describe()
+            return self.describe()
         except Exception as ex:
-            desc = (
+            return (
                 f"{self.__class__.__name__}.describe() failure "
                 f"({ex.__class__.__name__}: {ex})"
             )
-        return f"{self.__class__.__name__}({desc})"
+        # return f"{self.__class__.__name__}({desc})"
 
     def compare(self, value: Any, identifier: Optional[str] = None) -> Result:
         """
@@ -284,7 +284,7 @@ class Comparison:
         return Result(
             severity=self.severity_on_failure,
             reason=(
-                f"{value} failed: {desc}"
+                f"{desc}: value of {value}"
             ),
         )
 
@@ -586,7 +586,7 @@ def _single_attr_comparison(
         return Result(
             severity=Severity.internal_error,
             reason=(
-                f"Checking attribute {attr!r} with {comparison} "
+                f"Checking if {attr!r} {comparison} "
                 f"raised {ex.__class__.__name__}: {ex}"
             ),
         )
