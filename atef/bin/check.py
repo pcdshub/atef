@@ -4,7 +4,8 @@
 
 import argparse
 import logging
-from typing import Dict, Generator, List, Optional, Sequence, Tuple, Union
+from dataclasses import dataclass
+from typing import Dict, Generator, List, Optional, Sequence, Union, cast
 
 import apischema
 import happi
@@ -37,6 +38,12 @@ def build_arg_parser(argparser=None):
     )
 
     argparser.add_argument(
+        "-v", "--verbose",
+        action="count",
+        help="Increase output verbosity",
+    )
+
+    argparser.add_argument(
         "--device",
         type=str,
         nargs="*",
@@ -50,10 +57,34 @@ def build_arg_parser(argparser=None):
 AnyConfiguration = Union[PVConfiguration, DeviceConfiguration]
 
 
-def check_config_file(
+@dataclass
+class DeviceAndConfig:
+    device: ophyd.Device
+    dev_config: DeviceConfiguration
+    pv_config: Optional[PVConfiguration] = None
+
+
+class ConfigFileLoadError(Exception):
+    ...
+
+
+class ConfigFileHappiError(ConfigFileLoadError):
+    dev_name: str
+    dev_config: DeviceConfiguration
+
+
+class MissingHappiDeviceError(ConfigFileHappiError):
+    ...
+
+
+class HappiLoadError(ConfigFileHappiError):
+    ...
+
+
+def get_configurations_from_file(
     config: ConfigurationFile,
     filtered_devices: Optional[Sequence[str]] = None
-) -> Generator[Tuple[ophyd.Device, AnyConfiguration, Severity, List[Result]], None, None]:
+) -> Generator[Union[DeviceAndConfig, Exception], None, None]:
     for pv_config in config.pvs:
         if filtered_devices and pv_config.name not in filtered_devices:
             logger.debug(
@@ -65,8 +96,7 @@ def check_config_file(
         logger.debug("PV-only configuration %s -> %s", pv_config.name, dev_cls.__name__)
 
         dev = dev_cls(name=pv_config.name or "PVConfig")
-        severity, results = check_device(dev, dev_config.checks)
-        yield (dev, pv_config, severity, results)
+        yield DeviceAndConfig(dev, dev_config, pv_config)
 
     if not config.devices:
         return
@@ -80,27 +110,32 @@ def check_config_file(
         try:
             search_result = client[dev_name]
         except KeyError:
-            logger.error("Device %s not in happi database; skipping", dev_name)
+            ex = MissingHappiDeviceError(
+                f"Device {dev_name} not in happi database; skipping"
+            )
+            ex.dev_name = dev_name
+            ex.dev_config = cast(DeviceConfiguration, dev_config)
+            yield ex
             continue
 
         try:
             dev = search_result.get()
         except Exception as ex:
-            logger.error(
-                "Device %s invalid in happi database; skipping (%s: %s)",
-                dev_name,
-                ex.__class__.__name__,
-                ex,
-            )
             logger.debug(
                 "Failed to instantiate device %r",
                 dev_name,
                 exc_info=True,
             )
+            load_ex = HappiLoadError(
+                f"Device {dev_name} invalid in happi database; "
+                f"{ex.__class__.__name__}: {ex}"
+            )
+            load_ex.dev_name = dev_name
+            load_ex.dev_config = cast(DeviceConfiguration, dev_config)
+            yield load_ex
             continue
 
-        severity, results = check_device(dev, dev_config.checks)
-        yield (dev, dev_config, severity, results)
+        yield DeviceAndConfig(dev, dev_config)
 
 
 def log_results(
@@ -137,6 +172,7 @@ def log_results_rich(
     results: List[Result],
     *,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
+    verbose: int = 0,
 ):
     """Log check results to the module logger."""
     severity_to_rich = severity_to_rich or default_severity_to_rich
@@ -144,17 +180,17 @@ def log_results_rich(
     desc = f" ({config.description}) " if config.description else ""
     console.print(f"Device {device.name}{desc}", severity_to_rich[severity])
     for result in results:
-        if result.severity > Severity.success:
+        if result.severity > Severity.success or verbose > 0:
             console.print(
                 "  * ", severity_to_rich[result.severity], ": ", result.reason, sep=""
             )
 
 
 default_severity_to_rich = {
-    Severity.success: "[bold green]Success",
-    Severity.warning: "[bold yellow]Warning",
-    Severity.error: "[bold red]Error",
-    Severity.internal_error: "[bold red]Internal error",
+    Severity.success: "[bold green]:heavy_check_mark: Success",
+    Severity.warning: "[bold yellow]:heavy_check_mark: Warning",
+    Severity.error: "[bold red]:x: Error",
+    Severity.internal_error: "[bold red]:x: Internal error",
 }
 
 default_severity_to_log_level = {
@@ -168,6 +204,7 @@ default_severity_to_log_level = {
 def main(
     filename: str,
     filtered_devices: Optional[Sequence[str]] = None,
+    verbose: int = 0,
     *,
     cleanup: bool = True
 ):
@@ -177,15 +214,24 @@ def main(
     console = rich.console.Console()
     try:
         with console.status("[bold green] Performing checks..."):
-            for dev, config, severity, results in check_config_file(
+            for info in get_configurations_from_file(
                 config, filtered_devices=filtered_devices
             ):
+                if isinstance(info, ConfigFileHappiError):
+                    console.print("Failed to load", info.dev_name)
+                    continue
+                if isinstance(info, Exception):
+                    console.print("Failed to load", info)
+                    continue
+
+                severity, results = check_device(info.device, info.dev_config.checks)
                 log_results_rich(
                     console,
-                    device=dev,
-                    config=config,
+                    device=info.device,
+                    config=info.dev_config,
                     severity=severity,
                     results=results,
+                    verbose=verbose,
                 )
     finally:
         if cleanup:
