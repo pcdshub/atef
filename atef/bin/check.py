@@ -12,6 +12,7 @@ import happi
 import ophyd
 import rich
 import rich.console
+import rich.tree
 import yaml
 
 from ..check import (ConfigurationFile, DeviceConfiguration, PVConfiguration,
@@ -54,30 +55,49 @@ def build_arg_parser(argparser=None):
     return argparser
 
 
+default_severity_to_rich = {
+    Severity.success: "[bold green]:heavy_check_mark: Success",
+    Severity.warning: "[bold yellow]:heavy_check_mark: Warning",
+    Severity.error: "[bold red]:x: Error",
+    Severity.internal_error: "[bold red]:x: Internal error",
+}
+
+default_severity_to_log_level = {
+    Severity.success: logging.DEBUG,
+    Severity.warning: logging.WARNING,
+    Severity.error: logging.ERROR,
+    Severity.internal_error: logging.ERROR,
+}
+
 AnyConfiguration = Union[PVConfiguration, DeviceConfiguration]
 
 
 @dataclass
 class DeviceAndConfig:
+    """Device and configuration(s) from a ConfigurationFile."""
     device: ophyd.Device
     dev_config: DeviceConfiguration
     pv_config: Optional[PVConfiguration] = None
 
 
 class ConfigFileLoadError(Exception):
+    """Generic configuration file loading failure."""
     ...
 
 
 class ConfigFileHappiError(ConfigFileLoadError):
+    """Config file load error relating to a happi device."""
     dev_name: str
     dev_config: DeviceConfiguration
 
 
 class MissingHappiDeviceError(ConfigFileHappiError):
+    """Config file load error: the happi device doesn't exist."""
     ...
 
 
 class HappiLoadError(ConfigFileHappiError):
+    """Config file load error: the happi device couldn't be instantiated."""
     ...
 
 
@@ -85,6 +105,15 @@ def get_configurations_from_file(
     config: ConfigurationFile,
     filtered_devices: Optional[Sequence[str]] = None
 ) -> Generator[Union[DeviceAndConfig, Exception], None, None]:
+    """
+    Get all devices and configurations from the given configuration file.
+
+    Yields
+    ------
+    config : DeviceAndConfig or Exception
+        The configuration entry, if valid, or an exception detailing what went
+        wrong with the entry.
+    """
     for pv_config in config.pvs:
         if filtered_devices and pv_config.name not in filtered_devices:
             logger.debug(
@@ -178,27 +207,14 @@ def log_results_rich(
     severity_to_rich = severity_to_rich or default_severity_to_rich
 
     desc = f" ({config.description}) " if config.description else ""
-    console.print(f"Device {device.name}{desc}", severity_to_rich[severity])
+
+    tree = rich.tree.Tree(f"{severity_to_rich[severity]} [default]{device.name}{desc}")
     for result in results:
         if result.severity > Severity.success or verbose > 0:
-            console.print(
-                "  * ", severity_to_rich[result.severity], ": ", result.reason, sep=""
+            tree.add(
+                f"{severity_to_rich[result.severity]}[default]: {result.reason}"
             )
-
-
-default_severity_to_rich = {
-    Severity.success: "[bold green]:heavy_check_mark: Success",
-    Severity.warning: "[bold yellow]:heavy_check_mark: Warning",
-    Severity.error: "[bold red]:x: Error",
-    Severity.internal_error: "[bold red]:x: Internal error",
-}
-
-default_severity_to_log_level = {
-    Severity.success: logging.DEBUG,
-    Severity.warning: logging.WARNING,
-    Severity.error: logging.ERROR,
-    Severity.internal_error: logging.ERROR,
-}
+    console.print(tree)
 
 
 def main(
