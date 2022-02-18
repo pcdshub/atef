@@ -3,6 +3,7 @@
 coverage
 flake8
 pytest
+pytest-timeout
 
 # sphinx-related dependencies:
 sphinx
@@ -12,3 +13,5 @@ sphinx_rtd_theme
 doctr
 docs-versions-menu
 recommonmark
+
+pcdsdevices

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, Optional, Union
+from enum import Enum
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import apischema
+
+Number = Union[float, int]
 
 
 @dataclass
@@ -60,8 +63,88 @@ class ThresholdStep:
 
 
 @dataclass
-class FieldThreshold:
-    steps: List[ThresholdStep] = field(default_factory=list)
+class Threshold:
+    color: Optional[str] = None
+    state: Optional[str] = None
+    value: Optional[Number] = None
+
+
+class ThresholdsMode(str, Enum):
+    Absolute = "absolute"
+    #: between 0 and 1 (based on min/max)
+    Percentage = "percentage"
+
+
+@dataclass
+class ThresholdsConfig:
+    mode: ThresholdsMode
+    steps: Optional[List[Threshold]] = field(default_factory=list)
+
+
+class FieldColorSeriesByMode(str, Enum):
+    min = "min"
+    max = "max"
+    last = "last"
+
+
+class FieldColorModeId(str, Enum):
+    ContinuousGrYlRd = "continuous-GrYlRd"
+    Fixed = "fixed"
+    PaletteClassic = "palette-classic"
+    PaletteSaturated = "palette-saturated"
+    Thresholds = "thresholds"
+
+
+class NullValueMode(str, Enum):
+    AsZero = "null as zero"
+    Ignore = "connected"
+    Null = "null"
+
+
+@dataclass
+class FieldColor:
+    fixedColor: Optional[str] = None
+    mode: Union[FieldColorModeId, str] = ""
+    seriesBy: Optional[FieldColorSeriesByMode] = None
+
+
+@dataclass
+class FieldConfigSettings:
+    color: Optional[FieldColor] = None
+    custom: Optional[Any] = None
+    decimals: Optional[int] = None
+    description: Optional[str] = None
+    #: The display value for this field. This supports template variables blank
+    #: is auto
+    displayName: Optional[str] = None
+    #: This can be used by data sources that return and explicit naming
+    #: structure for values and labels When this property is configured, this
+    #: value is used rather than the default naming strategy.
+    displayNameFromDS: Optional[str] = None
+    #: True if data source field supports ad-hoc filters
+    filterable: Optional[bool] = False
+    # links: List[DataLink] = field(default_factory=list)
+    links: Optional[List[dict]] = field(default_factory=list)
+    # mappings: List[ValueMapping]  = field(default_factory=list)
+    mappings: Optional[List[dict]] = field(default_factory=list)
+    max: Optional[Number] = None
+    min: Optional[Number] = None
+    noValue: Optional[str] = None
+    nullValueMode: Optional[NullValueMode] = None
+    #: An explict path to the field in the datasource. When the frame meta
+    #: includes a path, This will default to `${frame.meta.path}/${field.name}
+    #: When defined, this value can be used as an identifier within the datasource
+    #: scope, and may be used to update the results
+    path: Optional[str] = None
+    thresholds: Optional[ThresholdsConfig] = None
+    unit: Optional[str] = None
+    writeable: Optional[bool] = False
+
+
+@dataclass
+class FieldConfig:
+    overrides: Optional[List[dict]] = field(default_factory=list)  # ?
+    defaults: Optional[FieldConfigSettings] = None
 
 
 @dataclass
@@ -83,6 +166,14 @@ class Panel:
     targets: List[AnyPanelTarget] = field(default_factory=list)
     links: List[DashboardLink] = field(default_factory=list)
 
+    @property
+    def targets_by_id(self) -> Dict[str, AnyPanelTarget]:
+        """Targets by their reference ID."""
+        return {
+            target.refId: target
+            for target in self.targets
+        }
+
 
 @dataclass
 class RowPanel(Panel):
@@ -96,15 +187,6 @@ class ReduceOptions:
     calcs: List[str] = field(default_factory=list)
     fields: str = ""
     values: bool = False
-
-
-@dataclass
-class BarGaugeOptions:
-    displayMode: str = "basic"
-    orientation: str = "auto"
-    reduceOptions: ReduceOptions = field(default_factory=ReduceOptions)
-    showUnfilled: bool = False
-    text: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -136,10 +218,19 @@ AnyPanelTarget = Union[EpicsArchiverPanelTarget]
 
 
 @dataclass
+class BarGaugeOptions:
+    displayMode: str = "basic"
+    orientation: str = "auto"
+    reduceOptions: ReduceOptions = field(default_factory=ReduceOptions)
+    showUnfilled: bool = False
+    text: dict = field(default_factory=dict)
+
+
+@dataclass
 class BarGaugePanel(Panel):
     type: Literal["bargauge"] = "bargauge"
 
-    fieldConfig: Dict = field(default_factory=dict)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: BarGaugeOptions = field(default_factory=BarGaugeOptions)
 
 
@@ -147,7 +238,7 @@ class BarGaugePanel(Panel):
 class GaugePanel(Panel):
     type: Literal["gauge"] = "gauge"
 
-    fieldConfig: Dict = field(default_factory=dict)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: dict = field(default_factory=dict)
 
 
@@ -169,7 +260,7 @@ class StatPanelOptions:
 class StatPanel(Panel):
     type: Literal["stat"] = "stat"
 
-    fieldConfig: Dict = field(default_factory=dict)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: StatPanelOptions = field(default_factory=StatPanelOptions)
 
 
@@ -215,7 +306,7 @@ class GraphLegend:
 class GraphPanel(Panel):
     type: Literal["graph"] = "graph"
 
-    fieldConfig: Dict = field(default_factory=dict)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: GraphPanelOptions = field(default_factory=GraphPanelOptions)
     aliasColors: dict = field(default_factory=dict)
     bars: bool = False
@@ -250,7 +341,7 @@ class GraphPanel(Panel):
 class TimeSeriesPanel(Panel):
     type: Literal["timeseries"] = "timeseries"
 
-    fieldConfig: dict = field(default_factory=dict)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: dict = field(default_factory=dict)
 
 

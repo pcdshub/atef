@@ -14,12 +14,13 @@ import atef
 DESCRIPTION = __doc__
 
 
-MODULES = ("help", )
+COMMAND_TO_MODULE = {
+    "check": "check",
+}
 
 
-def _try_import(module):
-    relative_module = f'.{module}'
-    return importlib.import_module(relative_module, 'atef.bin')
+def _try_import(module_name):
+    return importlib.import_module(f".{module_name}", 'atef.bin')
 
 
 def _build_commands():
@@ -27,21 +28,21 @@ def _build_commands():
     result = {}
     unavailable = []
 
-    for module in sorted(MODULES):
+    for command, module_name in sorted(COMMAND_TO_MODULE.items()):
         try:
-            mod = _try_import(module)
+            module = _try_import(module_name)
         except Exception as ex:
-            unavailable.append((module, ex))
+            unavailable.append((command, ex))
         else:
-            result[module] = (mod.build_arg_parser, mod.main)
-            DESCRIPTION += f'\n    $ atef {module} --help'
+            result[module_name] = (module.build_arg_parser, module.main)
+            DESCRIPTION += f'\n    $ atef {command} --help'
 
     if unavailable:
         DESCRIPTION += '\n\n'
 
-        for module, ex in unavailable:
+        for command, ex in unavailable:
             DESCRIPTION += (
-                f'\nWARNING: "atef {module}" is unavailable due to:'
+                f'\nWARNING: "atef {command}" is unavailable due to:'
                 f'\n\t{ex.__class__.__name__}: {ex}'
             )
 
