@@ -9,34 +9,26 @@ atef
         :target: https://pypi.python.org/pypi/atef
 
 
-Python Automated Test Execution Framework
+ATEF: "Automated Test Execution Framework"
 
-Documentation
--------------
+This is alpha-level software and does not include much in the way of working functionality just yet.
 
-Sphinx-generated documentation for this project can be found here:
-https://pcdshub.github.io/atef/
+While the project has "automated" in its name, that is only one part of atef.
+At this point - this is all subject to change - the project is broken up into several
+different parts:
 
-
-Requirements
-------------
-
-Describe the project requirements (i.e. Python version, packages and how to install them)
-
-Installation
-------------
-
-Describe the installation procedure
-
-Running the Tests
------------------
-::
-
-  $ python run_tests.py
-
-Directory Structure
--------------------
-
-This repo is based the PCDS python cookiecutter. See the following github page for more info:
-
-- `cookiecutter-pcds-python <https://github.com/pcdshub/cookiecutter-pcds-python>`_
+* Passive testing of control system devices/state
+    * Fully-automated
+    * Non-intrusive (will not move your motors)
+    * Report generated
+    * For daemon-backed passive tests, a control system-linked status report
+* Active testing of control system devices
+    * Guided, interactive checkout process with
+    * Perhaps also fully automated versions of the above
+    * Report generation
+* General user-facing GUI (TUI)
+    * Synoptic for launching tests ("device dashboard")
+    * Command-line tools for doing the same
+    
+Some plans and ramblings are detailed in the discussions section for now:
+https://github.com/pcdshub/atef/discussions
