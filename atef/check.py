@@ -3,15 +3,14 @@ from __future__ import annotations
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
-                    Sequence, Tuple, Type, Union)
+from typing import (Any, ClassVar, Dict, Generator, List, Optional, Sequence,
+                    Tuple, Type, Union)
 
 import numpy as np
 import ophyd
 
-from . import serialization
-
-Number = Union[int, float]
+from . import reduce, serialization
+from .type_hints import Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
 
@@ -38,35 +37,6 @@ class ComparisonWarning(ComparisonException):
     severity = Severity.warning
 
 
-class ReduceMethod(str, enum.Enum):
-    average = "average"
-    median = "median"
-    sum = "sum"
-    min = "min"
-    max = "max"
-    std = "std"
-
-    @property
-    def method(self) -> Callable:
-        return {
-            ReduceMethod.average: np.average,
-            ReduceMethod.median: np.median,
-            ReduceMethod.sum: np.sum,
-            ReduceMethod.min: np.min,
-            ReduceMethod.max: np.max,
-            ReduceMethod.std: np.std,
-        }[self]
-
-    def reduce(self, values: Sequence[PrimitiveType]) -> PrimitiveType:
-        """
-        Reduce the given values according to the configured method.
-
-        For example, if ``method`` is `ReduceMethod.average`, use `np.average`
-        to reduce the provided values into a scalar result.
-        """
-        return self.method(np.asarray(values))
-
-
 @dataclass(frozen=True)
 class Result:
     severity: Severity = Severity.success
@@ -91,7 +61,6 @@ def _raise_for_severity(severity: Severity, reason: str):
 
 
 success = Result()
-PrimitiveType = Union[str, int, bool, float]
 
 
 @dataclass
@@ -187,10 +156,10 @@ class Comparison:
 
     #: Period over which the comparison will occur, where multiple samples
     #: may be acquired prior to a result being available.
-    period: Optional[int] = None
+    reduce_period: Optional[Number] = None
 
-    #: Reduce collected samples by this method.
-    method: ReduceMethod = ReduceMethod.average
+    #: Reduce collected samples by this reduce method.
+    reduce_method: reduce.ReduceMethod = reduce.ReduceMethod.average
 
     #: If applicable, request and compare string values rather than the default
     #: specified.
@@ -204,6 +173,7 @@ class Comparison:
     if_disconnected: Severity = Severity.error
 
     def __call__(self, value: Any) -> Optional[Result]:
+        """Run the comparison against ``value``."""
         return self.compare(value)
 
     def describe(self) -> str:
@@ -570,7 +540,12 @@ def _single_attr_comparison(
     try:
         signal = getattr(device, attr)
         try:
-            value = signal.get()
+            if comparison.reduce_period and comparison.reduce_period > 0:
+                value = comparison.reduce_method.subscribe_and_reduce(
+                    signal, comparison.reduce_period
+                )
+            else:
+                value = signal.get()
         except TimeoutError:
             return Result(
                 severity=comparison.if_disconnected,
