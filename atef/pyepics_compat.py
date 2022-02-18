@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import (Any, ClassVar, Dict, List, Literal, NoReturn, Optional,
-                    Tuple, Union)
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, Union
 
 from ophyd._dispatch import EventDispatcher, wrap_callback
 from ophyd.signal import EpicsSignalBase
@@ -13,12 +12,12 @@ except ImportError:
 
 
 class PyepicsPutCallbackData(Protocol):
-    def __call__(self, data: Any) -> NoReturn:
+    def __call__(self, data: Any) -> None:
         ...
 
 
 class PyepicsPutCallbackKwargs(Protocol):
-    def __call__(self, **kwargs) -> NoReturn:
+    def __call__(self, **kwargs) -> None:
         ...
 
 
@@ -26,14 +25,14 @@ PyepicsPutCallback = Union[PyepicsPutCallbackData, PyepicsPutCallbackKwargs]
 
 
 class PyepicsMonitorCallback(Protocol):
-    def __call__(self, value: Any, timestamp: Any, **kwargs) -> NoReturn:
+    def __call__(self, value: Any, timestamp: Any, **kwargs) -> None:
         ...
 
 
 class PyepicsConnectionCallback(Protocol):
     def __call__(
         self, *, pvname: str, conn: bool, pv: PyepicsPvCompatibility
-    ) -> NoReturn:
+    ) -> None:
         ...
 
 
@@ -41,7 +40,7 @@ class PyepicsAccessCallback(Protocol):
     def __call__(
         self, read_access: bool, write_access: bool, *,
         pv: PyepicsPvCompatibility
-    ) -> NoReturn:
+    ) -> None:
         ...
 
 
