@@ -3,7 +3,7 @@ import ophyd
 import ophyd.sim
 import pytest
 
-from .. import check
+from .. import check, reduce
 from ..check import Severity
 
 
@@ -160,6 +160,26 @@ def test_at2l0_standin(at2l0):
     overall, results = check.check_device(at2l0, checks)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == severity
+
+
+def test_at2l0_standin_reduce(at2l0):
+    state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
+    state1.put(1.0)
+    checks = {
+        at2l0.state_attrs.split()[0]: [
+            check.Equals(
+                description="Duration test",
+                value=1,
+                reduce_method=reduce.ReduceMethod.average,
+                reduce_period=0.1,
+                severity_on_failure=Severity.error,
+            ),
+        ],
+    }
+
+    overall, results = check.check_device(at2l0, checks)
+    print("\n".join(res.reason or "n/a" for res in results))
+    assert overall == Severity.success
 
 
 def test_at2l0_standin_value_map(at2l0):
