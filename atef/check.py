@@ -652,17 +652,36 @@ def check_pvs(
     overall = Severity.success
     results = []
     cache = cache or get_signal_cache()
-    for checklist_item in checklist:
-        for comparison in checklist_item.comparisons:
-            for pvname in checklist_item.identifiers:
-                logger.debug("Checking %s.%s with comparison %s", pvname, comparison)
-                signal = cache[pvname]
-                # signal.wait_for_connection()
-                result = comparison.compare_signal(signal, identifier=pvname)
 
-                if result.severity > overall:
-                    overall = result.severity
-                results.append(result)
+    def get_comparison_and_pvname():
+        for checklist_item in checklist:
+            for comparison in checklist_item.comparisons:
+                for pvname in checklist_item.identifiers:
+                    yield comparison, pvname
+
+    for comparison, pvname in get_comparison_and_pvname():
+        # Pre-fill the cache with PVs, connecting in the background
+        _ = cache[pvname]
+
+    for comparison, pvname in get_comparison_and_pvname():
+        logger.debug("Checking %s.%s with comparison %s", pvname, comparison)
+        signal = cache[pvname]
+        try:
+            signal.wait_for_connection()
+        except TimeoutError:
+            result = Result(
+                severity=comparison.if_disconnected,
+                reason=(
+                    f"Unable to connect to {pvname} for comparison "
+                    f"{comparison}"
+                ),
+            )
+        else:
+            result = comparison.compare_signal(signal, identifier=pvname)
+
+        if result.severity > overall:
+            overall = result.severity
+        results.append(result)
 
     return overall, results
 
