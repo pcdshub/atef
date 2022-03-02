@@ -258,30 +258,48 @@ class Comparison:
             ),
         )
 
+    def get_data_for_signal(self, signal: ophyd.Signal) -> Any:
+        """
+        Get data for the given signal, according to the string and data
+        reduction settings.
+        """
+        if self.reduce_period and self.reduce_period > 0:
+            return self.reduce_method.subscribe_and_reduce(
+                signal, self.reduce_period
+            )
+
+        if self.string:
+            return signal.get(as_string=True)
+
+        return signal.get()
+
     def compare_signal(
         self, signal: ophyd.Signal, *, identifier: Optional[str] = None
     ) -> Result:
+        """
+        Compare the provided signal's value using the comparator's settings.
+
+        Parameters
+        ----------
+        signal : ophyd.Signal
+            The signal to get data from and run a comparison on.
+
+        identifier : str, optional
+            An identifier that goes along with the provided signal.  Used for
+            severity result descriptions.  Defaults to the signal's dotted
+            name.
+        """
         try:
+            identifier = identifier or signal.dotted_name
             try:
-                if self.reduce_period and self.reduce_period > 0:
-                    value = self.reduce_method.subscribe_and_reduce(
-                        signal, self.reduce_period
-                    )
-                else:
-                    value = signal.get()
+                value = self.get_data_for_signal(signal)
             except TimeoutError:
                 return Result(
                     severity=self.if_disconnected,
                     reason=f"Signal disconnected when reading: {signal}"
                 )
-            identifier = (
-                signal.name
-                if signal.attr_name.startswith("attr_")
-                else signal.dotted_name
-            )
             return self.compare(value, identifier=identifier)
         except Exception as ex:
-            identifier = identifier or signal.name
             return Result(
                 severity=Severity.internal_error,
                 reason=(
