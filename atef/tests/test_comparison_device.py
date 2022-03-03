@@ -308,3 +308,71 @@ def test_pv_config(
 ):
     overall, _ = check.check_pvs(checklist, cache=mock_signal_cache)
     assert overall == expected_severity
+
+
+@pytest.fixture
+def get_by_config_file() -> check.ConfigurationFile:
+    return check.ConfigurationFile(
+        configs=[
+            check.DeviceConfiguration(
+                tags=["a"],
+                devices=["dev_a", "dev_b"],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        name="dev_ab_checks",
+                        ids=["attr3", "attr2"],
+                        comparisons=[check.Equals(value=1)],
+                    ),
+                ],
+            ),
+            check.DeviceConfiguration(
+                tags=["a"],
+                devices=["dev_b", "dev_c"],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        name="dev_bc_checks",
+                        ids=["attr1", "attr2"],
+                        comparisons=[check.Equals(value=1)],
+                    ),
+                ],
+            ),
+            check.PVConfiguration(
+                tags=["a"],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        name="pv_checks",
+                        ids=["pv1", "pv2"],
+                        comparisons=[check.Equals(value=1)],
+                    ),
+                ],
+            ),
+            check.PVConfiguration(
+                tags=["a", "c"],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        name="pv_checks2",
+                        ids=["pv3"],
+                        comparisons=[check.Equals(value=1)],
+                    ),
+                ],
+            ),
+        ]
+    )
+
+
+def test_get_by_device(get_by_config_file: check.ConfigurationFile):
+    a_checks = list(get_by_config_file.get_by_device("dev_a"))
+    b_checks = list(get_by_config_file.get_by_device("dev_b"))
+    c_checks = list(get_by_config_file.get_by_device("dev_c"))
+    assert (a_checks + c_checks) == b_checks
+
+
+def test_get_by_pv(get_by_config_file: check.ConfigurationFile):
+    ((config, (ids,)),) = list(get_by_config_file.get_by_pv("pv1"))
+    assert isinstance(config, check.PVConfiguration)
+    assert "pv1" in ids.ids
+
+
+def test_get_by_tag(get_by_config_file: check.ConfigurationFile):
+    assert len(list(get_by_config_file.get_by_tag("a"))) == 4
+    assert len(list(get_by_config_file.get_by_tag("c"))) == 1

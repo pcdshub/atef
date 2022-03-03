@@ -604,15 +604,30 @@ class ConfigurationFile:
 
     def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
         """Get all configurations that match the device name."""
-        ...
+        for config in self.configs:
+            if isinstance(config, DeviceConfiguration):
+                if name in config.devices:
+                    yield config
 
-    def get_by_pv(self, pvname: str) -> Generator[PVConfiguration, None, None]:
-        """Get all configurations that match the PV name."""
-        ...
+    def get_by_pv(
+        self, pvname: str
+    ) -> Generator[Tuple[PVConfiguration, List[IdentifierAndComparison]], None, None]:
+        """Get all configurations + IdentifierAndComparison that match the PV name."""
+        for config in self.configs:
+            if isinstance(config, PVConfiguration):
+                checks = [check for check in config.checklist if pvname in check.ids]
+                if checks:
+                    yield config, checks
 
     def get_by_tag(self, *tags: str) -> Generator[Configuration, None, None]:
         """Get all configurations that match the tag name."""
-        ...
+        if not tags:
+            return
+
+        tag_set = set(tags)
+        for config in self.configs:
+            if tag_set.intersection(set(config.tags or [])):
+                yield config
 
 
 def check_device(
