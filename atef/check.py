@@ -551,13 +551,13 @@ class Range(Comparison):
 @dataclass
 class IdentifierAndComparison:
     """
-    Set of identifiers and comparisons to perform on those identifiers.
+    Set of identifiers (IDs) and comparisons to perform on those identifiers.
     """
     #: An optional identifier for this set.
     name: Optional[str] = None
     #: PV name, attribute name, or test-specific identifier.
-    identifiers: List[str] = field(default_factory=list)
-    #: The comparisons to perform for *each* of the identifiers.
+    ids: List[str] = field(default_factory=list)
+    #: The comparisons to perform for *each* of the ids.
     comparisons: List[Comparison] = field(default_factory=list)
 
 
@@ -584,7 +584,7 @@ class Configuration:
 
 @dataclass
 class DeviceConfiguration(Configuration):
-    #: Happi device names which give meaning to self.checklist[].identifiers.
+    #: Happi device names which give meaning to self.checklist[].ids.
     devices: List[str] = field(default_factory=list)
 
 
@@ -642,7 +642,7 @@ def check_device(
     results = []
     for checklist_item in checklist:
         for comparison in checklist_item.comparisons:
-            for attr in checklist_item.identifiers:
+            for attr in checklist_item.ids:
                 full_attr = f"{device.name}.{attr}"
                 logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
                 signal = getattr(device, attr, None)
@@ -693,7 +693,7 @@ def check_pvs(
     def get_comparison_and_pvname():
         for checklist_item in checklist:
             for comparison in checklist_item.comparisons:
-                for pvname in checklist_item.identifiers:
+                for pvname in checklist_item.ids:
                     yield comparison, pvname
 
     for comparison, pvname in get_comparison_and_pvname():

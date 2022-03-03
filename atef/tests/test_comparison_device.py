@@ -28,14 +28,14 @@ config_and_severity = pytest.mark.parametrize(
                 devices=[],
                 checklist=[
                     check.IdentifierAndComparison(
-                        identifiers=["sig1"],
+                        ids=["sig1"],
                         comparisons=[check.Equals(value=1)]
                     ),
                     check.IdentifierAndComparison(
-                        identifiers=["sig2"],
+                        ids=["sig2"],
                         comparisons=[check.Equals(value=2.5)]),
                     check.IdentifierAndComparison(
-                        identifiers=["sig3"],
+                        ids=["sig3"],
                         comparisons=[check.Equals(value="abc")]
                     ),
                 ]
@@ -48,7 +48,7 @@ config_and_severity = pytest.mark.parametrize(
                 devices=[],
                 checklist=[
                     check.IdentifierAndComparison(
-                        identifiers=["sig1", "sig2"],
+                        ids=["sig1", "sig2"],
                         comparisons=[check.Equals(value=1, atol=0)],
                     ),
                 ],
@@ -61,7 +61,7 @@ config_and_severity = pytest.mark.parametrize(
                 devices=[],
                 checklist=[
                     check.IdentifierAndComparison(
-                        identifiers=["sig1", "sig2"],
+                        ids=["sig1", "sig2"],
                         comparisons=[check.Equals(value=1, atol=2)],
                     ),
                 ],
@@ -74,7 +74,7 @@ config_and_severity = pytest.mark.parametrize(
                 devices=[],
                 checklist=[
                     check.IdentifierAndComparison(
-                        identifiers=["sig1", "sig2"],
+                        ids=["sig1", "sig2"],
                         comparisons=[
                             check.Equals(value=1, atol=2),
                             check.Equals(value=3, atol=4),
@@ -90,15 +90,15 @@ config_and_severity = pytest.mark.parametrize(
                 devices=[],
                 checklist=[
                     check.IdentifierAndComparison(
-                        identifiers=["sig1"],
+                        ids=["sig1"],
                         comparisons=[check.Equals(value=2)],
                     ),
                     check.IdentifierAndComparison(
-                        identifiers=["sig2"],
+                        ids=["sig2"],
                         comparisons=[check.Equals(value=2.5)],
                     ),
                     check.IdentifierAndComparison(
-                        identifiers=["sig3"],
+                        ids=["sig3"],
                         comparisons=[check.Equals(value="abc")],
                     ),
                 ]
@@ -166,7 +166,7 @@ def test_at2l0_standin(at2l0):
     }[state1.get()]
     checklist = [
         check.IdentifierAndComparison(
-            identifiers=at2l0.state_attrs,
+            ids=at2l0.state_attrs,
             comparisons=[
                 check.NotEquals(
                     description="Filter is moving",
@@ -203,7 +203,7 @@ def test_at2l0_standin_reduce(at2l0):
     state1.put(1.0)
     checklist = [
         check.IdentifierAndComparison(
-            identifiers=at2l0.state_attrs[:1],
+            ids=at2l0.state_attrs[:1],
             comparisons=[
                 check.Equals(
                     description="Duration test",
@@ -233,7 +233,7 @@ def test_at2l0_standin_value_map(at2l0):
     severity = value_to_severity[state1.get()]
     checklist = [
         check.IdentifierAndComparison(
-            identifiers=at2l0.state_attrs,
+            ids=at2l0.state_attrs,
             comparisons=[
                 check.ValueSet(
                     values=[
@@ -278,11 +278,11 @@ def mock_signal_cache() -> check._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
         pytest.param(
             [
                 check.IdentifierAndComparison(
-                    identifiers=["pv1", "pv2"],
+                    ids=["pv1", "pv2"],
                     comparisons=[check.Equals(value=1)],
                 ),
                 check.IdentifierAndComparison(
-                    identifiers=["pv3"],
+                    ids=["pv3"],
                     comparisons=[check.Equals(value=2)],
                 )
             ],
@@ -292,7 +292,7 @@ def mock_signal_cache() -> check._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
         pytest.param(
             [
                 check.IdentifierAndComparison(
-                    identifiers=["pv1", "pv2"],
+                    ids=["pv1", "pv2"],
                     comparisons=[check.Equals(value=2)],
                 ),
             ],
