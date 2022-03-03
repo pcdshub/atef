@@ -27,9 +27,17 @@ config_and_severity = pytest.mark.parametrize(
             check.DeviceConfiguration(
                 devices=[],
                 checklist=[
-                    check.IdentifierAndComparison(["sig1"], [check.Equals(value=1)]),
-                    check.IdentifierAndComparison(["sig2"], [check.Equals(value=2.5)]),
-                    check.IdentifierAndComparison(["sig3"], [check.Equals(value="abc")]),
+                    check.IdentifierAndComparison(
+                        identifiers=["sig1"],
+                        comparisons=[check.Equals(value=1)]
+                    ),
+                    check.IdentifierAndComparison(
+                        identifiers=["sig2"],
+                        comparisons=[check.Equals(value=2.5)]),
+                    check.IdentifierAndComparison(
+                        identifiers=["sig3"],
+                        comparisons=[check.Equals(value="abc")]
+                    ),
                 ]
             ),
             Severity.success,
@@ -40,8 +48,8 @@ config_and_severity = pytest.mark.parametrize(
                 devices=[],
                 checklist=[
                     check.IdentifierAndComparison(
-                        ["sig1", "sig2"],
-                        [check.Equals(value=1, atol=0)],
+                        identifiers=["sig1", "sig2"],
+                        comparisons=[check.Equals(value=1, atol=0)],
                     ),
                 ],
             ),
@@ -53,8 +61,8 @@ config_and_severity = pytest.mark.parametrize(
                 devices=[],
                 checklist=[
                     check.IdentifierAndComparison(
-                        ["sig1", "sig2"],
-                        [check.Equals(value=1, atol=2)],
+                        identifiers=["sig1", "sig2"],
+                        comparisons=[check.Equals(value=1, atol=2)],
                     ),
                 ],
             ),
@@ -66,8 +74,8 @@ config_and_severity = pytest.mark.parametrize(
                 devices=[],
                 checklist=[
                     check.IdentifierAndComparison(
-                        ["sig1", "sig2"],
-                        [
+                        identifiers=["sig1", "sig2"],
+                        comparisons=[
                             check.Equals(value=1, atol=2),
                             check.Equals(value=3, atol=4),
                         ],
@@ -82,16 +90,16 @@ config_and_severity = pytest.mark.parametrize(
                 devices=[],
                 checklist=[
                     check.IdentifierAndComparison(
-                        ["sig1"],
-                        [check.Equals(value=2)],
+                        identifiers=["sig1"],
+                        comparisons=[check.Equals(value=2)],
                     ),
                     check.IdentifierAndComparison(
-                        ["sig2"],
-                        [check.Equals(value=2.5)],
+                        identifiers=["sig2"],
+                        comparisons=[check.Equals(value=2.5)],
                     ),
                     check.IdentifierAndComparison(
-                        ["sig3"],
-                        [check.Equals(value="abc")],
+                        identifiers=["sig3"],
+                        comparisons=[check.Equals(value="abc")],
                     ),
                 ]
             ),
@@ -158,8 +166,8 @@ def test_at2l0_standin(at2l0):
     }[state1.get()]
     checklist = [
         check.IdentifierAndComparison(
-            at2l0.state_attrs,
-            [
+            identifiers=at2l0.state_attrs,
+            comparisons=[
                 check.NotEquals(
                     description="Filter is moving",
                     value=0,
@@ -195,8 +203,8 @@ def test_at2l0_standin_reduce(at2l0):
     state1.put(1.0)
     checklist = [
         check.IdentifierAndComparison(
-            at2l0.state_attrs[:1],
-            [
+            identifiers=at2l0.state_attrs[:1],
+            comparisons=[
                 check.Equals(
                     description="Duration test",
                     value=1,
@@ -225,8 +233,8 @@ def test_at2l0_standin_value_map(at2l0):
     severity = value_to_severity[state1.get()]
     checklist = [
         check.IdentifierAndComparison(
-            at2l0.state_attrs,
-            [
+            identifiers=at2l0.state_attrs,
+            comparisons=[
                 check.ValueSet(
                     values=[
                         check.Value(

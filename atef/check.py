@@ -4,7 +4,7 @@ import enum
 import logging
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Mapping, Optional, Sequence,
-                    Tuple, TypeVar, Union)
+                    Tuple, TypeVar)
 
 import numpy as np
 import ophyd
@@ -144,6 +144,10 @@ class ValueRange:
 class Comparison:
     """
     Base class for all atef value comparisons.
+
+    Subclasses of Comparison will be serialized as a tagged union.  This means
+    that the subclass name will be used as an identifier for the generated
+    serialized dictionary (and JSON object).
     """
 
     #: Description tied to this comparison.
@@ -546,6 +550,11 @@ class Range(Comparison):
 
 @dataclass
 class IdentifierAndComparison:
+    """
+    Set of identifiers and comparisons to perform on those identifiers.
+    """
+    #: An optional identifier for this set.
+    name: Optional[str] = None
     #: PV name, attribute name, or test-specific identifier.
     identifiers: List[str] = field(default_factory=list)
     #: The comparisons to perform for *each* of the identifiers.
@@ -553,7 +562,16 @@ class IdentifierAndComparison:
 
 
 @dataclass
+@serialization.as_tagged_union
 class Configuration:
+    """
+    Configuration base class for shared settings between all configurations.
+
+    Subclasses of Comparison will be serialized as a tagged union.  This means
+    that the subclass name will be used as an identifier for the generated
+    serialized dictionary (and JSON object).
+    """
+
     #: Name tied to this configuration.
     name: Optional[str] = None
     #: Description tied to this configuration.
@@ -581,7 +599,8 @@ class ConfigurationFile:
     A configuration file comprised of a number of devices/PV configurations.
     """
 
-    configs: List[Union[PVConfiguration, DeviceConfiguration]]
+    #: configs: either PVConfiguration or DeviceConfiguration.
+    configs: List[Configuration]
 
     def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
         """Get all configurations that match the device name."""
