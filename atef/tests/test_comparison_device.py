@@ -1,3 +1,5 @@
+from typing import List
+
 import apischema
 import ophyd
 import ophyd.sim
@@ -23,52 +25,83 @@ config_and_severity = pytest.mark.parametrize(
     [
         pytest.param(
             check.DeviceConfiguration(
-                checks=dict(
-                    sig1=check.Equals(value=1),
-                    sig2=check.Equals(value=2.5),
-                    sig3=check.Equals(value="abc"),
-                ),
+                devices=[],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        ids=["sig1"],
+                        comparisons=[check.Equals(value=1)]
+                    ),
+                    check.IdentifierAndComparison(
+                        ids=["sig2"],
+                        comparisons=[check.Equals(value=2.5)]),
+                    check.IdentifierAndComparison(
+                        ids=["sig3"],
+                        comparisons=[check.Equals(value="abc")]
+                    ),
+                ]
             ),
             Severity.success,
             id="all_good",
         ),
         pytest.param(
             check.DeviceConfiguration(
-                checks={
-                    "sig1 sig2": check.Equals(value=1, atol=0),
-                },
+                devices=[],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        ids=["sig1", "sig2"],
+                        comparisons=[check.Equals(value=1, atol=0)],
+                    ),
+                ],
             ),
             Severity.error,
             id="multi_attr_no_tol",
         ),
         pytest.param(
             check.DeviceConfiguration(
-                checks={
-                    "sig1 sig2": check.Equals(value=1, atol=2),
-                },
+                devices=[],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        ids=["sig1", "sig2"],
+                        comparisons=[check.Equals(value=1, atol=2)],
+                    ),
+                ],
             ),
             Severity.success,
             id="multi_attr_ok",
         ),
         pytest.param(
             check.DeviceConfiguration(
-                checks={
-                    "sig1 sig2": [
-                        check.Equals(value=1, atol=2),
-                        check.Equals(value=3, atol=4),
-                    ],
-                },
+                devices=[],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        ids=["sig1", "sig2"],
+                        comparisons=[
+                            check.Equals(value=1, atol=2),
+                            check.Equals(value=3, atol=4),
+                        ],
+                    ),
+                ],
             ),
             Severity.success,
             id="multi_attr_multi_test",
         ),
         pytest.param(
             check.DeviceConfiguration(
-                checks=dict(
-                    sig1=check.Equals(value=2),
-                    sig2=check.Equals(value=2.5),
-                    sig3=check.Equals(value="abc"),
-                ),
+                devices=[],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        ids=["sig1"],
+                        comparisons=[check.Equals(value=2)],
+                    ),
+                    check.IdentifierAndComparison(
+                        ids=["sig2"],
+                        comparisons=[check.Equals(value=2.5)],
+                    ),
+                    check.IdentifierAndComparison(
+                        ids=["sig3"],
+                        comparisons=[check.Equals(value="abc")],
+                    ),
+                ]
             ),
             Severity.error,
             id="sig1_failure",
@@ -87,7 +120,7 @@ def test_serializable(config: check.DeviceConfiguration, severity: Severity):
 def test_result_severity(
     device, config: check.DeviceConfiguration, severity: Severity
 ):
-    overall, _ = check.check_device(device=device, attr_to_checks=config.checks)
+    overall, _ = check.check_device(device=device, checklist=config.checklist)
     assert overall == severity
 
 
@@ -105,7 +138,7 @@ def at2l0(request):
 
     class FakeAT2L0:
         name: str = "fakedev"
-        state_attrs: str = (
+        state_attrs: List[str] = (
             "blade_01.state.state blade_02.state.state blade_03.state.state "
             "blade_04.state.state blade_05.state.state blade_06.state.state "
             "blade_07.state.state blade_08.state.state blade_09.state.state "
@@ -113,7 +146,7 @@ def at2l0(request):
             "blade_13.state.state blade_14.state.state blade_15.state.state "
             "blade_16.state.state blade_17.state.state blade_18.state.state "
             "blade_19.state.state"
-        )
+        ).split()
 
         def __getattr__(self, attr):
             if attr.startswith("blade_"):
@@ -131,33 +164,36 @@ def test_at2l0_standin(at2l0):
         2: Severity.warning,
         3: Severity.error,
     }[state1.get()]
-    checks = {
-        at2l0.state_attrs: [
-            check.NotEquals(
-                description="Filter is moving",
-                value=0,
-                severity_on_failure=Severity.error,
-            ),
-            check.NotEquals(
-                description="Filter is out of the beam",
-                value=1,
-                severity_on_failure=Severity.success,
-            ),
-            check.NotEquals(
-                description="Filter is in the beam",
-                value=2,
-                severity_on_failure=Severity.warning,
-            ),
-            check.GreaterOrEqual(
-                description="Filter status unknown",
-                value=3,
-                severity_on_failure=Severity.error,
-                invert=True,
-            ),
-        ],
-    }
+    checklist = [
+        check.IdentifierAndComparison(
+            ids=at2l0.state_attrs,
+            comparisons=[
+                check.NotEquals(
+                    description="Filter is moving",
+                    value=0,
+                    severity_on_failure=Severity.error,
+                ),
+                check.NotEquals(
+                    description="Filter is out of the beam",
+                    value=1,
+                    severity_on_failure=Severity.success,
+                ),
+                check.NotEquals(
+                    description="Filter is in the beam",
+                    value=2,
+                    severity_on_failure=Severity.warning,
+                ),
+                check.GreaterOrEqual(
+                    description="Filter status unknown",
+                    value=3,
+                    severity_on_failure=Severity.error,
+                    invert=True,
+                ),
+            ],
+        ),
+    ]
 
-    overall, results = check.check_device(at2l0, checks)
+    overall, results = check.check_device(at2l0, checklist=checklist)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == severity
 
@@ -165,19 +201,22 @@ def test_at2l0_standin(at2l0):
 def test_at2l0_standin_reduce(at2l0):
     state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
     state1.put(1.0)
-    checks = {
-        at2l0.state_attrs.split()[0]: [
-            check.Equals(
-                description="Duration test",
-                value=1,
-                reduce_method=reduce.ReduceMethod.average,
-                reduce_period=0.1,
-                severity_on_failure=Severity.error,
-            ),
-        ],
-    }
+    checklist = [
+        check.IdentifierAndComparison(
+            ids=at2l0.state_attrs[:1],
+            comparisons=[
+                check.Equals(
+                    description="Duration test",
+                    value=1,
+                    reduce_method=reduce.ReduceMethod.average,
+                    reduce_period=0.1,
+                    severity_on_failure=Severity.error,
+                ),
+            ],
+        ),
+    ]
 
-    overall, results = check.check_device(at2l0, checks)
+    overall, results = check.check_device(at2l0, checklist=checklist)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == Severity.success
 
@@ -192,67 +231,148 @@ def test_at2l0_standin_value_map(at2l0):
     }
 
     severity = value_to_severity[state1.get()]
-    checks = {
-        at2l0.state_attrs: [
-            check.ValueSet(
-                values=[
-                    check.Value(
-                        value=0,
-                        description="Filter is moving",
-                        severity=Severity.error,
-                    ),
-                    check.Value(
-                        description="Filter is out of the beam",
-                        value=1,
-                        severity=Severity.success,
-                    ),
-                    check.Value(
-                        description="Filter is in the beam",
-                        value=2,
-                        severity=Severity.warning,
-                    ),
-                ],
-            )
-        ]
-    }
+    checklist = [
+        check.IdentifierAndComparison(
+            ids=at2l0.state_attrs,
+            comparisons=[
+                check.ValueSet(
+                    values=[
+                        check.Value(
+                            value=0,
+                            description="Filter is moving",
+                            severity=Severity.error,
+                        ),
+                        check.Value(
+                            description="Filter is out of the beam",
+                            value=1,
+                            severity=Severity.success,
+                        ),
+                        check.Value(
+                            description="Filter is in the beam",
+                            value=2,
+                            severity=Severity.warning,
+                        ),
+                    ],
+                ),
+            ]
+        )
+    ]
 
-    overall, results = check.check_device(at2l0, checks)
+    overall, results = check.check_device(at2l0, checklist=checklist)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == severity
 
 
-def test_pv_conversion():
-    dev = check.pvs_to_device(["pv1 pv2", "pv3"])
-    assert dev._pv_to_attr_ == {
-        # Due to sort order
-        "pv1": "attr_0",
-        "pv2": "attr_1",
-        "pv3": "attr_2",
-    }
-
-    # TODO: FakeEpicsSignal has no pvname attribute
-    # fake_dev = ophyd.sim.make_fake_device(dev)(name="test")
-    # assert fake_dev.attr_0.name == "pv1"
-    # assert fake_dev.attr_1.name == "pv2"
-    # assert fake_dev.attr_2.name == "pv3"
+@pytest.fixture
+def mock_signal_cache() -> check._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
+    cache = check._SignalCache(ophyd.sim.FakeEpicsSignalRO)
+    cache["pv1"].sim_put(1)
+    cache["pv2"].sim_put(1)
+    cache["pv3"].sim_put(2)
+    return cache
 
 
-def test_pv_config_to_device_config():
-    check1 = check.Equals(value=1)
-    check2 = check.Equals(value=2)
+@pytest.mark.parametrize(
+    "checklist, expected_severity",
+    [
+        pytest.param(
+            [
+                check.IdentifierAndComparison(
+                    ids=["pv1", "pv2"],
+                    comparisons=[check.Equals(value=1)],
+                ),
+                check.IdentifierAndComparison(
+                    ids=["pv3"],
+                    comparisons=[check.Equals(value=2)],
+                )
+            ],
+            Severity.success,
+            id="exact_values_ok",
+        ),
+        pytest.param(
+            [
+                check.IdentifierAndComparison(
+                    ids=["pv1", "pv2"],
+                    comparisons=[check.Equals(value=2)],
+                ),
+            ],
+            Severity.error,
+            id="values_wrong",
+        ),
+    ],
+)
+def test_pv_config(
+    mock_signal_cache: check._SignalCache[ophyd.sim.FakeEpicsSignalRO],
+    checklist: List[check.IdentifierAndComparison],
+    expected_severity: check.Severity
+):
+    overall, _ = check.check_pvs(checklist, cache=mock_signal_cache)
+    assert overall == expected_severity
 
-    pv_config = check.PVConfiguration(
-        description="abc",
-        checks={
-            "pv1 pv2": check1,
-            "pv3": check2,
-        }
+
+@pytest.fixture
+def get_by_config_file() -> check.ConfigurationFile:
+    return check.ConfigurationFile(
+        configs=[
+            check.DeviceConfiguration(
+                tags=["a"],
+                devices=["dev_a", "dev_b"],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        name="dev_ab_checks",
+                        ids=["attr3", "attr2"],
+                        comparisons=[check.Equals(value=1)],
+                    ),
+                ],
+            ),
+            check.DeviceConfiguration(
+                tags=["a"],
+                devices=["dev_b", "dev_c"],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        name="dev_bc_checks",
+                        ids=["attr1", "attr2"],
+                        comparisons=[check.Equals(value=1)],
+                    ),
+                ],
+            ),
+            check.PVConfiguration(
+                tags=["a"],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        name="pv_checks",
+                        ids=["pv1", "pv2"],
+                        comparisons=[check.Equals(value=1)],
+                    ),
+                ],
+            ),
+            check.PVConfiguration(
+                tags=["a", "c"],
+                checklist=[
+                    check.IdentifierAndComparison(
+                        name="pv_checks2",
+                        ids=["pv3"],
+                        comparisons=[check.Equals(value=1)],
+                    ),
+                ],
+            ),
+        ]
     )
 
-    _, config = check.pv_config_to_device_config(pv_config)
-    assert list(config.checks) == [
-        "attr_0 attr_1",
-        "attr_2",
-    ]
 
-    assert config.description == pv_config.description
+def test_get_by_device(get_by_config_file: check.ConfigurationFile):
+    a_checks = list(get_by_config_file.get_by_device("dev_a"))
+    b_checks = list(get_by_config_file.get_by_device("dev_b"))
+    c_checks = list(get_by_config_file.get_by_device("dev_c"))
+    assert (a_checks + c_checks) == b_checks
+
+
+def test_get_by_pv(get_by_config_file: check.ConfigurationFile):
+    ((config, (ids,)),) = list(get_by_config_file.get_by_pv("pv1"))
+    assert isinstance(config, check.PVConfiguration)
+    assert "pv1" in ids.ids
+
+
+def test_get_by_tag(get_by_config_file: check.ConfigurationFile):
+    assert len(list(get_by_config_file.get_by_tag("a"))) == 4
+    assert len(list(get_by_config_file.get_by_tag("c"))) == 1

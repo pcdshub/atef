@@ -3,8 +3,8 @@ from __future__ import annotations
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import (Any, ClassVar, Dict, Generator, List, Optional, Sequence,
-                    Tuple, Type, Union)
+from typing import (Any, Dict, Generator, List, Mapping, Optional, Sequence,
+                    Tuple, TypeVar)
 
 import numpy as np
 import ophyd
@@ -144,6 +144,10 @@ class ValueRange:
 class Comparison:
     """
     Base class for all atef value comparisons.
+
+    Subclasses of Comparison will be serialized as a tagged union.  This means
+    that the subclass name will be used as an identifier for the generated
+    serialized dictionary (and JSON object).
     """
 
     #: Description tied to this comparison.
@@ -257,6 +261,56 @@ class Comparison:
                 f"{desc}: value of {value}"
             ),
         )
+
+    def get_data_for_signal(self, signal: ophyd.Signal) -> Any:
+        """
+        Get data for the given signal, according to the string and data
+        reduction settings.
+        """
+        if self.reduce_period and self.reduce_period > 0:
+            return self.reduce_method.subscribe_and_reduce(
+                signal, self.reduce_period
+            )
+
+        if self.string:
+            return signal.get(as_string=True)
+
+        return signal.get()
+
+    def compare_signal(
+        self, signal: ophyd.Signal, *, identifier: Optional[str] = None
+    ) -> Result:
+        """
+        Compare the provided signal's value using the comparator's settings.
+
+        Parameters
+        ----------
+        signal : ophyd.Signal
+            The signal to get data from and run a comparison on.
+
+        identifier : str, optional
+            An identifier that goes along with the provided signal.  Used for
+            severity result descriptions.  Defaults to the signal's dotted
+            name.
+        """
+        try:
+            identifier = identifier or signal.dotted_name
+            try:
+                value = self.get_data_for_signal(signal)
+            except TimeoutError:
+                return Result(
+                    severity=self.if_disconnected,
+                    reason=f"Signal disconnected when reading: {signal}"
+                )
+            return self.compare(value, identifier=identifier)
+        except Exception as ex:
+            return Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Checking if {identifier!r} {self} "
+                    f"raised {ex.__class__.__name__}: {ex}"
+                ),
+            )
 
 
 @dataclass
@@ -494,31 +548,49 @@ class Range(Comparison):
         return True
 
 
-ItemToChecks = Dict[
-    str,
-    Union[Comparison, Sequence[Comparison]],
-]
+@dataclass
+class IdentifierAndComparison:
+    """
+    Set of identifiers (IDs) and comparisons to perform on those identifiers.
+    """
+    #: An optional identifier for this set.
+    name: Optional[str] = None
+    #: PV name, attribute name, or test-specific identifier.
+    ids: List[str] = field(default_factory=list)
+    #: The comparisons to perform for *each* of the ids.
+    comparisons: List[Comparison] = field(default_factory=list)
 
 
 @dataclass
+@serialization.as_tagged_union
 class Configuration:
-    #: Description tied to this comparison.
+    """
+    Configuration base class for shared settings between all configurations.
+
+    Subclasses of Comparison will be serialized as a tagged union.  This means
+    that the subclass name will be used as an identifier for the generated
+    serialized dictionary (and JSON object).
+    """
+
+    #: Name tied to this configuration.
+    name: Optional[str] = None
+    #: Description tied to this configuration.
     description: Optional[str] = None
+    #: Tags tied to this configuration.
+    tags: Optional[List[str]] = None
+    #: Comparison checklist for this configuration.
+    checklist: List[IdentifierAndComparison] = field(default_factory=list)
 
 
 @dataclass
 class DeviceConfiguration(Configuration):
-    #: Dictionary of attribute name to sequence of checks (or single check).
-    checks: ItemToChecks = field(default_factory=dict)
+    #: Happi device names which give meaning to self.checklist[].ids.
+    devices: List[str] = field(default_factory=list)
 
 
 @dataclass
 class PVConfiguration(Configuration):
-    #: Name of this PV grouping.
-    name: Optional[str] = "PVConfig"
-
-    #: Dictionary of PV name to sequence of checks (or single check).
-    checks: ItemToChecks = field(default_factory=dict)
+    ...
 
 
 @dataclass
@@ -527,48 +599,39 @@ class ConfigurationFile:
     A configuration file comprised of a number of devices/PV configurations.
     """
 
-    #: Dictionary of happi device name to DeviceConfiguration.
-    devices: Dict[str, DeviceConfiguration]
+    #: configs: either PVConfiguration or DeviceConfiguration.
+    configs: List[Configuration]
 
-    #: PVConfiguration devices.
-    pvs: List[PVConfiguration]
+    def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
+        """Get all configurations that match the device name."""
+        for config in self.configs:
+            if isinstance(config, DeviceConfiguration):
+                if name in config.devices:
+                    yield config
 
+    def get_by_pv(
+        self, pvname: str
+    ) -> Generator[Tuple[PVConfiguration, List[IdentifierAndComparison]], None, None]:
+        """Get all configurations + IdentifierAndComparison that match the PV name."""
+        for config in self.configs:
+            if isinstance(config, PVConfiguration):
+                checks = [check for check in config.checklist if pvname in check.ids]
+                if checks:
+                    yield config, checks
 
-def _single_attr_comparison(
-    device: ophyd.Device, attr: str, comparison: Comparison
-) -> Result:
-    try:
-        signal = getattr(device, attr)
-        try:
-            if comparison.reduce_period and comparison.reduce_period > 0:
-                value = comparison.reduce_method.subscribe_and_reduce(
-                    signal, comparison.reduce_period
-                )
-            else:
-                value = signal.get()
-        except TimeoutError:
-            return Result(
-                severity=comparison.if_disconnected,
-                reason=f"Signal disconnected when reading: {signal}"
-            )
-        identifier = (
-            signal.name
-            if signal.attr_name.startswith("attr_")
-            else signal.dotted_name
-        )
-        return comparison.compare(value, identifier=identifier)
-    except Exception as ex:
-        return Result(
-            severity=Severity.internal_error,
-            reason=(
-                f"Checking if {attr!r} {comparison} "
-                f"raised {ex.__class__.__name__}: {ex}"
-            ),
-        )
+    def get_by_tag(self, *tags: str) -> Generator[Configuration, None, None]:
+        """Get all configurations that match the tag name."""
+        if not tags:
+            return
+
+        tag_set = set(tags)
+        for config in self.configs:
+            if tag_set.intersection(set(config.tags or [])):
+                yield config
 
 
 def check_device(
-    device: ophyd.Device, attr_to_checks: ItemToChecks
+    device: ophyd.Device, checklist: Sequence[IdentifierAndComparison]
 ) -> Tuple[Severity, List[Result]]:
     """
     Check a given device using the list of comparisons.
@@ -578,10 +641,9 @@ def check_device(
     device : ophyd.Device
         The device to check.
 
-    attr_to_checks : dict of attribute to Comparison(s)
+    checklist : sequence of IdentifierAndComparison
         Comparisons to run on the given device.  Multiple attributes may
-        share the same checks. To specify multiple attribute names, delimit
-        the names by spaces.
+        share the same checks.
 
     Returns
     -------
@@ -593,15 +655,23 @@ def check_device(
     """
     overall = Severity.success
     results = []
-    for attrs, checks in attr_to_checks.items():
-        checks = tuple([checks] if isinstance(checks, Comparison) else checks)
-        for comparison in checks:
-            for attr in attrs.strip().split():
-                logger.debug(
-                    "Checking %s.%s with comparison %s",
-                    device.name, attr, comparison
-                )
-                result = _single_attr_comparison(device, attr, comparison)
+    for checklist_item in checklist:
+        for comparison in checklist_item.comparisons:
+            for attr in checklist_item.ids:
+                full_attr = f"{device.name}.{attr}"
+                logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
+                signal = getattr(device, attr, None)
+                if signal is None:
+                    result = Result(
+                        severity=Severity.internal_error,
+                        reason=(
+                            f"Attribute {full_attr} does not exist on class "
+                            f"{type(device).__name__}"
+                        ),
+                    )
+                else:
+                    result = comparison.compare_signal(signal, identifier=full_attr)
+
                 if result.severity > overall:
                     overall = result.severity
                 results.append(result)
@@ -609,74 +679,102 @@ def check_device(
     return overall, results
 
 
-class _PVDevice(ophyd.Device):
-    _pv_to_attr_: ClassVar[Dict[str, str]]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # Set all signals to be just their PV name for now.
-        for attr in self.component_names:
-            sig = getattr(self, attr)
-            sig.name = getattr(sig, "pvname", sig.name)
-
-
-_pv_to_device_cache = {}
-
-
-def pvs_to_device(pvs: Sequence[str]) -> Type[_PVDevice]:
-    """Take PV-based items to check and make a device out of them."""
-    pv_names = tuple(
-        sum((item.strip().split() for item in sorted(pvs)), [])
-    )
-    if pv_names in _pv_to_device_cache:
-        return _pv_to_device_cache[pv_names]
-
-    pv_to_attr = {
-        pv: f"attr_{idx}"
-        for idx, pv in enumerate(pv_names)
-    }
-    components = {
-        attr: ophyd.device.Component(ophyd.EpicsSignalRO, pv, kind="config")
-        for pv, attr in pv_to_attr.items()
-    }
-    device = ophyd.device.create_device_from_components(
-        name="PVDevice",
-        base_class=_PVDevice,
-        **components
-    )
-    device._pv_to_attr_ = pv_to_attr
-    _pv_to_device_cache[pv_names] = device
-    return device
-
-
-def pv_config_to_device_config(
-    config: PVConfiguration,
-) -> Tuple[Type[_PVDevice], DeviceConfiguration]:
+def check_pvs(
+    checklist: Sequence[IdentifierAndComparison],
+    *,
+    cache: Optional[Mapping[str, ophyd.Signal]] = None,
+) -> Tuple[Severity, List[Result]]:
     """
-    Take PVConfiguration and make a Device class and DeviceConfiguration.
+    Check a PVConfiguration.
 
     Parameters
     ----------
-    config : PVConfiguration
-        The PV name-based configuration.
+    checklist : sequence of IdentifierAndComparison
+        Comparisons to run on the given device.  Multiple PVs may share the
+        same checks.
 
     Returns
     -------
-    dev : _PVDevice subclass
-        A dynamically-generated ophyd Device for the configuration.
+    overall_severity : Severity
+        Maximum severity found when running comparisons.
 
-    device_config : DeviceConfiguration
-        The attribute-based DeviceConfiguration, which works with the generated
-        device class above.
+    results : list of Result
+        Individual comparison results.
     """
-    device = pvs_to_device(list(config.checks))
-    attr_checks: ItemToChecks = {}
-    for item, checks in sorted(config.checks.items()):
-        attrs = " ".join(device._pv_to_attr_[pv] for pv in item.strip().split())
-        attr_checks[attrs] = checks
+    overall = Severity.success
+    results = []
+    cache = cache or get_signal_cache()
 
-    return device, DeviceConfiguration(
-        description=config.description,
-        checks=attr_checks,
-    )
+    def get_comparison_and_pvname():
+        for checklist_item in checklist:
+            for comparison in checklist_item.comparisons:
+                for pvname in checklist_item.ids:
+                    yield comparison, pvname
+
+    for comparison, pvname in get_comparison_and_pvname():
+        # Pre-fill the cache with PVs, connecting in the background
+        _ = cache[pvname]
+
+    for comparison, pvname in get_comparison_and_pvname():
+        logger.debug("Checking %s.%s with comparison %s", pvname, comparison)
+        signal = cache[pvname]
+        try:
+            signal.wait_for_connection()
+        except TimeoutError:
+            result = Result(
+                severity=comparison.if_disconnected,
+                reason=(
+                    f"Unable to connect to {pvname} for comparison "
+                    f"{comparison}"
+                ),
+            )
+        else:
+            result = comparison.compare_signal(signal, identifier=pvname)
+
+        if result.severity > overall:
+            overall = result.severity
+        results.append(result)
+
+    return overall, results
+
+
+_CacheSignalType = TypeVar("_CacheSignalType")
+
+
+@dataclass
+class _SignalCache(Mapping[str, _CacheSignalType]):
+    signal_type_cls: _CacheSignalType
+    pv_to_signal: Dict[str, _CacheSignalType] = field(default_factory=dict)
+
+    def __getitem__(self, pv: str) -> _CacheSignalType:
+        """Get a PV from the cache."""
+        if pv not in self.pv_to_signal:
+            self.pv_to_signal[pv] = self.signal_type_cls(pv, name=pv)
+
+        return self.pv_to_signal[pv]
+
+    def __iter__(self):
+        yield from self.pv_to_signal
+
+    def __len__(self):
+        return len(self.pv_to_signal)
+
+    def clear(self) -> None:
+        """Clear the signal cache."""
+        for sig in self.pv_to_signal.values():
+            try:
+                sig.destroy()
+            except Exception:
+                logger.debug("Destroy failed for signal %s", sig.name)
+        self.pv_to_signal.clear()
+
+
+_signal_cache = None
+
+
+def get_signal_cache() -> _SignalCache[ophyd.EpicsSignalRO]:
+    """Get the global EpicsSignal cache."""
+    global _signal_cache
+    if _signal_cache is None:
+        _signal_cache = _SignalCache(ophyd.EpicsSignalRO)
+    return _signal_cache
