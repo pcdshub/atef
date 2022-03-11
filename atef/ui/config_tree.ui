@@ -15,53 +15,20 @@
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout_3">
    <item>
-    <widget class="QTreeWidget" name="treeWidget">
+    <widget class="QTreeWidget" name="tree_widget">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Maximum" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="editTriggers">
       <set>QAbstractItemView::NoEditTriggers</set>
      </property>
      <property name="columnCount">
-      <number>2</number>
+      <number>0</number>
      </property>
-     <column>
-      <property name="text">
-       <string>Item</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>Type</string>
-      </property>
-     </column>
-     <item>
-      <property name="text">
-       <string>hutchname</string>
-      </property>
-      <property name="text">
-       <string>Config File</string>
-      </property>
-      <item>
-       <property name="text">
-        <string>settings</string>
-       </property>
-       <property name="text">
-        <string>Config Settings</string>
-       </property>
-      </item>
-     </item>
     </widget>
-   </item>
-   <item>
-    <spacer name="horizontalSpacer">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>40</width>
-       <height>20</height>
-      </size>
-     </property>
-    </spacer>
    </item>
   </layout>
  </widget>
