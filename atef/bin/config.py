@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Optional, Any
 
 from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QTabWidget,
-                            QTreeWidget, QTreeWidgetItem)
+                            QTreeWidget, QTreeWidgetItem, QPushButton,
+                            QVBoxLayout)
 from qtpy.uic import loadUiType
 
-from ..check import ConfigurationFile
+from ..check import ConfigurationFile, DeviceConfiguration, PVConfiguration
 
 
 def build_arg_parser(argparser=None):
@@ -136,8 +137,42 @@ class AtefItem(QTreeWidgetItem):
 class Overview(AtefCfgDisplay, QWidget):
     filename = 'config_overview.ui'
 
+    add_device_button: QPushButton
+    add_pv_button: QPushButton
+    config_layout: QVBoxLayout
+
     def __init__(self, config_file: ConfigurationFile, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.config_file = config_file
+        self.initialize_overview()
+        self.add_device_button.clicked.connect(self.add_device_config)
+        self.add_pv_button.clicked.connect(self.add_pv_config)
+
+    def initialize_overview(self):
+        for config in self.config_file.configs:
+            if isinstance(config, DeviceConfiguration):
+                self.add_device_config(config=config)
+            elif isinstance(config, PVConfiguration):
+                self.add_pv_config(config=config)
+            else:
+                raise RuntimeError(
+                    f'{config} is not a valid config!'
+                )
+
+    def add_device_config(
+        self,
+        checked: Optional[bool] = None,
+        config: Optional[DeviceConfiguration] = None,
+    ):
+        if config is None:
+            config = DeviceConfiguration()
+
+
+class NamedRow(AtefCfgDisplay, QWidget):
+    filename = 'config_named_row.ui'
+
+    rename_button: QPushButton
+    confirm_button: QPushButton
 
 
 class Group(AtefCfgDisplay, QWidget):
