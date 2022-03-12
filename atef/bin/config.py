@@ -10,7 +10,7 @@ from typing import Optional, Any, Union
 from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QTabWidget,
                             QTreeWidget, QTreeWidgetItem, QPushButton,
-                            QVBoxLayout, QMessageBox, QLineEdit, QLabel, QPlainTextEdit)
+                            QMessageBox, QLineEdit, QLabel, QPlainTextEdit)
 from qtpy.uic import loadUiType
 
 from ..check import ConfigurationFile, DeviceConfiguration, PVConfiguration
@@ -152,10 +152,13 @@ class AtefItem(QTreeWidgetItem):
 class Overview(AtefCfgDisplay, QWidget):
     filename = 'config_overview.ui'
 
-    tree_ref: QTreeWidget
     add_device_button: QPushButton
     add_pv_button: QPushButton
-    config_layout: QVBoxLayout
+    scroll_content: QWidget
+
+    config_file: ConfigurationFile
+    tree_ref: QTreeWidget
+    row_count: int
 
     def __init__(
         self,
@@ -167,6 +170,7 @@ class Overview(AtefCfgDisplay, QWidget):
         super().__init__(*args, **kwargs)
         self.config_file = config_file
         self.tree_ref = tree_ref
+        self.row_count = 0
         self.initialize_overview()
         self.add_device_button.clicked.connect(self.add_device_config)
         self.add_pv_button.clicked.connect(self.add_pv_config)
@@ -215,7 +219,11 @@ class Overview(AtefCfgDisplay, QWidget):
             func_name=func_name,
         )
         self.tree_ref.addTopLevelItem(item)
-        self.config_layout.addWidget(OverviewRow(config, item))
+        self.scroll_content.layout().insertWidget(
+            self.row_count,
+            OverviewRow(config, item),
+        )
+        self.row_count += 1
 
 
 class OverviewRow(AtefCfgDisplay, QWidget):

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>407</width>
-    <height>120</height>
+    <height>89</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -63,6 +63,18 @@
    </item>
    <item>
     <widget class="QPlainTextEdit" name="desc_edit">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>40</height>
+      </size>
+     </property>
      <property name="plainText">
       <string>description</string>
      </property>
