@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QTabWidget,
                             QTreeWidget, QTreeWidgetItem, QPushButton,
-                            QVBoxLayout, QMessageBox)
+                            QVBoxLayout, QMessageBox, QLineEdit, QLabel, QPlainTextEdit)
 from qtpy.uic import loadUiType
 
 from ..check import ConfigurationFile, DeviceConfiguration, PVConfiguration
@@ -86,7 +86,7 @@ class Window(AtefCfgDisplay, QMainWindow):
 class Tree(AtefCfgDisplay, QWidget):
     filename = 'config_tree.ui'
 
-    tree_widget = QTreeWidget
+    tree_widget: QTreeWidget
 
     def __init__(self, *args, config_file: ConfigurationFile, **kwargs):
         super().__init__(*args, **kwargs)
@@ -102,7 +102,7 @@ class Tree(AtefCfgDisplay, QWidget):
         self.tree_widget.setHeaderLabels(['Node', 'Function'])
         self.overview_item = AtefItem(
             widget_class=Overview,
-            widget_data=self.config_file,
+            widget_args=[self.config_file, self.tree_widget],
             name='Overview',
             func_name='Add New Configs'
         )
@@ -123,14 +123,14 @@ class Tree(AtefCfgDisplay, QWidget):
 
 class AtefItem(QTreeWidgetItem):
     widget_class: type[QWidget]
-    widget_data: Any
+    widget_args: list[Any]
     widget_cached: Optional[QWidget]
 
     def __init__(
         self,
         *args,
         widget_class: type[QWidget],
-        widget_data: Any,
+        widget_args: Optional[list[Any]],
         name: str,
         func_name: Optional[str] = None,
         **kwargs,
@@ -140,25 +140,33 @@ class AtefItem(QTreeWidgetItem):
         if func_name is not None:
             self.setText(1, func_name)
         self.widget_class = widget_class
-        self.widget_data = widget_data
+        self.widget_args = widget_args or []
         self.widget_cached = None
 
     def get_widget(self) -> QWidget:
         if self.widget_cached is None:
-            self.widget_cached = self.widget_class(self.widget_data)
+            self.widget_cached = self.widget_class(*self.widget_args)
         return self.widget_cached
 
 
 class Overview(AtefCfgDisplay, QWidget):
     filename = 'config_overview.ui'
 
+    tree_ref: QTreeWidget
     add_device_button: QPushButton
     add_pv_button: QPushButton
     config_layout: QVBoxLayout
 
-    def __init__(self, config_file: ConfigurationFile, *args, **kwargs):
+    def __init__(
+        self,
+        config_file: ConfigurationFile,
+        tree_ref: QTreeWidget,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.config_file = config_file
+        self.tree_ref = tree_ref
         self.initialize_overview()
         self.add_device_button.clicked.connect(self.add_device_config)
         self.add_pv_button.clicked.connect(self.add_pv_config)
@@ -181,6 +189,53 @@ class Overview(AtefCfgDisplay, QWidget):
     ):
         if config is None:
             config = DeviceConfiguration()
+        self.add_config(config)
+
+    def add_pv_config(
+        self,
+        checked: Optional[bool] = None,
+        config: Optional[PVConfiguration] = None,
+    ):
+        if config is None:
+            config = PVConfiguration()
+        self.add_config(PVConfiguration)
+
+    def add_config(
+        self,
+        config: Union[DeviceConfiguration, PVConfiguration],
+    ):
+        if isinstance(config, DeviceConfiguration):
+            func_name = 'device config'
+        else:
+            func_name = 'pv config'
+        item = AtefItem(
+            widget_class=Group,
+            widget_args=[],
+            name=config.name or 'untitled',
+            func_name=func_name,
+        )
+        self.tree_ref.addTopLevelItem(item)
+        self.config_layout.addWidget(OverviewRow(config, item))
+
+
+class OverviewRow(AtefCfgDisplay, QWidget):
+    filename = 'config_overview_row.ui'
+
+    name_edit: QLineEdit
+    config_type: QLabel
+    lock_button: QPushButton
+    desc_edit: QPlainTextEdit
+
+    def __init__(
+        self,
+        config: Union[DeviceConfiguration, PVConfiguration],
+        item: AtefItem,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self.config = config
+        self.item = item
 
 
 class NamedRow(AtefCfgDisplay, QWidget):
