@@ -7,9 +7,10 @@ import argparse
 from pathlib import Path
 from typing import Optional, Any
 
+from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QTabWidget,
                             QTreeWidget, QTreeWidgetItem, QPushButton,
-                            QVBoxLayout)
+                            QVBoxLayout, QMessageBox)
 from qtpy.uic import loadUiType
 
 from ..check import ConfigurationFile, DeviceConfiguration, PVConfiguration
@@ -52,7 +53,21 @@ class Window(AtefCfgDisplay, QMainWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.trees = {}
+        self.setWindowTitle('atef config')
         self.action_new_file.triggered.connect(self.open_new_file)
+        QTimer.singleShot(0, self.welcome_user)
+
+    def welcome_user(self):
+        welcome_box = QMessageBox()
+        welcome_box.setIcon(QMessageBox.Question)
+        welcome_box.setWindowTitle('Welcome')
+        welcome_box.setText('Welcome to atef config!')
+        welcome_box.setInformativeText('Please select a startup action')
+        welcome_box.addButton(QMessageBox.Open)
+        new_button = welcome_box.addButton('New', QMessageBox.AcceptRole)
+        welcome_box.addButton(QMessageBox.Close)
+        new_button.clicked.connect(self.open_new_file)
+        welcome_box.exec()
 
     def open_new_file(self, *args, **kwargs):
         name = self.user_default_filename
