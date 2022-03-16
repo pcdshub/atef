@@ -44,6 +44,12 @@ class AtefCfgDisplay:
 
 
 class Window(AtefCfgDisplay, QMainWindow):
+    """
+    Main atef config window
+
+    Has a tab widget for editing multiple files at once, and contains
+    the menu bar for facilitating saving/loading.
+    """
     filename = 'config_window.ui'
     user_default_filename = 'untitled'
     user_filename_ext = 'yaml'
@@ -58,6 +64,12 @@ class Window(AtefCfgDisplay, QMainWindow):
         QTimer.singleShot(0, self.welcome_user)
 
     def welcome_user(self):
+        """
+        On open, ask the user what they'd like to do (new config? load?)
+
+        TODO: implement loading
+        TODO: only show when we don't get a file cli argument to start.
+        """
         welcome_box = QMessageBox()
         welcome_box.setIcon(QMessageBox.Question)
         welcome_box.setWindowTitle('Welcome')
@@ -70,6 +82,11 @@ class Window(AtefCfgDisplay, QMainWindow):
         welcome_box.exec()
 
     def open_new_file(self, *args, **kwargs):
+        """
+        Create and populate a new edit tab.
+
+        The parameters are open as to accept inputs from any signal.
+        """
         name = self.user_default_filename
         index = 0
         while name in self.trees:
@@ -84,6 +101,17 @@ class Window(AtefCfgDisplay, QMainWindow):
 
 
 class Tree(AtefCfgDisplay, QWidget):
+    """
+    The main per-file widget as a "native" view into the file.
+
+    Consists of a tree visualization on the left that can be selected through
+    to choose which part of the tree to edit in the widget space on the right.
+
+    Parameters
+    ----------
+    config_file : ConfigurationFile
+        The config file object to use to build the tree.
+    """
     filename = 'config_tree.ui'
 
     tree_widget: QTreeWidget
@@ -98,6 +126,12 @@ class Tree(AtefCfgDisplay, QWidget):
         self.tree_widget.itemPressed.connect(self.show_selected_display)
 
     def assemble_tree(self):
+        """
+        On startup, create the full tree.
+
+        TODO: properly fill from the config_file, currently creates only the
+        base tree with a single "overview" item.
+        """
         self.tree_widget.setColumnCount(2)
         self.tree_widget.setHeaderLabels(['Node', 'Type'])
         self.overview_item = AtefItem(
@@ -109,6 +143,22 @@ class Tree(AtefCfgDisplay, QWidget):
         self.tree_widget.addTopLevelItem(self.overview_item)
 
     def show_selected_display(self, item: AtefItem, *args, **kwargs):
+        """
+        Show the proper widget on the right when a tree row is selected.
+
+        This works by hiding the previous widget and showing the new
+        selection, creating the widget object if needed.
+
+        TODO: make sure the widget we set visible is fully updated with
+        the latest config file information.
+
+        Parameters
+        ----------
+        item : AtefItem
+            The selected item in the tree. This contains information like
+            the textual annotation, cached widget references, and
+            arguments for creating a new widget if needed.
+        """
         if item is self.last_selection:
             return
         if self.last_selection is not None:
@@ -122,6 +172,11 @@ class Tree(AtefCfgDisplay, QWidget):
 
 
 class AtefItem(QTreeWidgetItem):
+    """
+    A QTreeWidget item with some convenience methods.
+
+    Facilitates the widget creation/caching mechanisms.
+    """
     widget_class: type[QWidget]
     widget_args: list[Any]
     widget_cached: Optional[QWidget]
@@ -144,12 +199,35 @@ class AtefItem(QTreeWidgetItem):
         self.widget_cached = None
 
     def get_widget(self) -> QWidget:
+        """
+        Return the edit widget associated with this tree node.
+
+        On the first call, the widget is created. On subsequent calls
+        we use the cached widget.
+        """
         if self.widget_cached is None:
             self.widget_cached = self.widget_class(*self.widget_args)
         return self.widget_cached
 
 
 class Overview(AtefCfgDisplay, QWidget):
+    """
+    A view of all the top-level "Configuration" objects.
+
+    This widget allows us to browse our config names, classes, and
+    descriptions, as well as add new configs.
+
+    TODO: add a way to delete configs.
+
+    Parameters
+    ----------
+    config_file : ConfigurationFile
+        A reference to the full config file dataclass to read from
+        and update to as we do edits.
+    tree_ref : QTreeWidget
+        A reference to the entire tree widget so we can update the
+        top-level names in the tree as they are edited here.
+    """
     filename = 'config_overview.ui'
 
     add_device_button: QPushButton
@@ -176,6 +254,9 @@ class Overview(AtefCfgDisplay, QWidget):
         self.add_pv_button.clicked.connect(self.add_pv_config)
 
     def initialize_overview(self):
+        """
+        Read the configuration data and create the overview rows.
+        """
         for config in self.config_file.configs:
             if isinstance(config, DeviceConfiguration):
                 self.add_device_config(config=config)
@@ -191,6 +272,19 @@ class Overview(AtefCfgDisplay, QWidget):
         checked: Optional[bool] = None,
         config: Optional[DeviceConfiguration] = None,
     ):
+        """
+        Add a device config row to the tree and to the overview.
+
+        This method exists so that we can make the "add_device_button" work.
+
+        Parameters
+        ----------
+        checked : bool
+            Expected argument from a qPushButton, unused
+        config : DeviceConfiguration, optional
+            The device configuration to add. If omitted, we'll create
+            a blank config.
+        """
         if config is None:
             config = DeviceConfiguration()
         self.add_config(config)
@@ -200,6 +294,19 @@ class Overview(AtefCfgDisplay, QWidget):
         checked: Optional[bool] = None,
         config: Optional[PVConfiguration] = None,
     ):
+        """
+        Add a pv config row to the tree and to the overview.
+
+        This method exists so that we can make the "add_pv_button" work.
+
+        Parameters
+        ----------
+        checked : bool
+            Expected argument from a qPushButton, unused
+        config : PVConfiguration, optional
+            The PV configuration to add. If omitted, we'll create
+            a blank config.
+        """
         if config is None:
             config = PVConfiguration()
         self.add_config(PVConfiguration)
@@ -208,6 +315,17 @@ class Overview(AtefCfgDisplay, QWidget):
         self,
         config: Union[DeviceConfiguration, PVConfiguration],
     ):
+        """
+        Add an existing config to the tree and to the overview.
+
+        This is the core method that modifies the tree and adds the row
+        widget.
+
+        Parameters
+        ----------
+        config : Configuration
+            A single configuration object.
+        """
         if isinstance(config, DeviceConfiguration):
             func_name = 'device config'
         else:
@@ -227,6 +345,23 @@ class Overview(AtefCfgDisplay, QWidget):
 
 
 class OverviewRow(AtefCfgDisplay, QWidget):
+    """
+    A single row in the overview widget.
+
+    This displays and provides means to edit the name and description
+    of a single configuration.
+
+    TODO: add a way to re-read the configuration if it is edited elsewhere
+
+    Parameters
+    ----------
+    config : Configuration
+        The full configuration associated with this row, so that we can
+        read and edit the name and description.
+    item : AtefItem
+        The single item in the tree associated with this config, so that we
+        can write to the text in the tree as we edit the name.
+    """
     filename = 'config_overview_row.ui'
 
     name_edit: QLineEdit
@@ -247,6 +382,9 @@ class OverviewRow(AtefCfgDisplay, QWidget):
         self.initialize_row()
 
     def initialize_row(self):
+        """
+        Set up all the logic and starting state of the row widget.
+        """
         self.name_edit.textEdited.connect(self.update_saved_name)
         self.desc_edit.textChanged.connect(self.update_saved_desc)
         self.update_text_height()
@@ -258,20 +396,41 @@ class OverviewRow(AtefCfgDisplay, QWidget):
             self.config_type.setText('PV Config')
 
     def update_saved_name(self, name: str):
+        """
+        When the user edits the name, write to the tree and the config.
+        """
         self.config.name = name
         self.item.setText(0, name)
 
     def update_saved_desc(self):
+        """
+        When the user edits the desc, write to the config.
+        """
         self.config.description = self.desc_edit.toPlainText()
 
     def update_text_height(self):
+        """
+        When the user edits the desc, make the text box the correct height.
+        """
         line_count = max(self.desc_edit.document().size().toSize().height(), 1)
         self.desc_edit.setFixedHeight(line_count * 13 + 12)
 
     def lock_editing(self, locked: bool):
+        """
+        Set the checked state of the "locked" button as the user would.
+        """
         self.lock_button.setChecked(locked)
 
     def handle_locking(self, locked: bool):
+        """
+        When the checked state of the "locked" button changes, make it so.
+
+        When locked, the boxes will be read only and have an indicated visual change.
+        When unlocked, the boxes will be writable and have the default look and feel.
+
+        It is expected that the user won't edit these a lot, and that it is easier
+        to browse through the rows with the non-edit style.
+        """
         self.name_edit.setReadOnly(locked)
         self.name_edit.setFrame(not locked)
         self.desc_edit.setReadOnly(locked)
