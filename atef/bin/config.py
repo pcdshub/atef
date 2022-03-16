@@ -99,12 +99,12 @@ class Tree(AtefCfgDisplay, QWidget):
 
     def assemble_tree(self):
         self.tree_widget.setColumnCount(2)
-        self.tree_widget.setHeaderLabels(['Node', 'Function'])
+        self.tree_widget.setHeaderLabels(['Node', 'Type'])
         self.overview_item = AtefItem(
             widget_class=Overview,
             widget_args=[self.config_file, self.tree_widget],
             name='Overview',
-            func_name='Add New Configs'
+            func_name='overview'
         )
         self.tree_widget.addTopLevelItem(self.overview_item)
 
@@ -244,6 +244,47 @@ class OverviewRow(AtefCfgDisplay, QWidget):
         super().__init__(*args, **kwargs)
         self.config = config
         self.item = item
+        self.initialize_row()
+
+    def initialize_row(self):
+        self.name_edit.textEdited.connect(self.update_saved_name)
+        self.desc_edit.textChanged.connect(self.update_saved_desc)
+        self.update_text_height()
+        self.desc_edit.textChanged.connect(self.update_text_height)
+        self.lock_button.toggled.connect(self.handle_locking)
+        if isinstance(self.config, DeviceConfiguration):
+            self.config_type.setText('Device Config')
+        else:
+            self.config_type.setText('PV Config')
+
+    def update_saved_name(self, name: str):
+        self.config.name = name
+        self.item.setText(0, name)
+
+    def update_saved_desc(self):
+        self.config.description = self.desc_edit.toPlainText()
+
+    def update_text_height(self):
+        line_count = max(self.desc_edit.document().size().toSize().height(), 1)
+        self.desc_edit.setFixedHeight(line_count * 13 + 12)
+
+    def lock_editing(self, locked: bool):
+        self.lock_button.setChecked(locked)
+
+    def handle_locking(self, locked: bool):
+        self.name_edit.setReadOnly(locked)
+        self.name_edit.setFrame(not locked)
+        self.desc_edit.setReadOnly(locked)
+        if locked:
+            self.desc_edit.setFrameShape(self.desc_edit.NoFrame)
+            self.setStyleSheet(
+                "QLineEdit, QPlainTextEdit { background: transparent }"
+            )
+        else:
+            self.desc_edit.setFrameShape(self.desc_edit.StyledPanel)
+            self.setStyleSheet(
+                "QLineEdit, QPlainTextEdit { background: white }"
+            )
 
 
 class NamedRow(AtefCfgDisplay, QWidget):
