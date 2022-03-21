@@ -53,9 +53,9 @@ class QDataclassBridge(QObject):
         for field in dataclasses.fields(data):
             # Need to figure out which category this is:
             # 1. Primitive value -> make a QDataclassValue
-            # 2. Another dataclass -> make a QDataclassBridge
+            # 2. Another dataclass -> make a QDataclassValue (object)
             # 3. A list of values -> make a QDataclassList
-            # 4. A list of datacalsses -> ??? TODO
+            # 4. A list of dataclasses -> QDataclassList (object)
             use_type = field.type
             NestedClass = QDataclassValue
             # Resolve "optional" fields
