@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 from pathlib import Path
-from typing import Optional, Any, Union
+from typing import Optional, Any, List, Union, ClassVar, Dict, Type
 
-from qtpy.QtCore import QTimer
+from qtpy.QtCore import QTimer, QObject, pyqtSignal
 from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QTabWidget,
                             QTreeWidget, QTreeWidgetItem, QPushButton,
                             QMessageBox, QLineEdit, QLabel, QPlainTextEdit)
@@ -22,8 +23,236 @@ def build_arg_parser(argparser=None):
     return argparser
 
 
+class QDataclassBridge(QObject):
+    """
+    Convenience structure for managing a dataclass along with qt.
+
+    Once created, you can navigate this object much like it was the
+    dataclass. For example:
+
+    @dataclass
+    def my_class:
+        field: int
+        others: list[OtherClass]
+
+    Would allow you to access:
+    bridge.field.put(3)
+    bridge.field.value_changed.connect(my_slot)
+    bridge.others.append(OtherClass(4))
+
+    This does not recursively dive down the tree of subdataclasses.
+    For these, we need to make multiple bridges.
+
+    Parameters
+    ----------
+    data : any dataclass
+        The dataclass we want to bridge to
+    """
+    def __init__(self, data: Any, parent: Optional[QObject] = None):
+        super().__init__(self, parent=parent)
+        for field in dataclasses.fields(data):
+            # Need to figure out which category this is:
+            # 1. Primitive value -> make a QDataclassValue
+            # 2. Another dataclass -> make a QDataclassBridge
+            # 3. A list of values -> make a QDataclassList
+            # 4. A list of datacalsses -> ??? TODO
+            use_type = field.type
+            NestedClass = QDataclassValue
+            # Resolve "optional" fields
+            if isinstance(use_type, Optional):
+                # Assume we may have it at some point
+                use_type = use_type.__args__[0]
+            # Extract the base type of the list
+            if isinstance(use_type, List):
+                NestedClass = QDataClassList
+                use_type = use_type.__args__[0]
+            # Identify dataclasses
+            try:
+                dataclasses.fields(use_type)
+            except TypeError:
+                # non-dataclass, use previous use_type
+                # expected to be a primitive type
+                ...
+            else:
+                # a dataclass, we need a generic object qsignal
+                use_type = object
+            setattr(
+                self,
+                field.name,
+                NestedClass.of_type(use_type)(
+                    data,
+                    field.name,
+                    parent=self,
+                ),
+            )
+
+
+class QDataclassElem:
+    """
+    Base class for elements of the QDataclassBridge
+
+    Parameters
+    ----------
+    data : any dataclass
+        The data we want to access and update
+    attr : str
+        The dataclass attribute to connect to
+    """
+    data: Any
+    attr: str
+    updated: pyqtSignal
+    _registry: ClassVar[Dict[str, type]]
+
+    def __init__(
+        self,
+        data: Any,
+        attr: str,
+        parent: Optional[QObject] = None,
+    ):
+        super().__init__(self, parent=parent)
+        self.data = data
+        self.attr = attr
+
+
+class QDataclassValue(QDataclassElem):
+    """
+    A single value in the QDataclassBridge.
+    """
+    changed_value: pyqtSignal
+
+    _registry = {}
+
+    @classmethod
+    def of_type(cls, data_type: type) -> Type[QDataclassValue]:
+        """
+        Create a QDataclass with a specific pyqtSignal
+
+        Parameters
+        ----------
+        data_type : any primitive type
+        """
+        try:
+            return cls._registry[data_type]
+        except KeyError:
+            ...
+        new_class = type(
+            f'QDataclass{data_type}',
+            (cls, QObject),
+            {
+                'updated': pyqtSignal(),
+                'changed_value': pyqtSignal(data_type),
+            },
+        )
+        cls._registry[data_type] = new_class
+        return new_class
+
+    def get(self) -> Any:
+        """
+        Return the current value.
+        """
+        return getattr(self.data, self.attr)
+
+    def put(self, value: Any):
+        """
+        Change a value on the dataclass and update consumers.
+
+        Parameters
+        ----------
+        value : any primitive type
+        """
+        setattr(self.data, self.attr, value)
+        self.changed_value.emit(self.get())
+        self.updated.emit()
+
+
+class QDataClassList(QDataclassElem):
+    """
+    A list of values in the QDataclassBridge.
+    """
+    added_value: pyqtSignal
+    added_index: pyqtSignal
+    removed_value: pyqtSignal
+    removed_index: pyqtSignal
+    changed_value: pyqtSignal
+    changed_index: pyqtSignal
+
+    _registry = {}
+
+    @classmethod
+    def of_type(cls, data_type: type) -> Type[QDataClassList]:
+        """
+        Create a QDataclass with a specific pyqtSignal
+
+        Parameters
+        ----------
+        data_type : any primitive type
+        """
+        try:
+            return cls._registry[data_type]
+        except KeyError:
+            ...
+        new_class = type(
+            f'QDataclass{data_type}',
+            (cls, QObject),
+            {
+                'updated': pyqtSignal(),
+                'added_value': pyqtSignal(data_type),
+                'added_index': pyqtSignal(int),
+                'removed_value': pyqtSignal(data_type),
+                'removed_index': pyqtSignal(int),
+                'changed_value': pyqtSignal(data_type),
+                'changed_index': pyqtSignal(int),
+            },
+        )
+        cls._registry[data_type] = new_class
+        return new_class
+
+    def get(self) -> List[Any]:
+        """
+        Return the current list of values.
+        """
+        return getattr(self.data, self.attr)
+
+    def append(self, new_value: Any) -> None:
+        """
+        Add a new value to the end of the list and update consumers.
+        """
+        self.get().append(new_value)
+        self.added_value.emit(new_value)
+        self.added_index.emit(len(self.get()) - 1)
+        self.updated.emit()
+
+    def remove_value(self, removal: Any) -> None:
+        """
+        Remove a value from the list by value and update consumers.
+        """
+        index = self.get().index(removal)
+        self.get().remove(removal)
+        self.removed_value.emit(removal)
+        self.removed_index.emit(index)
+        self.updated.emit()
+
+    def remove_index(self, index: int) -> None:
+        """
+        Remove a value from the list by index and update consumers.
+        """
+        value = self.get().pop(index)
+        self.removed_value.emit(value)
+        self.removed_index.emit(index)
+        self.updated.emit()
+
+    def put_to_index(self, index: int, new_value: Any) -> None:
+        """
+        Change a value in the list and update consumers.
+        """
+        self.get()[index] = new_value
+        self.changed_value.emit(new_value)
+        self.changed_index.emit(index)
+        self.updated.emit()
+
+
 class AtefCfgDisplay:
-    """Helper class for loading the .ui files and adding logic"""
+    """Helper class for loading the .ui files and adding logic."""
     filename: str
 
     def __init_subclass__(cls):
