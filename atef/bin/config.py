@@ -681,6 +681,9 @@ class OverviewRow(AtefCfgDisplay, QWidget):
         self.desc_edit.textChanged.connect(self.update_text_height)
         # Setup the lock button
         self.lock_button.toggled.connect(self.handle_locking)
+        if load_name:
+            # Start locked if we are reading from file
+            self.lock_button.toggle()
 
     def update_saved_name(self, name: str):
         """
