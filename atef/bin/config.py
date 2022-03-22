@@ -7,7 +7,7 @@ import argparse
 import dataclasses
 from functools import partial
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 from qtpy.QtCore import QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
@@ -58,36 +58,55 @@ class QDataclassBridge(QObject):
             # 2. Another dataclass -> make a QDataclassValue (object)
             # 3. A list of values -> make a QDataclassList
             # 4. A list of dataclasses -> QDataclassList (object)
-            use_type = field.type
-            NestedClass = QDataclassValue
-            # Resolve "optional" fields
-            # isinstance isn't allowed here for implementation reasons
-            if 'typing.Optional' in str(use_type):
-                # Assume we may have it at some point
-                use_type = use_type.__args__[0]
-            # Extract the base type of the list
-            if isinstance(use_type, List):
+            normalized = normalize_annotation(field.type)
+            if List in normalized:
                 NestedClass = QDataclassList
-                use_type = use_type.__args__[0]
-            # Identify dataclasses
-            try:
-                dataclasses.fields(use_type)
-            except TypeError:
-                # non-dataclass, use previous use_type
-                # expected to be a primitive type
-                ...
             else:
-                # a dataclass, we need a generic object qsignal
-                use_type = object
+                NestedClass = QDataclassValue
             setattr(
                 self,
                 field.name,
-                NestedClass.of_type(use_type)(
+                NestedClass.of_type(normalized[-1])(
                     data,
                     field.name,
                     parent=self,
                 ),
             )
+
+
+normalize_map = {
+    'Optional': Optional,
+    'List': List,
+    'Number': float,
+    'int': int,
+    'str': str,
+    'bool': bool,
+    'Configuration': object,
+    'IdentifierAndComparison': object,
+    'Comparison': object,
+}
+
+
+def normalize_annotation(annotation: str) -> Tuple[type]:
+    """
+    Change a string annotation into a tuple of the enclosing classes.
+
+    For example: "Optional[List[SomeClass]]" becomes
+    (Optional, List, object)
+
+    Somewhat incomplete- only correct to the level needed for this
+    application.
+
+    Only supports the cases where we have exactly one element in each
+    square bracket nesting level.
+
+    There is definitely a better way to handle this, but I can't
+    figure it out quickly and want to press forward to v0.
+    """
+    elems = []
+    for text in annotation.strip(']').split('['):
+        elems.append(normalize_map[text])
+    return tuple(elems)
 
 
 class QDataclassElem:
@@ -490,11 +509,11 @@ class Overview(AtefCfgDisplay, QWidget):
         """
         Read the configuration data and create the overview rows.
         """
-        for config in self.config_file.configs:
+        for config in self.config_list.get():
             if isinstance(config, DeviceConfiguration):
-                self.add_device_config(config=config)
+                self.add_device_config(config=config, update_data=False)
             elif isinstance(config, PVConfiguration):
-                self.add_pv_config(config=config)
+                self.add_pv_config(config=config, update_data=False)
             else:
                 raise RuntimeError(
                     f'{config} is not a valid config!'
