@@ -60,7 +60,8 @@ class QDataclassBridge(QObject):
             use_type = field.type
             NestedClass = QDataclassValue
             # Resolve "optional" fields
-            if isinstance(use_type, Optional):
+            # isinstance isn't allowed here for implementation reasons
+            if 'typing.Optional' in str(use_type):
                 # Assume we may have it at some point
                 use_type = use_type.__args__[0]
             # Extract the base type of the list
