@@ -368,12 +368,12 @@ class Tree(AtefCfgDisplay, QWidget):
     """
     filename = 'config_tree.ui'
 
-    config_file: QDataclassBridge
+    bridge: QDataclassBridge
     tree_widget: QTreeWidget
 
     def __init__(self, *args, config_file: ConfigurationFile, **kwargs):
         super().__init__(*args, **kwargs)
-        self.config_file = QDataclassBridge(config_file, parent=self)
+        self.bridge = QDataclassBridge(config_file, parent=self)
         self.last_selection: Optional[AtefItem] = None
         self.built_widgets = set()
         self.assemble_tree()
@@ -391,7 +391,7 @@ class Tree(AtefCfgDisplay, QWidget):
         self.tree_widget.setHeaderLabels(['Node', 'Type'])
         self.overview_item = AtefItem(
             widget_class=Overview,
-            widget_args=[self.config_file.configs, self.tree_widget],
+            widget_args=[self.bridge.configs, self.tree_widget],
             name='Overview',
             func_name='overview'
         )
@@ -602,10 +602,9 @@ class Overview(AtefCfgDisplay, QWidget):
             self.row_count,
             row,
         )
-        bridge = row.config
         item = AtefItem(
             widget_class=Group,
-            widget_args=[bridge],
+            widget_args=[row.bridge],
             name=config.name or 'untitled',
             func_name=func_name,
         )
@@ -613,7 +612,7 @@ class Overview(AtefCfgDisplay, QWidget):
         self.row_count += 1
 
         # If either of the widgets change the name, update tree
-        bridge.name.changed_value.connect(
+        row.bridge.name.changed_value.connect(
             partial(item.setText, 0)
         )
         # Note: this is the only place in the UI where
@@ -640,7 +639,7 @@ class OverviewRow(AtefCfgDisplay, QWidget):
     """
     filename = 'config_overview_row.ui'
 
-    config: QDataclassBridge
+    bridge: QDataclassBridge
 
     name_edit: QLineEdit
     config_type: QLabel
@@ -654,7 +653,7 @@ class OverviewRow(AtefCfgDisplay, QWidget):
         **kwargs
     ):
         super().__init__(*args, **kwargs)
-        self.config = QDataclassBridge(config, parent=self)
+        self.bridge = QDataclassBridge(config, parent=self)
         self.initialize_row()
 
     def initialize_row(self):
@@ -662,21 +661,21 @@ class OverviewRow(AtefCfgDisplay, QWidget):
         Set up all the logic and starting state of the row widget.
         """
         # Load starting text
-        load_name = self.config.name.get() or ''
-        load_desc = self.config.description.get() or ''
+        load_name = self.bridge.name.get() or ''
+        load_desc = self.bridge.description.get() or ''
         self.last_desc = load_desc
         self.name_edit.setText(load_name)
         self.desc_edit.setPlainText(load_desc)
-        if isinstance(self.config.data, DeviceConfiguration):
+        if isinstance(self.bridge.data, DeviceConfiguration):
             self.config_type.setText('Device Config')
         else:
             self.config_type.setText('PV Config')
         # Setup the name edit
         self.name_edit.textEdited.connect(self.update_saved_name)
-        self.config.name.changed_value.connect(self.name_edit.setText)
+        self.bridge.name.changed_value.connect(self.name_edit.setText)
         # Setup the desc edit
         self.desc_edit.textChanged.connect(self.update_saved_desc)
-        self.config.description.changed_value.connect(self.apply_new_desc)
+        self.bridge.description.changed_value.connect(self.apply_new_desc)
         self.update_text_height()
         self.desc_edit.textChanged.connect(self.update_text_height)
         # Setup the lock button
@@ -689,14 +688,14 @@ class OverviewRow(AtefCfgDisplay, QWidget):
         """
         When the user edits the name, write to the config.
         """
-        self.config.name.put(name)
+        self.bridge.name.put(name)
 
     def update_saved_desc(self):
         """
         When the user edits the desc, write to the config.
         """
         self.last_desc = self.desc_edit.toPlainText()
-        self.config.description.put(self.last_desc)
+        self.bridge.description.put(self.last_desc)
 
     def apply_new_desc(self, desc: str):
         """
@@ -748,12 +747,12 @@ class Group(AtefCfgDisplay, QWidget):
 
     def __init__(
         self,
-        config: QDataclassBridge,
+        bridge: QDataclassBridge,
         *args,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
-        self.config = QDataclassBridge(config, parent=self)
+        self.bridge = QDataclassBridge(bridge, parent=self)
 
 
 class Checklist(AtefCfgDisplay, QWidget):
