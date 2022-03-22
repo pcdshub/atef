@@ -7,12 +7,13 @@ import argparse
 import dataclasses
 from functools import partial
 from pathlib import Path
-from typing import Optional, Any, List, Union, ClassVar, Dict, Type
+from typing import Any, ClassVar, Dict, List, Optional, Type, Union
 
-from qtpy.QtCore import QTimer, QObject, Signal as QSignal
-from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QTabWidget,
-                            QTreeWidget, QTreeWidgetItem, QPushButton,
-                            QMessageBox, QLineEdit, QLabel, QPlainTextEdit)
+from qtpy.QtCore import QObject, QTimer
+from qtpy.QtCore import Signal as QSignal
+from qtpy.QtWidgets import (QApplication, QLabel, QLineEdit, QMainWindow,
+                            QMessageBox, QPlainTextEdit, QPushButton,
+                            QTabWidget, QTreeWidget, QTreeWidgetItem, QWidget)
 from qtpy.uic import loadUiType
 
 from ..check import ConfigurationFile, DeviceConfiguration, PVConfiguration
