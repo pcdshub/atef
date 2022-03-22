@@ -50,8 +50,11 @@ class QDataclassBridge(QObject):
     data : any dataclass
         The dataclass we want to bridge to
     """
+    data: Any
+
     def __init__(self, data: Any, parent: Optional[QObject] = None):
         super().__init__(parent=parent)
+        self.data = data
         for field in dataclasses.fields(data):
             # Need to figure out which category this is:
             # 1. Primitive value -> make a QDataclassValue
@@ -158,7 +161,7 @@ class QDataclassValue(QDataclassElem):
         except KeyError:
             ...
         new_class = type(
-            f'QDataclass{data_type}',
+            f'QDataclassValueFor{data_type.__name__}',
             (cls, QObject),
             {
                 'updated': QSignal(),
@@ -214,7 +217,7 @@ class QDataclassList(QDataclassElem):
         except KeyError:
             ...
         new_class = type(
-            f'QDataclass{data_type}',
+            f'QDataclassListFor{data_type.__name__}',
             (cls, QObject),
             {
                 'updated': QSignal(),
@@ -670,10 +673,10 @@ class OverviewRow(AtefCfgDisplay, QWidget):
             self.config_type.setText('PV Config')
         # Setup the name edit
         self.name_edit.textEdited.connect(self.update_saved_name)
-        self.config.name.new_value.connect(self.name_edit.setText)
+        self.config.name.changed_value.connect(self.name_edit.setText)
         # Setup the desc edit
         self.desc_edit.textChanged.connect(self.update_saved_desc)
-        self.config.description.new_value.connect(self.apply_new_desc)
+        self.config.description.changed_value.connect(self.apply_new_desc)
         self.update_text_height()
         self.desc_edit.textChanged.connect(self.update_text_height)
         # Setup the lock button
