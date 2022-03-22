@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+from functools import partial
 from pathlib import Path
 from typing import Optional, Any, List, Union, ClassVar, Dict, Type
 
-from qtpy.QtCore import QTimer, QObject, pyqtSignal
+from qtpy.QtCore import QTimer, QObject, Signal as QSignal
 from qtpy.QtWidgets import (QApplication, QMainWindow, QWidget, QTabWidget,
                             QTreeWidget, QTreeWidgetItem, QPushButton,
                             QMessageBox, QLineEdit, QLabel, QPlainTextEdit)
@@ -49,7 +50,7 @@ class QDataclassBridge(QObject):
         The dataclass we want to bridge to
     """
     def __init__(self, data: Any, parent: Optional[QObject] = None):
-        super().__init__(self, parent=parent)
+        super().__init__(parent=parent)
         for field in dataclasses.fields(data):
             # Need to figure out which category this is:
             # 1. Primitive value -> make a QDataclassValue
@@ -64,7 +65,7 @@ class QDataclassBridge(QObject):
                 use_type = use_type.__args__[0]
             # Extract the base type of the list
             if isinstance(use_type, List):
-                NestedClass = QDataClassList
+                NestedClass = QDataclassList
                 use_type = use_type.__args__[0]
             # Identify dataclasses
             try:
@@ -100,7 +101,7 @@ class QDataclassElem:
     """
     data: Any
     attr: str
-    updated: pyqtSignal
+    updated: QSignal
     _registry: ClassVar[Dict[str, type]]
 
     def __init__(
@@ -109,7 +110,7 @@ class QDataclassElem:
         attr: str,
         parent: Optional[QObject] = None,
     ):
-        super().__init__(self, parent=parent)
+        super().__init__(parent=parent)
         self.data = data
         self.attr = attr
 
@@ -118,14 +119,14 @@ class QDataclassValue(QDataclassElem):
     """
     A single value in the QDataclassBridge.
     """
-    changed_value: pyqtSignal
+    changed_value: QSignal
 
     _registry = {}
 
     @classmethod
     def of_type(cls, data_type: type) -> Type[QDataclassValue]:
         """
-        Create a QDataclass with a specific pyqtSignal
+        Create a QDataclass with a specific QSignal
 
         Parameters
         ----------
@@ -139,8 +140,8 @@ class QDataclassValue(QDataclassElem):
             f'QDataclass{data_type}',
             (cls, QObject),
             {
-                'updated': pyqtSignal(),
-                'changed_value': pyqtSignal(data_type),
+                'updated': QSignal(),
+                'changed_value': QSignal(data_type),
             },
         )
         cls._registry[data_type] = new_class
@@ -165,23 +166,23 @@ class QDataclassValue(QDataclassElem):
         self.updated.emit()
 
 
-class QDataClassList(QDataclassElem):
+class QDataclassList(QDataclassElem):
     """
     A list of values in the QDataclassBridge.
     """
-    added_value: pyqtSignal
-    added_index: pyqtSignal
-    removed_value: pyqtSignal
-    removed_index: pyqtSignal
-    changed_value: pyqtSignal
-    changed_index: pyqtSignal
+    added_value: QSignal
+    added_index: QSignal
+    removed_value: QSignal
+    removed_index: QSignal
+    changed_value: QSignal
+    changed_index: QSignal
 
     _registry = {}
 
     @classmethod
-    def of_type(cls, data_type: type) -> Type[QDataClassList]:
+    def of_type(cls, data_type: type) -> Type[QDataclassList]:
         """
-        Create a QDataclass with a specific pyqtSignal
+        Create a QDataclass with a specific QSignal
 
         Parameters
         ----------
@@ -195,13 +196,13 @@ class QDataClassList(QDataclassElem):
             f'QDataclass{data_type}',
             (cls, QObject),
             {
-                'updated': pyqtSignal(),
-                'added_value': pyqtSignal(data_type),
-                'added_index': pyqtSignal(int),
-                'removed_value': pyqtSignal(data_type),
-                'removed_index': pyqtSignal(int),
-                'changed_value': pyqtSignal(data_type),
-                'changed_index': pyqtSignal(int),
+                'updated': QSignal(),
+                'added_value': QSignal(data_type),
+                'added_index': QSignal(int),
+                'removed_value': QSignal(data_type),
+                'removed_index': QSignal(int),
+                'changed_value': QSignal(data_type),
+                'changed_index': QSignal(int),
             },
         )
         cls._registry[data_type] = new_class
@@ -343,11 +344,12 @@ class Tree(AtefCfgDisplay, QWidget):
     """
     filename = 'config_tree.ui'
 
+    config_file: QDataclassBridge
     tree_widget: QTreeWidget
 
     def __init__(self, *args, config_file: ConfigurationFile, **kwargs):
         super().__init__(*args, **kwargs)
-        self.config_file = config_file
+        self.config_file = QDataclassBridge(config_file, parent=self)
         self.last_selection: Optional[AtefItem] = None
         self.built_widgets = set()
         self.assemble_tree()
@@ -365,7 +367,7 @@ class Tree(AtefCfgDisplay, QWidget):
         self.tree_widget.setHeaderLabels(['Node', 'Type'])
         self.overview_item = AtefItem(
             widget_class=Overview,
-            widget_args=[self.config_file, self.tree_widget],
+            widget_args=[self.config_file.configs, self.tree_widget],
             name='Overview',
             func_name='overview'
         )
@@ -463,19 +465,19 @@ class Overview(AtefCfgDisplay, QWidget):
     add_pv_button: QPushButton
     scroll_content: QWidget
 
-    config_file: ConfigurationFile
+    config_list: QDataclassList
     tree_ref: QTreeWidget
     row_count: int
 
     def __init__(
         self,
-        config_file: ConfigurationFile,
+        config_list: QDataclassList,
         tree_ref: QTreeWidget,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.config_file = config_file
+        self.config_list = config_list
         self.tree_ref = tree_ref
         self.row_count = 0
         self.initialize_overview()
@@ -500,6 +502,7 @@ class Overview(AtefCfgDisplay, QWidget):
         self,
         checked: Optional[bool] = None,
         config: Optional[DeviceConfiguration] = None,
+        update_data: bool = True,
     ):
         """
         Add a device config row to the tree and to the overview.
@@ -513,15 +516,19 @@ class Overview(AtefCfgDisplay, QWidget):
         config : DeviceConfiguration, optional
             The device configuration to add. If omitted, we'll create
             a blank config.
+        update_data : bool, optional
+            If True, the default, mutates the dataclass.
+            Set to False during the initial reading of the file.
         """
         if config is None:
             config = DeviceConfiguration()
-        self.add_config(config)
+        self.add_config(config, update_data=update_data)
 
     def add_pv_config(
         self,
         checked: Optional[bool] = None,
         config: Optional[PVConfiguration] = None,
+        update_data: bool = True,
     ):
         """
         Add a pv config row to the tree and to the overview.
@@ -535,14 +542,18 @@ class Overview(AtefCfgDisplay, QWidget):
         config : PVConfiguration, optional
             The PV configuration to add. If omitted, we'll create
             a blank config.
+        update_data : bool, optional
+            If True, the default, mutates the dataclass.
+            Set to False during the initial reading of the file.
         """
         if config is None:
             config = PVConfiguration()
-        self.add_config(PVConfiguration)
+        self.add_config(config, update_data=update_data)
 
     def add_config(
         self,
         config: Union[DeviceConfiguration, PVConfiguration],
+        update_data: bool = True,
     ):
         """
         Add an existing config to the tree and to the overview.
@@ -554,23 +565,37 @@ class Overview(AtefCfgDisplay, QWidget):
         ----------
         config : Configuration
             A single configuration object.
+        update_data : bool, optional
+            If True, the default, mutates the dataclass.
+            Set to False during the initial reading of the file.
         """
         if isinstance(config, DeviceConfiguration):
             func_name = 'device config'
         else:
             func_name = 'pv config'
+        row = OverviewRow(config)
+        self.scroll_content.layout().insertWidget(
+            self.row_count,
+            row,
+        )
+        bridge = row.config
         item = AtefItem(
             widget_class=Group,
-            widget_args=[],
+            widget_args=[bridge],
             name=config.name or 'untitled',
             func_name=func_name,
         )
         self.tree_ref.addTopLevelItem(item)
-        self.scroll_content.layout().insertWidget(
-            self.row_count,
-            OverviewRow(config, item),
-        )
         self.row_count += 1
+
+        # If either of the widgets change the name, update tree
+        bridge.name.changed_value.connect(
+            partial(item.setText, 0)
+        )
+        # Note: this is the only place in the UI where
+        # we add new config data
+        if update_data:
+            self.config_list.append(config)
 
 
 class OverviewRow(AtefCfgDisplay, QWidget):
@@ -579,8 +604,6 @@ class OverviewRow(AtefCfgDisplay, QWidget):
 
     This displays and provides means to edit the name and description
     of a single configuration.
-
-    TODO: add a way to re-read the configuration if it is edited elsewhere
 
     Parameters
     ----------
@@ -593,6 +616,8 @@ class OverviewRow(AtefCfgDisplay, QWidget):
     """
     filename = 'config_overview_row.ui'
 
+    config: QDataclassBridge
+
     name_edit: QLineEdit
     config_type: QLabel
     lock_button: QPushButton
@@ -601,41 +626,57 @@ class OverviewRow(AtefCfgDisplay, QWidget):
     def __init__(
         self,
         config: Union[DeviceConfiguration, PVConfiguration],
-        item: AtefItem,
         *args,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
-        self.config = config
-        self.item = item
+        self.config = QDataclassBridge(config, parent=self)
         self.initialize_row()
 
     def initialize_row(self):
         """
         Set up all the logic and starting state of the row widget.
         """
-        self.name_edit.textEdited.connect(self.update_saved_name)
-        self.desc_edit.textChanged.connect(self.update_saved_desc)
-        self.update_text_height()
-        self.desc_edit.textChanged.connect(self.update_text_height)
-        self.lock_button.toggled.connect(self.handle_locking)
-        if isinstance(self.config, DeviceConfiguration):
+        # Load starting text
+        load_name = self.config.name.get() or ''
+        load_desc = self.config.description.get() or ''
+        self.last_desc = load_desc
+        self.name_edit.setText(load_name)
+        self.desc_edit.setPlainText(load_desc)
+        if isinstance(self.config.data, DeviceConfiguration):
             self.config_type.setText('Device Config')
         else:
             self.config_type.setText('PV Config')
+        # Setup the name edit
+        self.name_edit.textEdited.connect(self.update_saved_name)
+        self.config.name.new_value.connect(self.name_edit.setText)
+        # Setup the desc edit
+        self.desc_edit.textChanged.connect(self.update_saved_desc)
+        self.config.description.new_value.connect(self.apply_new_desc)
+        self.update_text_height()
+        self.desc_edit.textChanged.connect(self.update_text_height)
+        # Setup the lock button
+        self.lock_button.toggled.connect(self.handle_locking)
 
     def update_saved_name(self, name: str):
         """
-        When the user edits the name, write to the tree and the config.
+        When the user edits the name, write to the config.
         """
-        self.config.name = name
-        self.item.setText(0, name)
+        self.config.name.put(name)
 
     def update_saved_desc(self):
         """
         When the user edits the desc, write to the config.
         """
-        self.config.description = self.desc_edit.toPlainText()
+        self.last_desc = self.desc_edit.toPlainText()
+        self.config.description.put(self.last_desc)
+
+    def apply_new_desc(self, desc: str):
+        """
+        When some other widget updates the description, update it here.
+        """
+        if desc != self.last_desc:
+            self.desc_edit.setPlainText(desc)
 
     def update_text_height(self):
         """
@@ -675,15 +716,17 @@ class OverviewRow(AtefCfgDisplay, QWidget):
             )
 
 
-class NamedRow(AtefCfgDisplay, QWidget):
-    filename = 'config_named_row.ui'
-
-    rename_button: QPushButton
-    confirm_button: QPushButton
-
-
 class Group(AtefCfgDisplay, QWidget):
     filename = 'config_group.ui'
+
+    def __init__(
+        self,
+        config: QDataclassBridge,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self.config = QDataclassBridge(config, parent=self)
 
 
 class Checklist(AtefCfgDisplay, QWidget):
