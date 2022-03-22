@@ -621,7 +621,72 @@ class Overview(AtefCfgDisplay, QWidget):
             self.config_list.append(config)
 
 
-class OverviewRow(AtefCfgDisplay, QWidget):
+class ConfigTextMixin:
+    """
+    A mix-in class for proper name and desc widget handling.
+
+    Does the following:
+    - sets up self.bridge to take updates from and send
+      updates to self.name_edit and self.desc_edit
+    - makes self.desc_edit expand/contract to match the
+      available text
+    """
+    bridge: QDataclassBridge
+    name_edit: QLineEdit
+    desc_edit: QPlainTextEdit
+
+    def initialize_config_text(self):
+        """
+        Call this in the mixed-in class to establish the config text.
+
+        Requires self.bridge, self.name_edit, and self.desc_edit
+        to be instantiated and available.
+        """
+        # Load starting text
+        load_name = self.bridge.name.get() or ''
+        load_desc = self.bridge.description.get() or ''
+        self.last_desc = load_desc
+        self.name_edit.setText(load_name)
+        self.desc_edit.setPlainText(load_desc)
+
+        # Setup the name edit
+        self.name_edit.textEdited.connect(self.update_saved_name)
+        self.bridge.name.changed_value.connect(self.name_edit.setText)
+        # Setup the desc edit
+        self.desc_edit.textChanged.connect(self.update_saved_desc)
+        self.bridge.description.changed_value.connect(self.apply_new_desc)
+        self.update_text_height()
+        self.desc_edit.textChanged.connect(self.update_text_height)
+
+    def update_saved_name(self, name: str):
+        """
+        When the user edits the name, write to the config.
+        """
+        self.bridge.name.put(name)
+
+    def update_saved_desc(self):
+        """
+        When the user edits the desc, write to the config.
+        """
+        self.last_desc = self.desc_edit.toPlainText()
+        self.bridge.description.put(self.last_desc)
+
+    def apply_new_desc(self, desc: str):
+        """
+        When some other widget updates the description, update it here.
+        """
+        if desc != self.last_desc:
+            self.desc_edit.setPlainText(desc)
+
+    def update_text_height(self):
+        """
+        When the user edits the desc, make the text box the correct height.
+        """
+        line_count = max(self.desc_edit.document().size().toSize().height(), 1)
+        self.desc_edit.setFixedHeight(line_count * 13 + 12)
+
+
+class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
     """
     A single row in the overview widget.
 
@@ -660,56 +725,16 @@ class OverviewRow(AtefCfgDisplay, QWidget):
         """
         Set up all the logic and starting state of the row widget.
         """
-        # Load starting text
-        load_name = self.bridge.name.get() or ''
-        load_desc = self.bridge.description.get() or ''
-        self.last_desc = load_desc
-        self.name_edit.setText(load_name)
-        self.desc_edit.setPlainText(load_desc)
+        self.initialize_config_text()
         if isinstance(self.bridge.data, DeviceConfiguration):
             self.config_type.setText('Device Config')
         else:
             self.config_type.setText('PV Config')
-        # Setup the name edit
-        self.name_edit.textEdited.connect(self.update_saved_name)
-        self.bridge.name.changed_value.connect(self.name_edit.setText)
-        # Setup the desc edit
-        self.desc_edit.textChanged.connect(self.update_saved_desc)
-        self.bridge.description.changed_value.connect(self.apply_new_desc)
-        self.update_text_height()
-        self.desc_edit.textChanged.connect(self.update_text_height)
         # Setup the lock button
         self.lock_button.toggled.connect(self.handle_locking)
-        if load_name:
+        if self.name_edit.text():
             # Start locked if we are reading from file
             self.lock_button.toggle()
-
-    def update_saved_name(self, name: str):
-        """
-        When the user edits the name, write to the config.
-        """
-        self.bridge.name.put(name)
-
-    def update_saved_desc(self):
-        """
-        When the user edits the desc, write to the config.
-        """
-        self.last_desc = self.desc_edit.toPlainText()
-        self.bridge.description.put(self.last_desc)
-
-    def apply_new_desc(self, desc: str):
-        """
-        When some other widget updates the description, update it here.
-        """
-        if desc != self.last_desc:
-            self.desc_edit.setPlainText(desc)
-
-    def update_text_height(self):
-        """
-        When the user edits the desc, make the text box the correct height.
-        """
-        line_count = max(self.desc_edit.document().size().toSize().height(), 1)
-        self.desc_edit.setFixedHeight(line_count * 13 + 12)
 
     def lock_editing(self, locked: bool):
         """
@@ -742,8 +767,17 @@ class OverviewRow(AtefCfgDisplay, QWidget):
             )
 
 
-class Group(AtefCfgDisplay, QWidget):
+class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
     filename = 'config_group.ui'
+
+    name_edit: QLineEdit
+    desc_edit: QPlainTextEdit
+    add_tag_button: QPushButton
+    devices_container: QWidget
+    add_devices_button: QPushButton
+    checklist_container: QWidget
+    add_checklist_button: QPushButton
+    line_between_adds: QWidget
 
     def __init__(
         self,
@@ -752,7 +786,14 @@ class Group(AtefCfgDisplay, QWidget):
         **kwargs
     ):
         super().__init__(*args, **kwargs)
-        self.bridge = QDataclassBridge(bridge, parent=self)
+        self.bridge = bridge
+        self.initialize_group()
+
+    def initialize_group(self):
+        self.initialize_config_text()
+        if isinstance(self.bridge.data, PVConfiguration):
+            self.devices_container.hide()
+            self.line_between_adds.hide()
 
 
 class Checklist(AtefCfgDisplay, QWidget):
