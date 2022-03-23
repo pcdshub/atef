@@ -9,11 +9,12 @@ from functools import partial
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
-from qtpy.QtCore import QObject, QTimer
+from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtWidgets import (QApplication, QLabel, QLineEdit, QMainWindow,
-                            QMessageBox, QPlainTextEdit, QPushButton,
-                            QTabWidget, QTreeWidget, QTreeWidgetItem, QWidget)
+from qtpy.QtWidgets import (QApplication, QLabel, QLayout, QLineEdit,
+                            QMainWindow, QMessageBox, QPlainTextEdit,
+                            QPushButton, QTabWidget, QTreeWidget,
+                            QTreeWidgetItem, QVBoxLayout, QWidget)
 from qtpy.uic import loadUiType
 
 from ..check import ConfigurationFile, DeviceConfiguration, PVConfiguration
@@ -379,6 +380,14 @@ class Tree(AtefCfgDisplay, QWidget):
         self.assemble_tree()
         self.show_selected_display(self.overview_item)
         self.tree_widget.itemPressed.connect(self.show_selected_display)
+        # TODO remove this or make it a debug option
+        self.debug_timer = QTimer(parent=self)
+        self.debug_timer.setInterval(1000*60)
+        self.debug_timer.timeout.connect(self.debug_show_data)
+        self.debug_timer.start()
+
+    def debug_show_data(self, *args, **kwargs):
+        print(self.bridge.data)
 
     def assemble_tree(self):
         """
@@ -768,14 +777,22 @@ class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
 
 class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
+    """
+    The group of checklists and devices associated with a Configuration.
+
+    From this widget we can edit name/description, add tags,
+    add devices, and add checklists to the Configuration.
+    """
     filename = 'config_group.ui'
 
     name_edit: QLineEdit
     desc_edit: QPlainTextEdit
     add_tag_button: QPushButton
     devices_container: QWidget
+    devices_content: QVBoxLayout
     add_devices_button: QPushButton
-    checklist_container: QWidget
+    checklists_container: QWidget
+    checklists_content: QVBoxLayout
     add_checklist_button: QPushButton
     line_between_adds: QWidget
 
@@ -794,6 +811,99 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
         if isinstance(self.bridge.data, PVConfiguration):
             self.devices_container.hide()
             self.line_between_adds.hide()
+        else:
+            devices_list = StrList(
+                data_list=self.bridge.devices,
+                layout=QVBoxLayout(),
+            )
+            self.devices_content.addWidget(devices_list)
+            self.add_devices_button.clicked.connect(
+                partial(devices_list.add_item, '')
+            )
+
+
+class StrList(QWidget):
+    """
+    A widget used to modify the str variant of QDataclassList.
+    """
+    def __init__(
+        self,
+        data_list: QDataclassList,
+        layout: QLayout,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.data_list = data_list
+        self.setLayout(layout)
+        self.widgets = []
+        for starting_value in data_list.get():
+            self.add_item(starting_value)
+
+    def add_item(self, starting_value: str, checked: bool):
+        new_widget = StrListElem(starting_value, parent=self)
+        self.widgets.append(new_widget)
+        self.data_list.append(starting_value)
+        self.layout().addWidget(new_widget)
+        new_widget.line_edit.textChanged.connect(
+            partial(self.save_item_update, new_widget)
+        )
+        new_widget.del_button.clicked.connect(
+            partial(self.remove_item, new_widget)
+        )
+
+    def save_item_update(self, item: StrListElem, new_value: str):
+        index = self.widgets.index(item)
+        self.data_list.put_to_index(index, new_value)
+
+    def remove_item(self, item: StrListElem, checked: bool):
+        index = self.widgets.index(item)
+        self.widgets.remove(item)
+        self.data_list.remove_index(index)
+        item.deleteLater()
+
+
+class StrListElem(AtefCfgDisplay, QWidget):
+    """
+    A single element for the StrList widget.
+
+    Has a QLineEdit for changing the text and a delete button.
+    Changes its style to no frame when it has text and is out of focus.
+    Only shows the delete button when the text is empty.
+
+    The StrList widget is responsible for connecting this widget
+    to the dataclass bridge.
+    """
+    filename = 'str_list_elem.ui'
+
+    line_edit: QLineEdit
+    del_button: QPushButton
+
+    def __init__(self, start_text: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.line_edit.setText(start_text)
+        self.line_edit.setFrame(not start_text)
+        self.line_edit.textChanged.connect(self.on_text_changed)
+        edit_filter = FrameOnEditFilter(parent=self)
+        self.line_edit.installEventFilter(edit_filter)
+
+    def on_text_changed(self, text: str):
+        # Show or hide the del button as needed
+        self.del_button.setVisible(not text)
+
+
+class FrameOnEditFilter(QObject):
+    def eventFilter(self, object: QLineEdit, event: QEvent):
+        if event.type() == QEvent.FocusIn:
+            object.setFrame(True)
+            object.setReadOnly(False)
+            return True
+        if event.type() == QEvent.FocusOut:
+            if object.text():
+                object.setFrame(False)
+            object.setReadOnly(True)
+            return True
+        return False
 
 
 class Checklist(AtefCfgDisplay, QWidget):

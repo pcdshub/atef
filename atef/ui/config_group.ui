@@ -79,7 +79,7 @@
      </property>
      <item>
       <widget class="QWidget" name="devices_container" native="true">
-       <layout class="QVBoxLayout" name="devices_layout">
+       <layout class="QVBoxLayout" name="devices_container_layout">
         <property name="bottomMargin">
          <number>1</number>
         </property>
@@ -94,7 +94,14 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="add_device_button">
+         <layout class="QVBoxLayout" name="devices_content">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+         </layout>
+        </item>
+        <item>
+         <widget class="QPushButton" name="add_devices_button">
           <property name="text">
            <string>+ Add Device</string>
           </property>
@@ -124,8 +131,8 @@
       </widget>
      </item>
      <item>
-      <widget class="QWidget" name="checklist_container" native="true">
-       <layout class="QVBoxLayout" name="checklist_layout">
+      <widget class="QWidget" name="checklists_container" native="true">
+       <layout class="QVBoxLayout" name="checklists_container_layout">
         <property name="bottomMargin">
          <number>1</number>
         </property>
@@ -138,6 +145,9 @@
            <set>Qt::AlignCenter</set>
           </property>
          </widget>
+        </item>
+        <item>
+         <layout class="QVBoxLayout" name="checklists_content"/>
         </item>
         <item>
          <widget class="QPushButton" name="add_checklist_button">
