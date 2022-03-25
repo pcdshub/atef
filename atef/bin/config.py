@@ -11,10 +11,10 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtWidgets import (QApplication, QLabel, QLayout, QLineEdit,
-                            QMainWindow, QMessageBox, QPlainTextEdit,
-                            QPushButton, QTabWidget, QTreeWidget,
-                            QTreeWidgetItem, QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QApplication, QHBoxLayout, QLabel, QLayout,
+                            QLineEdit, QMainWindow, QMessageBox,
+                            QPlainTextEdit, QPushButton, QTabWidget,
+                            QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 from qtpy.uic import loadUiType
 
 from ..check import ConfigurationFile, DeviceConfiguration, PVConfiguration
@@ -243,9 +243,13 @@ class QDataclassList(QDataclassElem):
         """
         Add a new value to the end of the list and update consumers.
         """
-        self.get().append(new_value)
+        data_list = self.get()
+        if data_list is None:
+            data_list = []
+            setattr(self.data, self.attr, data_list)
+        data_list.append(new_value)
         self.added_value.emit(new_value)
-        self.added_index.emit(len(self.get()) - 1)
+        self.added_index.emit(len(data_list) - 1)
         self.updated.emit()
 
     def remove_value(self, removal: Any) -> None:
@@ -787,6 +791,7 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
     name_edit: QLineEdit
     desc_edit: QPlainTextEdit
+    tags_content: QVBoxLayout
     add_tag_button: QPushButton
     devices_container: QWidget
     devices_content: QVBoxLayout
@@ -808,6 +813,14 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
     def initialize_group(self):
         self.initialize_config_text()
+        tags_list = StrList(
+            data_list=self.bridge.tags,
+            layout=QHBoxLayout(),
+        )
+        self.tags_content.addWidget(tags_list)
+        self.add_tag_button.clicked.connect(
+            partial(tags_list.add_item, '')
+        )
         if isinstance(self.bridge.data, PVConfiguration):
             self.devices_container.hide()
             self.line_between_adds.hide()
@@ -837,8 +850,10 @@ class StrList(QWidget):
         self.data_list = data_list
         self.setLayout(layout)
         self.widgets = []
-        for starting_value in data_list.get():
-            self.add_item(starting_value)
+        starting_list = data_list.get()
+        if starting_list is not None:
+            for starting_value in starting_list:
+                self.add_item(starting_value)
 
     def add_item(self, starting_value: str, checked: bool):
         new_widget = StrListElem(starting_value, parent=self)
@@ -883,13 +898,18 @@ class StrListElem(AtefCfgDisplay, QWidget):
         super().__init__(*args, **kwargs)
         self.line_edit.setText(start_text)
         self.line_edit.setFrame(not start_text)
-        self.line_edit.textChanged.connect(self.on_text_changed)
         edit_filter = FrameOnEditFilter(parent=self)
         self.line_edit.installEventFilter(edit_filter)
+        self.on_text_changed(start_text)
+        self.line_edit.textChanged.connect(self.on_text_changed)
 
     def on_text_changed(self, text: str):
         # Show or hide the del button as needed
         self.del_button.setVisible(not text)
+        # Adjust the width to match the text
+        font_metrics = self.line_edit.fontMetrics()
+        width = font_metrics.boundingRect(text).width()
+        self.line_edit.setFixedWidth(max(width + 10, 40))
 
 
 class FrameOnEditFilter(QObject):
