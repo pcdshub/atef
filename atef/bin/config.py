@@ -90,6 +90,11 @@ normalize_map = {
     'Configuration': object,
     'IdentifierAndComparison': object,
     'Comparison': object,
+    'Severity': int,
+    'reduce.ReduceMethod': str,
+    'PrimitiveType': object,
+    'Sequence': List,
+    'Value': object,
 }
 
 
