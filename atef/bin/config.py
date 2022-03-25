@@ -11,13 +11,15 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtWidgets import (QApplication, QHBoxLayout, QLabel, QLayout,
-                            QLineEdit, QMainWindow, QMessageBox,
+from qtpy.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel,
+                            QLayout, QLineEdit, QMainWindow, QMessageBox,
                             QPlainTextEdit, QPushButton, QTabWidget,
                             QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 from qtpy.uic import loadUiType
 
-from ..check import ConfigurationFile, DeviceConfiguration, PVConfiguration
+from .. import check as check_module
+from ..check import (Comparison, ConfigurationFile, DeviceConfiguration,
+                     IdentifierAndComparison, PVConfiguration)
 
 
 def build_arg_parser(argparser=None):
@@ -655,16 +657,35 @@ class ConfigTextMixin:
         Requires self.bridge, self.name_edit, and self.desc_edit
         to be instantiated and available.
         """
+        self.initialize_config_name()
+        self.initialize_config_desc()
+
+    def initialize_config_name(self):
+        """
+        Call this in the mixed-in class to establish the config name only.
+
+        Requires self.bridge and self.name_edit
+        to be instantiated and available.
+        """
         # Load starting text
         load_name = self.bridge.name.get() or ''
-        load_desc = self.bridge.description.get() or ''
-        self.last_desc = load_desc
         self.name_edit.setText(load_name)
-        self.desc_edit.setPlainText(load_desc)
-
         # Setup the name edit
         self.name_edit.textEdited.connect(self.update_saved_name)
         self.bridge.name.changed_value.connect(self.name_edit.setText)
+
+    def initialize_config_desc(self):
+        """
+        Call this in the mixed-in class to establish the config desc only.
+
+        Requires self.bridge and self.desc_edit
+        to be instantiated and available.
+        """
+        # Load starting text
+        load_desc = self.bridge.description.get() or ''
+        self.last_desc = load_desc
+        self.desc_edit.setPlainText(load_desc)
+
         # Setup the desc edit
         self.desc_edit.textChanged.connect(self.update_saved_desc)
         self.bridge.description.changed_value.connect(self.apply_new_desc)
@@ -833,6 +854,23 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             self.add_devices_button.clicked.connect(
                 partial(devices_list.add_item, '')
             )
+        for id_and_comp in self.bridge.checklist.get():
+            self.add_checklist(id_and_comp=id_and_comp)
+        self.add_checklist_button.clicked.connect(self.add_checklist)
+
+    def add_checklist(
+        self,
+        checked: Optional[bool] = None,
+        id_and_comp: Optional[IdentifierAndComparison] = None,
+    ):
+        if id_and_comp is None:
+            id_and_comp = IdentifierAndComparison()
+            self.bridge.checklist.append(id_and_comp)
+        checklist_widget = IdAndCompWidget(
+            id_and_comp=id_and_comp,
+            config_type=type(self.bridge.data),
+        )
+        self.checklists_content.addWidget(checklist_widget)
 
 
 class StrList(QWidget):
@@ -926,8 +964,101 @@ class FrameOnEditFilter(QObject):
         return False
 
 
-class Checklist(AtefCfgDisplay, QWidget):
-    filename = 'checklist.ui'
+class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
+    filename = 'id_and_comp.ui'
+
+    name_edit: QLineEdit
+    id_label: QLabel
+    id_content: QVBoxLayout
+    add_id_button: QPushButton
+    comp_label: QLabel
+    comp_content: QVBoxLayout
+    add_comp_button: QPushButton
+
+    bridge: QDataclassBridge
+    config_type: type
+
+    def __init__(
+        self,
+        id_and_comp: IdentifierAndComparison,
+        config_type: type,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.bridge = QDataclassBridge(id_and_comp, parent=self)
+        self.config_type = config_type
+        self.initialize_idcomp()
+
+    def initialize_idcomp(self):
+        # Connect the name to the dataclass
+        self.initialize_config_name()
+        # Set up editing of the identifiers list
+        identifiers_list = StrList(
+            data_list=self.bridge.ids,
+            layout=QVBoxLayout(),
+        )
+        self.id_content.addWidget(identifiers_list)
+        self.add_id_button.clicked.connect(
+            partial(identifiers_list.add_item, '')
+        )
+        # Adjust the identifier text appropriately for config type
+        if issubclass(self.config_type, DeviceConfiguration):
+            self.id_label.setText('Device Signals')
+            self.add_id_button.setText('Add Signal')
+        elif issubclass(self.config_type, PVConfiguration):
+            self.id_label.setText('PV Names')
+            self.add_id_button.setText('Add PV')
+        for comparison in self.bridge.comparisons.get():
+            self.add_comparison(comparison=comparison)
+        self.add_comp_button.clicked.connect(self.add_comparison)
+
+    def add_comparison(
+        self,
+        checked: Optional[bool] = None,
+        comparison: Optional[Comparison] = None,
+    ):
+        if comparison is None:
+            # Empty default
+            comparison = Comparison()
+        new_row = CompRow(comparison=comparison, parent=self)
+        self.comp_content.addWidget(new_row)
+        # TODO make the delete button work
+        # new_row.del_button.clicked.connect
+
+
+class CompRow(AtefCfgDisplay, QWidget):
+    filename = 'comp_row.ui'
+
+    comp_combobox: QComboBox
+    comp_content: QHBoxLayout
+    del_button: QPushButton
+
+    bridge: QDataclassBridge
+
+    def __init__(self, comparison: Comparison, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bridge = QDataclassBridge(comparison)
+        self.initialize_comp_row()
+
+    def initialize_comp_row(self):
+        for name, obj in check_module.__dict__.items():
+            if isinstance(obj, Comparison):
+                self.comp_combobox.addItem(name)
+        # TODO select and set up the comparison based on the initial type
+
+    def change_comparison(self):
+        """
+        Switch the comparison from one type to another.
+
+        Needs to do the following:
+        - create new dataclass
+        - create new bridge
+        - transfer over any matching fields
+        - update the parent bridge about our new dataclass
+        - swap out the edit widgets for the appropriate version
+        """
+        raise NotImplementedError()
 
 
 def main():
