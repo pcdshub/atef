@@ -458,6 +458,7 @@ class AtefItem(QTreeWidgetItem):
         widget_args: Optional[list[Any]],
         name: str,
         func_name: Optional[str] = None,
+        append_item_arg: bool = False,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -466,6 +467,8 @@ class AtefItem(QTreeWidgetItem):
             self.setText(1, func_name)
         self.widget_class = widget_class
         self.widget_args = widget_args or []
+        if append_item_arg:
+            self.widget_args.append(self)
         self.widget_cached = None
 
     def get_widget(self) -> QWidget:
@@ -622,6 +625,7 @@ class Overview(AtefCfgDisplay, QWidget):
             widget_args=[row.bridge],
             name=config.name or 'untitled',
             func_name=func_name,
+            append_item_arg=True,
         )
         self.tree_ref.addTopLevelItem(item)
         self.row_count += 1
@@ -825,11 +829,13 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
     def __init__(
         self,
         bridge: QDataclassBridge,
+        tree_item: AtefItem,
         *args,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.bridge = bridge
+        self.tree_item = tree_item
         self.initialize_group()
 
     def initialize_group(self):
@@ -854,9 +860,26 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             self.add_devices_button.clicked.connect(
                 partial(devices_list.add_item, '')
             )
-        for id_and_comp in self.bridge.checklist.get():
-            self.add_checklist(id_and_comp=id_and_comp)
+        self.checklist_list = NamedDataclassList(
+            data_list=self.bridge.checklist,
+            layout=QVBoxLayout(),
+        )
+        self.checklists_content.addWidget(self.checklist_list)
+        for bridge in self.checklist_list.bridges:
+            self.setup_checklist_item_bridge(bridge)
         self.add_checklist_button.clicked.connect(self.add_checklist)
+
+    def setup_checklist_item_bridge(self, bridge: QDataclassBridge):
+        item = AtefItem(
+            widget_class=IdAndCompWidget,
+            widget_args=[bridge, type(self.bridge.data)],
+            name=bridge.name.get() or 'untitled',
+            func_name='checklist',
+        )
+        self.tree_item.addChild(item)
+        bridge.name.changed_value.connect(
+            partial(item.setText, 0)
+        )
 
     def add_checklist(
         self,
@@ -866,11 +889,8 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
         if id_and_comp is None:
             id_and_comp = IdentifierAndComparison()
             self.bridge.checklist.append(id_and_comp)
-        checklist_widget = IdAndCompWidget(
-            id_and_comp=id_and_comp,
-            config_type=type(self.bridge.data),
-        )
-        self.checklists_content.addWidget(checklist_widget)
+        bridge = self.checklist_list.add_item(id_and_comp)
+        self.setup_checklist_item_bridge(bridge)
 
 
 class StrList(QWidget):
@@ -891,12 +911,18 @@ class StrList(QWidget):
         starting_list = data_list.get()
         if starting_list is not None:
             for starting_value in starting_list:
-                self.add_item(starting_value)
+                self.add_item(starting_value, init=True)
 
-    def add_item(self, starting_value: str, checked: bool):
+    def add_item(
+        self,
+        starting_value: str,
+        checked: Optional[bool] = None,
+        init: bool = False,
+    ):
         new_widget = StrListElem(starting_value, parent=self)
         self.widgets.append(new_widget)
-        self.data_list.append(starting_value)
+        if not init:
+            self.data_list.append(starting_value)
         self.layout().addWidget(new_widget)
         new_widget.line_edit.textChanged.connect(
             partial(self.save_item_update, new_widget)
@@ -914,6 +940,45 @@ class StrList(QWidget):
         self.widgets.remove(item)
         self.data_list.remove_index(index)
         item.deleteLater()
+
+
+class NamedDataclassList(StrList):
+    """
+    A widget used to modify a QDataclassList with named dataclass elements.
+
+    A named dataclass is any dataclass element with a str "name" field.
+    This widget will allow us to add elements to the list by name,
+    display the names, modify the names, add blank entries, etc.
+    """
+    def __init__(self, *args, **kwargs):
+        self.bridges = []
+        super().__init__(*args, **kwargs)
+
+    def add_item(
+        self,
+        starting_value: Any,
+        checked: Optional[bool] = None,
+        init: bool = False,
+    ) -> QDataclassBridge:
+        super().add_item(
+            starting_value=starting_value.name,
+            checked=checked,
+            init=init,
+        )
+        bridge = QDataclassBridge(starting_value, parent=self)
+        self.bridges.append(bridge)
+        return bridge
+
+    def save_item_update(self, item: StrListElem, new_value: str):
+        index = self.widgets.index(item)
+        self.bridges[index].name.put(new_value)
+
+    def remove_item(self, item: StrListElem, checked: bool):
+        index = self.widgets.index(item)
+        super().remove_item(item=item, checked=checked)
+        bridge = self.bridges[index]
+        bridge.deleteLater()
+        del self.bridges[index]
 
 
 class StrListElem(AtefCfgDisplay, QWidget):
@@ -980,13 +1045,13 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
     def __init__(
         self,
-        id_and_comp: IdentifierAndComparison,
+        bridge: QDataclassBridge,
         config_type: type,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.bridge = QDataclassBridge(id_and_comp, parent=self)
+        self.bridge = bridge
         self.config_type = config_type
         self.initialize_idcomp()
 
