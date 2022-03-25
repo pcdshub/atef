@@ -1113,7 +1113,7 @@ class CompRow(AtefCfgDisplay, QWidget):
 
     def initialize_comp_row(self):
         for name, obj in check_module.__dict__.items():
-            if isinstance(obj, Comparison):
+            if isinstance(obj, type) and issubclass(obj, Comparison):
                 self.comp_combobox.addItem(name)
         # TODO select and set up the comparison based on the initial type
 
