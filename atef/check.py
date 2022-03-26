@@ -149,6 +149,8 @@ class Comparison:
     that the subclass name will be used as an identifier for the generated
     serialized dictionary (and JSON object).
     """
+    # Short name to use in the UI
+    name: Optional[str] = None
 
     #: Description tied to this comparison.
     description: Optional[str] = None
