@@ -136,18 +136,7 @@
       </widget>
      </item>
      <item row="0" column="1">
-      <widget class="QComboBox" name="invert_combo">
-       <item>
-        <property name="text">
-         <string>False</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>True</string>
-        </property>
-       </item>
-      </widget>
+      <widget class="QComboBox" name="invert_combo"/>
      </item>
      <item row="1" column="1">
       <widget class="QLineEdit" name="reduce_period_edit"/>
@@ -156,71 +145,20 @@
       <widget class="QComboBox" name="reduce_method_combo"/>
      </item>
      <item row="3" column="1">
-      <widget class="QComboBox" name="string_combo">
-       <item>
-        <property name="text">
-         <string>False</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>True</string>
-        </property>
-       </item>
-      </widget>
+      <widget class="QComboBox" name="string_combo"/>
      </item>
      <item row="4" column="1">
       <widget class="QComboBox" name="sev_on_failure_combo">
        <property name="currentIndex">
-        <number>2</number>
+        <number>-1</number>
        </property>
-       <item>
-        <property name="text">
-         <string>Success</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Warning</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Error</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Internal Error</string>
-        </property>
-       </item>
       </widget>
      </item>
      <item row="5" column="1">
       <widget class="QComboBox" name="if_disc_combo">
        <property name="currentIndex">
-        <number>2</number>
+        <number>-1</number>
        </property>
-       <item>
-        <property name="text">
-         <string>Success</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Warning</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Error</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Internal Error</string>
-        </property>
-       </item>
       </widget>
      </item>
     </layout>

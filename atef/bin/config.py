@@ -18,9 +18,9 @@ from qtpy.QtWidgets import (QApplication, QComboBox, QFormLayout, QHBoxLayout,
                             QVBoxLayout, QWidget)
 from qtpy.uic import loadUiType
 
-from .. import check as check_module
 from ..check import (Comparison, ConfigurationFile, DeviceConfiguration,
-                     IdentifierAndComparison, PVConfiguration)
+                     IdentifierAndComparison, PVConfiguration, Severity)
+from ..reduce import ReduceMethod
 
 
 def build_arg_parser(argparser=None):
@@ -1139,7 +1139,18 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
     sev_on_failure_combo: QComboBox
     if_disc_combo: QComboBox
 
-    specific_comparison_widgets: dict[type: type] = {}
+    specific_comparison_widgets: ClassVar[dict[type: type]] = {}
+    data_types: ClassVar[dict[str: type]] = {}
+
+    bool_choices = ('False', 'True')
+    severity_choices = tuple(sev.name for sev in Severity)
+    reduce_choices = tuple(red.name for red in ReduceMethod)
+
+    invert_combo_items = bool_choices
+    reduce_method_combo_items = reduce_choices
+    string_combo_items = bool_choices
+    sev_on_failure_combo_items = severity_choices
+    if_disc_combo_items = severity_choices
 
     @classmethod
     def register_comparison(
@@ -1148,30 +1159,149 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
         widget_type: type,
     ) -> None:
         cls.specific_comparison_widgets[dataclass_type] = widget_type
+        cls.data_types[dataclass_type.__name__] = dataclass_type
 
     def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.bridge = bridge
+        self.comparison_setup_done = False
         self.initialize_comp_view()
 
     def initialize_comp_view(self):
-        self.initialize_config_text()
-        for name, obj in check_module.__dict__.items():
-            if isinstance(obj, type) and issubclass(obj, Comparison):
-                self.comp_type_combo.addItem(name)
+        last_added_index = 0
+        for type_name, data_type in self.data_types.items():
+            self.comp_type_combo.addItem(type_name)
+            if isinstance(self.bridge.data, data_type):
+                self.comp_type_combo.setCurrentIndex(last_added_index)
+            last_added_index += 1
+        self.change_comparison_type(type(self.bridge.data))
+        self.comp_type_combo.currentTextChanged.connect(
+            self._comp_type_from_combobox,
+        )
+
+    def _comp_type_from_combobox(self, type_name: str):
+        return self.change_comparison_type(self.data_types[type_name])
 
     def change_comparison_type(self, new_type: type):
         """
         Switch the comparison from one type to another.
 
-        Needs to do the following:
+        On the first pass, this just needs to connect the generic
+        widgets to our dataclass and setup the type-specific edit
+        widgets by delegating to the appropriate widget class.
+
+        On subsequent calls, this also needs to do the following:
         - create new dataclass
         - create new bridge
         - transfer over any matching fields
         - update the parent bridge about our new dataclass
+        - clean up the old widget
         - swap out the edit widgets for the appropriate version
+        - connect everything to the new bridge
         """
-        raise NotImplementedError()
+        if self.comparison_setup_done:
+            # Clean up the previous widget
+            # Clean up the previous bridge
+            # Create a new dataclass, transferring over any compatible data
+            # Create a new bridge and assign it to self
+            # Replace our bridge in the parent as appropriate
+            raise NotImplementedError()
+        # Redo the text setup with the new bridge (or maybe the first time)
+        self.initialize_config_text()
+        # Set up the widget specific items
+        try:
+            widget_class = self.specific_comparison_widgets[new_type]
+        except KeyError:
+            raise TypeError(
+                f'{new_type} is not a registered type for CompView. '
+                'Currently the registered types are '
+                f'{tuple(self.specific_comparison_widgets)}'
+            )
+        new_widget = widget_class(self.bridge)
+        self.specific_content.addWidget(new_widget)
+        # Fill the generic combobox options
+        # For now, hard-code the defaults here
+        defaults = ('False', 'error', 'average')
+        if not self.comparison_setup_done:
+            for num, text in enumerate(self.invert_combo_items):
+                self.invert_combo.addItem(text)
+                if text in defaults:
+                    self.invert_combo.setCurrentIndex(num)
+            for num, text in enumerate(self.reduce_method_combo_items):
+                self.reduce_method_combo.addItem(text)
+                if text in defaults:
+                    self.invert_combo.setCurrentIndex(num)
+            for num, text in enumerate(self.string_combo_items):
+                self.string_combo.addItem(text)
+                if text in defaults:
+                    self.invert_combo.setCurrentIndex(num)
+            for num, text in enumerate(self.sev_on_failure_combo_items):
+                self.sev_on_failure_combo.addItem(text)
+                if text in defaults:
+                    self.invert_combo.setCurrentIndex(num)
+            for num, text in enumerate(self.if_disc_combo_items):
+                self.if_disc_combo.addItem(text)
+                if text in defaults:
+                    self.invert_combo.setCurrentIndex(num)
+
+        # Set up the generic item signals in order from top to bottom
+        self.invert_combo.currentIndexChanged.connect(
+            self.new_invert_combo
+        )
+        self.reduce_period_edit.textEdited.connect(
+            self.new_reduce_period_edit
+        )
+        self.reduce_method_combo.currentTextChanged.connect(
+            self.new_reduce_method_combo
+        )
+        self.string_combo.currentIndexChanged.connect(
+            self.new_string_combo
+        )
+        self.sev_on_failure_combo.currentTextChanged.connect(
+            self.new_sev_on_failure_combo
+        )
+        self.if_disc_combo.currentTextChanged.connect(
+            self.new_if_disc_combo
+        )
+        self.comparison_setup_done = True
+
+    def new_invert_combo(self, index: int):
+        self.bridge.invert.put(bool(index))
+
+    def new_reduce_period_edit(self, value: str):
+        try:
+            value = int(value)
+        except Exception:
+            value = None
+        self.bridge.reduce_period.put(value)
+
+    def new_reduce_method_combo(self, value: str):
+        self.bridge.reduce_method.put(ReduceMethod[value])
+
+    def new_string_combo(self, index: int):
+        self.bridge.string.put(bool(index))
+
+    def new_sev_on_failure_combo(self, value: str):
+        self.bridge.severity_on_failure.put(Severity[value])
+
+    def new_if_disc_combo(self, value: str):
+        self.bridge.if_disconnected.put(Severity[value])
+
+
+class CompMixin:
+    data_type: ClassVar[type]
+
+    def __init_subclass__(cls, *args, **kwargs):
+        super().__init_subclass__(*args, **kwargs)
+        CompView.register_comparison(cls.data_type, cls)
+
+
+class ComparisonWidget(CompMixin, QLabel):
+    data_type = Comparison
+
+    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setText('Please select a comparison type above.')
 
 
 def main():
