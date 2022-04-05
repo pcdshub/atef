@@ -11,10 +11,11 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel,
-                            QLayout, QLineEdit, QMainWindow, QMessageBox,
-                            QPlainTextEdit, QPushButton, QTabWidget,
-                            QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QApplication, QComboBox, QFormLayout, QHBoxLayout,
+                            QLabel, QLayout, QLineEdit, QMainWindow,
+                            QMessageBox, QPlainTextEdit, QPushButton,
+                            QTabWidget, QTreeWidget, QTreeWidgetItem,
+                            QVBoxLayout, QWidget)
 from qtpy.uic import loadUiType
 
 from .. import check as check_module
@@ -880,6 +881,7 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             widget_args=[bridge, type(self.bridge.data)],
             name=bridge.name.get() or 'untitled',
             func_name='checklist',
+            append_item_arg=True,
         )
         self.tree_item.addChild(item)
         bridge.name.changed_value.connect(
@@ -896,6 +898,8 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             self.bridge.checklist.append(id_and_comp)
         bridge = self.checklist_list.add_item(id_and_comp)
         self.setup_checklist_item_bridge(bridge)
+        # TODO make the delete button work
+        # new_row.del_button.clicked.connect
 
 
 class StrList(QWidget):
@@ -929,7 +933,7 @@ class StrList(QWidget):
         if not init:
             self.data_list.append(starting_value)
         self.layout().addWidget(new_widget)
-        new_widget.line_edit.textChanged.connect(
+        new_widget.line_edit.textEdited.connect(
             partial(self.save_item_update, new_widget)
         )
         new_widget.del_button.clicked.connect(
@@ -971,6 +975,9 @@ class NamedDataclassList(StrList):
             init=init,
         )
         bridge = QDataclassBridge(starting_value, parent=self)
+        bridge.name.changed_value.connect(
+            self.widgets[-1].line_edit.setText
+        )
         self.bridges.append(bridge)
         return bridge
 
@@ -1052,12 +1059,14 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self,
         bridge: QDataclassBridge,
         config_type: type,
+        tree_item: AtefItem,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.bridge = bridge
         self.config_type = config_type
+        self.tree_item = tree_item
         self.initialize_idcomp()
 
     def initialize_idcomp(self):
@@ -1079,9 +1088,26 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         elif issubclass(self.config_type, PVConfiguration):
             self.id_label.setText('PV Names')
             self.add_id_button.setText('Add PV')
+        self.comparison_list = NamedDataclassList(
+            data_list=self.bridge.comparisons,
+            layout=QVBoxLayout(),
+        )
+        self.comp_content.addWidget(self.comparison_list)
         for comparison in self.bridge.comparisons.get():
             self.add_comparison(comparison=comparison)
         self.add_comp_button.clicked.connect(self.add_comparison)
+
+    def setup_comparison_item_bridge(self, bridge: QDataclassBridge):
+        item = AtefItem(
+            widget_class=CompView,
+            widget_args=[bridge],
+            name=bridge.name.get() or 'untitled',
+            func_name='comparison',
+        )
+        self.tree_item.addChild(item)
+        bridge.name.changed_value.connect(
+            partial(item.setText, 0)
+        )
 
     def add_comparison(
         self,
@@ -1091,33 +1117,50 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         if comparison is None:
             # Empty default
             comparison = Comparison()
-        new_row = CompRow(comparison=comparison, parent=self)
-        self.comp_content.addWidget(new_row)
+            self.bridge.comparisons.append(comparison)
+        bridge = self.comparison_list.add_item(comparison)
+        self.setup_comparison_item_bridge(bridge)
         # TODO make the delete button work
         # new_row.del_button.clicked.connect
 
 
-class CompRow(AtefCfgDisplay, QWidget):
-    filename = 'comp_row.ui'
+class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
+    filename = 'comp_view.ui'
 
-    comp_combobox: QComboBox
-    comp_content: QHBoxLayout
-    del_button: QPushButton
+    name_edit: QLineEdit
+    desc_edit: QPlainTextEdit
+    comp_type_combo: QComboBox
+    specific_content: QVBoxLayout
+    generic_content: QFormLayout
+    invert_combo: QComboBox
+    reduce_period_edit: QLineEdit
+    reduce_method_combo: QComboBox
+    string_combo: QComboBox
+    sev_on_failure_combo: QComboBox
+    if_disc_combo: QComboBox
 
-    bridge: QDataclassBridge
+    specific_comparison_widgets: dict[type: type] = {}
 
-    def __init__(self, comparison: Comparison, *args, **kwargs):
+    @classmethod
+    def register_comparison(
+        cls,
+        dataclass_type: type,
+        widget_type: type,
+    ) -> None:
+        cls.specific_comparison_widgets[dataclass_type] = widget_type
+
+    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bridge = QDataclassBridge(comparison)
-        self.initialize_comp_row()
+        self.bridge = bridge
+        self.initialize_comp_view()
 
-    def initialize_comp_row(self):
+    def initialize_comp_view(self):
+        self.initialize_config_text()
         for name, obj in check_module.__dict__.items():
             if isinstance(obj, type) and issubclass(obj, Comparison):
-                self.comp_combobox.addItem(name)
-        # TODO select and set up the comparison based on the initial type
+                self.comp_type_combo.addItem(name)
 
-    def change_comparison(self):
+    def change_comparison_type(self, new_type: type):
         """
         Switch the comparison from one type to another.
 
