@@ -1201,10 +1201,16 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
         """
         if self.comparison_setup_done:
             # Clean up the previous widget
+            self.specific_widget.deleteLater()
             # Clean up the previous bridge
+            old_data = self.bridge.data
+            self.bridge.deleteLater()
             # Create a new dataclass, transferring over any compatible data
+            new_data = cast_dataclass(old_data, new_type)
             # Create a new bridge and assign it to self
+            self.bridge = QDataclassBridge(new_data)
             # Replace our bridge in the parent as appropriate
+            # TODO
             raise NotImplementedError()
         # Redo the text setup with the new bridge (or maybe the first time)
         self.initialize_config_text()
@@ -1217,8 +1223,8 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
                 'Currently the registered types are '
                 f'{tuple(self.specific_comparison_widgets)}'
             )
-        new_widget = widget_class(self.bridge)
-        self.specific_content.addWidget(new_widget)
+        self.specific_widget = widget_class(self.bridge)
+        self.specific_content.addWidget(self.specific_widget)
         # Fill the generic combobox options
         if not self.comparison_setup_done:
             for text in self.invert_combo_items:
@@ -1296,6 +1302,15 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
     def new_if_disc_combo(self, value: str):
         self.bridge.if_disconnected.put(Severity[value])
+
+
+def cast_dataclass(data: Any, new_type: type):
+    new_fields = dataclasses.fields(new_type)
+    new_kwargs = {
+        key: value for key, value in dataclasses.asdict(data).items()
+        if key in set(field.name for field in new_fields)
+    }
+    return new_type(**new_kwargs)
 
 
 class CompMixin:
