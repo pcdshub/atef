@@ -1220,29 +1220,39 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
         new_widget = widget_class(self.bridge)
         self.specific_content.addWidget(new_widget)
         # Fill the generic combobox options
-        # For now, hard-code the defaults here
-        defaults = ('False', 'error', 'average')
         if not self.comparison_setup_done:
-            for num, text in enumerate(self.invert_combo_items):
+            for text in self.invert_combo_items:
                 self.invert_combo.addItem(text)
-                if text in defaults:
-                    self.invert_combo.setCurrentIndex(num)
-            for num, text in enumerate(self.reduce_method_combo_items):
+            for text in self.reduce_method_combo_items:
                 self.reduce_method_combo.addItem(text)
-                if text in defaults:
-                    self.invert_combo.setCurrentIndex(num)
-            for num, text in enumerate(self.string_combo_items):
+            for text in self.string_combo_items:
                 self.string_combo.addItem(text)
-                if text in defaults:
-                    self.invert_combo.setCurrentIndex(num)
-            for num, text in enumerate(self.sev_on_failure_combo_items):
+            for text in self.sev_on_failure_combo_items:
                 self.sev_on_failure_combo.addItem(text)
-                if text in defaults:
-                    self.invert_combo.setCurrentIndex(num)
-            for num, text in enumerate(self.if_disc_combo_items):
+            for text in self.if_disc_combo_items:
                 self.if_disc_combo.addItem(text)
-                if text in defaults:
-                    self.invert_combo.setCurrentIndex(num)
+            # Set up starting values based on the dataclass values
+            self.invert_combo.setCurrentIndex(int(self.bridge.invert.get()))
+            reduce_period = self.bridge.reduce_period.get()
+            if reduce_period is not None:
+                self.reduce_period_edit.setText(str(reduce_period))
+            self.reduce_method_combo.setCurrentIndex(
+                self.reduce_method_combo_items.index(
+                    self.bridge.reduce_method.get().name
+                )
+            )
+            string_opt = self.bridge.string.get() or False
+            self.string_combo.setCurrentIndex(int(string_opt))
+            self.sev_on_failure_combo.setCurrentIndex(
+                self.sev_on_failure_combo_items.index(
+                    self.bridge.severity_on_failure.get().name
+                )
+            )
+            self.if_disc_combo.setCurrentIndex(
+                self.if_disc_combo_items.index(
+                    self.bridge.if_disconnected.get().name
+                )
+            )
 
         # Set up the generic item signals in order from top to bottom
         self.invert_combo.currentIndexChanged.connect(
