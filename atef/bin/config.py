@@ -10,6 +10,7 @@ import logging
 import os.path
 from functools import partial
 from pathlib import Path
+from pprint import pprint
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 from apischema import deserialize, serialize
@@ -333,6 +334,8 @@ class Window(AtefCfgDisplay, QMainWindow):
     action_open_file: QAction
     action_save: QAction
     action_save_as: QAction
+    action_print_dataclass: QAction
+    action_print_serialized: QAction
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -341,6 +344,8 @@ class Window(AtefCfgDisplay, QMainWindow):
         self.action_open_file.triggered.connect(self.open_file)
         self.action_save.triggered.connect(self.save)
         self.action_save_as.triggered.connect(self.save_as)
+        self.action_print_dataclass.triggered.connect(self.print_dataclass)
+        self.action_print_serialized.triggered.connect(self.print_serialized)
         QTimer.singleShot(0, self.welcome_user)
 
     def welcome_user(self):
@@ -446,8 +451,9 @@ class Window(AtefCfgDisplay, QMainWindow):
             appear to prompt the user for a filepath.
         """
         current_tree = self.get_current_tree()
-        data = current_tree.bridge.data
-        serialized = serialize(ConfigurationFile, data)
+        serialized = self.serialize_tree(current_tree)
+        if serialized is None:
+            return
         if filename is None:
             filename, _ = QFileDialog.getSaveFileName(
                 parent=self,
@@ -462,6 +468,31 @@ class Window(AtefCfgDisplay, QMainWindow):
         else:
             self.set_current_tab_name(filename)
             current_tree.full_path = filename
+
+    def serialize_tree(self, tree: Tree) -> dict:
+        try:
+            return serialize(
+                ConfigurationFile,
+                tree.bridge.data,
+            )
+        except Exception:
+            logger.exception('Error serializing file')
+
+    def print_dataclass(self, *args, **kwargs):
+        """
+        Print the dataclass of the current tab.
+
+        The parameters are open as to accept inputs from any signal.
+        """
+        pprint(self.get_current_tree().bridge.data)
+
+    def print_serialized(self, *args, **kwargs):
+        """
+        Print the serialized data structure of the current tab.
+
+        The parameters are open as to accept inputs from any signal.
+        """
+        pprint(self.serialize_tree(self.get_current_tree()))
 
 
 class Tree(AtefCfgDisplay, QWidget):
@@ -498,11 +529,6 @@ class Tree(AtefCfgDisplay, QWidget):
         self.assemble_tree()
         self.show_selected_display(self.overview_item)
         self.tree_widget.itemPressed.connect(self.show_selected_display)
-        # TODO remove this or make it a debug option
-        self.debug_timer = QTimer(parent=self)
-        self.debug_timer.setInterval(1000*60)
-        self.debug_timer.timeout.connect(self.debug_show_data)
-        self.debug_timer.start()
 
     def debug_show_data(self, *args, **kwargs):
         print(self.bridge.data)

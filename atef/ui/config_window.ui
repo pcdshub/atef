@@ -40,7 +40,15 @@
     <addaction name="action_save"/>
     <addaction name="action_save_as"/>
    </widget>
+   <widget class="QMenu" name="menuDebug">
+    <property name="title">
+     <string>Debug</string>
+    </property>
+    <addaction name="action_print_dataclass"/>
+    <addaction name="action_print_serialized"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuDebug"/>
   </widget>
   <widget class="QStatusBar" name="status_bar"/>
   <action name="action_new_file">
@@ -66,6 +74,16 @@
   <action name="action_save_all">
    <property name="text">
     <string>Save All</string>
+   </property>
+  </action>
+  <action name="action_print_dataclass">
+   <property name="text">
+    <string>Print DataClass</string>
+   </property>
+  </action>
+  <action name="action_print_serialized">
+   <property name="text">
+    <string>Print Serialized</string>
    </property>
   </action>
  </widget>
