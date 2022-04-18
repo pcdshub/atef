@@ -5,23 +5,29 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import json
+import logging
+import os.path
 from functools import partial
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
+from apischema import deserialize, serialize
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtWidgets import (QApplication, QComboBox, QFormLayout, QHBoxLayout,
-                            QLabel, QLayout, QLineEdit, QMainWindow,
-                            QMessageBox, QPlainTextEdit, QPushButton,
-                            QTabWidget, QTreeWidget, QTreeWidgetItem,
-                            QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QAction, QApplication, QComboBox, QFileDialog,
+                            QFormLayout, QHBoxLayout, QLabel, QLayout,
+                            QLineEdit, QMainWindow, QMessageBox,
+                            QPlainTextEdit, QPushButton, QTabWidget,
+                            QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 from qtpy.uic import loadUiType
 
 from ..check import (Comparison, ConfigurationFile, DeviceConfiguration,
                      Equals, IdentifierAndComparison, PVConfiguration,
                      Severity)
 from ..reduce import ReduceMethod
+
+logger = logging.getLogger(__name__)
 
 
 def build_arg_parser(argparser=None):
@@ -320,22 +326,27 @@ class Window(AtefCfgDisplay, QMainWindow):
     """
     filename = 'config_window.ui'
     user_default_filename = 'untitled'
-    user_filename_ext = 'yaml'
+    user_filename_ext = 'json'
 
     tab_widget: QTabWidget
+    action_new_file: QAction
+    action_open_file: QAction
+    action_save: QAction
+    action_save_as: QAction
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.trees = {}
         self.setWindowTitle('atef config')
-        self.action_new_file.triggered.connect(self.open_new_file)
+        self.action_new_file.triggered.connect(self.new_file)
+        self.action_open_file.triggered.connect(self.open_file)
+        self.action_save.triggered.connect(self.save)
+        self.action_save_as.triggered.connect(self.save_as)
         QTimer.singleShot(0, self.welcome_user)
 
     def welcome_user(self):
         """
         On open, ask the user what they'd like to do (new config? load?)
 
-        TODO: implement loading
         TODO: only show when we don't get a file cli argument to start.
         """
         welcome_box = QMessageBox()
@@ -343,29 +354,114 @@ class Window(AtefCfgDisplay, QMainWindow):
         welcome_box.setWindowTitle('Welcome')
         welcome_box.setText('Welcome to atef config!')
         welcome_box.setInformativeText('Please select a startup action')
-        welcome_box.addButton(QMessageBox.Open)
+        open_button = welcome_box.addButton(QMessageBox.Open)
         new_button = welcome_box.addButton('New', QMessageBox.AcceptRole)
         welcome_box.addButton(QMessageBox.Close)
-        new_button.clicked.connect(self.open_new_file)
+        open_button.clicked.connect(self.open_file)
+        new_button.clicked.connect(self.new_file)
         welcome_box.exec()
 
-    def open_new_file(self, *args, **kwargs):
+    def get_tab_name(self, filename: Optional[str] = None):
+        """
+        Get a standardized tab name from a filename.
+        """
+        if filename is None:
+            filename = self.user_default_filename
+        if '.' not in filename:
+            filename = '.'.join((filename, self.user_filename_ext))
+        return os.path.basename(filename)
+
+    def set_current_tab_name(self, filename: str):
+        """
+        Set the title of the current tab based on the filename.
+        """
+        self.tab_widget.setTabText(
+            self.tab_widget.currentIndex(),
+            self.get_tab_name(filename),
+        )
+
+    def get_current_tree(self) -> Tree:
+        """
+        Return the widget of the current open tab.
+        """
+        return self.tab_widget.currentWidget()
+
+    def new_file(self, *args, **kwargs):
         """
         Create and populate a new edit tab.
 
         The parameters are open as to accept inputs from any signal.
         """
-        name = self.user_default_filename
-        index = 0
-        while name in self.trees:
-            index += 1
-            name = f'{self.user_default_filename}{index}'
         widget = Tree(config_file=ConfigurationFile(configs=[]))
-        self.trees[name] = widget
-        self.tab_widget.addTab(
-            widget,
-            '.'.join((name, self.user_filename_ext))
-        )
+        self.tab_widget.addTab(widget, self.get_tab_name())
+
+    def open_file(self, *args, filename: Optional[str] = None, **kwargs):
+        """
+        Open an existing file and create a new tab containing it.
+
+        The parameters are open as to accept inputs from any signal.
+
+        Parameters
+        ----------
+        filename : str, optional
+            The name to save the file as. If omitted, a dialog will
+            appear to prompt the user for a filepath.
+        """
+        if filename is None:
+            filename, _ = QFileDialog.getOpenFileName(
+                parent=self,
+                caption='Select a config',
+                filter='Json Files (*.json)',
+            )
+        if not filename:
+            return
+        with open(filename, 'r') as fd:
+            serialized = json.load(fd)
+        data = deserialize(ConfigurationFile, serialized)
+        widget = Tree(config_file=data, full_path=filename)
+        self.tab_widget.addTab(widget, self.get_tab_name(filename))
+        self.tab_widget.setCurrentIndex(self.tab_widget.count()-1)
+
+    def save(self, *args, **kwargs):
+        """
+        Save the currently selected tab to the last used filename.
+
+        Reverts back to save_as if no such filename exists.
+
+        The parameters are open as to accept inputs from any signal.
+        """
+        current_tree = self.get_current_tree()
+        self.save_as(filename=current_tree.full_path)
+
+    def save_as(self, *args, filename: Optional[str] = None, **kwargs):
+        """
+        Save the currently selected tab, to a specific filename.
+
+        The parameters are open as to accept inputs from any signal.
+
+        Parameters
+        ----------
+        filename : str, optional
+            The name to save the file as. If omitted, a dialog will
+            appear to prompt the user for a filepath.
+        """
+        current_tree = self.get_current_tree()
+        data = current_tree.bridge.data
+        serialized = serialize(ConfigurationFile, data)
+        if filename is None:
+            filename, _ = QFileDialog.getSaveFileName(
+                parent=self,
+                caption='Save as',
+                filter='Json Files (*.json)',
+            )
+        try:
+            with open(filename, 'w') as fd:
+                json.dump(serialized, fd, indent=2)
+        except OSError:
+            logger.exception(f'Error saving file {filename}')
+        else:
+            self.set_current_tab_name(filename)
+            current_tree.full_path = filename
 
 
 class Tree(AtefCfgDisplay, QWidget):
@@ -385,9 +481,18 @@ class Tree(AtefCfgDisplay, QWidget):
     bridge: QDataclassBridge
     tree_widget: QTreeWidget
 
-    def __init__(self, *args, config_file: ConfigurationFile, **kwargs):
+    full_path: str
+
+    def __init__(
+        self,
+        *args,
+        config_file: ConfigurationFile,
+        full_path: Optional[str] = None,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.bridge = QDataclassBridge(config_file, parent=self)
+        self.full_path = full_path
         self.last_selection: Optional[AtefItem] = None
         self.built_widgets = set()
         self.assemble_tree()
