@@ -19,7 +19,8 @@ from qtpy.QtWidgets import (QApplication, QComboBox, QFormLayout, QHBoxLayout,
 from qtpy.uic import loadUiType
 
 from ..check import (Comparison, ConfigurationFile, DeviceConfiguration,
-                     IdentifierAndComparison, PVConfiguration, Severity)
+                     Equals, IdentifierAndComparison, PVConfiguration,
+                     Severity)
 from ..reduce import ReduceMethod
 
 
@@ -906,6 +907,8 @@ class StrList(QWidget):
     """
     A widget used to modify the str variant of QDataclassList.
     """
+    widgets: List[StrListElem]
+
     def __init__(
         self,
         data_list: QDataclassList,
@@ -927,7 +930,7 @@ class StrList(QWidget):
         starting_value: str,
         checked: Optional[bool] = None,
         init: bool = False,
-    ):
+    ) -> StrListElem:
         new_widget = StrListElem(starting_value, parent=self)
         self.widgets.append(new_widget)
         if not init:
@@ -939,6 +942,7 @@ class StrList(QWidget):
         new_widget.del_button.clicked.connect(
             partial(self.remove_item, new_widget)
         )
+        return new_widget
 
     def save_item_update(self, item: StrListElem, new_value: str):
         index = self.widgets.index(item)
@@ -959,6 +963,8 @@ class NamedDataclassList(StrList):
     This widget will allow us to add elements to the list by name,
     display the names, modify the names, add blank entries, etc.
     """
+    bridges = List[QDataclassBridge]
+
     def __init__(self, *args, **kwargs):
         self.bridges = []
         super().__init__(*args, **kwargs)
@@ -969,17 +975,24 @@ class NamedDataclassList(StrList):
         checked: Optional[bool] = None,
         init: bool = False,
     ) -> QDataclassBridge:
-        super().add_item(
+        new_widget = super().add_item(
             starting_value=starting_value.name,
             checked=checked,
             init=init,
         )
         bridge = QDataclassBridge(starting_value, parent=self)
-        bridge.name.changed_value.connect(
-            self.widgets[-1].line_edit.setText
-        )
+        self._setup_bridge_signals(bridge, new_widget)
         self.bridges.append(bridge)
         return bridge
+
+    def _setup_bridge_signals(
+        self,
+        bridge: QDataclassBridge,
+        widget: StrListElem,
+    ):
+        bridge.name.changed_value.connect(
+            widget.line_edit.setText
+        )
 
     def save_item_update(self, item: StrListElem, new_value: str):
         index = self.widgets.index(item)
@@ -991,6 +1004,21 @@ class NamedDataclassList(StrList):
         bridge = self.bridges[index]
         bridge.deleteLater()
         del self.bridges[index]
+
+    def update_item_bridge(
+        self,
+        old_bridge: QDataclassBridge,
+        new_bridge: QDataclassBridge,
+    ):
+        index = self.bridges.index(old_bridge)
+        self.bridges[index] = new_bridge
+        new_bridge.setParent(self)
+        self._setup_bridge_signals(
+            new_bridge,
+            self.widgets[index],
+        )
+        old_bridge.deleteLater()
+        self.data_list.put_to_index(index, new_bridge.data)
 
 
 class StrListElem(AtefCfgDisplay, QWidget):
@@ -1067,6 +1095,7 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self.bridge = bridge
         self.config_type = config_type
         self.tree_item = tree_item
+        self.bridge_item_map = {}
         self.initialize_idcomp()
 
     def initialize_idcomp(self):
@@ -1100,14 +1129,29 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
     def setup_comparison_item_bridge(self, bridge: QDataclassBridge):
         item = AtefItem(
             widget_class=CompView,
-            widget_args=[bridge],
+            widget_args=[bridge, self],
             name=bridge.name.get() or 'untitled',
             func_name='comparison',
         )
         self.tree_item.addChild(item)
+        self.bridge_item_map[bridge] = item
+        self._setup_bridge_signals(bridge)
+
+    def _setup_bridge_signals(self, bridge: QDataclassBridge):
+        item = self.bridge_item_map[bridge]
         bridge.name.changed_value.connect(
             partial(item.setText, 0)
         )
+
+    def update_comparison_bridge(
+        self,
+        old_bridge: QDataclassBridge,
+        new_bridge: QDataclassBridge,
+    ):
+        self.comparison_list.update_item_bridge(old_bridge, new_bridge)
+        item = self.bridge_item_map[old_bridge]
+        self.bridge_item_map[new_bridge] = item
+        self._setup_bridge_signals(new_bridge)
 
     def add_comparison(
         self,
@@ -1161,9 +1205,16 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
         cls.specific_comparison_widgets[dataclass_type] = widget_type
         cls.data_types[dataclass_type.__name__] = dataclass_type
 
-    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+    def __init__(
+        self,
+        bridge: QDataclassBridge,
+        id_and_comp: IdAndCompWidget,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.bridge = bridge
+        self.id_and_comp = id_and_comp
         self.comparison_setup_done = False
         self.initialize_comp_view()
 
@@ -1203,15 +1254,15 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
             # Clean up the previous widget
             self.specific_widget.deleteLater()
             # Clean up the previous bridge
+            old_bridge = self.bridge
             old_data = self.bridge.data
-            self.bridge.deleteLater()
             # Create a new dataclass, transferring over any compatible data
             new_data = cast_dataclass(old_data, new_type)
-            # Create a new bridge and assign it to self
-            self.bridge = QDataclassBridge(new_data)
+            # Create a new bridge, seeded with the new dataclass
+            new_bridge = QDataclassBridge(new_data)
+            self.bridge = new_bridge
             # Replace our bridge in the parent as appropriate
-            # TODO
-            raise NotImplementedError()
+            self.id_and_comp.update_comparison_bridge(old_bridge, new_bridge)
         # Redo the text setup with the new bridge (or maybe the first time)
         self.initialize_config_text()
         # Set up the widget specific items
@@ -1225,8 +1276,9 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
             )
         self.specific_widget = widget_class(self.bridge)
         self.specific_content.addWidget(self.specific_widget)
-        # Fill the generic combobox options
+
         if not self.comparison_setup_done:
+            # Fill the generic combobox options
             for text in self.invert_combo_items:
                 self.invert_combo.addItem(text)
             for text in self.reduce_method_combo_items:
@@ -1259,27 +1311,26 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
                     self.bridge.if_disconnected.get().name
                 )
             )
-
-        # Set up the generic item signals in order from top to bottom
-        self.invert_combo.currentIndexChanged.connect(
-            self.new_invert_combo
-        )
-        self.reduce_period_edit.textEdited.connect(
-            self.new_reduce_period_edit
-        )
-        self.reduce_method_combo.currentTextChanged.connect(
-            self.new_reduce_method_combo
-        )
-        self.string_combo.currentIndexChanged.connect(
-            self.new_string_combo
-        )
-        self.sev_on_failure_combo.currentTextChanged.connect(
-            self.new_sev_on_failure_combo
-        )
-        self.if_disc_combo.currentTextChanged.connect(
-            self.new_if_disc_combo
-        )
-        self.comparison_setup_done = True
+            # Set up the generic item signals in order from top to bottom
+            self.invert_combo.currentIndexChanged.connect(
+                self.new_invert_combo
+            )
+            self.reduce_period_edit.textEdited.connect(
+                self.new_reduce_period_edit
+            )
+            self.reduce_method_combo.currentTextChanged.connect(
+                self.new_reduce_method_combo
+            )
+            self.string_combo.currentIndexChanged.connect(
+                self.new_string_combo
+            )
+            self.sev_on_failure_combo.currentTextChanged.connect(
+                self.new_sev_on_failure_combo
+            )
+            self.if_disc_combo.currentTextChanged.connect(
+                self.new_if_disc_combo
+            )
+            self.comparison_setup_done = True
 
     def new_invert_combo(self, index: int):
         self.bridge.invert.put(bool(index))
@@ -1327,6 +1378,15 @@ class ComparisonWidget(CompMixin, QLabel):
     def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setText('Please select a comparison type above.')
+
+
+# This class should be replaced by a real "Equals" widget
+class EqualsWidget(CompMixin, QLabel):
+    data_type = Equals
+
+    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setText('This is just a placeholder for "Equals" for testing.')
 
 
 def main():
