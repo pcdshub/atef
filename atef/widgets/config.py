@@ -269,9 +269,6 @@ class Tree(AtefCfgDisplay, QWidget):
     def assemble_tree(self):
         """
         On startup, create the full tree.
-
-        TODO: properly fill from the config_file, currently creates only the
-        base tree with a single "overview" item.
         """
         self.tree_widget.setColumnCount(2)
         self.tree_widget.setHeaderLabels(['Node', 'Type'])
@@ -289,9 +286,6 @@ class Tree(AtefCfgDisplay, QWidget):
 
         This works by hiding the previous widget and showing the new
         selection, creating the widget object if needed.
-
-        TODO: make sure the widget we set visible is fully updated with
-        the latest config file information.
 
         Parameters
         ----------
