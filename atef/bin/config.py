@@ -692,7 +692,7 @@ class Overview(AtefCfgDisplay, QWidget):
         Parameters
         ----------
         checked : bool
-            Expected argument from a qPushButton, unused
+            Expected argument from a QPushButton, unused
         config : DeviceConfiguration, optional
             The device configuration to add. If omitted, we'll create
             a blank config.
