@@ -1470,7 +1470,7 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
         try:
             value = int(value)
         except Exception:
-            value = None
+            value = 0
         self.bridge.reduce_period.put(value)
 
     def new_reduce_method_combo(self, value: str):
