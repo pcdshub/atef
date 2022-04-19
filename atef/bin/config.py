@@ -3,6 +3,7 @@
 """
 import argparse
 
+from pydm import exception
 from qtpy.QtWidgets import QApplication
 
 from ..widgets.config import Window
@@ -18,4 +19,5 @@ def main():
     app = QApplication([])
     main_window = Window()
     main_window.show()
+    exception.install()
     app.exec()
