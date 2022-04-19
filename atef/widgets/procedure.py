@@ -15,9 +15,9 @@ import typhos.display
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
-from .procedure import (DescriptionStep, DisplayOptions, PlanOptions, PlanStep,
-                        ProcedureGroup, ProcedureStep, PydmDisplayStep,
-                        TyphosDisplayStep)
+from ..procedure import (DescriptionStep, DisplayOptions, PlanOptions,
+                         PlanStep, ProcedureGroup, ProcedureStep,
+                         PydmDisplayStep, TyphosDisplayStep)
 
 # TODO:  CodeStep, ConfigurationCheckStep,
 
