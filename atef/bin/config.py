@@ -1027,7 +1027,6 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
     ):
         if id_and_comp is None:
             id_and_comp = IdentifierAndComparison()
-            self.bridge.checklist.append(id_and_comp)
         bridge = self.checklist_list.add_item(id_and_comp)
         self.setup_checklist_item_bridge(bridge)
         # TODO make the delete button work
@@ -1106,10 +1105,11 @@ class NamedDataclassList(StrList):
         checked: Optional[bool] = None,
         init: bool = False,
     ) -> QDataclassBridge:
+        self.data_list.append(starting_value)
         new_widget = super().add_item(
             starting_value=starting_value.name,
             checked=checked,
-            init=init,
+            init=True,
         )
         bridge = QDataclassBridge(starting_value, parent=self)
         self._setup_bridge_signals(bridge, new_widget)
@@ -1292,7 +1292,6 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         if comparison is None:
             # Empty default
             comparison = Comparison()
-            self.bridge.comparisons.append(comparison)
         bridge = self.comparison_list.add_item(comparison)
         self.setup_comparison_item_bridge(bridge)
         # TODO make the delete button work
