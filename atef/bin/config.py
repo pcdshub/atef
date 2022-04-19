@@ -1105,7 +1105,8 @@ class NamedDataclassList(StrList):
         checked: Optional[bool] = None,
         init: bool = False,
     ) -> QDataclassBridge:
-        self.data_list.append(starting_value)
+        if not init:
+            self.data_list.append(starting_value)
         new_widget = super().add_item(
             starting_value=starting_value.name,
             checked=checked,
