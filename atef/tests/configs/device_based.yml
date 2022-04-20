@@ -1,0 +1,69 @@
+# Config file dumped from the test suite
+# Source:
+# check.ConfigurationFile(
+#     configs=[
+#         check.DeviceConfiguration(
+#             tags=["a"],
+#             devices=["at2l0"],
+#             checklist=[
+#                 check.IdentifierAndComparison(
+#                     ids=[
+#                         "blade_01.state.state",
+#                         "blade_02.state.state",
+#                         "blade_03.state.state",
+#                     ],
+#                     comparisons=[
+#                         check.NotEquals(
+#                             description="Filter is moving",
+#                             value=0,
+#                             severity_on_failure=check.Severity.error,
+#                         ),
+#                         check.NotEquals(
+#                             description="Filter is out of the beam",
+#                             value=1,
+#                             severity_on_failure=check.Severity.success,
+#                         ),
+#                         check.NotEquals(
+#                             description="Filter is in the beam",
+#                             value=2,
+#                             severity_on_failure=check.Severity.warning,
+#                         ),
+#                         check.GreaterOrEqual(
+#                             description="Filter status unknown",
+#                             value=3,
+#                             severity_on_failure=check.Severity.error,
+#                             invert=True,
+#                         ),
+#                     ],
+#                 )
+#             ],
+#         ),
+#     ],
+# )
+
+configs:
+- DeviceConfiguration:
+    checklist:
+    - comparisons:
+      - NotEquals:
+          description: Filter is moving
+      - NotEquals:
+          description: Filter is out of the beam
+          severity_on_failure: 0
+          value: 1
+      - NotEquals:
+          description: Filter is in the beam
+          severity_on_failure: 1
+          value: 2
+      - GreaterOrEqual:
+          description: Filter status unknown
+          invert: true
+          value: 3
+      ids:
+      - blade_01.state.state
+      - blade_02.state.state
+      - blade_03.state.state
+    devices:
+    - at2l0
+    tags:
+    - a

@@ -657,6 +657,7 @@ class ConfigurationFile:
 
     def to_yaml(self):
         """Dump this configuration file to yaml."""
+        _yaml_init()
         return yaml.dump(self.to_json())
 
 
@@ -808,3 +809,23 @@ def get_signal_cache() -> _SignalCache[ophyd.EpicsSignalRO]:
     if _signal_cache is None:
         _signal_cache = _SignalCache(ophyd.EpicsSignalRO)
     return _signal_cache
+
+
+_yaml_initialized = False
+
+
+def _yaml_init():
+    """Add necessary information to PyYAML for serialization."""
+    global _yaml_initialized
+    if _yaml_initialized:
+        # Make it idempotent
+        return
+
+    _yaml_initialized = True
+
+    def _enum_representer(dumper, data):
+        """Helper for pyyaml to represent enums as just integers."""
+        return dumper.represent_int(data.value)
+
+    # The ugliness of this makes me think we should use a different library
+    yaml.add_representer(Severity, _enum_representer)
