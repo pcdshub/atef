@@ -5,7 +5,7 @@
 import argparse
 import logging
 import pathlib
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence
 
 import happi
 import ophyd
@@ -13,8 +13,8 @@ import rich
 import rich.console
 import rich.tree
 
-from ..check import (ConfigurationFile, DeviceConfiguration,
-                     PreparedComparison, PVConfiguration, Result, Severity)
+from ..check import (AnyConfiguration, ConfigurationFile, PreparedComparison,
+                     PreparedComparisonException, Result, Severity)
 from ..exceptions import ConfigFileHappiError
 from ..util import get_maximum_severity, ophyd_cleanup
 
@@ -69,37 +69,12 @@ default_severity_to_log_level = {
 }
 
 
-def log_results(
-    device: ophyd.Device,
-    severity: Severity,
-    config: Union[PVConfiguration, DeviceConfiguration],
-    results: List[Result],
-    *,
-    severity_to_log_level: Optional[Dict[Severity, int]] = None,
-):
-    """Log check results to the module logger."""
-    severity_to_log_level = severity_to_log_level or default_severity_to_log_level
-
-    passed_or_failed = "passed" if severity <= Severity.warning else "FAILED"
-    logger.info(
-        "Device %s (%s) %s with severity %s",
-        device.name,
-        config.description or "no description",
-        passed_or_failed,
-        severity.name,
-    )
-    for result in results:
-        log_level = severity_to_log_level[result.severity]
-        if not logger.isEnabledFor(log_level):
-            continue
-        logger.log(log_level, result.reason)
-
-
 def log_results_rich(
     console: rich.console.Console,
     severity: Severity,
-    config: Union[PVConfiguration, DeviceConfiguration],
-    results: List[Result],
+    config: AnyConfiguration,
+    results: List[PreparedComparison],
+    errors: List[Result],
     *,
     device: Optional[ophyd.Device] = None,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
@@ -121,22 +96,35 @@ def log_results_rich(
         label_middle = ""
 
     tree = rich.tree.Tree(f"{label_prefix}{label_middle}{label_suffix}")
-    for result in results:
+    for error in errors:
+        tree.add(
+            tree.add(
+                f"{severity_to_rich[error.severity]}[default]: {error.reason}"
+            )
+        )
+
+    for prepared in results:
+        result = prepared.result
+        if result is None:
+            tree.add(
+                f"{severity_to_rich[result.severity]}[default]: comparison not run"
+            )
+            continue
+
         if result.severity > Severity.success:
             tree.add(
                 f"{severity_to_rich[result.severity]}[default]: {result.reason}"
             )
         elif verbose > 0:
-            # TODO
+            if prepared.comparison is not None:
+                description = prepared.comparison.describe()
+            else:
+                description = "no comparison configured"
+
             tree.add(
-                f"{severity_to_rich[result.severity]}[default]: {result.reason} (TODO)"
+                f"{severity_to_rich[result.severity]}[default]: "
+                f"{prepared.identifier} {description}"
             )
-            # comparison_info = result.comparison.describe() if result.comparison else ""
-            # tree.add(
-            #     f"{severity_to_rich[result.severity]}[default]: "
-            #     f"{comparison_info} "
-            #     f"{result.reason or ''}"
-            # )
 
     console.print(tree)
 
@@ -159,25 +147,45 @@ def main(
     try:
         with console.status("[bold green] Performing checks..."):
             for config in config_file.configs:
-                results = []
+                items = []
+                errors = []
                 for prepared in PreparedComparison.from_config(config, client=client):
-                    if isinstance(prepared, ConfigFileHappiError):
-                        console.print("Failed to load", prepared.dev_name)
-                        continue
-                    elif isinstance(prepared, Exception):
-                        console.print("Failed to load", prepared)
-                        continue
+                    if isinstance(prepared, PreparedComparison):
+                        prepared.result = prepared.compare()
+                        if prepared.result is not None:
+                            items.append(prepared)
+                    else:
+                        if isinstance(prepared, ConfigFileHappiError):
+                            console.print("Failed to load", prepared.dev_name)
+                            severity = Severity.internal_error
+                        elif isinstance(prepared, PreparedComparisonException):
+                            console.print("Failed to prepare comparison", prepared)
+                            if prepared.comparison is not None:
+                                severity = prepared.comparison.severity_on_failure
+                            else:
+                                severity = Severity.internal_error
+                        else:
+                            severity = Severity.internal_error
+                            console.print("Failed to load", prepared)
 
-                    results.append(prepared.compare())
+                        errors.append(
+                            Result(
+                                severity=severity,
+                                reason=str(prepared)
+                            )
+                        )
 
-                severity = get_maximum_severity([result.severity for result in results])
+                severity = get_maximum_severity(
+                    [item.result.severity for item in items] +
+                    [error.severity for error in errors]
+                )
 
                 log_results_rich(
                     console,
                     config=config,
+                    errors=errors,
                     severity=severity,
-                    results=results,
-                    device=prepared.device,
+                    results=items,
                     verbose=verbose,
                 )
     finally:

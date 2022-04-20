@@ -70,7 +70,7 @@ class Value:
 
         value_desc = f"{self.value}{tolerance} (for a result of {self.severity.name})"
         if self.description:
-            return f"{self.description} ({value_desc})"
+            return f"{value_desc}: {self.description}"
         return value_desc
 
     def compare(self, value: PrimitiveType) -> bool:
@@ -641,6 +641,27 @@ class ConfigurationFile:
         return yaml.dump(self.to_json())
 
 
+class PreparedComparisonException(Exception):
+    """Exception caught during preparation of comparisons."""
+    exception: Exception
+    identifier: str
+    comparison: Comparison
+    name: Optional[str] = None
+
+    def __init__(
+        self,
+        exception: Exception,
+        identifier: str,
+        comparison: Comparison,
+        name: Optional[str] = None,
+    ):
+        super().__init__(str(exception))
+        self.exception = exception
+        self.identifier = identifier
+        self.comparison = comparison
+        self.name = name
+
+
 @dataclass
 class PreparedComparison:
     """
@@ -651,6 +672,7 @@ class PreparedComparison:
     device: Optional[ophyd.Device] = None
     signal: Optional[ophyd.Signal] = None
     name: Optional[str] = None
+    result: Optional[Result] = None
 
     def compare(self) -> Result:
         """Run the prepared comparison."""
@@ -659,10 +681,21 @@ class PreparedComparison:
                 severity=Severity.internal_error,
                 reason="Signal not set"
             )
-        return self.comparison.compare_signal(
+        try:
+            self.signal.wait_for_connection()
+        except TimeoutError:
+            return Result(
+                severity=self.comparison.if_disconnected,
+                reason=(
+                    f"Unable to connect to {self.signal.name} ({self.identifier}) "
+                    f"for comparison {self.comparison}"
+                ),
+            )
+        self.result = self.comparison.compare_signal(
             self.signal,
             identifier=self.identifier
         )
+        return self.result
 
     @classmethod
     def from_device(
@@ -716,7 +749,7 @@ class PreparedComparison:
         cls,
         config: PVConfiguration,
         cache: Optional[Mapping[str, ophyd.Signal]] = None,
-    ) -> Generator[Union[Exception, PreparedComparison], None, None]:
+    ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
         """
         """
         for checklist_item in config.checklist:
@@ -730,16 +763,19 @@ class PreparedComparison:
                             cache=cache,
                         )
                     except Exception as ex:
-                        # ex.pvname = pvname
-                        # ex.comparison = comparison
-                        yield ex
+                        yield PreparedComparisonException(
+                            exception=ex,
+                            comparison=comparison,
+                            name=config.name,
+                            identifier=pvname,
+                        )
 
     @classmethod
     def _from_device_config(
         cls,
         device: ophyd.Device,
         config: DeviceConfiguration,
-    ) -> Generator[Union[Exception, PreparedComparison], None, None]:
+    ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
         """
         """
         for checklist_item in config.checklist:
@@ -753,7 +789,12 @@ class PreparedComparison:
                             name=config.name,
                         )
                     except Exception as ex:
-                        yield ex
+                        yield PreparedComparisonException(
+                            exception=ex,
+                            comparison=comparison,
+                            name=config.name,
+                            identifier=attr,
+                        )
 
     @classmethod
     def from_config(
@@ -762,7 +803,7 @@ class PreparedComparison:
         *,
         client: Optional[happi.Client] = None,
         cache: Optional[Mapping[str, ophyd.Signal]] = None,
-    ) -> Generator[Union[PreparedComparison, Exception], None, None]:
+    ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
         if isinstance(config, PVConfiguration):
             yield from cls._from_pv_config(config, cache=cache)
         elif isinstance(config, DeviceConfiguration):
@@ -770,120 +811,17 @@ class PreparedComparison:
                 try:
                     device = util.get_happi_device_by_name(dev_name, client=client)
                 except Exception as ex:
-                    yield ex
+                    yield PreparedComparisonException(
+                        exception=ex,
+                        comparison=None,  # TODO
+                        name=config.name,
+                        identifier=dev_name,
+                    )
                 else:
                     yield from cls._from_device_config(
                         config=config,
                         device=device,
                     )
-
-
-def check_device(
-    device: ophyd.Device, checklist: Sequence[IdentifierAndComparison]
-) -> Tuple[Severity, List[Result]]:
-    """
-    Check a given device using the list of comparisons.
-
-    Parameters
-    ----------
-    device : ophyd.Device
-        The device to check.
-
-    checklist : sequence of IdentifierAndComparison
-        Comparisons to run on the given device.  Multiple attributes may
-        share the same checks.
-
-    Returns
-    -------
-    overall_severity : Severity
-        Maximum severity found when running comparisons.
-
-    results : list of Result
-        Individual comparison results.
-    """
-    overall = Severity.success
-    results = []
-    for checklist_item in checklist:
-        for comparison in checklist_item.comparisons:
-            for attr in checklist_item.ids:
-                full_attr = f"{device.name}.{attr}"
-                logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
-                signal = getattr(device, attr, None)
-                if signal is None:
-                    result = Result(
-                        severity=Severity.internal_error,
-                        reason=(
-                            f"Attribute {full_attr} does not exist on class "
-                            f"{type(device).__name__}"
-                        ),
-                    )
-                else:
-                    result = comparison.compare_signal(signal, identifier=full_attr)
-
-                if result.severity > overall:
-                    overall = result.severity
-                results.append(result)
-
-    return overall, results
-
-
-def check_pvs(
-    checklist: Sequence[IdentifierAndComparison],
-    *,
-    cache: Optional[Mapping[str, ophyd.Signal]] = None,
-) -> Tuple[Severity, List[Result]]:
-    """
-    Check a PVConfiguration.
-
-    Parameters
-    ----------
-    checklist : sequence of IdentifierAndComparison
-        Comparisons to run on the given device.  Multiple PVs may share the
-        same checks.
-
-    Returns
-    -------
-    overall_severity : Severity
-        Maximum severity found when running comparisons.
-
-    results : list of Result
-        Individual comparison results.
-    """
-    overall = Severity.success
-    results = []
-    cache = cache or get_signal_cache()
-
-    def get_comparison_and_pvname():
-        for checklist_item in checklist:
-            for comparison in checklist_item.comparisons:
-                for pvname in checklist_item.ids:
-                    yield comparison, pvname
-
-    for comparison, pvname in get_comparison_and_pvname():
-        # Pre-fill the cache with PVs, connecting in the background
-        _ = cache[pvname]
-
-    for comparison, pvname in get_comparison_and_pvname():
-        logger.debug("Checking %s.%s with comparison %s", pvname, comparison)
-        signal = cache[pvname]
-        try:
-            signal.wait_for_connection()
-        except TimeoutError:
-            result = Result(
-                severity=comparison.if_disconnected,
-                reason=(
-                    f"Unable to connect to {pvname} for comparison "
-                    f"{comparison}"
-                ),
-            )
-        else:
-            result = comparison.compare_signal(signal, identifier=pvname)
-
-        if result.severity > overall:
-            overall = result.severity
-        results.append(result)
-
-    return overall, results
 
 
 _CacheSignalType = TypeVar("_CacheSignalType")
