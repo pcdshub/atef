@@ -10,7 +10,7 @@ import os.path
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, ClassVar, List, Optional, Union
+from typing import Any, ClassVar, List, Optional, Type, Union
 
 from apischema import deserialize, serialize
 from qtpy.QtCore import QEvent, QObject, QTimer
@@ -21,9 +21,9 @@ from qtpy.QtWidgets import (QAction, QComboBox, QFileDialog, QFormLayout,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 from qtpy.uic import loadUiType
 
-from ..check import (Comparison, ConfigurationFile, DeviceConfiguration,
-                     Equals, IdentifierAndComparison, PVConfiguration,
-                     Severity)
+from ..check import (Comparison, Configuration, ConfigurationFile,
+                     DeviceConfiguration, Equals, IdentifierAndComparison,
+                     PVConfiguration, Severity)
 from ..qt_helpers import QDataclassBridge, QDataclassList
 from ..reduce import ReduceMethod
 
@@ -203,6 +203,9 @@ class Window(AtefCfgDisplay, QMainWindow):
             current_tree.full_path = filename
 
     def serialize_tree(self, tree: Tree) -> dict:
+        """
+        Return the serialized data from a Tree widget.
+        """
         try:
             return serialize(
                 ConfigurationFile,
@@ -239,6 +242,8 @@ class Tree(AtefCfgDisplay, QWidget):
     ----------
     config_file : ConfigurationFile
         The config file object to use to build the tree.
+    full_path : str, optional
+        The full path to the last file used to save or load the tree.
     """
     filename = 'config_tree.ui'
 
@@ -262,9 +267,6 @@ class Tree(AtefCfgDisplay, QWidget):
         self.assemble_tree()
         self.show_selected_display(self.overview_item)
         self.tree_widget.itemPressed.connect(self.show_selected_display)
-
-    def debug_show_data(self, *args, **kwargs):
-        print(self.bridge.data)
 
     def assemble_tree(self):
         """
@@ -445,7 +447,7 @@ class Overview(AtefCfgDisplay, QWidget):
         Parameters
         ----------
         checked : bool
-            Expected argument from a qPushButton, unused
+            Expected argument from a QPushButton, unused
         config : PVConfiguration, optional
             The PV configuration to add. If omitted, we'll create
             a blank config.
@@ -601,9 +603,6 @@ class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
     config : Configuration
         The full configuration associated with this row, so that we can
         read and edit the name and description.
-    item : AtefItem
-        The single item in the tree associated with this config, so that we
-        can write to the text in the tree as we edit the name.
     """
     filename = 'config_overview_row.ui'
 
@@ -676,6 +675,17 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
     From this widget we can edit name/description, add tags,
     add devices, and add checklists to the Configuration.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        A dataclass bridge to an atef.check.Configuration dataclass.
+        This will be used to update the dataclass and to listen for
+        dataclass updates.
+    tree_item : AtefItem
+        The item in the atef config tree view that corresponds with
+        this widget. We'll use this to modify the tree as the user
+        adds, removes, or edits the contained checklists.
     """
     filename = 'config_group.ui'
 
@@ -703,7 +713,16 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self.tree_item = tree_item
         self.initialize_group()
 
-    def initialize_group(self):
+    def initialize_group(self) -> None:
+        """
+        Perform first-time setup for the widget.
+
+        - Set up the name and desc text using the standard behavior
+        - Set up the tag widget and make it functional
+        - Hide the devices layout for PVConfiguration
+        - Set up the devices widget for DeviceConfiguration
+        - Set up the list of checklists widget
+        """
         self.initialize_config_text()
         tags_list = StrList(
             data_list=self.bridge.tags,
@@ -734,7 +753,16 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             self.setup_checklist_item_bridge(bridge)
         self.add_checklist_button.clicked.connect(self.add_checklist)
 
-    def setup_checklist_item_bridge(self, bridge: QDataclassBridge):
+    def setup_checklist_item_bridge(self, bridge: QDataclassBridge) -> None:
+        """
+        Set up a single checklist item with a dataclass bridge.
+
+        Parameters
+        ----------
+        bridge : QDataclassBridge
+            A dataclass bridge to an instance of
+            atef.check.IdentifierAndComparison
+        """
         item = AtefItem(
             widget_class=IdAndCompWidget,
             widget_args=[bridge, type(self.bridge.data)],
@@ -751,7 +779,18 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self,
         checked: Optional[bool] = None,
         id_and_comp: Optional[IdentifierAndComparison] = None,
-    ):
+    ) -> None:
+        """
+        Add a new or existing checklist to the list of checklists.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            This argument is unused, but it will be sent by various button
+            widgets via the "clicked" signal so it must be present.
+        id_and_comp : IdentifierAndComparison, optional
+            The checklist to add. If omitted, we'll create a blank checklist.
+        """
         if id_and_comp is None:
             id_and_comp = IdentifierAndComparison()
         bridge = self.checklist_list.add_item(id_and_comp)
@@ -763,6 +802,16 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
 class StrList(QWidget):
     """
     A widget used to modify the str variant of QDataclassList.
+
+    Parameters
+    ----------
+    data_list : QDataclassList
+        The dataclass list to edit using this widget.
+    layout : QLayout
+        The layout to use to arrange our labels. This should be an
+        instantiated but not placed layout. This lets us have some
+        flexibility in whether we arrange things horizontally,
+        vertically, etc.
     """
     widgets: List[StrListElem]
 
@@ -788,6 +837,35 @@ class StrList(QWidget):
         checked: Optional[bool] = None,
         init: bool = False,
     ) -> StrListElem:
+        """
+        Create and add new editable widget element to this widget's layout.
+
+        This can either be an existing string on the dataclass list to keep
+        track of, or it can be used to add a new string to the dataclass list.
+
+        This method will also set up the signals and slots for the new widget.
+
+        Parameters
+        ----------
+        starting_value : str
+            The starting text value for the new widget element.
+            This should match the text exactly for tracking existing
+            strings.
+        checked : bool, optional
+            This argument is unused, but it will be sent by various button
+            widgets via the "clicked" signal so it must be present.
+        init : bool, optional
+            Whether or not this is the initial initialization of this widget.
+            This will be set to True in __init__ so that we don't mutate
+            the underlying dataclass. False, the default, means that we're
+            adding a new string to the dataclass, which means we should
+            definitely append it.
+
+        Returns
+        -------
+        strlistelem : StrListElem
+            The widget created by this function call.
+        """
         new_widget = StrListElem(starting_value, parent=self)
         self.widgets.append(new_widget)
         if not init:
@@ -801,11 +879,32 @@ class StrList(QWidget):
         )
         return new_widget
 
-    def save_item_update(self, item: StrListElem, new_value: str):
+    def save_item_update(self, item: StrListElem, new_value: str) -> None:
+        """
+        Update the dataclass as appropriate when the user submits a new value.
+
+        Parameters
+        ----------
+        item : StrListElem
+            The widget that the user has edited.
+        new_value : str
+            The value that the user has submitted.
+        """
         index = self.widgets.index(item)
         self.data_list.put_to_index(index, new_value)
 
-    def remove_item(self, item: StrListElem, checked: bool):
+    def remove_item(self, item: StrListElem, checked: bool) -> None:
+        """
+        Update the dataclass as appropriate when the user removes a value.
+
+        Parameters
+        ----------
+        item : StrListElem
+            The widget that the user has clicked the delete button for.
+        checked : bool, optional
+            This argument is unused, but it will be sent by various button
+            widgets via the "clicked" signal so it must be present.
+        """
         index = self.widgets.index(item)
         self.widgets.remove(item)
         self.data_list.remove_index(index)
@@ -819,6 +918,16 @@ class NamedDataclassList(StrList):
     A named dataclass is any dataclass element with a str "name" field.
     This widget will allow us to add elements to the list by name,
     display the names, modify the names, add blank entries, etc.
+
+    Parameters
+    ----------
+    data_list : QDataclassList
+        The dataclass list to edit using this widget.
+    layout : QLayout
+        The layout to use to arrange our labels. This should be an
+        instantiated but not placed layout. This lets us have some
+        flexibility in whether we arrange things horizontally,
+        vertically, etc.
     """
     bridges = List[QDataclassBridge]
 
@@ -832,6 +941,40 @@ class NamedDataclassList(StrList):
         checked: Optional[bool] = None,
         init: bool = False,
     ) -> QDataclassBridge:
+        """
+        Create and add new editable widget element to this widget's layout.
+
+        This can either be an existing dataclass for the list to keep
+        track of, or it can be used to add a new dataclass to the list.
+
+        This method will also set up the signals and slots for the new widget.
+
+        Unlike the parent class, this will set up and return a
+        QDataclassBridge that can be used to manage edits and updates to the
+        dataclass. This bridge will be configured to link edits to the
+        text widget with edits to the name field.
+
+        Parameters
+        ----------
+        starting_value : Any dataclass
+            The starting dataclass for the new widget element.
+            This should be the actual dataclass for tracking existing
+            dataclasses.
+        checked : bool, optional
+            This argument is unused, but it will be sent by various button
+            widgets via the "clicked" signal so it must be present.
+        init : bool, optional
+            Whether or not this is the initial initialization of this widget.
+            This will be set to True in __init__ so that we don't mutate
+            the underlying dataclass. False, the default, means that we're
+            adding a new dataclass to the list, which means we should
+            definitely append it.
+
+        Returns
+        -------
+        strlistelem : StrListElem
+            The widget created by this function call.
+        """
         if not init:
             self.data_list.append(starting_value)
         new_widget = super().add_item(
@@ -848,16 +991,50 @@ class NamedDataclassList(StrList):
         self,
         bridge: QDataclassBridge,
         widget: StrListElem,
-    ):
+    ) -> None:
+        """
+        Set up all the signals needed for a widget element and its bridge.
+
+        Parameters
+        ----------
+        bridge : QDataclassBridge
+            A bridge to the dataclass associated with the widget element.
+        widget : StrListElem
+            The widget element to link.
+        """
         bridge.name.changed_value.connect(
             widget.line_edit.setText
         )
 
-    def save_item_update(self, item: StrListElem, new_value: str):
+    def save_item_update(self, item: StrListElem, new_value: str) -> None:
+        """
+        Update the dataclass as appropriate when the user submits a new value.
+
+        Unlike the parent class, this will update the name field rather than
+        replace the entire string object.
+
+        Parameters
+        ----------
+        item : StrListElem
+            The widget that the user has edited.
+        new_value : str
+            The value that the user has submitted.
+        """
         index = self.widgets.index(item)
         self.bridges[index].name.put(new_value)
 
-    def remove_item(self, item: StrListElem, checked: bool):
+    def remove_item(self, item: StrListElem, checked: bool) -> None:
+        """
+        Update the dataclass as appropriate when the user removes a value.
+
+        Parameters
+        ----------
+        item : StrListElem
+            The widget that the user has clicked the delete button for.
+        checked : bool, optional
+            This argument is unused, but it will be sent by various button
+            widgets via the "clicked" signal so it must be present.
+        """
         index = self.widgets.index(item)
         super().remove_item(item=item, checked=checked)
         bridge = self.bridges[index]
@@ -868,7 +1045,24 @@ class NamedDataclassList(StrList):
         self,
         old_bridge: QDataclassBridge,
         new_bridge: QDataclassBridge,
-    ):
+    ) -> None:
+        """
+        Replace an existing bridge with a new bridge.
+
+        This can be useful if you need to change out an entire dataclass,
+        as may need to be done when the user requests a change of
+        Comparison type.
+
+        Internally, this handles any widget-specific setup of the new bridge
+        and as much teardown as we can do to the old bridge.
+
+        Parameters
+        ----------
+        old_bridge : QDataclassBridge
+            The existing bridge that we'd like to replace.
+        new_bridge : QDataclassBridge
+            The new bridge that we'd like to replace it with.
+        """
         index = self.bridges.index(old_bridge)
         self.bridges[index] = new_bridge
         new_bridge.setParent(self)
@@ -905,7 +1099,15 @@ class StrListElem(AtefCfgDisplay, QWidget):
         self.on_text_changed(start_text)
         self.line_edit.textChanged.connect(self.on_text_changed)
 
-    def on_text_changed(self, text: str):
+    def on_text_changed(self, text: str) -> None:
+        """
+        Edit our various visual elements when the user edits the text field.
+
+        This will do all of the following:
+        - make the delete button show only when the text field is empty
+        - adjust the size of the text field to be roughly the size of the
+          string we've inputted
+        """
         # Show or hide the del button as needed
         self.del_button.setVisible(not text)
         # Adjust the width to match the text
@@ -915,7 +1117,13 @@ class StrListElem(AtefCfgDisplay, QWidget):
 
 
 class FrameOnEditFilter(QObject):
-    def eventFilter(self, object: QLineEdit, event: QEvent):
+    """
+    A QLineEdit event filter for editing vs not editing style handling.
+
+    This will make the QLineEdit look like a QLabel when the user is
+    not editing it.
+    """
+    def eventFilter(self, object: QLineEdit, event: QEvent) -> bool:
         if event.type() == QEvent.FocusIn:
             object.setFrame(True)
             object.setReadOnly(False)
@@ -929,6 +1137,18 @@ class FrameOnEditFilter(QObject):
 
 
 class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
+    """
+    A widget to manage the ids and comparisons associated with a checklist.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        A dataclass bridge to an atef.check.IdentifierAndComparison instance.
+    config_type : DeviceConfiguration or PVConfiguration
+        The type associated with this configuration. There are two types of
+        checklists: those that reference ophyd objects, and those that
+        reference PVs.
+    """
     filename = 'id_and_comp.ui'
 
     name_edit: QLineEdit
@@ -940,12 +1160,12 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
     add_comp_button: QPushButton
 
     bridge: QDataclassBridge
-    config_type: type
+    config_type: Type[Configuration]
 
     def __init__(
         self,
         bridge: QDataclassBridge,
-        config_type: type,
+        config_type: Type[Configuration],
         tree_item: AtefItem,
         *args,
         **kwargs,
@@ -957,7 +1177,15 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self.bridge_item_map = {}
         self.initialize_idcomp()
 
-    def initialize_idcomp(self):
+    def initialize_idcomp(self) -> None:
+        """
+        Perform first-time setup of this widget.
+
+        Does the following:
+        - Connects the name field with the dataclass
+        - Sets up the list of PVs or Devices and adjusts the label
+        - Sets up the list of comparisons
+        """
         # Connect the name to the dataclass
         self.initialize_config_name()
         # Set up editing of the identifiers list
@@ -985,7 +1213,18 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
             self.add_comparison(comparison=comparison)
         self.add_comp_button.clicked.connect(self.add_comparison)
 
-    def setup_comparison_item_bridge(self, bridge: QDataclassBridge):
+    def setup_comparison_item_bridge(self, bridge: QDataclassBridge) -> None:
+        """
+        Create the AtefItem associated with a bridge and set it up.
+
+        These items handle the tree entry and loading of the subscreen.
+
+        Parameters
+        ----------
+        bridge : QDataclassBridge
+            A dataclass bridge to an instance of
+            atef.check.IdentifierAndComparison
+        """
         item = AtefItem(
             widget_class=CompView,
             widget_args=[bridge, self],
@@ -996,7 +1235,18 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self.bridge_item_map[bridge] = item
         self._setup_bridge_signals(bridge)
 
-    def _setup_bridge_signals(self, bridge: QDataclassBridge):
+    def _setup_bridge_signals(self, bridge: QDataclassBridge) -> None:
+        """
+        Set up all the relevant signals for a QDataclassBridge.
+
+        Currently, this just makes it so that when you edit the
+        name field, the tree entry updates its text.
+
+        Parameters
+        ----------
+        bridge : QDataclassBridge
+
+        """
         item = self.bridge_item_map[bridge]
         bridge.name.changed_value.connect(
             partial(item.setText, 0)
@@ -1006,7 +1256,19 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self,
         old_bridge: QDataclassBridge,
         new_bridge: QDataclassBridge,
-    ):
+    ) -> None:
+        """
+        Swap out an underlying QDataclassBridge.
+
+        This is used when the user wants to change a comparison's class.
+
+        Parameters
+        ----------
+        old_bridge : QDataclassBridge
+            The previous existing bridge.
+        new_bridge : QDataclassBridge
+            The new bridge to replace it with.
+        """
         self.comparison_list.update_item_bridge(old_bridge, new_bridge)
         item = self.bridge_item_map[old_bridge]
         self.bridge_item_map[new_bridge] = item
@@ -1016,7 +1278,20 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self,
         checked: Optional[bool] = None,
         comparison: Optional[Comparison] = None,
-    ):
+    ) -> None:
+        """
+        Add a new or existing comparison to the list.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            This argument is unused, but it will be sent by various button
+            widgets via the "clicked" signal so it must be present.
+        comparison : Comparison subclass, optional
+            The specific comparison instance to add.
+            If omitted, we'll create a blank atef.check.Equals instance
+            as a default.
+        """
         if comparison is None:
             # Empty default
             comparison = Equals()
@@ -1027,6 +1302,27 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
 
 class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
+    """
+    Widget to view and edit a single Comparison subclass.
+
+    This contains some generic fields common to all Comparison
+    subclasses, and then a placeholder for Comparison-specific
+    widgets to be loaded into.
+
+    Comparison subclasses can be registered for use here by
+    calling the register_comparison classmethod, which is
+    called automatically in the CompMixin helper class.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        A dataclass bridge that points to a subclass of Comparison.
+    id_and_comp : IdAndCompWidget
+        The widget that created and owns this widget.
+        This is used in place of parent to be more robust to
+        structural changes for us to access the checklist when we
+        need to change the data type.
+    """
     filename = 'comp_view.ui'
 
     name_edit: QLineEdit
@@ -1057,9 +1353,21 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
     @classmethod
     def register_comparison(
         cls,
-        dataclass_type: type,
-        widget_type: type,
+        dataclass_type: Type[Comparison],
+        widget_type: Type[QWidget],
     ) -> None:
+        """
+        Register a comparison to be added to the combobox options.
+
+        Parameters
+        ----------
+        dataclass_type : any Comparison subclass
+            The comparison type to register.
+        widget_type : QWidget
+            The widget to load for that comparison type. Must accept
+            a QDataclassBridge to the comparison instance as its
+            first positional argument.
+        """
         cls.specific_comparison_widgets[dataclass_type] = widget_type
         cls.data_types[dataclass_type.__name__] = dataclass_type
 
@@ -1076,7 +1384,15 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self.comparison_setup_done = False
         self.initialize_comp_view()
 
-    def initialize_comp_view(self):
+    def initialize_comp_view(self) -> None:
+        """
+        First time setup for the widget.
+
+        - Populates the combo box with options
+        - Switches the combobox to match the loaded type
+        - Calls change_comparison_type with the initial type
+        - Sets up the combobox signals and slots
+        """
         last_added_index = 0
         for type_name, data_type in self.data_types.items():
             self.comp_type_combo.addItem(type_name)
@@ -1088,10 +1404,21 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
             self._comp_type_from_combobox,
         )
 
-    def _comp_type_from_combobox(self, type_name: str):
+    def _comp_type_from_combobox(self, type_name: str) -> None:
+        """
+        Call change_comparison_type as a combobox slot.
+
+        Changes the argument to the type name as a string rather than as
+        the type itself.
+
+        Parameters
+        ----------
+        type_name : str
+            The string name of the comparison type.
+        """
         return self.change_comparison_type(self.data_types[type_name])
 
-    def change_comparison_type(self, new_type: type):
+    def change_comparison_type(self, new_type: Type[Comparison]) -> None:
         """
         Switch the comparison from one type to another.
 
@@ -1106,7 +1433,12 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
         - update the parent bridge about our new dataclass
         - clean up the old widget
         - swap out the edit widgets for the appropriate version
-        - connect everything to the new bridge
+        - connect everything to the new bridge'
+
+        Parameters
+        ----------
+        new_type : Comparison subclass
+            The class to switch our comparison type to.
         """
         if self.comparison_setup_done:
             # Clean up the previous widget
@@ -1190,39 +1522,124 @@ class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
             )
             self.comparison_setup_done = True
 
-    def new_invert_combo(self, index: int):
+    def new_invert_combo(self, index: int) -> None:
+        """
+        Slot to handle user input in the generic "Invert" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        index : int
+            The index the user selects in the combo box.
+        """
         self.bridge.invert.put(bool(index))
 
-    def new_reduce_period_edit(self, value: str):
+    def new_reduce_period_edit(self, value: str) -> None:
+        """
+        Slot to handle user intput in the generic "Reduce Period" line edit.
+
+        Tries to interpet user input as a float. If this is not possible,
+        the period will be stored as zero.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        value : str
+            The string contents of the line edit.
+        """
         try:
-            value = int(value)
+            value = float(value)
         except Exception:
             value = 0
         self.bridge.reduce_period.put(value)
 
-    def new_reduce_method_combo(self, value: str):
+    def new_reduce_method_combo(self, value: str) -> None:
+        """
+        Slot to handle user input in the generic "Reduce Method" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        value : str
+            The string contents of the combo box.
+        """
         self.bridge.reduce_method.put(ReduceMethod[value])
 
-    def new_string_combo(self, index: int):
+    def new_string_combo(self, index: int) -> None:
+        """
+        Slot to handle user input in the generic "String" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        index : int
+            The integer index of the combo box.
+        """
         self.bridge.string.put(bool(index))
 
-    def new_sev_on_failure_combo(self, value: str):
+    def new_sev_on_failure_combo(self, value: str) -> None:
+        """
+        Slot to handle user input in the "Severity on Failure" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        value : str
+            The string contents of the combo box.
+        """
         self.bridge.severity_on_failure.put(Severity[value])
 
     def new_if_disc_combo(self, value: str):
+        """
+        Slot to handle user input in the "If Disconnected" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        value : str
+            The string contents of the combo box.
+        """
         self.bridge.if_disconnected.put(Severity[value])
 
 
-def cast_dataclass(data: Any, new_type: type):
+def cast_dataclass(data: Any, new_type: Type) -> Any:
+    """
+    Convert one dataclass to another, keeping values in any same-named fields.
+
+    Parameters
+    ----------
+    data : Any dataclass instance
+        The dataclass instance that we'd like to convert.
+    new_type : Any dataclass
+        The dataclass type that we'd like to convert.
+
+    Returns
+    -------
+    casted_data : instance of new_type
+        The new dataclass instance.
+    """
     new_fields = dataclasses.fields(new_type)
+    field_names = set(field.name for field in new_fields)
     new_kwargs = {
         key: value for key, value in dataclasses.asdict(data).items()
-        if key in set(field.name for field in new_fields)
+        if key in field_names
     }
     return new_type(**new_kwargs)
 
 
 class CompMixin:
+    """
+    Helper class for creating comparison widgets.
+
+    Include as one of the parent classes and define the data_type classvar
+    to ensure the widget is included as an option in CompView.
+    """
     data_type: ClassVar[type]
 
     def __init_subclass__(cls, *args, **kwargs):
