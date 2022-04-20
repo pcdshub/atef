@@ -824,6 +824,109 @@ class PreparedComparison:
                     )
 
 
+def check_device(
+    device: ophyd.Device, checklist: Sequence[IdentifierAndComparison]
+) -> Tuple[Severity, List[Result]]:
+    """
+    Check a given device using the list of comparisons.
+
+    Parameters
+    ----------
+    device : ophyd.Device
+        The device to check.
+
+    checklist : sequence of IdentifierAndComparison
+        Comparisons to run on the given device.  Multiple attributes may
+        share the same checks.
+
+    Returns
+    -------
+    overall_severity : Severity
+        Maximum severity found when running comparisons.
+
+    results : list of Result
+        Individual comparison results.
+    """
+    overall = Severity.success
+    results = []
+    for checklist_item in checklist:
+        for comparison in checklist_item.comparisons:
+            for attr in checklist_item.ids:
+                full_attr = f"{device.name}.{attr}"
+                logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
+                try:
+                    prepared = PreparedComparison.from_device(
+                        device=device, attr=attr, comparison=comparison
+                    )
+                except AttributeError:
+                    result = Result(
+                        severity=Severity.internal_error,
+                        reason=(
+                            f"Attribute {full_attr} does not exist on class "
+                            f"{type(device).__name__}"
+                        ),
+                    )
+                else:
+                    result = prepared.compare()
+
+                if result.severity > overall:
+                    overall = result.severity
+                results.append(result)
+
+    return overall, results
+
+
+def check_pvs(
+    checklist: Sequence[IdentifierAndComparison],
+    *,
+    cache: Optional[Mapping[str, ophyd.Signal]] = None,
+) -> Tuple[Severity, List[Result]]:
+    """
+    Check a PVConfiguration.
+
+    Parameters
+    ----------
+    checklist : sequence of IdentifierAndComparison
+        Comparisons to run on the given device.  Multiple PVs may share the
+        same checks.
+
+    Returns
+    -------
+    overall_severity : Severity
+        Maximum severity found when running comparisons.
+
+    results : list of Result
+        Individual comparison results.
+    """
+    overall = Severity.success
+    results = []
+    cache = cache or get_signal_cache()
+
+    def get_comparison_and_pvname():
+        for checklist_item in checklist:
+            for comparison in checklist_item.comparisons:
+                for pvname in checklist_item.ids:
+                    yield comparison, pvname
+
+    for comparison, pvname in get_comparison_and_pvname():
+        # Pre-fill the cache with PVs, connecting in the background
+        _ = cache[pvname]
+
+    for comparison, pvname in get_comparison_and_pvname():
+        logger.debug("Checking %s.%s with comparison %s", pvname, comparison)
+
+        prepared = PreparedComparison.from_pvname(
+            pvname=pvname, comparison=comparison, cache=cache
+        )
+        result = prepared.compare()
+
+        if result.severity > overall:
+            overall = result.severity
+        results.append(result)
+
+    return overall, results
+
+
 _CacheSignalType = TypeVar("_CacheSignalType")
 
 
