@@ -667,15 +667,28 @@ class PreparedComparison:
     """
     A unified representation of comparisons for device signals and standalone PVs.
     """
+    #: The identifier used for the comparison.
     identifier: str = ""
+    #: The comparison itself.
     comparison: Comparison = field(default_factory=Comparison)
+    #: The device the comparison applies to, if applicable.
     device: Optional[ophyd.Device] = None
+    #: The signal the comparison is to be run on.
     signal: Optional[ophyd.Signal] = None
+    #: The name of the associated configuration.
     name: Optional[str] = None
+    #: The last result of the comparison, if run.
     result: Optional[Result] = None
 
     def compare(self) -> Result:
-        """Run the prepared comparison."""
+        """
+        Run the prepared comparison.
+
+        Returns
+        -------
+        Result
+            The result of the comparison.  This is also set in ``self.result``.
+        """
         if self.signal is None:
             return Result(
                 severity=Severity.internal_error,
@@ -705,6 +718,7 @@ class PreparedComparison:
         comparison: Comparison,
         name: Optional[str] = None,
     ) -> PreparedComparison:
+        """Create a PreparedComparison from a device and comparison."""
         full_attr = f"{device.name}.{attr}"
         logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
         signal = getattr(device, attr, None)
@@ -731,8 +745,7 @@ class PreparedComparison:
         *,
         cache: Optional[Mapping[str, ophyd.Signal]] = None,
     ) -> PreparedComparison:
-        """
-        """
+        """Create a PreparedComparison from a PV name and comparison."""
         if cache is None:
             cache = get_signal_cache()
 
@@ -751,6 +764,22 @@ class PreparedComparison:
         cache: Optional[Mapping[str, ophyd.Signal]] = None,
     ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
         """
+        Create one or more PreparedComparison instances from a PVConfiguration.
+
+        Parameters
+        ----------
+        config : PVConfiguration or DeviceConfiguration
+            The configuration.
+
+        cache : dict of str to type[Signal]
+            The PV to signal cache.
+
+        Yields
+        ------
+        item : PreparedComparisonException or PreparedComparison
+            If an error occurs during preparation, a
+            PreparedComparisonException will be yielded in place of the
+            PreparedComparison.
         """
         for checklist_item in config.checklist:
             for comparison in checklist_item.comparisons:
@@ -777,6 +806,22 @@ class PreparedComparison:
         config: DeviceConfiguration,
     ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
         """
+        Create one or more PreparedComparison instances from a DeviceConfiguration.
+
+        Parameters
+        ----------
+        config : PVConfiguration or DeviceConfiguration
+            The configuration.
+
+        client : happi.Client
+            A happi Client instance.
+
+        Yields
+        ------
+        item : PreparedComparisonException or PreparedComparison
+            If an error occurs during preparation, a
+            PreparedComparisonException will be yielded in place of the
+            PreparedComparison.
         """
         for checklist_item in config.checklist:
             for comparison in checklist_item.comparisons:
@@ -804,9 +849,37 @@ class PreparedComparison:
         client: Optional[happi.Client] = None,
         cache: Optional[Mapping[str, ophyd.Signal]] = None,
     ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
+        """
+        Create one or more PreparedComparison instances from a PVConfiguration
+        or a DeviceConfiguration.
+
+        If available, provide an instantiated happi Client and PV-to-Signal
+        cache.  If unspecified, a configuration-derived happi Client will
+        be instantiated and a global PV-to-Signal cache will be utilized.
+
+        Parameters
+        ----------
+        config : PVConfiguration or DeviceConfiguration
+            The configuration.
+
+        client : happi.Client
+            A happi Client instance.
+
+        cache : dict of str to type[Signal]
+            The PV to signal cache.
+
+        Yields
+        ------
+        item : PreparedComparisonException or PreparedComparison
+            If an error occurs during preparation, a
+            PreparedComparisonException will be yielded in place of the
+            PreparedComparison.
+        """
         if isinstance(config, PVConfiguration):
             yield from cls._from_pv_config(config, cache=cache)
         elif isinstance(config, DeviceConfiguration):
+            if client is None:
+                client = happi.Client.from_config()
             for dev_name in config.devices:
                 try:
                     device = util.get_happi_device_by_name(dev_name, client=client)
