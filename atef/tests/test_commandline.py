@@ -4,7 +4,7 @@ import pytest
 
 import atef.bin.main as atef_main
 
-# from atef.bin.config import main as config_main
+from .conftest import CONFIG_PATH
 
 
 def test_help_main(monkeypatch):
@@ -21,4 +21,4 @@ def test_help_module(monkeypatch, subcommand):
 
 def test_check_smoke():
     from atef.bin.check import main as check_main
-    check_main(filename="")
+    check_main(filename=str(CONFIG_PATH / "pv_based.yml"))

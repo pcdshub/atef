@@ -1,0 +1,50 @@
+# Config file dumped from the test suite
+# Source:
+#   check.ConfigurationFile(
+#       configs=[
+#           check.PVConfiguration(
+#               tags=["a"],
+#               checklist=[
+#                   check.IdentifierAndComparison(
+#                       name="pv_checks",
+#                       ids=["simple:A", "simple:B"],
+#                       comparisons=[check.Equals(value=1)],
+#                   ),
+#               ],
+#           ),
+#           check.PVConfiguration(
+#               tags=["a", "c"],
+#               checklist=[
+#                   check.IdentifierAndComparison(
+#                       name="pv_checks2",
+#                       ids=["simple:C"],
+#                       comparisons=[check.Equals(value=1)],
+#                   ),
+#               ],
+#           ),
+#       ]
+#   )
+
+configs:
+- PVConfiguration:
+    checklist:
+    - comparisons:
+      - Equals:
+          value: 1
+      ids:
+      - simple:A
+      - simple:B
+      name: pv_checks
+    tags:
+    - a
+- PVConfiguration:
+    checklist:
+    - comparisons:
+      - Equals:
+          value: 1
+      ids:
+      - simple:C
+      name: pv_checks2
+    tags:
+    - a
+    - c

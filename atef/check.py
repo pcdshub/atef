@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import enum
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Mapping, Optional, Sequence,
-                    Tuple, TypeVar)
+                    Tuple, TypeVar, Union)
 
+import apischema
 import numpy as np
 import ophyd
+import yaml
 
 from . import reduce, serialization
-from .type_hints import Number, PrimitiveType
+from .type_hints import AnyPath, Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
 
@@ -595,6 +598,9 @@ class PVConfiguration(Configuration):
     ...
 
 
+AnyConfiguration = Union[PVConfiguration, DeviceConfiguration]
+
+
 @dataclass
 class ConfigurationFile:
     """
@@ -630,6 +636,28 @@ class ConfigurationFile:
         for config in self.configs:
             if tag_set.intersection(set(config.tags or [])):
                 yield config
+
+    @classmethod
+    def from_json(cls, filename: AnyPath) -> ConfigurationFile:
+        """Load a configuration file from JSON."""
+        with open(filename) as fp:
+            serialized_config = json.load(fp)
+        return apischema.deserialize(cls, serialized_config)
+
+    @classmethod
+    def from_yaml(cls, filename: AnyPath) -> ConfigurationFile:
+        """Load a configuration file from yaml."""
+        with open(filename) as fp:
+            serialized_config = yaml.safe_load(fp)
+        return apischema.deserialize(cls, serialized_config)
+
+    def to_json(self):
+        """Dump this configuration file to a JSON-compatible dictionary."""
+        return apischema.serialize(ConfigurationFile, self, exclude_defaults=True)
+
+    def to_yaml(self):
+        """Dump this configuration file to yaml."""
+        return yaml.dump(self.to_json())
 
 
 def check_device(
