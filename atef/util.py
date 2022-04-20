@@ -1,9 +1,10 @@
 import logging
-from typing import Optional
+from typing import Optional, Sequence
 
 import happi
 import ophyd
 
+from .enums import Severity
 from .exceptions import HappiLoadError, MissingHappiDeviceError
 
 logger = logging.getLogger(__name__)
@@ -61,3 +62,10 @@ def get_happi_device_by_name(
         load_ex.dev_name = name
         load_ex.dev_config = None
         raise load_ex from ex
+
+
+def get_maximum_severity(severities: Sequence[Severity]) -> Severity:
+    """Get the maximum severity defined from the sequence of severities."""
+    return Severity(
+        max(severity.value for severity in tuple(severities) + (Severity.success, ))
+    )

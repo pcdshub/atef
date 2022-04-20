@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import json
 import logging
 from dataclasses import dataclass, field
@@ -8,36 +7,17 @@ from typing import (Any, Dict, Generator, List, Mapping, Optional, Sequence,
                     Tuple, TypeVar, Union)
 
 import apischema
+import happi
 import numpy as np
 import ophyd
 import yaml
 
-from . import reduce, serialization
+from . import reduce, serialization, util
+from .enums import Severity
+from .exceptions import ComparisonError, ComparisonException, ComparisonWarning
 from .type_hints import AnyPath, Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
-
-
-class Severity(enum.IntEnum):
-    success = 0
-    warning = 1
-    error = 2
-    internal_error = 3
-
-
-class ComparisonException(Exception):
-    """Raise this exception to exit a comparator and set severity."""
-    severity = Severity.success
-
-
-class ComparisonError(ComparisonException):
-    """Raise this exception to error out in a comparator."""
-    severity = Severity.error
-
-
-class ComparisonWarning(ComparisonException):
-    """Raise this exception to warn in a comparator."""
-    severity = Severity.warning
 
 
 @dataclass(frozen=True)
@@ -661,6 +641,143 @@ class ConfigurationFile:
         return yaml.dump(self.to_json())
 
 
+@dataclass
+class PreparedComparison:
+    """
+    A unified representation of comparisons for device signals and standalone PVs.
+    """
+    identifier: str = ""
+    comparison: Comparison = field(default_factory=Comparison)
+    device: Optional[ophyd.Device] = None
+    signal: Optional[ophyd.Signal] = None
+    name: Optional[str] = None
+
+    def compare(self) -> Result:
+        """Run the prepared comparison."""
+        if self.signal is None:
+            return Result(
+                severity=Severity.internal_error,
+                reason="Signal not set"
+            )
+        return self.comparison.compare_signal(
+            self.signal,
+            identifier=self.identifier
+        )
+
+    @classmethod
+    def from_device(
+        cls,
+        device: ophyd.Device,
+        attr: str,
+        comparison: Comparison,
+        name: Optional[str] = None,
+    ) -> PreparedComparison:
+        full_attr = f"{device.name}.{attr}"
+        logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
+        signal = getattr(device, attr, None)
+        if signal is None:
+            raise AttributeError(
+                f"Attribute {full_attr} does not exist on class "
+                f"{type(device).__name__}"
+            )
+
+        return cls(
+            name=name,
+            device=device,
+            identifier=attr,
+            comparison=comparison,
+            signal=signal,
+        )
+
+    @classmethod
+    def from_pvname(
+        cls,
+        pvname: str,
+        comparison: Comparison,
+        name: Optional[str] = None,
+        *,
+        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+    ) -> PreparedComparison:
+        """
+        """
+        if cache is None:
+            cache = get_signal_cache()
+
+        return cls(
+            identifier=pvname,
+            device=None,
+            signal=cache[pvname],
+            comparison=comparison,
+            name=name,
+        )
+
+    @classmethod
+    def _from_pv_config(
+        cls,
+        config: PVConfiguration,
+        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+    ) -> Generator[Union[Exception, PreparedComparison], None, None]:
+        """
+        """
+        for checklist_item in config.checklist:
+            for comparison in checklist_item.comparisons:
+                for pvname in checklist_item.ids:
+                    try:
+                        yield cls.from_pvname(
+                            pvname=pvname,
+                            comparison=comparison,
+                            name=config.name,
+                            cache=cache,
+                        )
+                    except Exception as ex:
+                        # ex.pvname = pvname
+                        # ex.comparison = comparison
+                        yield ex
+
+    @classmethod
+    def _from_device_config(
+        cls,
+        device: ophyd.Device,
+        config: DeviceConfiguration,
+    ) -> Generator[Union[Exception, PreparedComparison], None, None]:
+        """
+        """
+        for checklist_item in config.checklist:
+            for comparison in checklist_item.comparisons:
+                for attr in checklist_item.ids:
+                    try:
+                        yield cls.from_device(
+                            device=device,
+                            attr=attr,
+                            comparison=comparison,
+                            name=config.name,
+                        )
+                    except Exception as ex:
+                        yield ex
+
+    @classmethod
+    def from_config(
+        cls,
+        config: AnyConfiguration,
+        *,
+        client: Optional[happi.Client] = None,
+        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+    ) -> Generator[Union[PreparedComparison, Exception], None, None]:
+        if isinstance(config, PVConfiguration):
+            yield from cls._from_pv_config(config, cache=cache)
+        elif isinstance(config, DeviceConfiguration):
+            for dev_name in config.devices:
+                try:
+                    device = util.get_happi_device_by_name(dev_name, client=client)
+                except Exception as ex:
+                    yield ex
+                else:
+                    yield from cls._from_device_config(
+                        config=config,
+                        device=device,
+                    )
+
+
 def check_device(
     device: ophyd.Device, checklist: Sequence[IdentifierAndComparison]
 ) -> Tuple[Severity, List[Result]]:
@@ -831,8 +948,6 @@ def _yaml_init():
         """Helper for pyyaml to represent string enums as just strings."""
         return dumper.represent_str(data.value)
 
-    from .reduce import ReduceMethod
-
     # The ugliness of this makes me think we should use a different library
     yaml.add_representer(Severity, int_enum_representer)
-    yaml.add_representer(ReduceMethod, str_enum_representer)
+    yaml.add_representer(reduce.ReduceMethod, str_enum_representer)

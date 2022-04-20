@@ -5,8 +5,7 @@
 import argparse
 import logging
 import pathlib
-from dataclasses import dataclass
-from typing import Dict, Generator, List, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 import happi
 import ophyd
@@ -14,10 +13,10 @@ import rich
 import rich.console
 import rich.tree
 
-from ..check import (ConfigurationFile, DeviceConfiguration, PVConfiguration,
-                     Result, Severity, check_device, check_pvs)
+from ..check import (ConfigurationFile, DeviceConfiguration,
+                     PreparedComparison, PVConfiguration, Result, Severity)
 from ..exceptions import ConfigFileHappiError
-from ..util import get_happi_device_by_name, ophyd_cleanup
+from ..util import get_maximum_severity, ophyd_cleanup
 
 logger = logging.getLogger(__name__)
 
@@ -68,50 +67,6 @@ default_severity_to_log_level = {
     Severity.error: logging.ERROR,
     Severity.internal_error: logging.ERROR,
 }
-
-
-@dataclass
-class DeviceAndConfig:
-    """Device and configuration(s) from a ConfigurationFile."""
-    device: ophyd.Device
-    config: DeviceConfiguration
-
-
-def get_configurations_from_file(
-    config_file: ConfigurationFile,
-    filtered_devices: Optional[Sequence[str]] = None
-) -> Generator[Union[DeviceAndConfig, PVConfiguration, Exception], None, None]:
-    """
-    Get all devices and configurations from the given configuration file.
-
-    Yields
-    ------
-    config_file : DeviceAndConfig, PVConfiguration, or Exception
-        The configuration entry, if valid, or an exception detailing what went
-        wrong with the entry.
-    """
-    client = happi.Client.from_config()
-    for config in config_file.configs:
-        if isinstance(config, PVConfiguration):
-            if filtered_devices and config.name not in filtered_devices:
-                logger.debug("Skipping filtered-out PV configuration %s", config.name)
-                continue
-            yield config
-        elif isinstance(config, DeviceConfiguration):
-            for dev_name in config.devices:
-                if filtered_devices and dev_name not in filtered_devices:
-                    logger.debug("Skipping filtered-out device %s", dev_name)
-                    continue
-
-                try:
-                    dev = get_happi_device_by_name(dev_name, client=client)
-                except ConfigFileHappiError as ex:
-                    ex.config = config
-                    yield ex
-                except Exception as ex:
-                    yield ex
-                else:
-                    yield DeviceAndConfig(dev, config)
 
 
 def log_results(
@@ -167,10 +122,22 @@ def log_results_rich(
 
     tree = rich.tree.Tree(f"{label_prefix}{label_middle}{label_suffix}")
     for result in results:
-        if result.severity > Severity.success or verbose > 0:
+        if result.severity > Severity.success:
             tree.add(
                 f"{severity_to_rich[result.severity]}[default]: {result.reason}"
             )
+        elif verbose > 0:
+            # TODO
+            tree.add(
+                f"{severity_to_rich[result.severity]}[default]: {result.reason} (TODO)"
+            )
+            # comparison_info = result.comparison.describe() if result.comparison else ""
+            # tree.add(
+            #     f"{severity_to_rich[result.severity]}[default]: "
+            #     f"{comparison_info} "
+            #     f"{result.reason or ''}"
+            # )
+
     console.print(tree)
 
 
@@ -183,38 +150,34 @@ def main(
 ):
     path = pathlib.Path(filename)
     if path.suffix.lower() == ".json":
-        config = ConfigurationFile.from_json(filename)
+        config_file = ConfigurationFile.from_json(filename)
     else:
-        config = ConfigurationFile.from_yaml(filename)
+        config_file = ConfigurationFile.from_yaml(filename)
 
+    client = happi.Client.from_config()
     console = rich.console.Console()
     try:
         with console.status("[bold green] Performing checks..."):
-            for info in get_configurations_from_file(
-                config, filtered_devices=filtered_devices
-            ):
-                if isinstance(info, ConfigFileHappiError):
-                    console.print("Failed to load", info.dev_name)
-                    continue
-                if isinstance(info, Exception):
-                    console.print("Failed to load", info)
-                    continue
+            for config in config_file.configs:
+                results = []
+                for prepared in PreparedComparison.from_config(config, client=client):
+                    if isinstance(prepared, ConfigFileHappiError):
+                        console.print("Failed to load", prepared.dev_name)
+                        continue
+                    elif isinstance(prepared, Exception):
+                        console.print("Failed to load", prepared)
+                        continue
 
-                if isinstance(info, DeviceAndConfig):
-                    severity, results = check_device(info.device, info.config.checklist)
-                    config = info.config
-                elif isinstance(info, PVConfiguration):
-                    severity, results = check_pvs(info.checklist)
-                    config = info
-                else:
-                    raise NotImplementedError(f"{info} not yet supported by atef check")
+                    results.append(prepared.compare())
+
+                severity = get_maximum_severity([result.severity for result in results])
 
                 log_results_rich(
                     console,
                     config=config,
                     severity=severity,
                     results=results,
-                    device=getattr(info, "device", None),
+                    device=prepared.device,
                     verbose=verbose,
                 )
     finally:
