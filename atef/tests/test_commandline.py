@@ -1,5 +1,6 @@
 import sys
 
+import happi
 import pytest
 
 import atef.bin.main as atef_main
@@ -34,4 +35,5 @@ def test_check_device_smoke(monkeypatch, at2l0):  # noqa: F811
         return at2l0
 
     monkeypatch.setattr(util, "get_happi_device_by_name", get_happi_device_by_name)
+    monkeypatch.setattr(happi.Client, "from_config", lambda: None)
     bin_check.main(filename=str(CONFIG_PATH / "device_based.yml"))

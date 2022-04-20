@@ -142,7 +142,13 @@ def main(
     else:
         config_file = ConfigurationFile.from_yaml(filename)
 
-    client = happi.Client.from_config()
+    try:
+        client = happi.Client.from_config()
+    except Exception:
+        # happi isn't necessarily required; fail later if we try to use it.
+        # Without a proper config, it may raise OSError or something strange.
+        client = None
+
     console = rich.console.Console()
     try:
         with console.status("[bold green] Performing checks..."):
