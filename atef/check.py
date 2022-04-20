@@ -823,9 +823,16 @@ def _yaml_init():
 
     _yaml_initialized = True
 
-    def _enum_representer(dumper, data):
+    def int_enum_representer(dumper, data):
         """Helper for pyyaml to represent enums as just integers."""
         return dumper.represent_int(data.value)
 
+    def str_enum_representer(dumper, data):
+        """Helper for pyyaml to represent string enums as just strings."""
+        return dumper.represent_str(data.value)
+
+    from .reduce import ReduceMethod
+
     # The ugliness of this makes me think we should use a different library
-    yaml.add_representer(Severity, _enum_representer)
+    yaml.add_representer(Severity, int_enum_representer)
+    yaml.add_representer(ReduceMethod, str_enum_representer)
