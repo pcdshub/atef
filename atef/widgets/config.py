@@ -1019,7 +1019,7 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
     ):
         if comparison is None:
             # Empty default
-            comparison = Comparison()
+            comparison = Equals()
         bridge = self.comparison_list.add_item(comparison)
         self.setup_comparison_item_bridge(bridge)
         # TODO make the delete button work
@@ -1228,14 +1228,6 @@ class CompMixin:
     def __init_subclass__(cls, *args, **kwargs):
         super().__init_subclass__(*args, **kwargs)
         CompView.register_comparison(cls.data_type, cls)
-
-
-class ComparisonWidget(CompMixin, QLabel):
-    data_type = Comparison
-
-    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setText('Please select a comparison type above.')
 
 
 # This class should be replaced by a real "Equals" widget
