@@ -129,6 +129,56 @@ def log_results_rich(
     console.print(tree)
 
 
+def check_and_log(
+    config: AnyConfiguration,
+    console: rich.console.Console,
+    verbose: int = 0,
+    client: Optional[happi.Client] = None,
+):
+    """Check a configuration and log the results."""
+    items = []
+    errors = []
+    for prepared in PreparedComparison.from_config(config, client=client):
+        if isinstance(prepared, PreparedComparison):
+            prepared.result = prepared.compare()
+            if prepared.result is not None:
+                items.append(prepared)
+        else:
+            if isinstance(prepared, ConfigFileHappiError):
+                console.print("Failed to load", prepared.dev_name)
+                severity = Severity.internal_error
+            elif isinstance(prepared, PreparedComparisonException):
+                console.print("Failed to prepare comparison", prepared)
+                if prepared.comparison is not None:
+                    severity = prepared.comparison.severity_on_failure
+                else:
+                    severity = Severity.internal_error
+            else:
+                severity = Severity.internal_error
+                console.print("Failed to load", prepared)
+
+            errors.append(
+                Result(
+                    severity=severity,
+                    reason=str(prepared)
+                )
+            )
+
+    severity = get_maximum_severity(
+        [item.result.severity for item in items] +
+        [error.severity for error in errors]
+    )
+
+    log_results_rich(
+        console,
+        config=config,
+        errors=errors,
+        severity=severity,
+        results=items,
+        verbose=verbose,
+    )
+
+
 def main(
     filename: str,
     filtered_devices: Optional[Sequence[str]] = None,
@@ -153,47 +203,7 @@ def main(
     try:
         with console.status("[bold green] Performing checks..."):
             for config in config_file.configs:
-                items = []
-                errors = []
-                for prepared in PreparedComparison.from_config(config, client=client):
-                    if isinstance(prepared, PreparedComparison):
-                        prepared.result = prepared.compare()
-                        if prepared.result is not None:
-                            items.append(prepared)
-                    else:
-                        if isinstance(prepared, ConfigFileHappiError):
-                            console.print("Failed to load", prepared.dev_name)
-                            severity = Severity.internal_error
-                        elif isinstance(prepared, PreparedComparisonException):
-                            console.print("Failed to prepare comparison", prepared)
-                            if prepared.comparison is not None:
-                                severity = prepared.comparison.severity_on_failure
-                            else:
-                                severity = Severity.internal_error
-                        else:
-                            severity = Severity.internal_error
-                            console.print("Failed to load", prepared)
-
-                        errors.append(
-                            Result(
-                                severity=severity,
-                                reason=str(prepared)
-                            )
-                        )
-
-                severity = get_maximum_severity(
-                    [item.result.severity for item in items] +
-                    [error.severity for error in errors]
-                )
-
-                log_results_rich(
-                    console,
-                    config=config,
-                    errors=errors,
-                    severity=severity,
-                    results=items,
-                    verbose=verbose,
-                )
+                check_and_log(config, console=console, verbose=verbose, client=client)
     finally:
         if cleanup:
             ophyd_cleanup()
