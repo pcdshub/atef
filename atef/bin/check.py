@@ -44,11 +44,11 @@ def build_arg_parser(argparser=None):
     )
 
     argparser.add_argument(
-        "--device",
+        "--filter",
         type=str,
         nargs="*",
-        dest="filtered_devices",
-        help="Limit checkout to the named device(s)",
+        dest="name_filter",
+        help="Limit checkout to the named device(s) or identifiers",
     )
 
     return argparser
@@ -134,12 +134,30 @@ def check_and_log(
     console: rich.console.Console,
     verbose: int = 0,
     client: Optional[happi.Client] = None,
+    name_filter: Optional[Sequence[str]] = None,
 ):
     """Check a configuration and log the results."""
     items = []
     errors = []
+    name_filter = list(name_filter or [])
     for prepared in PreparedComparison.from_config(config, client=client):
         if isinstance(prepared, PreparedComparison):
+            if name_filter:
+                device_name = getattr(prepared.device, "name", None)
+                if device_name is not None:
+                    if device_name not in name_filter:
+                        logger.debug(
+                            "Skipping device check at user's request: %s",
+                            device_name,
+                        )
+                        continue
+                elif prepared.identifier not in name_filter:
+                    logger.debug(
+                        "Skipping identifier at user's request: %s",
+                        prepared.identifier
+                    )
+                    continue
+
             prepared.result = prepared.compare()
             if prepared.result is not None:
                 items.append(prepared)
@@ -164,6 +182,10 @@ def check_and_log(
                 )
             )
 
+    if not items or errors:
+        # Nothing to report; all filtered out
+        return
+
     severity = get_maximum_severity(
         [item.result.severity for item in items] +
         [error.severity for error in errors]
@@ -181,7 +203,7 @@ def check_and_log(
 
 def main(
     filename: str,
-    filtered_devices: Optional[Sequence[str]] = None,
+    name_filter: Optional[Sequence[str]] = None,
     verbose: int = 0,
     *,
     cleanup: bool = True
@@ -203,7 +225,13 @@ def main(
     try:
         with console.status("[bold green] Performing checks..."):
             for config in config_file.configs:
-                check_and_log(config, console=console, verbose=verbose, client=client)
+                check_and_log(
+                    config,
+                    console=console,
+                    verbose=verbose,
+                    client=client,
+                    name_filter=name_filter,
+                )
     finally:
         if cleanup:
             ophyd_cleanup()

@@ -731,7 +731,7 @@ class PreparedComparison:
         return cls(
             name=name,
             device=device,
-            identifier=attr,
+            identifier=full_attr,
             comparison=comparison,
             signal=signal,
         )
