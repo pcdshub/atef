@@ -10,10 +10,11 @@ import os.path
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, ClassVar, List, Optional, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Type, Union
 
 from apischema import deserialize, serialize
 from qtpy.QtCore import QEvent, QObject, QTimer
+from qtpy.QtCore import Signal as QSignal
 from qtpy.QtWidgets import (QAction, QComboBox, QFileDialog, QFormLayout,
                             QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QMainWindow, QMessageBox, QPlainTextEdit,
@@ -697,6 +698,8 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
     add_checklist_button: QPushButton
     line_between_adds: QWidget
 
+    bridge_item_map: Dict[QDataclassBridge, AtefItem]
+
     def __init__(
         self,
         bridge: QDataclassBridge,
@@ -707,6 +710,7 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
         super().__init__(*args, **kwargs)
         self.bridge = bridge
         self.tree_item = tree_item
+        self.bridge_item_map = {}
         self.initialize_group()
 
     def initialize_group(self) -> None:
@@ -744,6 +748,9 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             data_list=self.bridge.checklist,
             layout=QVBoxLayout(),
         )
+        self.checklist_list.bridge_item_removed.connect(
+            self._cleanup_bridge_node,
+        )
         self.checklists_content.addWidget(self.checklist_list)
         for bridge in self.checklist_list.bridges:
             self.setup_checklist_item_bridge(bridge)
@@ -767,6 +774,7 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             append_item_arg=True,
         )
         self.tree_item.addChild(item)
+        self.bridge_item_map[bridge] = item
         bridge.name.changed_value.connect(
             partial(item.setText, 0)
         )
@@ -791,8 +799,24 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             id_and_comp = IdentifierAndComparison()
         bridge = self.checklist_list.add_item(id_and_comp)
         self.setup_checklist_item_bridge(bridge)
-        # TODO make the delete button work
-        # new_row.del_button.clicked.connect
+
+    def _cleanup_bridge_node(
+        self,
+        bridge: QDataclassBridge,
+    ) -> None:
+        """
+        Remove the tree item and delete the bridge when we remove a checklist.
+
+        Parameters
+        ----------
+        bridge: QDataclassBridge
+            A dataclass bridge to an instance of
+            atef.check.IdentifierAndComparison
+        """
+        item = self.bridge_item_map[bridge]
+        self.tree_item.removeChild(item)
+        del self.bridge_item_map[bridge]
+        bridge.deleteLater()
 
 
 class StrList(QWidget):
@@ -925,6 +949,7 @@ class NamedDataclassList(StrList):
         flexibility in whether we arrange things horizontally,
         vertically, etc.
     """
+    bridge_item_removed = QSignal(QDataclassBridge)
     bridges = List[QDataclassBridge]
 
     def __init__(self, *args, **kwargs):
@@ -1034,7 +1059,7 @@ class NamedDataclassList(StrList):
         index = self.widgets.index(item)
         super().remove_item(item=item, checked=checked)
         bridge = self.bridges[index]
-        bridge.deleteLater()
+        self.bridge_item_removed.emit(bridge)
         del self.bridges[index]
 
     def update_item_bridge(
@@ -1157,6 +1182,7 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
     bridge: QDataclassBridge
     config_type: Type[Configuration]
+    bridge_item_map: Dict[QDataclassBridge, AtefItem]
 
     def __init__(
         self,
@@ -1203,6 +1229,9 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self.comparison_list = NamedDataclassList(
             data_list=self.bridge.comparisons,
             layout=QVBoxLayout(),
+        )
+        self.comparison_list.bridge_item_removed.connect(
+            self._cleanup_bridge_node,
         )
         self.comp_content.addWidget(self.comparison_list)
         for bridge in self.comparison_list.bridges:
@@ -1293,8 +1322,24 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
             comparison = Equals()
         bridge = self.comparison_list.add_item(comparison)
         self.setup_comparison_item_bridge(bridge)
-        # TODO make the delete button work
-        # new_row.del_button.clicked.connect
+
+    def _cleanup_bridge_node(
+        self,
+        bridge: QDataclassBridge,
+    ) -> None:
+        """
+        Remove the tree item and delete the bridge when we remove comparisons.
+
+        Parameters
+        ----------
+        bridge: QDataclassBridge
+            A dataclass bridge to an instance of
+            atef.check.IdentifierAndComparison
+        """
+        item = self.bridge_item_map[bridge]
+        self.tree_item.removeChild(item)
+        del self.bridge_item_map[bridge]
+        bridge.deleteLater()
 
 
 class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
