@@ -5,7 +5,7 @@
 import argparse
 import logging
 import pathlib
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Union, cast
 
 import happi
 import ophyd
@@ -14,8 +14,7 @@ import rich.console
 import rich.tree
 
 from ..check import (AnyConfiguration, ConfigurationFile, PreparedComparison,
-                     PreparedComparisonException, Result, Severity)
-from ..exceptions import ConfigFileHappiError
+                     Result, Severity)
 from ..util import get_maximum_severity, ophyd_cleanup
 
 logger = logging.getLogger(__name__)
@@ -73,8 +72,7 @@ def log_results_rich(
     console: rich.console.Console,
     severity: Severity,
     config: AnyConfiguration,
-    results: List[PreparedComparison],
-    errors: List[Result],
+    items: List[Union[Result, PreparedComparison]],
     *,
     device: Optional[ophyd.Device] = None,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
@@ -96,26 +94,26 @@ def log_results_rich(
         label_middle = ""
 
     tree = rich.tree.Tree(f"{label_prefix}{label_middle}{label_suffix}")
-    for error in errors:
-        tree.add(
-            tree.add(
-                f"{severity_to_rich[error.severity]}[default]: {error.reason}"
-            )
-        )
+    for item in items:
+        if isinstance(item, PreparedComparison):
+            # A successfully prepared comparison
+            result = item.result
+            prepared = item
+        else:
+            # An error that was transformed into a Result with a severity
+            result = item
+            prepared = None
 
-    for prepared in results:
-        result = prepared.result
         if result is None:
             tree.add(
-                f"{severity_to_rich[result.severity]}[default]: comparison not run"
+                f"{severity_to_rich[Severity.internal_error]}[default]: "
+                f"comparison not run"
             )
-            continue
-
-        if result.severity > Severity.success:
+        elif result.severity > Severity.success:
             tree.add(
                 f"{severity_to_rich[result.severity]}[default]: {result.reason}"
             )
-        elif verbose > 0:
+        elif verbose > 0 and prepared is not None:
             if prepared.comparison is not None:
                 description = prepared.comparison.describe()
             else:
@@ -138,8 +136,8 @@ def check_and_log(
 ):
     """Check a configuration and log the results."""
     items = []
-    errors = []
     name_filter = list(name_filter or [])
+    severities = []
     for prepared in PreparedComparison.from_config(config, client=client):
         if isinstance(prepared, PreparedComparison):
             if name_filter:
@@ -161,42 +159,27 @@ def check_and_log(
             prepared.result = prepared.compare()
             if prepared.result is not None:
                 items.append(prepared)
+                severities.append(prepared.result.severity)
+        elif isinstance(prepared, Exception):
+            ex = cast(Exception, prepared)
+            result = Result.from_exception(ex)
+            items.append(result)
+            severities.append(result.severity)
         else:
-            if isinstance(prepared, ConfigFileHappiError):
-                console.print("Failed to load", prepared.dev_name)
-                severity = Severity.internal_error
-            elif isinstance(prepared, PreparedComparisonException):
-                console.print("Failed to prepare comparison", prepared)
-                if prepared.comparison is not None:
-                    severity = prepared.comparison.severity_on_failure
-                else:
-                    severity = Severity.internal_error
-            else:
-                severity = Severity.internal_error
-                console.print("Failed to load", prepared)
-
-            errors.append(
-                Result(
-                    severity=severity,
-                    reason=str(prepared)
-                )
+            logger.error(
+                "Internal error: unexpected result from PreparedComparison: %s",
+                type(prepared)
             )
 
-    if not items or errors:
+    if not items:
         # Nothing to report; all filtered out
         return
-
-    severity = get_maximum_severity(
-        [item.result.severity for item in items] +
-        [error.severity for error in errors]
-    )
 
     log_results_rich(
         console,
         config=config,
-        errors=errors,
-        severity=severity,
-        results=items,
+        severity=get_maximum_severity(severities),
+        items=items,
         verbose=verbose,
     )
 

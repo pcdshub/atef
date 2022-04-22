@@ -12,7 +12,7 @@ import numpy as np
 import ophyd
 import yaml
 
-from . import reduce, serialization, util
+from . import exceptions, reduce, serialization, util
 from .enums import Severity
 from .exceptions import ComparisonError, ComparisonException, ComparisonWarning
 from .type_hints import AnyPath, Number, PrimitiveType
@@ -24,6 +24,27 @@ logger = logging.getLogger(__name__)
 class Result:
     severity: Severity = Severity.success
     reason: Optional[str] = None
+
+    @classmethod
+    def from_exception(cls, error: Exception) -> Result:
+        """Convert an error exception to a Result."""
+        severity = Severity.internal_error
+        if isinstance(error, exceptions.ConfigFileHappiError):
+            reason = f"Failed to load: {error.dev_name}"
+        elif isinstance(error, PreparedComparisonException):
+            if error.comparison is not None:
+                severity = error.comparison.severity_on_failure
+            reason = (
+                f"Failed to prepare comparison {error.name!r} for "
+                f"{error.identifier!r}: {error}"
+            )
+        else:
+            reason = f"Failed to load: {type(error).__name__}: {error}"
+
+        return cls(
+            severity=severity,
+            reason=reason,
+        )
 
 
 def _is_in_range(
@@ -68,7 +89,17 @@ class Value:
         else:
             tolerance = ""
 
-        value_desc = f"{self.value}{tolerance} (for a result of {self.severity.name})"
+        # Since "success" is likely implicit here, only specify the resulting
+        # severity in the description when it's not "success":
+        #   at2l0.blade_01.state.state not equal to 0
+        #   (for a result of success): Filter is moving
+        # becomes
+        #   at2l0.blade_01.state.state not equal to 0: Filter is moving
+        if self.severity == Severity.success:
+            value_desc = f"{self.value}{tolerance}"
+        else:
+            value_desc = f"{self.value}{tolerance} (for a result of {self.severity.name})"
+
         if self.description:
             return f"{value_desc}: {self.description}"
         return value_desc
@@ -700,7 +731,7 @@ class PreparedComparison:
             return Result(
                 severity=self.comparison.if_disconnected,
                 reason=(
-                    f"Unable to connect to {self.signal.name} ({self.identifier}) "
+                    f"Unable to connect to {self.identifier!r} ({self.name}) "
                     f"for comparison {self.comparison}"
                 ),
             )
@@ -788,14 +819,14 @@ class PreparedComparison:
                         yield cls.from_pvname(
                             pvname=pvname,
                             comparison=comparison,
-                            name=config.name,
+                            name=config.name or config.description,
                             cache=cache,
                         )
                     except Exception as ex:
                         yield PreparedComparisonException(
                             exception=ex,
                             comparison=comparison,
-                            name=config.name,
+                            name=config.name or config.description,
                             identifier=pvname,
                         )
 
@@ -831,13 +862,13 @@ class PreparedComparison:
                             device=device,
                             attr=attr,
                             comparison=comparison,
-                            name=config.name,
+                            name=config.name or config.description,
                         )
                     except Exception as ex:
                         yield PreparedComparisonException(
                             exception=ex,
                             comparison=comparison,
-                            name=config.name,
+                            name=config.name or config.description,
                             identifier=attr,
                         )
 
@@ -887,7 +918,7 @@ class PreparedComparison:
                     yield PreparedComparisonException(
                         exception=ex,
                         comparison=None,  # TODO
-                        name=config.name,
+                        name=config.name or config.description,
                         identifier=dev_name,
                     )
                 else:

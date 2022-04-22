@@ -3,6 +3,7 @@
 # check.ConfigurationFile(
 #     configs=[
 #         check.DeviceConfiguration(
+#             name="Basics",
 #             tags=["a"],
 #             devices=["at2l0"],
 #             checklist=[
@@ -43,6 +44,7 @@
 
 configs:
 - DeviceConfiguration:
+    name: Basics
     checklist:
     - comparisons:
       - NotEquals:
