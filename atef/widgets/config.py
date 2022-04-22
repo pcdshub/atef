@@ -1209,8 +1209,8 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
             layout=QVBoxLayout(),
         )
         self.comp_content.addWidget(self.comparison_list)
-        for comparison in self.bridge.comparisons.get():
-            self.add_comparison(comparison=comparison)
+        for bridge in self.comparison_list.bridges:
+            self.setup_comparison_item_bridge(bridge)
         self.add_comp_button.clicked.connect(self.add_comparison)
 
     def setup_comparison_item_bridge(self, bridge: QDataclassBridge) -> None:
