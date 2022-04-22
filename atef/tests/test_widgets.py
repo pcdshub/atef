@@ -8,6 +8,7 @@ import yaml
 from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
                          ProcedureStep, PydmDisplayStep, TyphosDisplayStep)
 from ..widgets import procedure_step_to_widget
+from ..widgets.config import Window
 from . import qt_utils
 
 logger = logging.getLogger(__name__)
@@ -167,3 +168,7 @@ def test_create_widget(request: pytest.FixtureRequest, group: ProcedureStep):
     qt_utils.save_widget_screenshot(widget, prefix=request.node.name)
     widget.close()
     widget.deleteLater()
+
+
+def test_config_window_basic():
+    Window()
