@@ -1,46 +1,50 @@
 from __future__ import annotations
 
-import enum
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Mapping, Optional, Sequence,
-                    Tuple, TypeVar)
+                    Tuple, TypeVar, Union)
 
+import apischema
+import happi
 import numpy as np
 import ophyd
+import yaml
 
-from . import reduce, serialization
-from .type_hints import Number, PrimitiveType
+from . import exceptions, reduce, serialization, util
+from .enums import Severity
+from .exceptions import ComparisonError, ComparisonException, ComparisonWarning
+from .type_hints import AnyPath, Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
-
-
-class Severity(enum.IntEnum):
-    success = 0
-    warning = 1
-    error = 2
-    internal_error = 3
-
-
-class ComparisonException(Exception):
-    """Raise this exception to exit a comparator and set severity."""
-    severity = Severity.success
-
-
-class ComparisonError(ComparisonException):
-    """Raise this exception to error out in a comparator."""
-    severity = Severity.error
-
-
-class ComparisonWarning(ComparisonException):
-    """Raise this exception to warn in a comparator."""
-    severity = Severity.warning
 
 
 @dataclass(frozen=True)
 class Result:
     severity: Severity = Severity.success
     reason: Optional[str] = None
+
+    @classmethod
+    def from_exception(cls, error: Exception) -> Result:
+        """Convert an error exception to a Result."""
+        severity = Severity.internal_error
+        if isinstance(error, exceptions.ConfigFileHappiError):
+            reason = f"Failed to load: {error.dev_name}"
+        elif isinstance(error, PreparedComparisonException):
+            if error.comparison is not None:
+                severity = error.comparison.severity_on_failure
+            reason = (
+                f"Failed to prepare comparison {error.name!r} for "
+                f"{error.identifier!r}: {error}"
+            )
+        else:
+            reason = f"Failed to load: {type(error).__name__}: {error}"
+
+        return cls(
+            severity=severity,
+            reason=reason,
+        )
 
 
 def _is_in_range(
@@ -85,9 +89,19 @@ class Value:
         else:
             tolerance = ""
 
-        value_desc = f"{self.value}{tolerance} (for a result of {self.severity.name})"
+        # Since "success" is likely implicit here, only specify the resulting
+        # severity in the description when it's not "success":
+        #   at2l0.blade_01.state.state not equal to 0
+        #   (for a result of success): Filter is moving
+        # becomes
+        #   at2l0.blade_01.state.state not equal to 0: Filter is moving
+        if self.severity == Severity.success:
+            value_desc = f"{self.value}{tolerance}"
+        else:
+            value_desc = f"{self.value}{tolerance} (for a result of {self.severity.name})"
+
         if self.description:
-            return f"{self.description} ({value_desc})"
+            return f"{value_desc}: {self.description}"
         return value_desc
 
     def compare(self, value: PrimitiveType) -> bool:
@@ -595,6 +609,9 @@ class PVConfiguration(Configuration):
     ...
 
 
+AnyConfiguration = Union[PVConfiguration, DeviceConfiguration]
+
+
 @dataclass
 class ConfigurationFile:
     """
@@ -631,6 +648,285 @@ class ConfigurationFile:
             if tag_set.intersection(set(config.tags or [])):
                 yield config
 
+    @classmethod
+    def from_json(cls, filename: AnyPath) -> ConfigurationFile:
+        """Load a configuration file from JSON."""
+        with open(filename) as fp:
+            serialized_config = json.load(fp)
+        return apischema.deserialize(cls, serialized_config)
+
+    @classmethod
+    def from_yaml(cls, filename: AnyPath) -> ConfigurationFile:
+        """Load a configuration file from yaml."""
+        with open(filename) as fp:
+            serialized_config = yaml.safe_load(fp)
+        return apischema.deserialize(cls, serialized_config)
+
+    def to_json(self):
+        """Dump this configuration file to a JSON-compatible dictionary."""
+        return apischema.serialize(ConfigurationFile, self, exclude_defaults=True)
+
+    def to_yaml(self):
+        """Dump this configuration file to yaml."""
+        _yaml_init()
+        return yaml.dump(self.to_json())
+
+
+class PreparedComparisonException(Exception):
+    """Exception caught during preparation of comparisons."""
+    exception: Exception
+    identifier: str
+    comparison: Comparison
+    name: Optional[str] = None
+
+    def __init__(
+        self,
+        exception: Exception,
+        identifier: str,
+        comparison: Comparison,
+        name: Optional[str] = None,
+    ):
+        super().__init__(str(exception))
+        self.exception = exception
+        self.identifier = identifier
+        self.comparison = comparison
+        self.name = name
+
+
+@dataclass
+class PreparedComparison:
+    """
+    A unified representation of comparisons for device signals and standalone PVs.
+    """
+    #: The identifier used for the comparison.
+    identifier: str = ""
+    #: The comparison itself.
+    comparison: Comparison = field(default_factory=Comparison)
+    #: The device the comparison applies to, if applicable.
+    device: Optional[ophyd.Device] = None
+    #: The signal the comparison is to be run on.
+    signal: Optional[ophyd.Signal] = None
+    #: The name of the associated configuration.
+    name: Optional[str] = None
+    #: The last result of the comparison, if run.
+    result: Optional[Result] = None
+
+    def compare(self) -> Result:
+        """
+        Run the prepared comparison.
+
+        Returns
+        -------
+        Result
+            The result of the comparison.  This is also set in ``self.result``.
+        """
+        if self.signal is None:
+            return Result(
+                severity=Severity.internal_error,
+                reason="Signal not set"
+            )
+        try:
+            self.signal.wait_for_connection()
+        except TimeoutError:
+            return Result(
+                severity=self.comparison.if_disconnected,
+                reason=(
+                    f"Unable to connect to {self.identifier!r} ({self.name}) "
+                    f"for comparison {self.comparison}"
+                ),
+            )
+        self.result = self.comparison.compare_signal(
+            self.signal,
+            identifier=self.identifier
+        )
+        return self.result
+
+    @classmethod
+    def from_device(
+        cls,
+        device: ophyd.Device,
+        attr: str,
+        comparison: Comparison,
+        name: Optional[str] = None,
+    ) -> PreparedComparison:
+        """Create a PreparedComparison from a device and comparison."""
+        full_attr = f"{device.name}.{attr}"
+        logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
+        signal = getattr(device, attr, None)
+        if signal is None:
+            raise AttributeError(
+                f"Attribute {full_attr} does not exist on class "
+                f"{type(device).__name__}"
+            )
+
+        return cls(
+            name=name,
+            device=device,
+            identifier=full_attr,
+            comparison=comparison,
+            signal=signal,
+        )
+
+    @classmethod
+    def from_pvname(
+        cls,
+        pvname: str,
+        comparison: Comparison,
+        name: Optional[str] = None,
+        *,
+        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+    ) -> PreparedComparison:
+        """Create a PreparedComparison from a PV name and comparison."""
+        if cache is None:
+            cache = get_signal_cache()
+
+        return cls(
+            identifier=pvname,
+            device=None,
+            signal=cache[pvname],
+            comparison=comparison,
+            name=name,
+        )
+
+    @classmethod
+    def _from_pv_config(
+        cls,
+        config: PVConfiguration,
+        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+    ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
+        """
+        Create one or more PreparedComparison instances from a PVConfiguration.
+
+        Parameters
+        ----------
+        config : PVConfiguration or DeviceConfiguration
+            The configuration.
+
+        cache : dict of str to type[Signal]
+            The PV to signal cache.
+
+        Yields
+        ------
+        item : PreparedComparisonException or PreparedComparison
+            If an error occurs during preparation, a
+            PreparedComparisonException will be yielded in place of the
+            PreparedComparison.
+        """
+        for checklist_item in config.checklist:
+            for comparison in checklist_item.comparisons:
+                for pvname in checklist_item.ids:
+                    try:
+                        yield cls.from_pvname(
+                            pvname=pvname,
+                            comparison=comparison,
+                            name=config.name or config.description,
+                            cache=cache,
+                        )
+                    except Exception as ex:
+                        yield PreparedComparisonException(
+                            exception=ex,
+                            comparison=comparison,
+                            name=config.name or config.description,
+                            identifier=pvname,
+                        )
+
+    @classmethod
+    def _from_device_config(
+        cls,
+        device: ophyd.Device,
+        config: DeviceConfiguration,
+    ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
+        """
+        Create one or more PreparedComparison instances from a DeviceConfiguration.
+
+        Parameters
+        ----------
+        config : PVConfiguration or DeviceConfiguration
+            The configuration.
+
+        client : happi.Client
+            A happi Client instance.
+
+        Yields
+        ------
+        item : PreparedComparisonException or PreparedComparison
+            If an error occurs during preparation, a
+            PreparedComparisonException will be yielded in place of the
+            PreparedComparison.
+        """
+        for checklist_item in config.checklist:
+            for comparison in checklist_item.comparisons:
+                for attr in checklist_item.ids:
+                    try:
+                        yield cls.from_device(
+                            device=device,
+                            attr=attr,
+                            comparison=comparison,
+                            name=config.name or config.description,
+                        )
+                    except Exception as ex:
+                        yield PreparedComparisonException(
+                            exception=ex,
+                            comparison=comparison,
+                            name=config.name or config.description,
+                            identifier=attr,
+                        )
+
+    @classmethod
+    def from_config(
+        cls,
+        config: AnyConfiguration,
+        *,
+        client: Optional[happi.Client] = None,
+        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+    ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
+        """
+        Create one or more PreparedComparison instances from a PVConfiguration
+        or a DeviceConfiguration.
+
+        If available, provide an instantiated happi Client and PV-to-Signal
+        cache.  If unspecified, a configuration-derived happi Client will
+        be instantiated and a global PV-to-Signal cache will be utilized.
+
+        Parameters
+        ----------
+        config : PVConfiguration or DeviceConfiguration
+            The configuration.
+
+        client : happi.Client
+            A happi Client instance.
+
+        cache : dict of str to type[Signal]
+            The PV to signal cache.
+
+        Yields
+        ------
+        item : PreparedComparisonException or PreparedComparison
+            If an error occurs during preparation, a
+            PreparedComparisonException will be yielded in place of the
+            PreparedComparison.
+        """
+        if isinstance(config, PVConfiguration):
+            yield from cls._from_pv_config(config, cache=cache)
+        elif isinstance(config, DeviceConfiguration):
+            if client is None:
+                client = happi.Client.from_config()
+            for dev_name in config.devices:
+                try:
+                    device = util.get_happi_device_by_name(dev_name, client=client)
+                except Exception as ex:
+                    yield PreparedComparisonException(
+                        exception=ex,
+                        comparison=None,  # TODO
+                        name=config.name or config.description,
+                        identifier=dev_name,
+                    )
+                else:
+                    yield from cls._from_device_config(
+                        config=config,
+                        device=device,
+                    )
+
 
 def check_device(
     device: ophyd.Device, checklist: Sequence[IdentifierAndComparison]
@@ -662,8 +958,11 @@ def check_device(
             for attr in checklist_item.ids:
                 full_attr = f"{device.name}.{attr}"
                 logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
-                signal = getattr(device, attr, None)
-                if signal is None:
+                try:
+                    prepared = PreparedComparison.from_device(
+                        device=device, attr=attr, comparison=comparison
+                    )
+                except AttributeError:
                     result = Result(
                         severity=Severity.internal_error,
                         reason=(
@@ -672,7 +971,7 @@ def check_device(
                         ),
                     )
                 else:
-                    result = comparison.compare_signal(signal, identifier=full_attr)
+                    result = prepared.compare()
 
                 if result.severity > overall:
                     overall = result.severity
@@ -719,19 +1018,11 @@ def check_pvs(
 
     for comparison, pvname in get_comparison_and_pvname():
         logger.debug("Checking %s.%s with comparison %s", pvname, comparison)
-        signal = cache[pvname]
-        try:
-            signal.wait_for_connection()
-        except TimeoutError:
-            result = Result(
-                severity=comparison.if_disconnected,
-                reason=(
-                    f"Unable to connect to {pvname} for comparison "
-                    f"{comparison}"
-                ),
-            )
-        else:
-            result = comparison.compare_signal(signal, identifier=pvname)
+
+        prepared = PreparedComparison.from_pvname(
+            pvname=pvname, comparison=comparison, cache=cache
+        )
+        result = prepared.compare()
 
         if result.severity > overall:
             overall = result.severity
@@ -780,3 +1071,28 @@ def get_signal_cache() -> _SignalCache[ophyd.EpicsSignalRO]:
     if _signal_cache is None:
         _signal_cache = _SignalCache(ophyd.EpicsSignalRO)
     return _signal_cache
+
+
+_yaml_initialized = False
+
+
+def _yaml_init():
+    """Add necessary information to PyYAML for serialization."""
+    global _yaml_initialized
+    if _yaml_initialized:
+        # Make it idempotent
+        return
+
+    _yaml_initialized = True
+
+    def int_enum_representer(dumper, data):
+        """Helper for pyyaml to represent enums as just integers."""
+        return dumper.represent_int(data.value)
+
+    def str_enum_representer(dumper, data):
+        """Helper for pyyaml to represent string enums as just strings."""
+        return dumper.represent_str(data.value)
+
+    # The ugliness of this makes me think we should use a different library
+    yaml.add_representer(Severity, int_enum_representer)
+    yaml.add_representer(reduce.ReduceMethod, str_enum_representer)

@@ -11,6 +11,7 @@ from qtpy import QtWidgets
 from ..archive_device import ArchivedValue, ArchiverHelper
 
 TEST_PATH = pathlib.Path(__file__).parent.resolve()
+CONFIG_PATH = TEST_PATH / "configs"
 
 
 class MockEpicsArch:

@@ -4,21 +4,18 @@
 
 import argparse
 import logging
-from dataclasses import dataclass
-from typing import Dict, Generator, List, Optional, Sequence, Union, cast
+import pathlib
+from typing import Dict, List, Optional, Sequence, Union, cast
 
-import apischema
 import happi
 import ophyd
 import rich
 import rich.console
 import rich.tree
-import yaml
 
-from ..check import (ConfigurationFile, DeviceConfiguration, PVConfiguration,
-                     Result, Severity, check_device,
-                     pv_config_to_device_config)
-from ..util import ophyd_cleanup
+from ..check import (AnyConfiguration, ConfigurationFile, PreparedComparison,
+                     Result, Severity)
+from ..util import get_maximum_severity, ophyd_cleanup
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +39,15 @@ def build_arg_parser(argparser=None):
         "-v", "--verbose",
         action="count",
         help="Increase output verbosity",
+        default=0,
     )
 
     argparser.add_argument(
-        "--device",
+        "--filter",
         type=str,
         nargs="*",
-        dest="filtered_devices",
-        help="Limit checkout to the named device(s)",
+        dest="name_filter",
+        help="Limit checkout to the named device(s) or identifiers",
     )
 
     return argparser
@@ -69,137 +67,14 @@ default_severity_to_log_level = {
     Severity.internal_error: logging.ERROR,
 }
 
-AnyConfiguration = Union[PVConfiguration, DeviceConfiguration]
-
-
-@dataclass
-class DeviceAndConfig:
-    """Device and configuration(s) from a ConfigurationFile."""
-    device: ophyd.Device
-    dev_config: DeviceConfiguration
-    pv_config: Optional[PVConfiguration] = None
-
-
-class ConfigFileLoadError(Exception):
-    """Generic configuration file loading failure."""
-    ...
-
-
-class ConfigFileHappiError(ConfigFileLoadError):
-    """Config file load error relating to a happi device."""
-    dev_name: str
-    dev_config: DeviceConfiguration
-
-
-class MissingHappiDeviceError(ConfigFileHappiError):
-    """Config file load error: the happi device doesn't exist."""
-    ...
-
-
-class HappiLoadError(ConfigFileHappiError):
-    """Config file load error: the happi device couldn't be instantiated."""
-    ...
-
-
-def get_configurations_from_file(
-    config: ConfigurationFile,
-    filtered_devices: Optional[Sequence[str]] = None
-) -> Generator[Union[DeviceAndConfig, Exception], None, None]:
-    """
-    Get all devices and configurations from the given configuration file.
-
-    Yields
-    ------
-    config : DeviceAndConfig or Exception
-        The configuration entry, if valid, or an exception detailing what went
-        wrong with the entry.
-    """
-    for pv_config in config.pvs:
-        if filtered_devices and pv_config.name not in filtered_devices:
-            logger.debug(
-                "Skipping filtered-out PV-only configuration %s", pv_config.name
-            )
-            continue
-
-        dev_cls, dev_config = pv_config_to_device_config(pv_config)
-        logger.debug("PV-only configuration %s -> %s", pv_config.name, dev_cls.__name__)
-
-        dev = dev_cls(name=pv_config.name or "PVConfig")
-        yield DeviceAndConfig(dev, dev_config, pv_config)
-
-    if not config.devices:
-        return
-
-    client = happi.Client.from_config()
-    for dev_name, dev_config in config.devices.items():
-        if filtered_devices and dev_name not in filtered_devices:
-            logger.debug("Skipping filtered-out device %s", dev_name)
-            continue
-
-        try:
-            search_result = client[dev_name]
-        except KeyError:
-            ex = MissingHappiDeviceError(
-                f"Device {dev_name} not in happi database; skipping"
-            )
-            ex.dev_name = dev_name
-            ex.dev_config = cast(DeviceConfiguration, dev_config)
-            yield ex
-            continue
-
-        try:
-            dev = search_result.get()
-        except Exception as ex:
-            logger.debug(
-                "Failed to instantiate device %r",
-                dev_name,
-                exc_info=True,
-            )
-            load_ex = HappiLoadError(
-                f"Device {dev_name} invalid in happi database; "
-                f"{ex.__class__.__name__}: {ex}"
-            )
-            load_ex.dev_name = dev_name
-            load_ex.dev_config = cast(DeviceConfiguration, dev_config)
-            yield load_ex
-            continue
-
-        yield DeviceAndConfig(dev, dev_config)
-
-
-def log_results(
-    device: ophyd.Device,
-    severity: Severity,
-    config: Union[PVConfiguration, DeviceConfiguration],
-    results: List[Result],
-    *,
-    severity_to_log_level: Optional[Dict[Severity, int]] = None,
-):
-    """Log check results to the module logger."""
-    severity_to_log_level = severity_to_log_level or default_severity_to_log_level
-
-    passed_or_failed = "passed" if severity <= Severity.warning else "FAILED"
-    logger.info(
-        "Device %s (%s) %s with severity %s",
-        device.name,
-        config.description or "no description",
-        passed_or_failed,
-        severity.name,
-    )
-    for result in results:
-        log_level = severity_to_log_level[result.severity]
-        if not logger.isEnabledFor(log_level):
-            continue
-        logger.log(log_level, result.reason)
-
 
 def log_results_rich(
     console: rich.console.Console,
-    device: ophyd.Device,
     severity: Severity,
-    config: Union[PVConfiguration, DeviceConfiguration],
-    results: List[Result],
+    config: AnyConfiguration,
+    items: List[Union[Result, PreparedComparison]],
     *,
+    device: Optional[ophyd.Device] = None,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
     verbose: int = 0,
 ):
@@ -208,46 +83,137 @@ def log_results_rich(
 
     desc = f" ({config.description}) " if config.description else ""
 
-    tree = rich.tree.Tree(f"{severity_to_rich[severity]} [default]{device.name}{desc}")
-    for result in results:
-        if result.severity > Severity.success or verbose > 0:
+    # Not sure about this just yet:
+    label_prefix = f"{severity_to_rich[severity]} [default]"
+    label_suffix = desc
+    if config.name:
+        label_middle = config.name
+    elif device is not None:
+        label_middle = device.name
+    else:
+        label_middle = ""
+
+    tree = rich.tree.Tree(f"{label_prefix}{label_middle}{label_suffix}")
+    for item in items:
+        if isinstance(item, PreparedComparison):
+            # A successfully prepared comparison
+            result = item.result
+            prepared = item
+        else:
+            # An error that was transformed into a Result with a severity
+            result = item
+            prepared = None
+
+        if result is None:
+            tree.add(
+                f"{severity_to_rich[Severity.internal_error]}[default]: "
+                f"comparison not run"
+            )
+        elif result.severity > Severity.success:
             tree.add(
                 f"{severity_to_rich[result.severity]}[default]: {result.reason}"
             )
+        elif verbose > 0 and prepared is not None:
+            if prepared.comparison is not None:
+                description = prepared.comparison.describe()
+            else:
+                description = "no comparison configured"
+
+            tree.add(
+                f"{severity_to_rich[result.severity]}[default]: "
+                f"{prepared.identifier} {description}"
+            )
+
     console.print(tree)
+
+
+def check_and_log(
+    config: AnyConfiguration,
+    console: rich.console.Console,
+    verbose: int = 0,
+    client: Optional[happi.Client] = None,
+    name_filter: Optional[Sequence[str]] = None,
+):
+    """Check a configuration and log the results."""
+    items = []
+    name_filter = list(name_filter or [])
+    severities = []
+    for prepared in PreparedComparison.from_config(config, client=client):
+        if isinstance(prepared, PreparedComparison):
+            if name_filter:
+                device_name = getattr(prepared.device, "name", None)
+                if device_name is not None:
+                    if device_name not in name_filter:
+                        logger.debug(
+                            "Skipping device check at user's request: %s",
+                            device_name,
+                        )
+                        continue
+                elif prepared.identifier not in name_filter:
+                    logger.debug(
+                        "Skipping identifier at user's request: %s",
+                        prepared.identifier
+                    )
+                    continue
+
+            prepared.result = prepared.compare()
+            if prepared.result is not None:
+                items.append(prepared)
+                severities.append(prepared.result.severity)
+        elif isinstance(prepared, Exception):
+            ex = cast(Exception, prepared)
+            result = Result.from_exception(ex)
+            items.append(result)
+            severities.append(result.severity)
+        else:
+            logger.error(
+                "Internal error: unexpected result from PreparedComparison: %s",
+                type(prepared)
+            )
+
+    if not items:
+        # Nothing to report; all filtered out
+        return
+
+    log_results_rich(
+        console,
+        config=config,
+        severity=get_maximum_severity(severities),
+        items=items,
+        verbose=verbose,
+    )
 
 
 def main(
     filename: str,
-    filtered_devices: Optional[Sequence[str]] = None,
+    name_filter: Optional[Sequence[str]] = None,
     verbose: int = 0,
     *,
     cleanup: bool = True
 ):
-    serialized_config = yaml.safe_load(open(filename))
-    config = apischema.deserialize(ConfigurationFile, serialized_config)
+    path = pathlib.Path(filename)
+    if path.suffix.lower() == ".json":
+        config_file = ConfigurationFile.from_json(filename)
+    else:
+        config_file = ConfigurationFile.from_yaml(filename)
+
+    try:
+        client = happi.Client.from_config()
+    except Exception:
+        # happi isn't necessarily required; fail later if we try to use it.
+        # Without a proper config, it may raise OSError or something strange.
+        client = None
 
     console = rich.console.Console()
     try:
         with console.status("[bold green] Performing checks..."):
-            for info in get_configurations_from_file(
-                config, filtered_devices=filtered_devices
-            ):
-                if isinstance(info, ConfigFileHappiError):
-                    console.print("Failed to load", info.dev_name)
-                    continue
-                if isinstance(info, Exception):
-                    console.print("Failed to load", info)
-                    continue
-
-                severity, results = check_device(info.device, info.dev_config.checks)
-                log_results_rich(
-                    console,
-                    device=info.device,
-                    config=info.dev_config,
-                    severity=severity,
-                    results=results,
+            for config in config_file.configs:
+                check_and_log(
+                    config,
+                    console=console,
                     verbose=verbose,
+                    client=client,
+                    name_filter=name_filter,
                 )
     finally:
         if cleanup:
