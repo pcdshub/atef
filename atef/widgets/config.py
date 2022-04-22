@@ -280,7 +280,7 @@ class Tree(AtefCfgDisplay, QWidget):
             name='Overview',
             func_name='overview'
         )
-        self.tree_widget.addTopLevelItem(self.overview_item)
+        self.tree_widget.insertTopLevelItem(0, self.overview_item)
 
     def show_selected_display(self, item: AtefItem, *args, **kwargs):
         """
@@ -316,7 +316,7 @@ class AtefItem(QTreeWidgetItem):
     """
     widget_class: type[QWidget]
     widget_args: list[Any]
-    widget_cached: Optional[QWidget]
+    widget_cached: QWidget
 
     def __init__(
         self,
@@ -336,17 +336,12 @@ class AtefItem(QTreeWidgetItem):
         self.widget_args = widget_args or []
         if append_item_arg:
             self.widget_args.append(self)
-        self.widget_cached = None
+        self.widget_cached = self.widget_class(*self.widget_args)
 
     def get_widget(self) -> QWidget:
         """
         Return the edit widget associated with this tree node.
-
-        On the first call, the widget is created. On subsequent calls
-        we use the cached widget.
         """
-        if self.widget_cached is None:
-            self.widget_cached = self.widget_class(*self.widget_args)
         return self.widget_cached
 
 
@@ -1209,8 +1204,8 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
             layout=QVBoxLayout(),
         )
         self.comp_content.addWidget(self.comparison_list)
-        for comparison in self.bridge.comparisons.get():
-            self.add_comparison(comparison=comparison)
+        for bridge in self.comparison_list.bridges:
+            self.setup_comparison_item_bridge(bridge)
         self.add_comp_button.clicked.connect(self.add_comparison)
 
     def setup_comparison_item_bridge(self, bridge: QDataclassBridge) -> None:
