@@ -23,7 +23,8 @@ from qtpy.uic import loadUiType
 
 from ..check import (Comparison, Configuration, ConfigurationFile,
                      DeviceConfiguration, Equals, IdentifierAndComparison,
-                     PVConfiguration, Severity)
+                     PVConfiguration)
+from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList
 from ..reduce import ReduceMethod
 
