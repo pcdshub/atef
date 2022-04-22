@@ -280,7 +280,7 @@ class Tree(AtefCfgDisplay, QWidget):
             name='Overview',
             func_name='overview'
         )
-        self.tree_widget.addTopLevelItem(self.overview_item)
+        self.tree_widget.insertTopLevelItem(0, self.overview_item)
 
     def show_selected_display(self, item: AtefItem, *args, **kwargs):
         """
