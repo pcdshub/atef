@@ -10,10 +10,11 @@ import os.path
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, ClassVar, List, Optional, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 from apischema import deserialize, serialize
 from qtpy.QtCore import QEvent, QObject, QTimer
+from qtpy.QtCore import Signal as QSignal
 from qtpy.QtWidgets import (QAction, QComboBox, QFileDialog, QFormLayout,
                             QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QMainWindow, QMessageBox, QPlainTextEdit,
@@ -373,6 +374,7 @@ class Overview(AtefCfgDisplay, QWidget):
     config_list: QDataclassList
     tree_ref: QTreeWidget
     row_count: int
+    row_mapping: Dict[OverviewRow, Tuple[Configuration, AtefItem]]
 
     def __init__(
         self,
@@ -385,6 +387,7 @@ class Overview(AtefCfgDisplay, QWidget):
         self.config_list = config_list
         self.tree_ref = tree_ref
         self.row_count = 0
+        self.row_mapping = {}
         self.initialize_overview()
         self.add_device_button.clicked.connect(self.add_device_config)
         self.add_pv_button.clicked.connect(self.add_pv_config)
@@ -478,7 +481,7 @@ class Overview(AtefCfgDisplay, QWidget):
             func_name = 'device config'
         else:
             func_name = 'pv config'
-        row = OverviewRow(config)
+        row = OverviewRow(config, self)
         self.scroll_content.layout().insertWidget(
             self.row_count,
             row,
@@ -493,6 +496,8 @@ class Overview(AtefCfgDisplay, QWidget):
         self.tree_ref.addTopLevelItem(item)
         self.row_count += 1
 
+        self.row_mapping[row] = (config, item)
+
         # If either of the widgets change the name, update tree
         row.bridge.name.changed_value.connect(
             partial(item.setText, 0)
@@ -501,6 +506,28 @@ class Overview(AtefCfgDisplay, QWidget):
         # we add new config data
         if update_data:
             self.config_list.append(config)
+
+    def delete_row(self, row: OverviewRow) -> None:
+        """
+        Delete a row and the corresponding data from the file.
+
+        This will remove the config data structure and the
+        tree node, and leave us in a state where adding a new
+        config will work as expected.
+
+        Parameters
+        ----------
+        row : OverviewRow
+            The row that we want to remove from the display.
+            This row has an associated tree item and config
+            dataclass.
+        """
+        config, tree_item = self.row_mapping[row]
+        self.config_list.remove_value(config)
+        self.tree_ref.invisibleRootItem().removeChild(tree_item)
+        self.row_count -= 1
+        del self.row_mapping[row]
+        row.deleteLater()
 
 
 class ConfigTextMixin:
@@ -608,15 +635,18 @@ class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
     config_type: QLabel
     lock_button: QPushButton
     desc_edit: QPlainTextEdit
+    delete_button: QPushButton
 
     def __init__(
         self,
         config: Union[DeviceConfiguration, PVConfiguration],
+        overview: Overview,
         *args,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.bridge = QDataclassBridge(config, parent=self)
+        self.overview = overview
         self.initialize_row()
 
     def initialize_row(self):
@@ -628,8 +658,12 @@ class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
             self.config_type.setText('Device Config')
         else:
             self.config_type.setText('PV Config')
-        # Setup the lock button
+        # Setup the lock and delete buttons
         self.lock_button.toggled.connect(self.handle_locking)
+        self.name_edit.textChanged.connect(
+            self.on_name_changed,
+        )
+        self.delete_button.clicked.connect(self.delete_this_config)
         if self.name_edit.text():
             # Start locked if we are reading from file
             self.lock_button.toggle()
@@ -637,6 +671,11 @@ class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
     def lock_editing(self, locked: bool):
         """
         Set the checked state of the "locked" button as the user would.
+
+        Parameters
+        ----------
+        locked : bool
+            True if locking, False if unlocking
         """
         self.lock_button.setChecked(locked)
 
@@ -649,6 +688,11 @@ class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
         It is expected that the user won't edit these a lot, and that it is easier
         to browse through the rows with the non-edit style.
+
+        Parameters
+        ----------
+        locked : bool
+            True if locking, False if unlocking
         """
         self.name_edit.setReadOnly(locked)
         self.name_edit.setFrame(not locked)
@@ -658,11 +702,45 @@ class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
             self.setStyleSheet(
                 "QLineEdit, QPlainTextEdit { background: transparent }"
             )
+            self.delete_button.hide()
         else:
             self.desc_edit.setFrameShape(self.desc_edit.StyledPanel)
             self.setStyleSheet(
                 "QLineEdit, QPlainTextEdit { background: white }"
             )
+            if not self.name_edit.text():
+                self.delete_button.show()
+
+    def on_name_changed(self, name: str) -> None:
+        """
+        Actions to perform when the name field changes.
+
+        This will hide/show the delete button as appropriate.
+        Only show the delete button in an unlocked state with an
+        empty name. This is to help prevent someone from
+        accidentally nuking their entire config tree.
+
+        Parameters
+        ----------
+        name : str
+            The updated configuration name.
+        """
+        if not name and not self.lock_button.isChecked():
+            self.delete_button.show()
+        else:
+            self.delete_button.hide()
+
+    def delete_this_config(self, checked: Optional[bool] = None) -> None:
+        """
+        Helper function to facilitate the removal of this row.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            This argument is unused, but it will be sent by various button
+            widgets via the "clicked" signal so it must be present.
+        """
+        self.overview.delete_row(self)
 
 
 class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
@@ -697,6 +775,8 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
     add_checklist_button: QPushButton
     line_between_adds: QWidget
 
+    bridge_item_map: Dict[QDataclassBridge, AtefItem]
+
     def __init__(
         self,
         bridge: QDataclassBridge,
@@ -707,6 +787,7 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
         super().__init__(*args, **kwargs)
         self.bridge = bridge
         self.tree_item = tree_item
+        self.bridge_item_map = {}
         self.initialize_group()
 
     def initialize_group(self) -> None:
@@ -744,6 +825,9 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             data_list=self.bridge.checklist,
             layout=QVBoxLayout(),
         )
+        self.checklist_list.bridge_item_removed.connect(
+            self._cleanup_bridge_node,
+        )
         self.checklists_content.addWidget(self.checklist_list)
         for bridge in self.checklist_list.bridges:
             self.setup_checklist_item_bridge(bridge)
@@ -767,6 +851,7 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             append_item_arg=True,
         )
         self.tree_item.addChild(item)
+        self.bridge_item_map[bridge] = item
         bridge.name.changed_value.connect(
             partial(item.setText, 0)
         )
@@ -791,8 +876,24 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
             id_and_comp = IdentifierAndComparison()
         bridge = self.checklist_list.add_item(id_and_comp)
         self.setup_checklist_item_bridge(bridge)
-        # TODO make the delete button work
-        # new_row.del_button.clicked.connect
+
+    def _cleanup_bridge_node(
+        self,
+        bridge: QDataclassBridge,
+    ) -> None:
+        """
+        Remove the tree item and delete the bridge when we remove a checklist.
+
+        Parameters
+        ----------
+        bridge: QDataclassBridge
+            A dataclass bridge to an instance of
+            atef.check.IdentifierAndComparison
+        """
+        item = self.bridge_item_map[bridge]
+        self.tree_item.removeChild(item)
+        del self.bridge_item_map[bridge]
+        bridge.deleteLater()
 
 
 class StrList(QWidget):
@@ -925,6 +1026,7 @@ class NamedDataclassList(StrList):
         flexibility in whether we arrange things horizontally,
         vertically, etc.
     """
+    bridge_item_removed = QSignal(QDataclassBridge)
     bridges = List[QDataclassBridge]
 
     def __init__(self, *args, **kwargs):
@@ -1034,7 +1136,7 @@ class NamedDataclassList(StrList):
         index = self.widgets.index(item)
         super().remove_item(item=item, checked=checked)
         bridge = self.bridges[index]
-        bridge.deleteLater()
+        self.bridge_item_removed.emit(bridge)
         del self.bridges[index]
 
     def update_item_bridge(
@@ -1157,6 +1259,7 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
 
     bridge: QDataclassBridge
     config_type: Type[Configuration]
+    bridge_item_map: Dict[QDataclassBridge, AtefItem]
 
     def __init__(
         self,
@@ -1203,6 +1306,9 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self.comparison_list = NamedDataclassList(
             data_list=self.bridge.comparisons,
             layout=QVBoxLayout(),
+        )
+        self.comparison_list.bridge_item_removed.connect(
+            self._cleanup_bridge_node,
         )
         self.comp_content.addWidget(self.comparison_list)
         for bridge in self.comparison_list.bridges:
@@ -1293,8 +1399,24 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
             comparison = Equals()
         bridge = self.comparison_list.add_item(comparison)
         self.setup_comparison_item_bridge(bridge)
-        # TODO make the delete button work
-        # new_row.del_button.clicked.connect
+
+    def _cleanup_bridge_node(
+        self,
+        bridge: QDataclassBridge,
+    ) -> None:
+        """
+        Remove the tree item and delete the bridge when we remove comparisons.
+
+        Parameters
+        ----------
+        bridge: QDataclassBridge
+            A dataclass bridge to an instance of
+            atef.check.IdentifierAndComparison
+        """
+        item = self.bridge_item_map[bridge]
+        self.tree_item.removeChild(item)
+        del self.bridge_item_map[bridge]
+        bridge.deleteLater()
 
 
 class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
