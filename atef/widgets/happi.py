@@ -86,8 +86,21 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             self.combo_by_category.itemText(idx)
             for idx in range(self.combo_by_category.count())
         ]
-        self._category_changed(self.combo_by_category.currentText())
         self.list_or_tree_frame.layout().insertWidget(0, view)
+
+        def tree_selection_changed(
+            selected: QtCore.QItemSelection, deselected: QtCore.QItemSelection
+        ):
+            items = [
+                idx.data() for idx in selected.indexes()
+                if idx.parent().data() is not None  # skip top-level items
+            ]
+            self.happi_items_selected.emit(items)
+
+        view.selectionModel().selectionChanged.connect(
+            tree_selection_changed
+        )
+
         self.happi_tree_view = view
         return view
 
@@ -98,7 +111,9 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             return self.happi_list_view
 
         if self.happi_tree_view is None:
-            return self._setup_tree_view()
+            view = self._setup_tree_view()
+            self._category_changed(self.combo_by_category.currentText())
+            return view
 
         return self.happi_tree_view
 
@@ -110,7 +125,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
 
         self.happi_tree_view.group_by(category)
         # Bugfix (?) otherwise this ends up in descending order
-        self.happi_tree_view.proxy_model.sort(0, QtCore.Qt.AscendingOrder)
+        self.happi_tree_view.model().sort(0, QtCore.Qt.AscendingOrder)
 
     @QtCore.Slot()
     def _select_device_widget(self):
