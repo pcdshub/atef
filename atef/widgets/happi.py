@@ -16,6 +16,18 @@ from .core import DesignerDisplay
 
 
 class HappiSearchWidget(DesignerDisplay, QWidget):
+    """
+    Happi device search widget.
+
+    Parameters
+    ----------
+    client : happi.Client, optional
+        Happi client instance.  One will be created using ``from_config`` if
+        not supplied.
+
+    parent : QWidget, optional
+        The parent widget.
+    """
     filename = 'happi_search_widget.ui'
 
     client: happi.client.Client
@@ -60,7 +72,6 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
 
         if self.happi_tree_view is None:
             self.happi_tree_view = HappiDeviceTreeView(client=self.client)
-            # self.happi_tree_view.setSortingEnabled(True)
             self.happi_tree_view.search()
             self.happi_tree_view.groups = [
                 self.combo_by_category.itemText(idx)
@@ -73,6 +84,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
 
     @QtCore.Slot(str)
     def _category_changed(self, category: str):
+        """By-category category has changed."""
         if self.happi_tree_view is None:
             return
 
