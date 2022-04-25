@@ -1,4 +1,5 @@
 import logging
+import pathlib
 from typing import Optional, Sequence
 
 import happi
@@ -8,6 +9,8 @@ from .enums import Severity
 from .exceptions import HappiLoadError, MissingHappiDeviceError
 
 logger = logging.getLogger(__name__)
+
+ATEF_SOURCE_PATH = pathlib.Path(__file__).parent
 
 
 def ophyd_cleanup():
