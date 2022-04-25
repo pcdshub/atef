@@ -7,10 +7,14 @@ widgets.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type
+import logging
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type
 
+from qtpy import QtCore
 from qtpy.QtCore import QObject
 from qtpy.QtCore import Signal as QSignal
+
+logger = logging.getLogger(__name__)
 
 
 class QDataclassBridge(QObject):
@@ -271,3 +275,44 @@ class QDataclassList(QDataclassElem):
         self.changed_value.emit(new_value)
         self.changed_index.emit(index)
         self.updated.emit()
+
+
+class ThreadPoolWorker(QtCore.QRunnable):
+    """
+    Worker thread helper.  For running a function in a background QThread.
+
+    Parameters
+    ----------
+    func : callable
+        The function to call when the thread starts.
+    *args
+        Arguments for the function call.
+    **kwargs
+        Keyword arguments for the function call.
+    """
+
+    def __init__(self, func, *args, **kwargs):
+        super().__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    @QtCore.Slot()
+    def run(self):
+        try:
+            self.func(*self.args, **self.kwargs)
+        except Exception:
+            logger.exception(
+                "Failed to run %s(*%s, **%r) in thread pool",
+                self.func,
+                self.args,
+                self.kwargs,
+            )
+
+    @classmethod
+    def new_thread(cls, func: Callable, *args, start=True, **kwargs) -> ThreadPoolWorker:
+        """Start a utility thread in the global QThreadPool."""
+        worker = ThreadPoolWorker(func, *args, **kwargs)
+        if start:
+            QtCore.QThreadPool.globalInstance().start(worker)
+        return worker

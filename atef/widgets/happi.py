@@ -4,7 +4,7 @@ Widget classes designed for atef-to-happi interaction.
 
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import ClassVar, Optional, Union
 
 import happi
 from happi.qt import HappiDeviceListView
@@ -12,12 +12,13 @@ from happi.qt.model import HappiDeviceTreeView
 from qtpy import QtCore, QtWidgets
 from qtpy.QtWidgets import QWidget
 
+from ..qt_helpers import ThreadPoolWorker
 from .core import DesignerDisplay
 
 
 class HappiSearchWidget(DesignerDisplay, QWidget):
     """
-    Happi device search widget.
+    Happi item (device) search widget.
 
     Parameters
     ----------
@@ -28,7 +29,8 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     parent : QWidget, optional
         The parent widget.
     """
-    filename = 'happi_search_widget.ui'
+    filename: ClassVar[str] = 'happi_search_widget.ui'
+    happi_items_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)
 
     client: happi.client.Client
     combo_by_category: QtWidgets.QComboBox
@@ -64,6 +66,31 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.combo_by_category.currentTextChanged.connect(self._category_changed)
         self.button_refresh.clicked.emit()
 
+        def list_selection_changed(
+            selected: QtCore.QItemSelection, deselected: QtCore.QItemSelection
+        ):
+            self.happi_items_selected.emit([idx.data() for idx in selected.indexes()])
+
+        self.happi_list_view.selectionModel().selectionChanged.connect(
+            list_selection_changed
+        )
+
+    def _setup_tree_view(self) -> HappiDeviceTreeView:
+        """Set up the happi_tree_view if not already configured."""
+        if self.happi_tree_view is not None:
+            return self.happi_tree_view
+
+        view = HappiDeviceTreeView(client=self.client)
+        view.search()
+        view.groups = [
+            self.combo_by_category.itemText(idx)
+            for idx in range(self.combo_by_category.count())
+        ]
+        self._category_changed(self.combo_by_category.currentText())
+        self.list_or_tree_frame.layout().insertWidget(0, view)
+        self.happi_tree_view = view
+        return view
+
     @property
     def selected_device_widget(self) -> Union[HappiDeviceListView, HappiDeviceTreeView]:
         """The selected device widget - either the list or tree view."""
@@ -71,14 +98,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             return self.happi_list_view
 
         if self.happi_tree_view is None:
-            self.happi_tree_view = HappiDeviceTreeView(client=self.client)
-            self.happi_tree_view.search()
-            self.happi_tree_view.groups = [
-                self.combo_by_category.itemText(idx)
-                for idx in range(self.combo_by_category.count())
-            ]
-            self._category_changed(self.combo_by_category.currentText())
-            self.list_or_tree_frame.layout().insertWidget(0, self.happi_tree_view)
+            return self._setup_tree_view()
 
         return self.happi_tree_view
 
@@ -103,4 +123,11 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     @QtCore.Slot()
     def refresh_happi(self):
         """Search happi again and update the widgets."""
+        if False:
+            # To be threaded we need to decouple search and GUI updates;
+            # this will require some happi.qt.model changes.
+            def search():
+                self.selected_device_widget.search()
+
+            ThreadPoolWorker.new_thread(search)
         self.selected_device_widget.search()
