@@ -1252,7 +1252,7 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
     name_edit: QLineEdit
     id_label: QLabel
     id_content: QVBoxLayout
-    add_id_button: QToolButton
+    add_id_button: QPushButton
     comp_label: QLabel
     comp_content: QVBoxLayout
     add_comp_button: QPushButton
