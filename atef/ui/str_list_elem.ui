@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>174</width>
-    <height>23</height>
+    <width>392</width>
+    <height>53</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -43,24 +43,12 @@
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="del_button">
+    <widget class="QToolButton" name="del_button">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
-     </property>
-     <property name="minimumSize">
-      <size>
-       <width>23</width>
-       <height>23</height>
-      </size>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>23</width>
-       <height>23</height>
-      </size>
      </property>
      <property name="baseSize">
       <size>
