@@ -18,7 +18,7 @@ from qtpy.QtCore import Signal as QSignal
 from qtpy.QtWidgets import (QAction, QComboBox, QFileDialog, QFormLayout,
                             QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QMainWindow, QMessageBox, QPlainTextEdit,
-                            QPushButton, QTabWidget, QTreeWidget,
+                            QPushButton, QTabWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 from qtpy.uic import loadUiType
 
@@ -766,7 +766,7 @@ class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
     name_edit: QLineEdit
     desc_edit: QPlainTextEdit
     tags_content: QVBoxLayout
-    add_tag_button: QPushButton
+    add_tag_button: QToolButton
     devices_container: QWidget
     devices_content: QVBoxLayout
     add_devices_button: QPushButton
@@ -1186,7 +1186,7 @@ class StrListElem(AtefCfgDisplay, QWidget):
     filename = 'str_list_elem.ui'
 
     line_edit: QLineEdit
-    del_button: QPushButton
+    del_button: QToolButton
 
     def __init__(self, start_text: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
