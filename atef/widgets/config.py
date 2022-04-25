@@ -28,6 +28,7 @@ from ..check import (Comparison, Configuration, ConfigurationFile,
 from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList
 from ..reduce import ReduceMethod
+from ..type_hints import Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
 
@@ -1765,10 +1766,179 @@ class CompMixin:
         CompView.register_comparison(cls.data_type, cls)
 
 
-# This class should be replaced by a real "Equals" widget
-class EqualsWidget(CompMixin, QLabel):
+class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
+    """
+    Widget to handle the fields unique to the "Equals" Comparison.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to an "Equals" object. This widget will
+        read from and write to the "value", "atol", and "rtol"
+        fields.
+    parent : QObject, keyword=only
+        The normal qt parent argument
+    """
+    filename = 'comp_equals.ui'
     data_type = Equals
+    type_casts: Dict[str, type] = {
+        'float': float,
+        'integer': int,
+        # 'bool': bool, TODO bool needs special handling
+        'string': str,
+    }
+    from_type: Dict[type, str] = {
+        value: key for key, value in type_casts.items()
+    }
+
+    equals_label: QLabel
+    value_edit: QLineEdit
+    range_label: QLabel
+    atol_label: QLabel
+    atol_edit: QLineEdit
+    rtol_label: QLabel
+    rtol_edit: QLineEdit
+    data_type_label: QLabel
+    data_type_combo: QComboBox
 
     def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setText('This is just a placeholder for "Equals" for testing.')
+        self.bridge = bridge
+        self.setup_equals_widget()
+
+    def setup_equals_widget(self):
+        """
+        Do all the setup needed to make this widget functional.
+
+        Things handled here:
+        - Set up the data type selection to know whether or not
+          atol/rtol/range means anything and so that we can allow
+          things like numeric strings. Use this selection to cast
+          the input from the value text box.
+        - Fill in the starting values for value, atol, and rtol.
+        - Connect the various edit widgets to their correspoinding
+          data fields
+        - Set up the range_label for a summary of the allowed range
+        """
+        for option in self.type_casts:
+            self.data_type_combo.addItem(option)
+        starting_value = self.bridge.value.get()
+        self.value_edit.setText(str(starting_value))
+        combo_text = self.from_type[type(starting_value)]
+        self.data_type_combo.setCurrentText(combo_text)
+        starting_atol = self.bridge.atol.get()
+        if starting_atol is not None:
+            self.atol_edit.setText(str(starting_atol))
+        starting_rtol = self.bridge.rtol.get()
+        if starting_rtol is not None:
+            self.rtol_edit.setText(str(starting_rtol))
+        self.update_range_label()
+        self.value_edit.textEdited.connect(self.new_gui_value)
+        self.atol_edit.textEdited.connect(self.new_gui_atol)
+        self.rtol_edit.textEdited.connect(self.new_gui_rtol)
+        self.data_type_combo.currentTextChanged.connect(self.new_gui_type)
+        self.bridge.value.changed_value.connect(self.new_internal_value)
+        self.bridge.atol.changed_value.connect(self.new_internal_atol)
+        self.bridge.rtol.changed_value.connect(self.new_internal_rtol)
+
+    def update_range_label(self):
+        """
+        Update the range label as appropriate.
+
+        If our value is an int or float, this will do calculations
+        using the atol and rtol to report the actualy low/high ends
+        of the range to the user.
+        """
+        value = self.bridge.value.get()
+        if not isinstance(value, (int, float)):
+            return
+        atol = self.bridge.atol.get() or 0
+        rtol = self.bridge.rtol.get() or 0
+
+        diff = atol + abs(rtol * value)
+        high_val = value + diff
+        low_val = value - diff
+        self.range_label.setText(f'[{low_val}, {high_val}]')
+
+    def new_gui_value(self, value: str):
+        """Slot for when the user inputs a new value using the GUI."""
+        type_cast = self.type_casts[self.data_type_combo.currentText()]
+        try:
+            typed_value = type_cast(value)
+        except ValueError:
+            return
+        self.bridge.value.put(typed_value)
+        self.update_range_label()
+
+    def new_gui_atol(self, atol: str):
+        """Slot for when the user inputs a new atol using the GUI."""
+        try:
+            typed_atol = float(atol)
+        except ValueError:
+            return
+        self.bridge.atol.put(typed_atol)
+        self.update_range_label()
+
+    def new_gui_rtol(self, rtol: str):
+        """Slot for when the user inputs a new atol using the GUI."""
+        try:
+            typed_rtol = float(rtol)
+        except ValueError:
+            return
+        self.bridge.rtol.put(typed_rtol)
+        self.update_range_label()
+
+    def new_gui_type(self, gui_type: str):
+        """
+        Slot for when the user changes the GUI data type.
+
+        Re-interprets our value as the selected type. This will
+        update the current value in the bridge as appropriate.
+
+        If we have a numeric type, we'll enable the range and
+        tolerance widgets. Otherwise, we'll disable them.
+        """
+        type_cast = self.type_casts[gui_type]
+        # Try the gui value first
+        try:
+            new_value = type_cast(self.value_edit.text())
+        except ValueError:
+            # Try the bridge value second, or give up
+            try:
+                new_value = type_cast(self.bridge.value.get())
+            except ValueError:
+                new_value = None
+        if new_value is not None:
+            self.bridge.value.put(new_value)
+        if issubclass(self.type_casts[gui_type], (int, float)):
+            self.range_label.setVisible(True)
+            self.atol_edit.setEnabled(True)
+            self.rtol_edit.setEnabled(True)
+        else:
+            self.range_label.setVisible(False)
+            self.atol_edit.setEnabled(False)
+            self.rtol_edit.setEnabled(False)
+
+    def new_internal_value(self, value: PrimitiveType):
+        """
+        Slot for when anything besides the user updates the value.
+        """
+        if not self.value_edit.hasFocus():
+            self.value_edit.setText(str(value))
+            self.update_range_label()
+
+    def new_internal_atol(self, atol: Number):
+        """
+        Slot for when anything besides the user updates the atol.
+        """
+        if not self.atol_edit.hasFocus():
+            self.atol_edit.setText(str(atol))
+            self.update_range_label()
+
+    def new_internal_rtol(self, rtol: Number):
+        """
+        Slot for when anything besides the user updates the rtol.
+        """
+        if not self.rtol_edit.hasFocus():
+            self.rtol_edit.setText(str(rtol))
+            self.update_range_label()
