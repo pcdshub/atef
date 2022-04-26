@@ -10,7 +10,8 @@ import os.path
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
+                    Union)
 
 from apischema import deserialize, serialize
 from qtpy.QtCore import QEvent, QObject, QTimer
@@ -24,10 +25,11 @@ from qtpy.uic import loadUiType
 
 from ..check import (Comparison, Configuration, ConfigurationFile,
                      DeviceConfiguration, Equals, IdentifierAndComparison,
-                     PVConfiguration)
+                     NotEquals, PVConfiguration)
 from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList
 from ..reduce import ReduceMethod
+from ..type_hints import Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
 
@@ -1209,9 +1211,45 @@ class StrListElem(AtefCfgDisplay, QWidget):
         # Show or hide the del button as needed
         self.del_button.setVisible(not text)
         # Adjust the width to match the text
-        font_metrics = self.line_edit.fontMetrics()
-        width = font_metrics.boundingRect(text).width()
-        self.line_edit.setFixedWidth(max(width + 10, 40))
+        match_line_edit_text_width(self.line_edit, text=text)
+
+
+def match_line_edit_text_width(
+    line_edit: QLineEdit,
+    text: Optional[str] = None,
+    min: int = 40,
+    buffer: int = 10,
+) -> None:
+    """
+    Set the width of a line edit to match the text length.
+
+    You can use this in a slot and connect it to the line edit's
+    "textChanged" signal. This creates an effect where the line
+    edit will get longer when the user types text into it and
+    shorter when the user deletes text from it.
+
+    Parameters
+    ----------
+    line_edit : QLineEdit
+        The line edit whose width you'd like to adjust.
+    text : str, optional
+        The text to use as the basis for our size metrics.
+        In a slot you could pass in the text we get from the
+        signal update. If omitted, we'll use the current text
+        in the widget.
+    min : int, optional
+        The minimum width of the line edit, even when we have no
+        text. If omitted, we'll use a default value.
+    buffer : int, optional
+        The buffer we have on the right side of the rightmost
+        character in the line_edit before the edge of the widget.
+        If omitted, we'll use a default value.
+    """
+    font_metrics = line_edit.fontMetrics()
+    if text is None:
+        text = line_edit.text()
+    width = font_metrics.boundingRect(text).width()
+    line_edit.setFixedWidth(max(width + buffer, min))
 
 
 class FrameOnEditFilter(QObject):
@@ -1765,10 +1803,319 @@ class CompMixin:
         CompView.register_comparison(cls.data_type, cls)
 
 
-# This class should be replaced by a real "Equals" widget
-class EqualsWidget(CompMixin, QLabel):
+def user_string_to_bool(text: str) -> bool:
+    """
+    Interpret a user's input as a boolean value.
+
+    Strings like "true" should evaluate to True, strings
+    like "fa" should evaluate to False, numeric inputs like
+    1 or 2 should evaluate to True, numeric inputs like 0 or
+    0.0 should evaluate to False, etc.
+
+    Parameters
+    ----------
+    text : str
+        The user's text input as a string. This is usually
+        the value directly from a line edit widget.
+    """
+    if not text:
+        return False
+    try:
+        if text[0].lower() in ('n', 'f', '0'):
+            return False
+    except (IndexError, AttributeError):
+        # Not a string, let's be slightly helpful
+        return bool(text)
+    return True
+
+
+class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
+    """
+    Widget to handle the fields unique to the "Equals" Comparison.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to an "Equals" object. This widget will
+        read from and write to the "value", "atol", and "rtol"
+        fields.
+    parent : QObject, keyword-only
+        The normal qt parent argument
+    """
+    filename = 'comp_equals.ui'
     data_type = Equals
+    label_to_type: Dict[str, type] = {
+        'float': float,
+        'integer': int,
+        'bool': bool,
+        'string': str,
+    }
+    type_to_label: Dict[type, str] = {
+        value: key for key, value in label_to_type.items()
+    }
+    cast_from_user_str: Dict[type, Callable[[str], bool]] = {
+        tp: tp for tp in type_to_label
+    }
+    cast_from_user_str[bool] = user_string_to_bool
+
+    equals_label: QLabel
+    value_edit: QLineEdit
+    range_label: QLabel
+    atol_label: QLabel
+    atol_edit: QLineEdit
+    rtol_label: QLabel
+    rtol_edit: QLineEdit
+    data_type_label: QLabel
+    data_type_combo: QComboBox
 
     def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setText('This is just a placeholder for "Equals" for testing.')
+        self.bridge = bridge
+        self.setup_equals_widget()
+
+    def setup_equals_widget(self) -> None:
+        """
+        Do all the setup needed to make this widget functional.
+
+        Things handled here:
+        - Set up the data type selection to know whether or not
+          atol/rtol/range means anything and so that we can allow
+          things like numeric strings. Use this selection to cast
+          the input from the value text box.
+        - Fill in the starting values for value, atol, and rtol.
+        - Connect the various edit widgets to their correspoinding
+          data fields
+        - Set up the range_label for a summary of the allowed range
+        """
+        for option in self.label_to_type:
+            self.data_type_combo.addItem(option)
+        starting_value = self.bridge.value.get()
+        starting_text = str(starting_value)
+        self.value_edit.setText(starting_text)
+        self.update_value_size(starting_text)
+        self.data_type_combo.setCurrentText(
+            self.type_to_label[type(starting_value)]
+        )
+        starting_atol = self.bridge.atol.get()
+        if starting_atol is not None:
+            self.atol_edit.setText(str(starting_atol))
+        starting_rtol = self.bridge.rtol.get()
+        if starting_rtol is not None:
+            self.rtol_edit.setText(str(starting_rtol))
+        self.update_range_label()
+        self.value_edit.textEdited.connect(self.new_gui_value)
+        self.atol_edit.textEdited.connect(self.new_gui_atol)
+        self.rtol_edit.textEdited.connect(self.new_gui_rtol)
+        self.data_type_combo.currentTextChanged.connect(self.new_gui_type)
+        self.bridge.value.changed_value.connect(self.new_internal_value)
+        self.bridge.atol.changed_value.connect(self.new_internal_atol)
+        self.bridge.rtol.changed_value.connect(self.new_internal_rtol)
+
+    def update_value_size(self, text: str) -> None:
+        """
+        Call match_line_edit_text_with with specific kwargs.
+
+        This makes the value edit box expand or contract as needed.
+
+        Parameters
+        ----------
+        text : str
+            The text from the textUpdated signal.
+        """
+        match_line_edit_text_width(
+            self.value_edit,
+            text=text,
+            min=30,
+            buffer=15,
+        )
+
+    def update_range_label(self) -> None:
+        """
+        Update the range label as appropriate.
+
+        If our value is an int or float, this will do calculations
+        using the atol and rtol to report the tolerance
+        of the range to the user.
+
+        If our value is a bool, this will summarize whether our
+        value is being interpretted as True or False.
+        """
+        value = self.bridge.value.get()
+        if not isinstance(value, (int, float, bool)):
+            return
+        if isinstance(value, bool):
+            text = f' ({value})'
+        else:
+            atol = self.bridge.atol.get() or 0
+            rtol = self.bridge.rtol.get() or 0
+
+            diff = atol + abs(rtol * value)
+            text = f' ± {diff:.3g}'
+        self.range_label.setText(text)
+
+    def new_gui_value(self, value: str) -> None:
+        """
+        Slot for when the user inputs a new value using the GUI.
+
+        Parameters
+        ----------
+        value : str
+            The user's text input from the GUI
+        """
+        self.update_value_size(value)
+        type_cast = self.cast_from_user_str[
+            self.label_to_type[
+                self.data_type_combo.currentText()
+            ]
+        ]
+        try:
+            typed_value = type_cast(value)
+        except ValueError:
+            return
+        self.bridge.value.put(typed_value)
+        self.update_range_label()
+
+    def new_gui_atol(self, atol: str) -> None:
+        """
+        Slot for when the user inputs a new atol using the GUI.
+
+        Parameters
+        ----------
+        atol : str
+            The user's text input from the GUI
+        """
+        try:
+            typed_atol = float(atol)
+        except ValueError:
+            return
+        self.bridge.atol.put(typed_atol)
+        self.update_range_label()
+
+    def new_gui_rtol(self, rtol: str) -> None:
+        """
+        Slot for when the user inputs a new atol using the GUI.
+
+        Parameters
+        ----------
+        rtol : str
+            The user's text input from the GUI
+        """
+        try:
+            typed_rtol = float(rtol)
+        except ValueError:
+            return
+        self.bridge.rtol.put(typed_rtol)
+        self.update_range_label()
+
+    def new_gui_type(self, gui_type_str: str) -> None:
+        """
+        Slot for when the user changes the GUI data type.
+
+        Re-interprets our value as the selected type. This will
+        update the current value in the bridge as appropriate.
+
+        If we have a numeric type, we'll enable the range and
+        tolerance widgets. Otherwise, we'll disable them.
+
+        Parameters
+        ----------
+        gui_type_str : str
+            The user's text input from the data type combobox.
+        """
+        gui_type = self.label_to_type[gui_type_str]
+        user_cast = self.cast_from_user_str[gui_type]
+        # Try the gui value first
+        try:
+            new_value = user_cast(self.value_edit.text())
+        except ValueError:
+            # Try the bridge value second, or give up
+            try:
+                new_value = gui_type(self.bridge.value.get())
+            except ValueError:
+                new_value = None
+        if new_value is not None:
+            self.bridge.value.put(new_value)
+        self.range_label.setVisible(gui_type in (int, float, bool))
+        tol_vis = gui_type in (int, float)
+        self.atol_label.setVisible(tol_vis)
+        self.atol_edit.setVisible(tol_vis)
+        self.rtol_label.setVisible(tol_vis)
+        self.rtol_edit.setVisible(tol_vis)
+
+    def new_internal_value(self, value: PrimitiveType) -> None:
+        """
+        Slot for when anything besides the user updates the value.
+
+        Through this, we'll  update the user's live view
+        of the data structure.
+
+        Parameters
+        ----------
+        value : any primitive
+            The value we recieve from the dataclass bridge's
+            changed_value signal.
+        """
+        if not self.value_edit.hasFocus():
+            text = str(value)
+            self.value_edit.setText(text)
+            self.update_value_size(text)
+            self.update_range_label()
+
+    def new_internal_atol(self, atol: Number) -> None:
+        """
+        Slot for when anything besides the user updates the atol.
+
+        Through this, we'll  update the user's live view
+        of the data structure.
+
+        Parameters
+        ----------
+        atol : any primitive
+            The value we recieve from the dataclass bridge's
+            changed_value signal.
+        """
+        if not self.atol_edit.hasFocus():
+            self.atol_edit.setText(str(atol))
+            self.update_range_label()
+
+    def new_internal_rtol(self, rtol: Number) -> None:
+        """
+        Slot for when anything besides the user updates the rtol.
+
+        Through this, we'll  update the user's live view
+        of the data structure.
+
+        Parameters
+        ----------
+        rtol : any primitive
+            The value we recieve from the dataclass bridge's
+            changed_value signal.
+        """
+        if not self.rtol_edit.hasFocus():
+            self.rtol_edit.setText(str(rtol))
+            self.update_range_label()
+
+
+class NotEqualsWidget(EqualsWidget):
+    """
+    Variant of the "EqualsWidget" for the "NotEquals" case.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to a "NotEquals" object. This widget will
+        read from and write to the "value", "atol", and "rtol"
+        fields.
+    parent : QObject, keyword-only
+        The normal qt parent argument
+    """
+    data_type = NotEquals
+
+    def setup_equals_widget(self) -> None:
+        """
+        After the equals widget setup, change the symbol.
+        """
+        super().setup_equals_widget()
+        self.equals_label.setText(
+            self.equals_label.text().replace('=', '≠')
+        )
