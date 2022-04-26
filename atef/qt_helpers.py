@@ -292,7 +292,8 @@ class ThreadWorker(QtCore.QThread):
         Keyword arguments for the function call.
     """
 
-    error_caught = QtCore.Signal(Exception)
+    error_raised = QtCore.Signal(Exception)
+    returned = QtCore.Signal(object)
     func: Callable
     args: Tuple[Any, ...]
     kwargs: Dict[str, Any]
@@ -317,7 +318,9 @@ class ThreadWorker(QtCore.QThread):
                 self.kwargs,
             )
             self.return_value = ex
-            self.error_caught.emit(ex)
+            self.error_raised.emit(ex)
+        else:
+            self.returned.emit(self.return_value)
 
 
 def run_in_gui_thread(func: Callable, *args, _start_delay_ms: int = 0, **kwargs):

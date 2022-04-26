@@ -5,9 +5,10 @@ Widget classes designed for atef-to-happi interaction.
 from __future__ import annotations
 
 import logging
-from typing import ClassVar, Optional, Union
+from typing import ClassVar, Dict, List, Optional, Union
 
 import happi
+import ophyd
 from happi.qt.model import (HappiDeviceListView, HappiDeviceTreeView,
                             HappiViewMixin)
 from qtpy import QtCore, QtWidgets
@@ -15,6 +16,7 @@ from qtpy.QtWidgets import QWidget
 
 from ..qt_helpers import ThreadWorker
 from .core import DesignerDisplay
+from .ophyd import DeviceWidget
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +27,12 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
 
     Parameters
     ----------
+    parent : QWidget, optional
+        The parent widget.
+
     client : happi.Client, optional
         Happi client instance.  May be supplied at initialization time or
         later.
-
-    parent : QWidget, optional
-        The parent widget.
     """
     filename: ClassVar[str] = 'happi_search_widget.ui'
     happi_items_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)
@@ -51,10 +53,12 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
 
     def __init__(
         self,
-        client: Optional[happi.Client] = None,
         parent: Optional[QWidget] = None,
+        *,
+        client: Optional[happi.Client] = None,
     ):
         super().__init__(parent=parent)
+        self._client = None
         self._tree_current_category = "beamline"
         self._search_thread = None
         self._tree_has_data = False
@@ -155,7 +159,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             logger.warning("Failed to update happi information: %s", ex, exc_info=ex)
             self.button_refresh.setEnabled(True)
 
-        if self.client is None:
+        if self._client is None:
             return
         if self._search_thread is not None and self._search_thread.isRunning():
             return
@@ -163,7 +167,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.button_refresh.setEnabled(False)
         self._search_thread = ThreadWorker(search)
         self._search_thread.finished.connect(update_gui)
-        self._search_thread.error_caught.connect(report_error)
+        self._search_thread.error_raised.connect(report_error)
         self._search_thread.start()
 
     @property
@@ -185,26 +189,71 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
 
     Parameters
     ----------
+    parent : QWidget, optional
+        The parent widget.
+
     client : happi.Client, optional
         Happi client instance.  One will be created using ``from_config`` if
         not supplied.
-
-    parent : QWidget, optional
-        The parent widget.
     """
     filename: ClassVar[str] = 'happi_device_component.ui'
 
     item_search_widget: HappiSearchWidget
+    device_widget: DeviceWidget
     _client: Optional[happi.client.Client]
+    _device_worker: Optional[ThreadWorker]
+    _device_cache: Dict[str, ophyd.Device]
 
     def __init__(
         self,
-        client: Optional[happi.Client] = None,
         parent: Optional[QWidget] = None,
+        client: Optional[happi.Client] = None,
     ):
         super().__init__(parent=parent)
+        self._client = None
+        self._device_worker = None
+        self._device_cache = {}
         self.client = client
         # self._setup_ui()
+        self.item_search_widget.happi_items_selected.connect(
+            self._new_item_selection
+        )
+
+    def _new_item_selection(self, items: List[str]):
+        """New item selected from the happi search."""
+        client = self.client
+        if not client or not items:
+            return
+
+        def get_device() -> Optional[ophyd.Device]:
+            if client is None:  # static check fail
+                return None
+
+            if item in self._device_cache:
+                return self._device_cache[item]
+
+            container = client[item]
+            device = container.get()
+            self._device_cache[item] = device
+            return device
+
+        def get_device_error(ex: Exception):
+            logger.error("Failed to instantiate device %s: %s", item, ex)
+            logger.debug("Failed to instantiate device %s: %s", item, ex, exc_info=ex)
+
+        def set_device(device: Optional[ophyd.Device] = None):
+            self.device_widget.device = device
+
+        if self._device_worker is not None and self._device_worker.isRunning():
+            return
+
+        item, *_ = items
+
+        worker = ThreadWorker(get_device)
+        self._device_worker = worker
+        worker.returned.connect(set_device)
+        worker.error_raised.connect(get_device_error)
+        worker.start()
 
     @property
     def client(self):
