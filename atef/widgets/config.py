@@ -24,7 +24,7 @@ from qtpy.uic import loadUiType
 
 from ..check import (Comparison, Configuration, ConfigurationFile,
                      DeviceConfiguration, Equals, IdentifierAndComparison,
-                     PVConfiguration)
+                     NotEquals, PVConfiguration)
 from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList
 from ..reduce import ReduceMethod
@@ -1992,3 +1992,14 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         if not self.rtol_edit.hasFocus():
             self.rtol_edit.setText(str(rtol))
             self.update_range_label()
+
+
+class NotEqualsWidget(EqualsWidget):
+    data_type = NotEquals
+
+    def setup_equals_widget(self) -> None:
+        """
+        After the equals widget setup, change the symbol.
+        """
+        super().setup_equals_widget()
+        self.equals_label.setText('x ≠ ')
