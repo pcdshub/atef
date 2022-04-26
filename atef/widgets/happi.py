@@ -11,7 +11,7 @@ import happi
 import ophyd
 from happi.qt.model import (HappiDeviceListView, HappiDeviceTreeView,
                             HappiViewMixin)
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtWidgets import QWidget
 
 from ..qt_helpers import ThreadWorker
@@ -171,16 +171,116 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self._search_thread.start()
 
     @property
-    def client(self):
+    def client(self) -> Optional[happi.Client]:
         """The client to use for search."""
         return self._client
 
     @client.setter
-    def client(self, client):
+    def client(self, client: Optional[happi.Client]):
         self._client = client
         self.happi_tree_view.client = client
         self.happi_list_view.client = client
         self.refresh_happi()
+
+
+class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
+    """
+    Happi item (device) metadata information widget.
+
+    Parameters
+    ----------
+    parent : QWidget, optional
+        The parent widget.
+
+    client : happi.Client, optional
+        Happi client instance.  May be supplied at initialization time or
+        later.
+    """
+    filename: ClassVar[str] = 'happi_metadata_view.ui'
+    model: QtGui.QStandardItemModel
+    proxy_model: QtCore.QSortFilterProxyModel
+    label_title: QtWidgets.QLabel
+    table_view: QtWidgets.QTableView
+    happi_items_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)
+
+    updated_metadata = QtCore.Signal(object)
+
+    _client: Optional[happi.client.Client]
+    _item_name: Optional[str]
+    item: Optional[happi.HappiItem]
+
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        *,
+        client: Optional[happi.Client] = None,
+        item_name: Optional[str] = None,
+    ):
+        super().__init__(parent=parent)
+        self._client = None
+        self._item_name = None
+        self._item = None
+        self._setup_ui()
+        # Set the client/item at the end, as this may trigger an update:
+        self.client = client
+        self.item_name = item_name
+
+    def _setup_ui(self):
+        self.model = QtGui.QStandardItemModel()
+
+        self.proxy_model = QtCore.QSortFilterProxyModel()
+        self.proxy_model.setFilterKeyColumn(-1)
+        self.proxy_model.setDynamicSortFilter(True)
+        self.proxy_model.setSourceModel(self.model)
+        self.table_view.setModel(self.proxy_model)
+
+    def _update_metadata(self):
+        if self.client is None or self.item_name is None:
+            return
+
+        try:
+            self.item = self.client[self.item_name]
+        except KeyError:
+            self.item = None
+
+        metadata = dict(self.item or {})
+        self.updated_metadata.emit(metadata)
+        self.model.clear()
+        if self.item is None:
+            self.label_title.setText("")
+            return
+
+        self.label_title.setText(metadata["name"])
+        self.model.setHorizontalHeaderLabels(["Key", "Value"])
+        skip_keys = {"_id", "name"}
+        for key, value in sorted(metadata.items()):
+            if key not in skip_keys:
+                self.model.appendRow(
+                    [
+                        QtGui.QStandardItem(str(key)),
+                        QtGui.QStandardItem(str(value)),
+                    ]
+                )
+
+    @property
+    def client(self) -> Optional[happi.Client]:
+        """The client to use for search."""
+        return self._client
+
+    @client.setter
+    def client(self, client: Optional[happi.Client]):
+        self._client = client
+        self._update_metadata()
+
+    @property
+    def item_name(self) -> Optional[str]:
+        """The item name to use for search."""
+        return self._item_name
+
+    @item_name.setter
+    def item_name(self, item_name: Optional[str]):
+        self._item_name = item_name
+        self._update_metadata()
 
 
 class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
@@ -200,6 +300,7 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
 
     item_search_widget: HappiSearchWidget
     device_widget: OphydDeviceTableWidget
+    metadata_widget: HappiItemMetadataView
     _client: Optional[happi.client.Client]
     _device_worker: Optional[ThreadWorker]
     _device_cache: Dict[str, ophyd.Device]
@@ -243,6 +344,7 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
 
         def set_device(device: Optional[ophyd.Device] = None):
             self.device_widget.device = device
+            self.metadata_widget.item_name = item
 
         if self._device_worker is not None and self._device_worker.isRunning():
             return
@@ -256,11 +358,12 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
         worker.start()
 
     @property
-    def client(self):
+    def client(self) -> Optional[happi.Client]:
         """The client to use for search."""
         return self._client
 
     @client.setter
-    def client(self, client):
+    def client(self, client: Optional[happi.Client]):
         self._client = client
         self.item_search_widget.client = client
+        self.metadata_widget.client = client
