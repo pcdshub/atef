@@ -1886,8 +1886,8 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         match_line_edit_text_width(
             self.value_edit,
             text=text,
-            min=20,
-            buffer=10,
+            min=30,
+            buffer=15,
         )
 
     def update_range_label(self):
@@ -1905,7 +1905,7 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         rtol = self.bridge.rtol.get() or 0
 
         diff = atol + abs(rtol * value)
-        self.range_label.setText(f'± {diff:.3g}')
+        self.range_label.setText(f' ± {diff:.3g}')
 
     def new_gui_value(self, value: str):
         """Slot for when the user inputs a new value using the GUI."""

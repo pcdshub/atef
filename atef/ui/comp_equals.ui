@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
-    <number>1</number>
+    <number>6</number>
    </property>
    <property name="leftMargin">
     <number>0</number>
@@ -33,6 +33,11 @@
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QLabel" name="equals_label">
+       <property name="font">
+        <font>
+         <pointsize>16</pointsize>
+        </font>
+       </property>
        <property name="text">
         <string>x = </string>
        </property>
@@ -40,6 +45,11 @@
      </item>
      <item>
       <widget class="QLineEdit" name="value_edit">
+       <property name="font">
+        <font>
+         <pointsize>16</pointsize>
+        </font>
+       </property>
        <property name="placeholderText">
         <string>0</string>
        </property>
@@ -47,6 +57,11 @@
      </item>
      <item>
       <widget class="QLabel" name="range_label">
+       <property name="font">
+        <font>
+         <pointsize>16</pointsize>
+        </font>
+       </property>
        <property name="text">
         <string>+-0</string>
        </property>
