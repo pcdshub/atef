@@ -1,6 +1,8 @@
 """
 Core classes for atef Qt-based display GUIs.
 """
+from typing import ClassVar
+
 from qtpy.uic import loadUiType
 
 from ..util import ATEF_SOURCE_PATH
@@ -8,7 +10,7 @@ from ..util import ATEF_SOURCE_PATH
 
 class DesignerDisplay:
     """Helper class for loading designer .ui files and adding logic."""
-    filename: str
+    filename: ClassVar[str]
 
     def __init_subclass__(cls):
         """Read the file when the class is created"""

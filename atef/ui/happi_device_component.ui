@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Happi Item and Ophyd Component Selection</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
@@ -57,7 +57,7 @@
        <number>0</number>
       </property>
       <item>
-       <widget class="DeviceWidget" name="device_widget"/>
+       <widget class="OphydDeviceTableWidget" name="device_widget"/>
       </item>
      </layout>
     </widget>
@@ -72,7 +72,7 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>DeviceWidget</class>
+   <class>OphydDeviceTableWidget</class>
    <extends>QFrame</extends>
    <header>atef.widgets.ophyd</header>
    <container>1</container>

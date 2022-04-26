@@ -16,6 +16,8 @@ import ophyd.device
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
+from .core import DesignerDisplay
+
 logger = logging.getLogger(__name__)
 
 
@@ -325,7 +327,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         return len(self._data)
 
 
-class DeviceView(QtWidgets.QTableView):
+class OphydDeviceTableView(QtWidgets.QTableView):
     """A tabular view of an ophyd.Device."""
 
     def __init__(
@@ -361,7 +363,10 @@ class DeviceView(QtWidgets.QTableView):
             return
 
         if self._device is not None:
-            self.models[device].stop()
+            try:
+                self.models[self._device].stop()
+            except KeyError:
+                logger.exception("Failed to stop device model for: %s", self._device)
 
         self._device = device
         if device:
@@ -376,9 +381,14 @@ class DeviceView(QtWidgets.QTableView):
             self.proxy_model.setSourceModel(model)
 
 
-class DeviceWidget(QtWidgets.QFrame):
-    """A convenient frame with an embedded DeviceView."""
+class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
+    """A convenient frame with an embedded OphydDeviceTableView."""
+    filename = "ophyd_device_tree_widget.ui"
+
     closed = QtCore.Signal()
+    label_filter: QtWidgets.QLabel
+    edit_filter: QtWidgets.QLineEdit
+    device_table_view: OphydDeviceTableView
 
     def __init__(
         self,
@@ -388,36 +398,26 @@ class DeviceWidget(QtWidgets.QFrame):
     ):
         super().__init__(parent=parent)
 
-        if device is not None:
-            self.setWindowTitle(device.name)
+        self._setup_ui()
+        self.device = device
 
-        self.setMinimumSize(500, 400)
-
-        self.filter_label = QtWidgets.QLabel("&Filter")
-        self.filter_edit = QtWidgets.QLineEdit()
-        self.filter_label.setBuddy(self.filter_edit)
-
+    def _setup_ui(self):
         def set_filter(text):
-            self.view.proxy_model.setFilterRegExp(text)
+            self.device_table_view.proxy_model.setFilterRegExp(text)
 
-        self.filter_edit.textEdited.connect(set_filter)
-        self.view = DeviceView(device=device)
-        layout = QtWidgets.QGridLayout()
-        self.setLayout(layout)
-
-        layout.addWidget(self.filter_label, 0, 0)
-        layout.addWidget(self.filter_edit, 0, 1)
-        layout.addWidget(self.view, 1, 0, 1, 2)
+        self.edit_filter.textEdited.connect(set_filter)
 
     def closeEvent(self, ev):
         super().closeEvent(ev)
-        self.view.clear()
+        self.device_table_view.clear()
         self.closed.emit()
 
     @property
     def device(self) -> Optional[ophyd.Device]:
-        return self.view.device
+        return self.device_table_view.device
 
     @device.setter
     def device(self, device: Optional[ophyd.Device]):
-        self.view.device = device
+        self.device_table_view.device = device
+        if device is not None:
+            self.setWindowTitle(device.name)

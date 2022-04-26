@@ -16,7 +16,7 @@ from qtpy.QtWidgets import QWidget
 
 from ..qt_helpers import ThreadWorker
 from .core import DesignerDisplay
-from .ophyd import DeviceWidget
+from .ophyd import OphydDeviceTableWidget
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +199,7 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
     filename: ClassVar[str] = 'happi_device_component.ui'
 
     item_search_widget: HappiSearchWidget
-    device_widget: DeviceWidget
+    device_widget: OphydDeviceTableWidget
     _client: Optional[happi.client.Client]
     _device_worker: Optional[ThreadWorker]
     _device_cache: Dict[str, ophyd.Device]
