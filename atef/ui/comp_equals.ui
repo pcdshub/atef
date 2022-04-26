@@ -6,20 +6,35 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>236</width>
-    <height>120</height>
+    <width>238</width>
+    <height>97</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>1</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QLabel" name="equals_label">
        <property name="text">
-        <string>x =</string>
+        <string>x = </string>
        </property>
       </widget>
      </item>
@@ -33,9 +48,22 @@
      <item>
       <widget class="QLabel" name="range_label">
        <property name="text">
-        <string>[low, high]</string>
+        <string>+-0</string>
        </property>
       </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
      </item>
     </layout>
    </item>

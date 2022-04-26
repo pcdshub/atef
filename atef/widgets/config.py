@@ -1210,9 +1210,45 @@ class StrListElem(AtefCfgDisplay, QWidget):
         # Show or hide the del button as needed
         self.del_button.setVisible(not text)
         # Adjust the width to match the text
-        font_metrics = self.line_edit.fontMetrics()
-        width = font_metrics.boundingRect(text).width()
-        self.line_edit.setFixedWidth(max(width + 10, 40))
+        match_line_edit_text_width(self.line_edit, text=text)
+
+
+def match_line_edit_text_width(
+    line_edit: QLineEdit,
+    text: Optional[str] = None,
+    min: int = 40,
+    buffer: int = 10,
+) -> None:
+    """
+    Set the width of a line edit to match the text length.
+
+    You can use this in a slot and connect it to the line edit's
+    "textChanged" signal. This creates an effect where the line
+    edit will get longer when the user types text into it and
+    shorter when the user deletes text from it.
+
+    Parameters
+    ----------
+    line_edit : QLineEdit
+        The line edit whose width you'd like to adjust.
+    text : str, optional
+        The text to use as the basis for our size metrics.
+        In a slot you could pass in the text we get from the
+        signal update. If omitted, we'll use the current text
+        in the widget.
+    min : int, optional
+        The minimum width of the line edit, even when we have no
+        text. If omitted, we'll use a default value.
+    buffer : int, optional
+        The buffer we have on the right side of the rightmost
+        character in the line_edit before the edge of the widget.
+        If omitted, we'll use a default value.
+    """
+    font_metrics = line_edit.fontMetrics()
+    if text is None:
+        text = line_edit.text()
+    width = font_metrics.boundingRect(text).width()
+    line_edit.setFixedWidth(max(width + buffer, min))
 
 
 class FrameOnEditFilter(QObject):
@@ -1823,7 +1859,9 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         for option in self.type_casts:
             self.data_type_combo.addItem(option)
         starting_value = self.bridge.value.get()
-        self.value_edit.setText(str(starting_value))
+        starting_text = str(starting_value)
+        self.value_edit.setText(starting_text)
+        self.update_value_size(starting_text)
         combo_text = self.from_type[type(starting_value)]
         self.data_type_combo.setCurrentText(combo_text)
         starting_atol = self.bridge.atol.get()
@@ -1841,12 +1879,23 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.bridge.atol.changed_value.connect(self.new_internal_atol)
         self.bridge.rtol.changed_value.connect(self.new_internal_rtol)
 
+    def update_value_size(self, text: str):
+        """
+        Call match_line_edit_text_with with specific kwargs.
+        """
+        match_line_edit_text_width(
+            self.value_edit,
+            text=text,
+            min=20,
+            buffer=10,
+        )
+
     def update_range_label(self):
         """
         Update the range label as appropriate.
 
         If our value is an int or float, this will do calculations
-        using the atol and rtol to report the actualy low/high ends
+        using the atol and rtol to report the tolerance
         of the range to the user.
         """
         value = self.bridge.value.get()
@@ -1856,12 +1905,11 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         rtol = self.bridge.rtol.get() or 0
 
         diff = atol + abs(rtol * value)
-        high_val = value + diff
-        low_val = value - diff
-        self.range_label.setText(f'[{low_val}, {high_val}]')
+        self.range_label.setText(f'± {diff:.3g}')
 
     def new_gui_value(self, value: str):
         """Slot for when the user inputs a new value using the GUI."""
+        self.update_value_size(value)
         type_cast = self.type_casts[self.data_type_combo.currentText()]
         try:
             typed_value = type_cast(value)
@@ -1924,7 +1972,9 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         Slot for when anything besides the user updates the value.
         """
         if not self.value_edit.hasFocus():
-            self.value_edit.setText(str(value))
+            text = str(value)
+            self.value_edit.setText(text)
+            self.update_value_size(text)
             self.update_range_label()
 
     def new_internal_atol(self, atol: Number):
