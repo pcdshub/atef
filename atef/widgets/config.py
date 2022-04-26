@@ -1839,7 +1839,7 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         Dataclass bridge to an "Equals" object. This widget will
         read from and write to the "value", "atol", and "rtol"
         fields.
-    parent : QObject, keyword=only
+    parent : QObject, keyword-only
         The normal qt parent argument
     """
     filename = 'comp_equals.ui'
@@ -2106,7 +2106,7 @@ class NotEqualsWidget(EqualsWidget):
         Dataclass bridge to a "NotEquals" object. This widget will
         read from and write to the "value", "atol", and "rtol"
         fields.
-    parent : QObject, keyword=only
+    parent : QObject, keyword-only
         The normal qt parent argument
     """
     data_type = NotEquals
