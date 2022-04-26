@@ -331,7 +331,7 @@ class Comparison:
 
 @dataclass
 class Equals(Comparison):
-    value: PrimitiveType = 0
+    value: PrimitiveType = 0.0
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
 
