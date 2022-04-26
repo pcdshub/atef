@@ -43,8 +43,9 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     radio_by_name: QtWidgets.QRadioButton
     list_or_tree_frame: QtWidgets.QFrame
     button_refresh: QtWidgets.QPushButton
-    happi_tree_view: Optional[HappiDeviceTreeView]
+    happi_tree_view: HappiDeviceTreeView
     happi_list_view: HappiDeviceListView
+    _tree_updated: bool
     _tree_current_category: str
     _search_thread: Optional[ThreadWorker]
 
@@ -59,11 +60,13 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.client = client
         self._tree_current_category = "beamline"
         self._search_thread = None
+        self._tree_has_data = False
         self._setup_ui()
 
     def _setup_ui(self):
-        self.happi_list_view = HappiDeviceListView(client=self.client)
-        self.happi_tree_view = None
+        self.happi_list_view.client = self.client
+        self.happi_tree_view.setVisible(False)
+        self._setup_tree_view()
 
         self.button_refresh.clicked.connect(self.refresh_happi)
         self.list_or_tree_frame.layout().insertWidget(0, self.happi_list_view)
@@ -82,12 +85,10 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             list_selection_changed
         )
 
-    def _setup_tree_view(self) -> HappiDeviceTreeView:
+    def _setup_tree_view(self):
         """Set up the happi_tree_view if not already configured."""
-        if self.happi_tree_view is not None:
-            return self.happi_tree_view
-
-        view = HappiDeviceTreeView(client=self.client)
+        view = self.happi_tree_view
+        view.client = self.client
         view.groups = [
             self.combo_by_category.itemText(idx)
             for idx in range(self.combo_by_category.count())
@@ -108,8 +109,6 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         )
 
         self.happi_tree_view = view
-        self.refresh_happi()
-        return view
 
     @property
     def selected_device_widget(self) -> Union[HappiDeviceListView, HappiDeviceTreeView]:
@@ -117,19 +116,12 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         if self.radio_by_name.isChecked():
             return self.happi_list_view
 
-        if self.happi_tree_view is None:
-            view = self._setup_tree_view()
-            self._category_changed(self.combo_by_category.currentText())
-            return view
-
         return self.happi_tree_view
 
     @QtCore.Slot(str)
     def _category_changed(self, category: str):
         """By-category category has changed."""
-        if self.happi_tree_view is None:
-            self._setup_tree_view()
-        elif self._tree_current_category == category:
+        if self._tree_has_data and self._tree_current_category == category:
             return
 
         self._tree_current_category = category
@@ -144,8 +136,11 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         """Switch between the list/table view."""
         selected = self.selected_device_widget
         for widget in (self.happi_tree_view, self.happi_list_view):
-            if widget is not None:
-                widget.setVisible(selected is widget)
+            widget.setVisible(selected is widget)
+
+        if self.happi_tree_view.isVisible() and not self._tree_has_data:
+            self._tree_has_data = True
+            self.refresh_happi()
 
     @QtCore.Slot()
     def refresh_happi(self):
