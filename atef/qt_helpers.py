@@ -7,6 +7,7 @@ widgets.
 from __future__ import annotations
 
 import dataclasses
+import functools
 import logging
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type
 
@@ -277,7 +278,7 @@ class QDataclassList(QDataclassElem):
         self.updated.emit()
 
 
-class ThreadPoolWorker(QtCore.QRunnable):
+class ThreadWorker(QtCore.QThread):
     """
     Worker thread helper.  For running a function in a background QThread.
 
@@ -291,28 +292,34 @@ class ThreadPoolWorker(QtCore.QRunnable):
         Keyword arguments for the function call.
     """
 
-    def __init__(self, func, *args, **kwargs):
+    error_caught = QtCore.Signal(Exception)
+    func: Callable
+    args: Tuple[Any, ...]
+    kwargs: Dict[str, Any]
+    return_value: Any
+
+    def __init__(self, func: Callable, *args, **kwargs):
         super().__init__()
         self.func = func
         self.args = args
         self.kwargs = kwargs
+        self.return_value = None
 
     @QtCore.Slot()
     def run(self):
         try:
-            self.func(*self.args, **self.kwargs)
-        except Exception:
+            self.return_value = self.func(*self.args, **self.kwargs)
+        except Exception as ex:
             logger.exception(
                 "Failed to run %s(*%s, **%r) in thread pool",
                 self.func,
                 self.args,
                 self.kwargs,
             )
+            self.return_value = ex
+            self.error_caught.emit(ex)
 
-    @classmethod
-    def new_thread(cls, func: Callable, *args, start=True, **kwargs) -> ThreadPoolWorker:
-        """Start a utility thread in the global QThreadPool."""
-        worker = ThreadPoolWorker(func, *args, **kwargs)
-        if start:
-            QtCore.QThreadPool.globalInstance().start(worker)
-        return worker
+
+def run_in_gui_thread(func: Callable, *args, _start_delay_ms: int = 0, **kwargs):
+    """Run the provided function in the GUI thread."""
+    QtCore.QTimer.singleShot(_start_delay_ms, functools.partial(func, *args, **kwargs))

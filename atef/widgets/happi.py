@@ -4,16 +4,19 @@ Widget classes designed for atef-to-happi interaction.
 
 from __future__ import annotations
 
+import logging
 from typing import ClassVar, Optional, Union
 
 import happi
-from happi.qt import HappiDeviceListView
-from happi.qt.model import HappiDeviceTreeView
+from happi.qt.model import (HappiDeviceListView, HappiDeviceTreeView,
+                            HappiViewMixin)
 from qtpy import QtCore, QtWidgets
 from qtpy.QtWidgets import QWidget
 
-from ..qt_helpers import ThreadPoolWorker
+from ..qt_helpers import ThreadWorker
 from .core import DesignerDisplay
+
+logger = logging.getLogger(__name__)
 
 
 class HappiSearchWidget(DesignerDisplay, QWidget):
@@ -42,6 +45,8 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     button_refresh: QtWidgets.QPushButton
     happi_tree_view: Optional[HappiDeviceTreeView]
     happi_list_view: HappiDeviceListView
+    _tree_current_category: str
+    _search_thread: Optional[ThreadWorker]
 
     def __init__(
         self,
@@ -52,6 +57,8 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         if client is None:
             client = happi.Client.from_config()
         self.client = client
+        self._tree_current_category = "beamline"
+        self._search_thread = None
         self._setup_ui()
 
     def _setup_ui(self):
@@ -81,7 +88,6 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             return self.happi_tree_view
 
         view = HappiDeviceTreeView(client=self.client)
-        view.search()
         view.groups = [
             self.combo_by_category.itemText(idx)
             for idx in range(self.combo_by_category.count())
@@ -102,6 +108,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         )
 
         self.happi_tree_view = view
+        self.refresh_happi()
         return view
 
     @property
@@ -121,11 +128,16 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     def _category_changed(self, category: str):
         """By-category category has changed."""
         if self.happi_tree_view is None:
+            self._setup_tree_view()
+        elif self._tree_current_category == category:
             return
 
+        self._tree_current_category = category
         self.happi_tree_view.group_by(category)
         # Bugfix (?) otherwise this ends up in descending order
         self.happi_tree_view.model().sort(0, QtCore.Qt.AscendingOrder)
+        self.radio_by_category.setChecked(True)
+        self._select_device_widget()
 
     @QtCore.Slot()
     def _select_device_widget(self):
@@ -138,11 +150,24 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     @QtCore.Slot()
     def refresh_happi(self):
         """Search happi again and update the widgets."""
-        if False:
-            # To be threaded we need to decouple search and GUI updates;
-            # this will require some happi.qt.model changes.
-            def search():
-                self.selected_device_widget.search()
+        def search():
+            # TODO/upstream: this is coupled with 'search' in the view
+            HappiViewMixin.search(self.selected_device_widget)
 
-            ThreadPoolWorker.new_thread(search)
-        self.selected_device_widget.search()
+        def update_gui():
+            # TODO/upstream: this is coupled with 'search' in the view
+            self.selected_device_widget._update_data()
+            self.button_refresh.setEnabled(True)
+
+        def report_error(ex: Exception):
+            logger.warning("Failed to update happi information: %s", ex, exc_info=ex)
+            self.button_refresh.setEnabled(True)
+
+        if self._search_thread is not None and self._search_thread.isRunning():
+            return
+
+        self.button_refresh.setEnabled(False)
+        self._search_thread = ThreadWorker(search)
+        self._search_thread.finished.connect(update_gui)
+        self._search_thread.error_caught.connect(report_error)
+        self._search_thread.start()
