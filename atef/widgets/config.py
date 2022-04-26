@@ -1811,6 +1811,12 @@ def user_string_to_bool(text: str) -> bool:
     like "fa" should evaluate to False, numeric inputs like
     1 or 2 should evaluate to True, numeric inputs like 0 or
     0.0 should evaluate to False, etc.
+
+    Parameters
+    ----------
+    text : str
+        The user's text input as a string. This is usually
+        the value directly from a line edit widget.
     """
     if not text:
         return False
@@ -1867,7 +1873,7 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.bridge = bridge
         self.setup_equals_widget()
 
-    def setup_equals_widget(self):
+    def setup_equals_widget(self) -> None:
         """
         Do all the setup needed to make this widget functional.
 
@@ -1905,9 +1911,16 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.bridge.atol.changed_value.connect(self.new_internal_atol)
         self.bridge.rtol.changed_value.connect(self.new_internal_rtol)
 
-    def update_value_size(self, text: str):
+    def update_value_size(self, text: str) -> None:
         """
         Call match_line_edit_text_with with specific kwargs.
+
+        This makes the value edit box expand or contract as needed.
+
+        Parameters
+        ----------
+        text : str
+            The text from the textUpdated signal.
         """
         match_line_edit_text_width(
             self.value_edit,
@@ -1916,13 +1929,16 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
             buffer=15,
         )
 
-    def update_range_label(self):
+    def update_range_label(self) -> None:
         """
         Update the range label as appropriate.
 
         If our value is an int or float, this will do calculations
         using the atol and rtol to report the tolerance
         of the range to the user.
+
+        If our value is a bool, this will summarize whether our
+        value is being interpretted as True or False.
         """
         value = self.bridge.value.get()
         if not isinstance(value, (int, float, bool)):
@@ -1937,8 +1953,15 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
             text = f' ± {diff:.3g}'
         self.range_label.setText(text)
 
-    def new_gui_value(self, value: str):
-        """Slot for when the user inputs a new value using the GUI."""
+    def new_gui_value(self, value: str) -> None:
+        """
+        Slot for when the user inputs a new value using the GUI.
+
+        Parameters
+        ----------
+        value : str
+            The user's text input from the GUI
+        """
         self.update_value_size(value)
         type_cast = self.cast_from_user_str[
             self.label_to_type[
@@ -1952,8 +1975,15 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.bridge.value.put(typed_value)
         self.update_range_label()
 
-    def new_gui_atol(self, atol: str):
-        """Slot for when the user inputs a new atol using the GUI."""
+    def new_gui_atol(self, atol: str) -> None:
+        """
+        Slot for when the user inputs a new atol using the GUI.
+
+        Parameters
+        ----------
+        atol : str
+            The user's text input from the GUI
+        """
         try:
             typed_atol = float(atol)
         except ValueError:
@@ -1961,8 +1991,15 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.bridge.atol.put(typed_atol)
         self.update_range_label()
 
-    def new_gui_rtol(self, rtol: str):
-        """Slot for when the user inputs a new atol using the GUI."""
+    def new_gui_rtol(self, rtol: str) -> None:
+        """
+        Slot for when the user inputs a new atol using the GUI.
+
+        Parameters
+        ----------
+        rtol : str
+            The user's text input from the GUI
+        """
         try:
             typed_rtol = float(rtol)
         except ValueError:
@@ -1970,7 +2007,7 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.bridge.rtol.put(typed_rtol)
         self.update_range_label()
 
-    def new_gui_type(self, gui_type_str: str):
+    def new_gui_type(self, gui_type_str: str) -> None:
         """
         Slot for when the user changes the GUI data type.
 
@@ -1979,6 +2016,11 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
 
         If we have a numeric type, we'll enable the range and
         tolerance widgets. Otherwise, we'll disable them.
+
+        Parameters
+        ----------
+        gui_type_str : str
+            The user's text input from the data type combobox.
         """
         gui_type = self.label_to_type[gui_type_str]
         user_cast = self.cast_from_user_str[gui_type]
@@ -2000,9 +2042,18 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.rtol_label.setVisible(tol_vis)
         self.rtol_edit.setVisible(tol_vis)
 
-    def new_internal_value(self, value: PrimitiveType):
+    def new_internal_value(self, value: PrimitiveType) -> None:
         """
         Slot for when anything besides the user updates the value.
+
+        Through this, we'll  update the user's live view
+        of the data structure.
+
+        Parameters
+        ----------
+        value : any primitive
+            The value we recieve from the dataclass bridge's
+            changed_value signal.
         """
         if not self.value_edit.hasFocus():
             text = str(value)
@@ -2010,17 +2061,35 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
             self.update_value_size(text)
             self.update_range_label()
 
-    def new_internal_atol(self, atol: Number):
+    def new_internal_atol(self, atol: Number) -> None:
         """
         Slot for when anything besides the user updates the atol.
+
+        Through this, we'll  update the user's live view
+        of the data structure.
+
+        Parameters
+        ----------
+        atol : any primitive
+            The value we recieve from the dataclass bridge's
+            changed_value signal.
         """
         if not self.atol_edit.hasFocus():
             self.atol_edit.setText(str(atol))
             self.update_range_label()
 
-    def new_internal_rtol(self, rtol: Number):
+    def new_internal_rtol(self, rtol: Number) -> None:
         """
         Slot for when anything besides the user updates the rtol.
+
+        Through this, we'll  update the user's live view
+        of the data structure.
+
+        Parameters
+        ----------
+        rtol : any primitive
+            The value we recieve from the dataclass bridge's
+            changed_value signal.
         """
         if not self.rtol_edit.hasFocus():
             self.rtol_edit.setText(str(rtol))
@@ -2028,6 +2097,18 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
 
 
 class NotEqualsWidget(EqualsWidget):
+    """
+    Variant of the "EqualsWidget" for the "NotEquals" case.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to a "NotEquals" object. This widget will
+        read from and write to the "value", "atol", and "rtol"
+        fields.
+    parent : QObject, keyword=only
+        The normal qt parent argument
+    """
     data_type = NotEquals
 
     def setup_equals_widget(self) -> None:
@@ -2035,4 +2116,6 @@ class NotEqualsWidget(EqualsWidget):
         After the equals widget setup, change the symbol.
         """
         super().setup_equals_widget()
-        self.equals_label.setText('x ≠ ')
+        self.equals_label.setText(
+            self.equals_label.text().replace('=', '≠')
+        )
