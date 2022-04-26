@@ -10,7 +10,8 @@ import os.path
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
+                    Union)
 
 from apischema import deserialize, serialize
 from qtpy.QtCore import QEvent, QObject, QTimer
@@ -1802,6 +1803,26 @@ class CompMixin:
         CompView.register_comparison(cls.data_type, cls)
 
 
+def user_string_to_bool(text: str) -> bool:
+    """
+    Interpret a user's input as a boolean value.
+
+    Strings like "true" should evaluate to True, strings
+    like "fa" should evaluate to False, numeric inputs like
+    1 or 2 should evaluate to True, numeric inputs like 0 or
+    0.0 should evaluate to False, etc.
+    """
+    if not text:
+        return False
+    try:
+        if text[0].lower() in ('n', 'f', '0'):
+            return False
+    except (IndexError, AttributeError):
+        # Not a string, let's be slightly helpful
+        return bool(text)
+    return True
+
+
 class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
     """
     Widget to handle the fields unique to the "Equals" Comparison.
@@ -1817,15 +1838,19 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
     """
     filename = 'comp_equals.ui'
     data_type = Equals
-    type_casts: Dict[str, type] = {
+    label_to_type: Dict[str, type] = {
         'float': float,
         'integer': int,
-        # 'bool': bool, TODO bool needs special handling
+        'bool': bool,
         'string': str,
     }
-    from_type: Dict[type, str] = {
-        value: key for key, value in type_casts.items()
+    type_to_label: Dict[type, str] = {
+        value: key for key, value in label_to_type.items()
     }
+    cast_from_user_str: Dict[type, Callable[[str], bool]] = {
+        tp: tp for tp in type_to_label
+    }
+    cast_from_user_str[bool] = user_string_to_bool
 
     equals_label: QLabel
     value_edit: QLineEdit
@@ -1856,14 +1881,15 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
           data fields
         - Set up the range_label for a summary of the allowed range
         """
-        for option in self.type_casts:
+        for option in self.label_to_type:
             self.data_type_combo.addItem(option)
         starting_value = self.bridge.value.get()
         starting_text = str(starting_value)
         self.value_edit.setText(starting_text)
         self.update_value_size(starting_text)
-        combo_text = self.from_type[type(starting_value)]
-        self.data_type_combo.setCurrentText(combo_text)
+        self.data_type_combo.setCurrentText(
+            self.type_to_label[type(starting_value)]
+        )
         starting_atol = self.bridge.atol.get()
         if starting_atol is not None:
             self.atol_edit.setText(str(starting_atol))
@@ -1899,18 +1925,26 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         of the range to the user.
         """
         value = self.bridge.value.get()
-        if not isinstance(value, (int, float)):
+        if not isinstance(value, (int, float, bool)):
             return
-        atol = self.bridge.atol.get() or 0
-        rtol = self.bridge.rtol.get() or 0
+        if isinstance(value, bool):
+            text = f' ({value})'
+        else:
+            atol = self.bridge.atol.get() or 0
+            rtol = self.bridge.rtol.get() or 0
 
-        diff = atol + abs(rtol * value)
-        self.range_label.setText(f' ± {diff:.3g}')
+            diff = atol + abs(rtol * value)
+            text = f' ± {diff:.3g}'
+        self.range_label.setText(text)
 
     def new_gui_value(self, value: str):
         """Slot for when the user inputs a new value using the GUI."""
         self.update_value_size(value)
-        type_cast = self.type_casts[self.data_type_combo.currentText()]
+        type_cast = self.cast_from_user_str[
+            self.label_to_type[
+                self.data_type_combo.currentText()
+            ]
+        ]
         try:
             typed_value = type_cast(value)
         except ValueError:
@@ -1936,7 +1970,7 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.bridge.rtol.put(typed_rtol)
         self.update_range_label()
 
-    def new_gui_type(self, gui_type: str):
+    def new_gui_type(self, gui_type_str: str):
         """
         Slot for when the user changes the GUI data type.
 
@@ -1946,26 +1980,25 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         If we have a numeric type, we'll enable the range and
         tolerance widgets. Otherwise, we'll disable them.
         """
-        type_cast = self.type_casts[gui_type]
+        gui_type = self.label_to_type[gui_type_str]
+        user_cast = self.cast_from_user_str[gui_type]
         # Try the gui value first
         try:
-            new_value = type_cast(self.value_edit.text())
+            new_value = user_cast(self.value_edit.text())
         except ValueError:
             # Try the bridge value second, or give up
             try:
-                new_value = type_cast(self.bridge.value.get())
+                new_value = gui_type(self.bridge.value.get())
             except ValueError:
                 new_value = None
         if new_value is not None:
             self.bridge.value.put(new_value)
-        if issubclass(self.type_casts[gui_type], (int, float)):
-            self.range_label.setVisible(True)
-            self.atol_edit.setEnabled(True)
-            self.rtol_edit.setEnabled(True)
-        else:
-            self.range_label.setVisible(False)
-            self.atol_edit.setEnabled(False)
-            self.rtol_edit.setEnabled(False)
+        self.range_label.setVisible(gui_type in (int, float, bool))
+        tol_vis = gui_type in (int, float)
+        self.atol_label.setVisible(tol_vis)
+        self.atol_edit.setVisible(tol_vis)
+        self.rtol_label.setVisible(tol_vis)
+        self.rtol_edit.setVisible(tol_vis)
 
     def new_internal_value(self, value: PrimitiveType):
         """
