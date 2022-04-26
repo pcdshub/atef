@@ -26,8 +26,8 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     Parameters
     ----------
     client : happi.Client, optional
-        Happi client instance.  One will be created using ``from_config`` if
-        not supplied.
+        Happi client instance.  May be supplied at initialization time or
+        later.
 
     parent : QWidget, optional
         The parent widget.
@@ -35,7 +35,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     filename: ClassVar[str] = 'happi_search_widget.ui'
     happi_items_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)
 
-    client: happi.client.Client
+    _client: Optional[happi.client.Client]
     combo_by_category: QtWidgets.QComboBox
     device_selection_group: QtWidgets.QGroupBox
     layout_by_name: QtWidgets.QHBoxLayout
@@ -55,16 +55,14 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         parent: Optional[QWidget] = None,
     ):
         super().__init__(parent=parent)
-        if client is None:
-            client = happi.Client.from_config()
-        self.client = client
         self._tree_current_category = "beamline"
         self._search_thread = None
         self._tree_has_data = False
         self._setup_ui()
+        # Set the client at the end, as this may trigger an update:
+        self.client = client
 
     def _setup_ui(self):
-        self.happi_list_view.client = self.client
         self.happi_tree_view.setVisible(False)
         self._setup_tree_view()
 
@@ -88,7 +86,6 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     def _setup_tree_view(self):
         """Set up the happi_tree_view if not already configured."""
         view = self.happi_tree_view
-        view.client = self.client
         view.groups = [
             self.combo_by_category.itemText(idx)
             for idx in range(self.combo_by_category.count())
@@ -158,6 +155,8 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             logger.warning("Failed to update happi information: %s", ex, exc_info=ex)
             self.button_refresh.setEnabled(True)
 
+        if self.client is None:
+            return
         if self._search_thread is not None and self._search_thread.isRunning():
             return
 
@@ -166,3 +165,53 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self._search_thread.finished.connect(update_gui)
         self._search_thread.error_caught.connect(report_error)
         self._search_thread.start()
+
+    @property
+    def client(self):
+        """The client to use for search."""
+        return self._client
+
+    @client.setter
+    def client(self, client):
+        self._client = client
+        self.happi_tree_view.client = client
+        self.happi_list_view.client = client
+        self.refresh_happi()
+
+
+class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
+    """
+    Happi item (device) search widget + component view and selection.
+
+    Parameters
+    ----------
+    client : happi.Client, optional
+        Happi client instance.  One will be created using ``from_config`` if
+        not supplied.
+
+    parent : QWidget, optional
+        The parent widget.
+    """
+    filename: ClassVar[str] = 'happi_device_component.ui'
+
+    item_search_widget: HappiSearchWidget
+    _client: Optional[happi.client.Client]
+
+    def __init__(
+        self,
+        client: Optional[happi.Client] = None,
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(parent=parent)
+        self.client = client
+        # self._setup_ui()
+
+    @property
+    def client(self):
+        """The client to use for search."""
+        return self._client
+
+    @client.setter
+    def client(self, client):
+        self._client = client
+        self.item_search_widget.client = client
