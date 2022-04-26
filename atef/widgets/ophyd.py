@@ -127,17 +127,32 @@ class _DevicePollThread(QtCore.QThread):
         """Update an attribute of the device."""
         setpoint = None
         data = self.data[attr]
+
         try:
-            sig = data.signal
+            if not data.signal.connected:
+                return
+        except TimeoutError:
+            return
 
-            if not data.description:
-                data.description = sig.describe()[sig.name] or {}
+        if not data.description:
+            try:
+                data.description = data.signal.describe()[data.signal.name] or {}
+            except Exception:
+                data.description = {
+                    "units": data.signal.metadata.get("units", ""),
+                }
 
-            if hasattr(sig, "get_setpoint"):
-                setpoint = sig.get_setpoint()
-            elif hasattr(sig, "setpoint"):
-                setpoint = sig.setpoint
-            readback = sig.get()
+        try:
+
+            if hasattr(data.signal, "get_setpoint"):
+                setpoint = data.signal.get_setpoint()
+            elif hasattr(data.signal, "setpoint"):
+                setpoint = data.signal.setpoint
+            readback = data.signal.get()
+        except TimeoutError as ex:
+            # Don't spam on failure to connect
+            logger.debug("Failed to connect to %s.%s (%s)", self.device.name, attr, ex)
+            return
         except Exception:
             logger.exception(
                 "Poll thread for %s.%s @ %.3f sec failure",
@@ -171,12 +186,13 @@ class _DevicePollThread(QtCore.QThread):
 
     def run(self):
         self.running = True
-        attrs = self._instantiate_device()
+        self._attrs = self._instantiate_device()
 
         while self.running:
             t0 = time.monotonic()
-            for attr in list(attrs):
+            for attr in list(self._attrs):
                 self._update_attr(attr)
+                time.sleep(0.001)
 
             elapsed = time.monotonic() - t0
             time.sleep(max((0, self.poll_rate - elapsed)))
