@@ -29,6 +29,6 @@ different parts:
 * General user-facing GUI (TUI)
     * Synoptic for launching tests ("device dashboard")
     * Command-line tools for doing the same
-    
+
 Some plans and ramblings are detailed in the discussions section for now:
 https://github.com/pcdshub/atef/discussions
