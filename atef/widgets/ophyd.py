@@ -13,7 +13,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Set
 import numpy as np
 import ophyd
 import ophyd.device
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
 
 from ..qt_helpers import copy_to_clipboard
@@ -95,11 +95,13 @@ class _DevicePollThread(QtCore.QThread):
     device : ophyd.Device
         The ophyd device to poll.
 
+    poll_rate : float
+        The poll rate in seconds. A zero or negative poll rate will indicate
+        single-shot mode.  In "single shot" mode, the data is queried exactly
+        once and then the thread exits.
+
     data : dict of attr to OphydAttributeData
         Per-attribute OphydAttributeData, potentially generated previously.
-
-    poll_rate : float
-        The poll rate in seconds.
 
     parent : QWidget, optional, keyword-only
         The parent widget.
@@ -233,7 +235,11 @@ class _DevicePollThread(QtCore.QThread):
                 self._update_attr(attr)
                 if not self.running:
                     break
-                time.sleep(0.001)
+                time.sleep(0)
+
+            if self.poll_rate <= 0.0:
+                # A zero or below means "single shot" updates.
+                break
 
             elapsed = time.monotonic() - t0
             time.sleep(max((0, self.poll_rate - elapsed)))
@@ -242,6 +248,9 @@ class _DevicePollThread(QtCore.QThread):
 class PolledDeviceModel(QtCore.QAbstractTableModel):
     """
     A table model representing an ophyd Device with periodic data polling.
+
+    Emits ``data_updates_started`` when polling begins.
+    Emits ``data_updates_finished`` when the polling thread stops.
 
     Parameters
     ----------
@@ -260,13 +269,14 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
     """
 
     _data: Dict[str, OphydAttributeData]
+    _poll_thread: Optional[_DevicePollThread]
     _polling: bool
     _row_to_data: Dict[int, OphydAttributeData]
     device: ophyd.Device
     horizontal_header: List[str]
-    poll_rate: float
-    poll_thread: Optional[_DevicePollThread]
     read_only: bool
+    data_updates_started: ClassVar[QtCore.Signal] = QtCore.Signal()
+    data_updates_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
 
     def __init__(
         self,
@@ -280,7 +290,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         super().__init__(parent=parent, **kwargs)
         self._polling = False
         self.device = device
-        self.poll_rate = float(poll_rate)
+        self._poll_rate = float(poll_rate)
         self.poll_thread = None
         self.read_only = read_only
 
@@ -308,7 +318,30 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         )
         self._data = self._poll_thread.data  # A shared reference
         self._poll_thread.data_ready.connect(self._data_ready)
+        self._poll_thread.finished.connect(self._poll_thread_finished)
+        self.data_updates_started.emit()
         self._poll_thread.start()
+
+    def stop(self) -> None:
+        """Stop the polling thread for the model."""
+        thread = self._poll_thread
+        if not self._polling or not thread:
+            return
+
+        thread.stop()
+        self._poll_thread = None
+        self._polling = False
+
+    @QtCore.Slot()
+    def _poll_thread_finished(self):
+        """Slot: poll thread finished and returned."""
+        self.data_updates_finished.emit()
+        if self._poll_thread is None:
+            return
+
+        self._poll_thread.data_ready.disconnect(self._data_ready)
+        self._poll_thread.finished.disconnect(self._poll_thread_finished)
+        self._polling = False
 
     @QtCore.Slot()
     def _data_ready(self) -> None:
@@ -320,7 +353,8 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
             row: data for row, (_, data) in enumerate(sorted(self._data.items()))
         }
         self.endResetModel()
-        self._poll_thread.data_changed.connect(self._data_changed)
+        if self._poll_thread is not None:
+            self._poll_thread.data_changed.connect(self._data_changed)
 
     @QtCore.Slot(str)
     def _data_changed(self, attr: str) -> None:
@@ -335,15 +369,16 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
                 self.createIndex(row, DeviceColumn.pvname),
             )
 
-    def stop(self) -> None:
-        """Stop the polling thread for the model."""
-        thread = self._poll_thread
-        if not self._polling or not thread:
-            return
+    @property
+    def poll_rate(self) -> float:
+        """The poll rate for the underlying thread."""
+        return self._poll_rate
 
-        thread.running = False
-        self._poll_thread = None
-        self._polling = False
+    @poll_rate.setter
+    def poll_rate(self, rate: float) -> None:
+        self._poll_rate = rate
+        if self._poll_thread is not None and self._polling:
+            self._poll_thread.poll_rate = rate
 
     def hasChildren(self, index: QtCore.QModelIndex) -> bool:
         """Qt hook: does the index have children?"""
@@ -454,6 +489,10 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         The ophyd device to look at.  May be set later.
     """
 
+    poll_rate: float = 0.0
+    data_updates_started: ClassVar[QtCore.Signal] = QtCore.Signal()
+    data_updates_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
+
     def __init__(
         self,
         parent: Optional[QtWidgets.QWidget] = None,
@@ -474,8 +513,26 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         # Set the property last
         self.device = device
 
+    def stop(self) -> None:
+        """Stop the underlying model from updating."""
+        model = self.current_model
+        if model is None:
+            return
+
+        model.stop()
+        try:
+            model.data_updates_started.disconnect(self.data_updates_started.emit)
+        except TypeError:
+            ...
+
+        try:
+            model.data_updates_finished.disconnect(self.data_updates_finished.emit)
+        except TypeError:
+            ...
+
     def clear(self):
         """Clear all models and reset the device."""
+        self.stop()
         for model in self.models.values():
             model.stop()
 
@@ -496,6 +553,14 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         self.menu.exec_(self.mapToGlobal(pos))
 
     @property
+    def current_model(self) -> Optional[PolledDeviceModel]:
+        """The current device model."""
+        try:
+            return self.models[self._device]
+        except KeyError:
+            return None
+
+    @property
     def device(self) -> Optional[ophyd.Device]:
         """The currently-configured ophyd Device."""
         return self._device
@@ -505,22 +570,30 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         if device is self._device:
             return
 
-        if self._device is not None:
-            try:
-                self.models[self._device].stop()
-            except KeyError:
-                logger.exception("Failed to stop device model for: %s", self._device)
+        self.stop()
 
         self._device = device
-        if device:
-            try:
-                model = self.models[device]
-            except KeyError:
-                model = PolledDeviceModel(device=device)
-                self.models[device] = model
+        if not device:
+            return
 
+        try:
+            model = self.models[device]
+        except KeyError:
+            model = PolledDeviceModel(device=device, poll_rate=self.poll_rate)
+            self.models[device] = model
+            new_model = True
+        else:
+            new_model = False
+
+        model.poll_rate = self.poll_rate
+        model.data_updates_started.connect(self.data_updates_started.emit)
+        model.data_updates_finished.connect(self.data_updates_finished.emit)
+        self.proxy_model.setSourceModel(model)
+
+        if new_model:
+            # Only start an update if we haven't previously gotten information
+            # about the device
             model.start()
-            self.proxy_model.setSourceModel(model)
 
 
 class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
@@ -541,6 +614,7 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
     label_filter: QtWidgets.QLabel
     edit_filter: QtWidgets.QLineEdit
     device_table_view: OphydDeviceTableView
+    button_update_data: QtWidgets.QPushButton
 
     def __init__(
         self,
@@ -558,9 +632,28 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
         def set_filter(text):
             self.device_table_view.proxy_model.setFilterRegExp(text)
 
-        self.edit_filter.textEdited.connect(set_filter)
+        def update_data():
+            model = self.device_table_view.current_model
+            if model is not None:
+                model.start()
 
-    def closeEvent(self, ev):
+        self.edit_filter.textEdited.connect(set_filter)
+        self.button_update_data.clicked.connect(update_data)
+        # For now, we are disabling polling for device tables.  Update at the
+        # request of the user.
+        self.device_table_view.poll_rate = 0.0
+
+        def disable_button():
+            self.button_update_data.setEnabled(False)
+
+        self.device_table_view.data_updates_started.connect(disable_button)
+
+        def enable_button():
+            self.button_update_data.setEnabled(True)
+
+        self.device_table_view.data_updates_finished.connect(enable_button)
+
+    def closeEvent(self, ev: QtGui.QCloseEvent):
         super().closeEvent(ev)
         self.device_table_view.clear()
         self.closed.emit()
