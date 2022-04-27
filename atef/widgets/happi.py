@@ -14,7 +14,7 @@ from happi.qt.model import (HappiDeviceListView, HappiDeviceTreeView,
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtWidgets import QWidget
 
-from ..qt_helpers import ThreadWorker
+from ..qt_helpers import ThreadWorker, copy_to_clipboard
 from .core import DesignerDisplay
 from .ophyd import OphydDeviceTableWidget
 
@@ -233,6 +233,21 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         self.proxy_model.setDynamicSortFilter(True)
         self.proxy_model.setSourceModel(self.model)
         self.table_view.setModel(self.proxy_model)
+
+        self.table_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.table_view.customContextMenuRequested.connect(self._table_context_menu)
+
+    def _table_context_menu(self, pos: QtCore.QPoint) -> None:
+        self.menu = QtWidgets.QMenu(self)
+        index: QtCore.QModelIndex = self.table_view.indexAt(pos)
+        if index is not None:
+            def copy(*_):
+                copy_to_clipboard(index.data())
+
+            copy_action = self.menu.addAction(f"&Copy: {index.data()}")
+            copy_action.triggered.connect(copy)
+
+        self.menu.exec_(self.table_view.mapToGlobal(pos))
 
     def _update_metadata(self):
         if self.client is None or self.item_name is None:

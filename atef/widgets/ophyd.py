@@ -16,6 +16,7 @@ import ophyd.device
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
+from ..qt_helpers import copy_to_clipboard
 from .core import DesignerDisplay
 
 logger = logging.getLogger(__name__)
@@ -359,6 +360,9 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         self.proxy_model.setDynamicSortFilter(True)
         self.setModel(self.proxy_model)
 
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._table_context_menu)
+
         self.models = {}
         self._device = None
 
@@ -370,6 +374,18 @@ class OphydDeviceTableView(QtWidgets.QTableView):
             model.stop()
         self.models.clear()
         self._device = None
+
+    def _table_context_menu(self, pos: QtCore.QPoint) -> None:
+        self.menu = QtWidgets.QMenu(self)
+        index: QtCore.QModelIndex = self.indexAt(pos)
+        if index is not None:
+            def copy(*_):
+                copy_to_clipboard(index.data())
+
+            copy_action = self.menu.addAction(f"&Copy: {index.data()}")
+            copy_action.triggered.connect(copy)
+
+        self.menu.exec_(self.mapToGlobal(pos))
 
     @property
     def device(self) -> Optional[ophyd.Device]:
