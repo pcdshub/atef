@@ -369,6 +369,13 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
                 self.createIndex(row, DeviceColumn.pvname),
             )
 
+    def get_data_for_row(self, row: int) -> Optional[OphydAttributeData]:
+        """Get the OphydAttributeData for the provided row."""
+        try:
+            return self._row_to_data[row]
+        except KeyError:
+            return None
+
     @property
     def poll_rate(self) -> float:
         """The poll rate for the underlying thread."""
@@ -496,7 +503,7 @@ class OphydDeviceTableView(QtWidgets.QTableView):
     #: Signal indicating the model's poll thread has finished executing.
     data_updates_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
     #: Signal indicating the attributes have been selected by the user.
-    attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(str)
+    attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)  # List[str]
 
     def __init__(
         self,
@@ -553,7 +560,7 @@ class OphydDeviceTableView(QtWidgets.QTableView):
                 copy_to_clipboard(index.data())
 
             def select_attr(*_):
-                self.attributes_selected.emit([attr])
+                self.attributes_selected.emit([row_data.attr])
 
             if index.data() is not None:
                 copy_action = self.menu.addAction(f"&Copy: {index.data()}")
@@ -561,11 +568,12 @@ class OphydDeviceTableView(QtWidgets.QTableView):
 
             model = self.current_model
             if model is not None:
-                attr = model.data(
-                    model.createIndex(index.row(), DeviceColumn.attribute), 0
-                )
-                select_action = self.menu.addAction(f"&Select attribute: {attr}")
-                select_action.triggered.connect(select_attr)
+                row_data = self.proxy_model.get_data_for_row(index.row())
+                if row_data is not None:
+                    select_action = self.menu.addAction(
+                        f"&Select attribute: {row_data.attr}"
+                    )
+                    select_action.triggered.connect(select_attr)
 
         self.menu.exec_(self.mapToGlobal(pos))
 
@@ -627,11 +635,14 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
     """
     filename = "ophyd_device_tree_widget.ui"
 
-    closed = QtCore.Signal()
+    closed: ClassVar[QtCore.Signal] = QtCore.Signal()
+    attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)  # List[str]
+
     label_filter: QtWidgets.QLabel
     edit_filter: QtWidgets.QLineEdit
     device_table_view: OphydDeviceTableView
     button_update_data: QtWidgets.QPushButton
+    button_select_attrs: QtWidgets.QPushButton
 
     def __init__(
         self,
@@ -669,6 +680,29 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
             self.button_update_data.setEnabled(True)
 
         self.device_table_view.data_updates_finished.connect(enable_button)
+
+        def table_selection_changed(
+            selected: QtCore.QItemSelection, deselected: QtCore.QItemSelection
+        ):
+            self.button_select_attrs.setEnabled(len(selected.indexes()))
+
+        def select_attrs():
+            model = self.device_table_view.current_model
+            if model is not None:
+                rows = sorted(
+                    set(
+                        index.row()
+                        for index in self.device_table_view.selectedIndexes()
+                    )
+                )
+                data = [model.get_data_for_row(row) for row in rows]
+                attrs = [datum.attr for datum in data if datum is not None]
+                self.attributes_selected.emit(attrs)
+
+        self.button_select_attrs.clicked.connect(select_attrs)
+        self.device_table_view.attributes_selected.connect(
+            self.attributes_selected.emit
+        )
 
     def closeEvent(self, ev: QtGui.QCloseEvent):
         super().closeEvent(ev)
