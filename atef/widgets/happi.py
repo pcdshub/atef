@@ -344,12 +344,14 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
 
         def set_device(device: Optional[ophyd.Device] = None):
             self.device_widget.device = device
-            self.metadata_widget.item_name = item
 
         if self._device_worker is not None and self._device_worker.isRunning():
             return
 
         item, *_ = items
+
+        # Set metadata early, even if instantiation fails
+        self.metadata_widget.item_name = item
 
         worker = ThreadWorker(get_device)
         self._device_worker = worker
