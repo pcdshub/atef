@@ -9,9 +9,10 @@ from __future__ import annotations
 import dataclasses
 import functools
 import logging
+import platform
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type
 
-from qtpy import QtCore
+from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QObject
 from qtpy.QtCore import Signal as QSignal
 
@@ -326,3 +327,65 @@ class ThreadWorker(QtCore.QThread):
 def run_in_gui_thread(func: Callable, *args, _start_delay_ms: int = 0, **kwargs):
     """Run the provided function in the GUI thread."""
     QtCore.QTimer.singleShot(_start_delay_ms, functools.partial(func, *args, **kwargs))
+
+
+def get_clipboard() -> Optional[QtGui.QClipboard]:
+    """Get the clipboard instance. Requires a QApplication."""
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return None
+
+    return QtWidgets.QApplication.clipboard()
+
+
+def get_clipboard_modes() -> List[int]:
+    """Get the clipboard modes for the current platform."""
+    clipboard = get_clipboard()
+    if clipboard is None:
+        return []
+
+    if platform.system() == "Linux":
+        # Mode selection is only valid for X11.
+        return [
+            QtGui.QClipboard.Selection,
+            QtGui.QClipboard.Clipboard
+        ]
+
+    return [QtGui.QClipboard.Clipboard]
+
+
+def copy_to_clipboard(text, *, quiet: bool = False):
+    """Copy ``text`` to the clipboard."""
+    clipboard = get_clipboard()
+    if clipboard is None:
+        return None
+
+    for mode in get_clipboard_modes():
+        clipboard.setText(text, mode=mode)
+        event = QtCore.QEvent(QtCore.QEvent.Clipboard)
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            app.sendEvent(clipboard, event)
+
+    if not quiet:
+        logger.warning(
+            (
+                "Copied text to clipboard:\n"
+                "-------------------------\n"
+                "%s\n"
+                "-------------------------\n"
+            ),
+            text
+        )
+
+
+def get_clipboard_text() -> str:
+    """Get ``text`` from the clipboard. If unavailable or unset, empty string."""
+    clipboard = get_clipboard()
+    if clipboard is None:
+        return ""
+    for mode in get_clipboard_modes():
+        text = clipboard.text(mode=mode)
+        if text:
+            return text
+    return ""
