@@ -238,7 +238,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         ]
         self.start()
 
-    def start(self):
+    def start(self) -> None:
         "Start the polling thread"
         if self._polling:
             return
@@ -250,13 +250,13 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         self._poll_thread.data_changed.connect(self._data_changed)
         self._poll_thread.start()
 
-    def _data_changed(self, attr):
+    def _data_changed(self, attr: str) -> None:
         row = list(self._data).index(attr)
         self.dataChanged.emit(
             self.createIndex(row, 0), self.createIndex(row, self.columnCount(0))
         )
 
-    def stop(self):
+    def stop(self) -> None:
         thread = self._poll_thread
         if self._polling or not thread:
             return
@@ -265,16 +265,18 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         self._poll_thread = None
         self._polling = False
 
-    def hasChildren(self, index):
+    def hasChildren(self, index: QtCore.QModelIndex) -> bool:
         # TODO sub-devices?
         return False
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole:
-            if orientation == Qt.Horizontal:
-                return self.horizontal_header[section]
+    def headerData(self, section, orientation, role=Qt.DisplayRole) -> Optional[str]:
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return self.horizontal_header[section]
+        return None
 
-    def setData(self, index, value, role=Qt.EditRole):
+    def setData(
+        self, index: QtCore.QModelIndex, value: Any, role: int = Qt.EditRole
+    ) -> bool:
         row = index.row()
         column = index.column()
         info = self._row_to_data[row]
@@ -295,7 +297,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         self._set_thread.start()
         return True
 
-    def flags(self, index):
+    def flags(self, index: QtCore.QModelIndex) -> Qt.ItemFlags:
         flags = super().flags(index)
 
         row = index.row()
@@ -336,10 +338,10 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
                     f"{idx}: {item!r}" for idx, item in enumerate(enum_strings)
                 )
 
-    def columnCount(self, index) -> int:
+    def columnCount(self, index: QtCore.QModelIndex) -> int:
         return DeviceColumn.total_columns
 
-    def rowCount(self, index) -> int:
+    def rowCount(self, index: QtCore.QModelIndex) -> int:
         return len(self._data)
 
 
