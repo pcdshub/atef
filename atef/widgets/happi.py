@@ -87,6 +87,35 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             list_selection_changed
         )
 
+        self.happi_list_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.happi_list_view.customContextMenuRequested.connect(
+            self._list_view_context_menu
+        )
+
+    def _tree_view_context_menu(self, pos: QtCore.QPoint) -> None:
+        self.menu = QtWidgets.QMenu(self)
+        index: QtCore.QModelIndex = self.happi_tree_view.indexAt(pos)
+        if index is not None:
+            def copy(*_):
+                copy_to_clipboard(index.data())
+
+            copy_action = self.menu.addAction(f"&Copy: {index.data()}")
+            copy_action.triggered.connect(copy)
+
+        self.menu.exec_(self.happi_tree_view.mapToGlobal(pos))
+
+    def _list_view_context_menu(self, pos: QtCore.QPoint) -> None:
+        self.menu = QtWidgets.QMenu(self)
+        index: QtCore.QModelIndex = self.happi_list_view.indexAt(pos)
+        if index is not None:
+            def copy(*_):
+                copy_to_clipboard(index.data())
+
+            copy_action = self.menu.addAction(f"&Copy: {index.data()}")
+            copy_action.triggered.connect(copy)
+
+        self.menu.exec_(self.happi_list_view.mapToGlobal(pos))
+
     def _setup_tree_view(self):
         """Set up the happi_tree_view if not already configured."""
         view = self.happi_tree_view
@@ -109,7 +138,8 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             tree_selection_changed
         )
 
-        self.happi_tree_view = view
+        view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        view.customContextMenuRequested.connect(self._tree_view_context_menu)
 
     @property
     def selected_device_widget(self) -> Union[HappiDeviceListView, HappiDeviceTreeView]:
