@@ -254,13 +254,14 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         self.model.setHorizontalHeaderLabels(["Key", "Value"])
         skip_keys = {"_id", "name"}
         for key, value in sorted(metadata.items()):
-            if key not in skip_keys:
-                self.model.appendRow(
-                    [
-                        QtGui.QStandardItem(str(key)),
-                        QtGui.QStandardItem(str(value)),
-                    ]
-                )
+            if key in skip_keys:
+                continue
+
+            key_item = QtGui.QStandardItem(str(key))
+            value_item = QtGui.QStandardItem(str(value))
+            key_item.setFlags(key_item.flags() & ~QtCore.Qt.ItemIsEditable)
+            value_item.setFlags(value_item.flags() & ~QtCore.Qt.ItemIsEditable)
+            self.model.appendRow([key_item, value_item])
 
     @property
     def client(self) -> Optional[happi.Client]:
