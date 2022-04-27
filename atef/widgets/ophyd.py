@@ -8,7 +8,7 @@ import enum
 import logging
 import threading
 import time
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
 import ophyd
@@ -96,7 +96,7 @@ class _DevicePollThread(QtCore.QThread):
         The ophyd device to poll.
 
     data : dict of attr to OphydAttributeData
-        Per-attribute OphydAttributeData, generated previously.
+        Per-attribute OphydAttributeData, potentially generated previously.
 
     poll_rate : float
         The poll rate in seconds.
@@ -105,7 +105,8 @@ class _DevicePollThread(QtCore.QThread):
         The parent widget.
     """
 
-    data_changed = QtCore.Signal(str)
+    data_ready: ClassVar[QtCore.Signal] = QtCore.Signal()
+    data_changed: ClassVar[QtCore.Signal] = QtCore.Signal(str)
     running: bool
     device: ophyd.Device
     data: Dict[str, OphydAttributeData]
@@ -115,8 +116,8 @@ class _DevicePollThread(QtCore.QThread):
     def __init__(
         self,
         device: ophyd.Device,
-        data: Dict[str, OphydAttributeData],
         poll_rate: float,
+        data: Dict[str, OphydAttributeData],
         *,
         parent: Optional[QtWidgets.QWidget] = None
     ):
@@ -220,6 +221,12 @@ class _DevicePollThread(QtCore.QThread):
         self.running = True
         self._attrs = self._instantiate_device()
 
+        # We may have already created the dictionary; only do it if necessary:
+        if not self.data:
+            self.data.update(**OphydAttributeData.from_device(self.device))
+
+        self.data_ready.emit()
+
         while self.running:
             t0 = time.monotonic()
             for attr in list(self._attrs):
@@ -241,9 +248,6 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
     device : ophyd.Device
         The ophyd device to poll.
 
-    data : dict of attr to OphydAttributeData
-        Per-attribute OphydAttributeData, generated previously.
-
     poll_rate : float, optional, keyword-only
         The poll rate in seconds.
 
@@ -261,7 +265,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
     device: ophyd.Device
     horizontal_header: List[str]
     poll_rate: float
-    poll_thread: Optional[QtCore.QThread]
+    poll_thread: Optional[_DevicePollThread]
     read_only: bool
 
     def __init__(
@@ -280,10 +284,8 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         self.poll_thread = None
         self.read_only = read_only
 
-        self._data = OphydAttributeData.from_device(device)
-        self._row_to_data = {
-            row: data for row, (_, data) in enumerate(sorted(self._data.items()))
-        }
+        self._data = {}
+        self._row_to_data = {}
         self.horizontal_header = [
             "Attribute",
             "Readback",
@@ -299,23 +301,44 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
 
         self._polling = True
         self._poll_thread = _DevicePollThread(
-            self.device, self._data, self.poll_rate, parent=self
+            device=self.device,
+            data=self._data,
+            poll_rate=self.poll_rate,
+            parent=self,
         )
-        self._poll_thread.data_changed.connect(self._data_changed)
+        self._data = self._poll_thread.data  # A shared reference
+        self._poll_thread.data_ready.connect(self._data_ready)
         self._poll_thread.start()
+
+    @QtCore.Slot()
+    def _data_ready(self) -> None:
+        """
+        Slot: initial indication from _DevicePollThread that the data dictionary is ready.
+        """
+        self.beginResetModel()
+        self._row_to_data = {
+            row: data for row, (_, data) in enumerate(sorted(self._data.items()))
+        }
+        self.endResetModel()
+        self._poll_thread.data_changed.connect(self._data_changed)
 
     @QtCore.Slot(str)
     def _data_changed(self, attr: str) -> None:
         """Slot: data changed for the given attribute in the thread."""
-        row = list(self._data).index(attr)
-        self.dataChanged.emit(
-            self.createIndex(row, 0), self.createIndex(row, self.columnCount(0))
-        )
+        try:
+            row = list(self._data).index(attr)
+        except IndexError:
+            ...
+        else:
+            self.dataChanged.emit(
+                self.createIndex(row, DeviceColumn.readback),
+                self.createIndex(row, DeviceColumn.pvname),
+            )
 
     def stop(self) -> None:
         """Stop the polling thread for the model."""
         thread = self._poll_thread
-        if self._polling or not thread:
+        if not self._polling or not thread:
             return
 
         thread.running = False
@@ -374,7 +397,10 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         """Qt hook: get data for the provided index and role."""
         row = index.row()
         column = index.column()
-        info = self._row_to_data[row]
+        try:
+            info = self._row_to_data[row]
+        except KeyError:
+            return
 
         if role == Qt.EditRole and column == DeviceColumn.setpoint:
             return info.setpoint
@@ -404,13 +430,15 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
 
         return None
 
-    def columnCount(self, index: QtCore.QModelIndex) -> int:
+    def columnCount(self, index: Optional[QtCore.QModelIndex] = None) -> int:
         """Qt hook: column count for the given index."""
         return DeviceColumn.total_columns
 
-    def rowCount(self, index: QtCore.QModelIndex) -> int:
+    def rowCount(self, index: Optional[QtCore.QModelIndex] = None) -> int:
         """Qt hook: row count for the given index."""
-        return len(self._data)
+        if not self._row_to_data:
+            return 0
+        return max(self._row_to_data) + 1
 
 
 class OphydDeviceTableView(QtWidgets.QTableView):
@@ -492,7 +520,6 @@ class OphydDeviceTableView(QtWidgets.QTableView):
                 self.models[device] = model
 
             model.start()
-
             self.proxy_model.setSourceModel(model)
 
 
