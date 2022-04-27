@@ -489,9 +489,14 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         The ophyd device to look at.  May be set later.
     """
 
+    #: The default poll rate for the model update thread.
     poll_rate: float = 0.0
+    #: Signal indicating the model's poll thread has started executing.
     data_updates_started: ClassVar[QtCore.Signal] = QtCore.Signal()
+    #: Signal indicating the model's poll thread has finished executing.
     data_updates_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
+    #: Signal indicating the attributes have been selected by the user.
+    attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(str)
 
     def __init__(
         self,
@@ -547,8 +552,20 @@ class OphydDeviceTableView(QtWidgets.QTableView):
             def copy(*_):
                 copy_to_clipboard(index.data())
 
-            copy_action = self.menu.addAction(f"&Copy: {index.data()}")
-            copy_action.triggered.connect(copy)
+            def select_attr(*_):
+                self.attributes_selected.emit([attr])
+
+            if index.data() is not None:
+                copy_action = self.menu.addAction(f"&Copy: {index.data()}")
+                copy_action.triggered.connect(copy)
+
+            model = self.current_model
+            if model is not None:
+                attr = model.data(
+                    model.createIndex(index.row(), DeviceColumn.attribute), 0
+                )
+                select_action = self.menu.addAction(f"&Select attribute: {attr}")
+                select_action.triggered.connect(select_attr)
 
         self.menu.exec_(self.mapToGlobal(pos))
 
