@@ -51,8 +51,10 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     button_refresh: QtWidgets.QPushButton
     combo_by_category: QtWidgets.QComboBox
     device_selection_group: QtWidgets.QGroupBox
+    edit_filter: QtWidgets.QLineEdit
     happi_list_view: HappiDeviceListView
     happi_tree_view: HappiDeviceTreeView
+    label_filter: QtWidgets.QLabel
     layout_by_name: QtWidgets.QHBoxLayout
     list_or_tree_frame: QtWidgets.QFrame
     radio_by_category: QtWidgets.QRadioButton
@@ -103,6 +105,11 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             self._list_view_context_menu
         )
 
+        def set_filter(text):
+            self.happi_list_view.proxy_model.setFilterRegExp(text)
+
+        self.edit_filter.textEdited.connect(set_filter)
+
     def _setup_tree_view(self):
         """Set up the happi_tree_view."""
         view = self.happi_tree_view
@@ -128,6 +135,12 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
 
         view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         view.customContextMenuRequested.connect(self._tree_view_context_menu)
+
+        def set_filter(text):
+            self.happi_tree_view.proxy_model.setFilterRegExp(text)
+
+        self.edit_filter.textEdited.connect(set_filter)
+        view.proxy_model.setRecursiveFilteringEnabled(True)
 
     def _tree_view_context_menu(self, pos: QtCore.QPoint) -> None:
         """Context menu for the happi tree view."""
