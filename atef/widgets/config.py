@@ -24,8 +24,9 @@ from qtpy.QtWidgets import (QAction, QComboBox, QFileDialog, QFormLayout,
 from qtpy.uic import loadUiType
 
 from ..check import (Comparison, Configuration, ConfigurationFile,
-                     DeviceConfiguration, Equals, IdentifierAndComparison,
-                     NotEquals, PVConfiguration)
+                     DeviceConfiguration, Equals, Greater, GreaterOrEqual,
+                     IdentifierAndComparison, Less, LessOrEqual, NotEquals,
+                     PVConfiguration)
 from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList
 from ..reduce import ReduceMethod
@@ -2119,3 +2120,167 @@ class NotEqualsWidget(EqualsWidget):
         self.equals_label.setText(
             self.equals_label.text().replace('=', '≠')
         )
+
+
+class GtLtBaseWidget(AtefCfgDisplay, QWidget):
+    """
+    Base widget for comparisons like greater, less, etc.
+
+    This class cannot be used on its own to manipulate the
+    configuration. It must be subclassed to define "data_type"
+    and "symbol".
+
+    These comparisons have the following properties in common:
+    - The only unique field is "value"
+    - The comparison can be represented by a single symbol
+    """
+    filename = 'comp_float_gtlt.ui'
+
+    symbol: str
+    value_edit: QLineEdit
+    comp_symbol_label: QLabel
+
+    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bridge = bridge
+        self.setup_gtlt_widget()
+
+    def setup_gtlt_widget(self) -> None:
+        """
+        Do all the setup needed to make this widget functional.
+
+        Things handled here:
+        - Set the comparison symbol character
+        - Fill in the starting value
+        - Connect the edit widget to its data field
+        """
+        self.comp_symbol_label.setText(self.symbol)
+        starting_value = self.bridge.value.get()
+        starting_text = str(starting_value)
+        self.value_edit.setText(starting_text)
+        self.update_value_size(starting_text)
+        self.value_edit.textEdited.connect(self.new_gui_value)
+        self.bridge.value.changed_value.connect(self.new_internal_value)
+
+    def update_value_size(self, text: str) -> None:
+        """
+        Call match_line_edit_text_with with specific kwargs.
+
+        This makes the value edit box expand or contract as needed.
+
+        Parameters
+        ----------
+        text : str
+            The text from the textUpdated signal.
+        """
+        match_line_edit_text_width(
+            self.value_edit,
+            text=text,
+            min=30,
+            buffer=15,
+        )
+
+    def new_gui_value(self, value: str) -> None:
+        """
+        Slot for when the user inputs a new value using the GUI.
+
+        Parameters
+        ----------
+        value : str
+            The user's text input from the GUI
+        """
+        self.update_value_size(value)
+        try:
+            typed_value = int(value)
+        except ValueError:
+            try:
+                typed_value = float(value)
+            except ValueError:
+                return
+        self.bridge.value.put(typed_value)
+
+    def new_internal_value(self, value: Number) -> None:
+        """
+        Slot for when anything besides the user updates the value.
+
+        Through this, we'll  update the user's live view
+        of the data structure.
+
+        Parameters
+        ----------
+        value : any primitive
+            The value we recieve from the dataclass bridge's
+            changed_value signal.
+        """
+        if not self.value_edit.hasFocus():
+            text = str(value)
+            self.value_edit.setText(text)
+            self.update_value_size(text)
+
+
+class GreaterWidget(CompMixin, GtLtBaseWidget):
+    """
+    Widget to handle the "Greater" comparison.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to an "Equals" object. This widget will
+        read from and write to the "value", "atol", and "rtol"
+        fields.
+    parent : QObject, keyword-only
+        The normal qt parent argument
+    """
+    data_type = Greater
+    symbol = '>'
+
+
+class GreaterOrEqualWidget(CompMixin, GtLtBaseWidget):
+    """
+    Widget to handle the "GreaterOrEqual" comparison.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to an "Equals" object. This widget will
+        read from and write to the "value", "atol", and "rtol"
+        fields.
+    parent : QObject, keyword-only
+        The normal qt parent argument
+    """
+    data_type = GreaterOrEqual
+    symbol = '≥'
+
+
+class LessWidget(CompMixin, GtLtBaseWidget):
+    """
+    Widget to handle the "Less" comparison.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to an "Equals" object. This widget will
+        read from and write to the "value", "atol", and "rtol"
+        fields.
+    parent : QObject, keyword-only
+        The normal qt parent argument
+    """
+    data_type = Less
+    symbol = '<'
+
+
+class LessOrEqualWidget(CompMixin, GtLtBaseWidget):
+    """
+    Widget to handle the "LessOrEqual" comparison.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to an "Equals" object. This widget will
+        read from and write to the "value", "atol", and "rtol"
+        fields.
+    parent : QObject, keyword-only
+        The normal qt parent argument
+    """
+    data_type = LessOrEqual
+    symbol = '≤'
