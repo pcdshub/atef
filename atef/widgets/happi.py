@@ -5,7 +5,7 @@ Widget classes designed for atef-to-happi interaction.
 from __future__ import annotations
 
 import logging
-from typing import ClassVar, Dict, List, Optional, Union
+from typing import Any, ClassVar, Dict, List, Optional, Union
 
 import happi
 import ophyd
@@ -25,6 +25,13 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     """
     Happi item (device) search widget.
 
+    This widget includes a list view and a tree view for showing all items
+    in happi.  It provides a signal ``happi_items_selected`` such that external
+    widgets can use this to monitor for the selection of one (or more) items.
+
+    To configure multi-item selection, external configuration of
+    happi_list_view and happi_tree_view are currently required.
+
     Parameters
     ----------
     parent : QWidget, optional
@@ -35,21 +42,21 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         later.
     """
     filename: ClassVar[str] = 'happi_search_widget.ui'
-    happi_items_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)
+    happi_items_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)  # List[str]
 
     _client: Optional[happi.client.Client]
+    _search_thread: Optional[ThreadWorker]
+    _tree_current_category: str
+    _tree_updated: bool
+    button_refresh: QtWidgets.QPushButton
     combo_by_category: QtWidgets.QComboBox
     device_selection_group: QtWidgets.QGroupBox
+    happi_list_view: HappiDeviceListView
+    happi_tree_view: HappiDeviceTreeView
     layout_by_name: QtWidgets.QHBoxLayout
+    list_or_tree_frame: QtWidgets.QFrame
     radio_by_category: QtWidgets.QRadioButton
     radio_by_name: QtWidgets.QRadioButton
-    list_or_tree_frame: QtWidgets.QFrame
-    button_refresh: QtWidgets.QPushButton
-    happi_tree_view: HappiDeviceTreeView
-    happi_list_view: HappiDeviceListView
-    _tree_updated: bool
-    _tree_current_category: str
-    _search_thread: Optional[ThreadWorker]
 
     def __init__(
         self,
@@ -67,8 +74,9 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.client = client
 
     def _setup_ui(self):
-        self.happi_tree_view.setVisible(False)
+        """Configure UI elements at init time."""
         self._setup_tree_view()
+        self._setup_list_view()
 
         self.button_refresh.clicked.connect(self.refresh_happi)
         self.list_or_tree_frame.layout().insertWidget(0, self.happi_list_view)
@@ -78,47 +86,27 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.combo_by_category.currentTextChanged.connect(self._category_changed)
         self.button_refresh.clicked.emit()
 
+    def _setup_list_view(self):
+        """Set up the happi_list_view."""
         def list_selection_changed(
             selected: QtCore.QItemSelection, deselected: QtCore.QItemSelection
         ):
             self.happi_items_selected.emit([idx.data() for idx in selected.indexes()])
 
-        self.happi_list_view.selectionModel().selectionChanged.connect(
+        view = self.happi_list_view
+        view.selectionModel().selectionChanged.connect(
             list_selection_changed
         )
 
-        self.happi_list_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.happi_list_view.customContextMenuRequested.connect(
+        view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        view.customContextMenuRequested.connect(
             self._list_view_context_menu
         )
 
-    def _tree_view_context_menu(self, pos: QtCore.QPoint) -> None:
-        self.menu = QtWidgets.QMenu(self)
-        index: QtCore.QModelIndex = self.happi_tree_view.indexAt(pos)
-        if index is not None:
-            def copy(*_):
-                copy_to_clipboard(index.data())
-
-            copy_action = self.menu.addAction(f"&Copy: {index.data()}")
-            copy_action.triggered.connect(copy)
-
-        self.menu.exec_(self.happi_tree_view.mapToGlobal(pos))
-
-    def _list_view_context_menu(self, pos: QtCore.QPoint) -> None:
-        self.menu = QtWidgets.QMenu(self)
-        index: QtCore.QModelIndex = self.happi_list_view.indexAt(pos)
-        if index is not None:
-            def copy(*_):
-                copy_to_clipboard(index.data())
-
-            copy_action = self.menu.addAction(f"&Copy: {index.data()}")
-            copy_action.triggered.connect(copy)
-
-        self.menu.exec_(self.happi_list_view.mapToGlobal(pos))
-
     def _setup_tree_view(self):
-        """Set up the happi_tree_view if not already configured."""
+        """Set up the happi_tree_view."""
         view = self.happi_tree_view
+        view.setVisible(False)
         view.groups = [
             self.combo_by_category.itemText(idx)
             for idx in range(self.combo_by_category.count())
@@ -140,6 +128,32 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
 
         view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         view.customContextMenuRequested.connect(self._tree_view_context_menu)
+
+    def _tree_view_context_menu(self, pos: QtCore.QPoint) -> None:
+        """Context menu for the happi tree view."""
+        self.menu = QtWidgets.QMenu(self)
+        index: QtCore.QModelIndex = self.happi_tree_view.indexAt(pos)
+        if index is not None:
+            def copy(*_):
+                copy_to_clipboard(index.data())
+
+            copy_action = self.menu.addAction(f"&Copy: {index.data()}")
+            copy_action.triggered.connect(copy)
+
+        self.menu.exec_(self.happi_tree_view.mapToGlobal(pos))
+
+    def _list_view_context_menu(self, pos: QtCore.QPoint) -> None:
+        """Context menu for the happi list view."""
+        self.menu = QtWidgets.QMenu(self)
+        index: QtCore.QModelIndex = self.happi_list_view.indexAt(pos)
+        if index is not None:
+            def copy(*_):
+                copy_to_clipboard(index.data())
+
+            copy_action = self.menu.addAction(f"&Copy: {index.data()}")
+            copy_action.triggered.connect(copy)
+
+        self.menu.exec_(self.happi_list_view.mapToGlobal(pos))
 
     @property
     def selected_device_widget(self) -> Union[HappiDeviceListView, HappiDeviceTreeView]:
@@ -217,6 +231,14 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
     """
     Happi item (device) metadata information widget.
 
+    This widget contains a table that displays key and value information
+    as provided from the happi client.
+
+    The default context menu allows for copying of keys or values.
+
+    It emits an ``updated_metadata(item_name: str, md: dict)`` when the
+    underlying model is updated.
+
     Parameters
     ----------
     parent : QWidget, optional
@@ -227,17 +249,16 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         later.
     """
     filename: ClassVar[str] = 'happi_metadata_view.ui'
-    model: QtGui.QStandardItemModel
-    proxy_model: QtCore.QSortFilterProxyModel
-    label_title: QtWidgets.QLabel
-    table_view: QtWidgets.QTableView
-    happi_items_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)
-
-    updated_metadata = QtCore.Signal(object)
+    updated_metadata: ClassVar[QtCore.Signal] = QtCore.Signal(str, object)
 
     _client: Optional[happi.client.Client]
     _item_name: Optional[str]
     item: Optional[happi.HappiItem]
+    label_title: QtWidgets.QLabel
+    model: QtGui.QStandardItemModel
+    proxy_model: QtCore.QSortFilterProxyModel
+    table_view: QtWidgets.QTableView
+    _metadata: Dict[str, Any]
 
     def __init__(
         self,
@@ -256,6 +277,7 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         self.item_name = item_name
 
     def _setup_ui(self):
+        """Configure UI elements at init time."""
         self.model = QtGui.QStandardItemModel()
 
         self.proxy_model = QtCore.QSortFilterProxyModel()
@@ -268,6 +290,7 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         self.table_view.customContextMenuRequested.connect(self._table_context_menu)
 
     def _table_context_menu(self, pos: QtCore.QPoint) -> None:
+        """Context menu when the key/value table is right-clicked."""
         self.menu = QtWidgets.QMenu(self)
         index: QtCore.QModelIndex = self.table_view.indexAt(pos)
         if index is not None:
@@ -280,6 +303,7 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         self.menu.exec_(self.table_view.mapToGlobal(pos))
 
     def _update_metadata(self):
+        """Update the metadata based on ``self.item_name`` using the configured client."""
         if self.client is None or self.item_name is None:
             return
 
@@ -289,7 +313,8 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
             self.item = None
 
         metadata = dict(self.item or {})
-        self.updated_metadata.emit(metadata)
+        self._metadata = metadata
+        self.updated_metadata.emit(self.item_name, metadata)
         self.model.clear()
         if self.item is None:
             self.label_title.setText("")
@@ -320,7 +345,7 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
 
     @property
     def item_name(self) -> Optional[str]:
-        """The item name to use for search."""
+        """The item name to search for metadata."""
         return self._item_name
 
     @item_name.setter
@@ -328,10 +353,20 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         self._item_name = item_name
         self._update_metadata()
 
+    @property
+    def metadata(self) -> Dict[str, Any]:
+        """The current happi item metadata, as a dictionary."""
+        return dict(self._metadata)
+
 
 class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
     """
     Happi item (device) search widget + component view and selection.
+
+    This is comprised of a :class:`HappiSearchWidget`, which allow for happi
+    item searching and selection, a :class:`HappiItemMetadataView`, and an
+    :class:`OphydDeviceTableWidget` which shows control system-connected
+    information about the device and its components.
 
     Parameters
     ----------
@@ -366,13 +401,15 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
             self._new_item_selection
         )
 
-    def _new_item_selection(self, items: List[str]):
+    @QtCore.Slot(list)
+    def _new_item_selection(self, items: List[str]) -> None:
         """New item selected from the happi search."""
         client = self.client
         if not client or not items:
             return
 
         def get_device() -> Optional[ophyd.Device]:
+            """This happens in a QThread."""
             if client is None:  # static check fail
                 return None
 
@@ -385,10 +422,13 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
             return device
 
         def get_device_error(ex: Exception):
+            """Handler for when ``get_device`` failed in the background thread."""
             logger.error("Failed to instantiate device %s: %s", item, ex)
             logger.debug("Failed to instantiate device %s: %s", item, ex, exc_info=ex)
 
         def set_device(device: Optional[ophyd.Device] = None):
+            """Handler for when ``get_device`` succeeds in the background thread."""
+            # Any GUI-related handling should happen here.
             self.device_widget.device = device
 
         if self._device_worker is not None and self._device_worker.isRunning():

@@ -86,10 +86,30 @@ class DeviceColumn(enum.IntEnum):
 
 class _DevicePollThread(QtCore.QThread):
     """
-    Polling thread
+    Polling thread for updating a PolledDeviceModel.
+
+    Emits ``data_changed(attr: str)`` when an attribute has new data.
+
+    Parameters
+    ----------
+    device : ophyd.Device
+        The ophyd device to poll.
+
+    data : dict of attr to OphydAttributeData
+        Per-attribute OphydAttributeData, generated previously.
+
+    poll_rate : float
+        The poll rate in seconds.
+
+    parent : QWidget, optional, keyword-only
+        The parent widget.
     """
 
     data_changed = QtCore.Signal(str)
+    running: bool
+    device: ophyd.Device
+    data: Dict[str, OphydAttributeData]
+    poll_rate: float
     _attrs: Set[str]
 
     def __init__(
@@ -104,7 +124,12 @@ class _DevicePollThread(QtCore.QThread):
         self.device = device
         self.data = data
         self.poll_rate = poll_rate
+        self.running = False
         self._attrs = set()
+
+    def stop(self) -> None:
+        """Stop the polling thread."""
+        self.running = False
 
     def _instantiate_device(self) -> Set[str]:
         """Instantiate the device and return the attrs to pay attention to."""
@@ -122,6 +147,11 @@ class _DevicePollThread(QtCore.QThread):
                         self.poll_rate,
                     )
                     attrs.remove(attr)
+
+                if not self.running:
+                    # ``stop()`` may have been requested in the meantime
+                    break
+
         return attrs
 
     def _update_attr(self, attr: str):
@@ -144,11 +174,11 @@ class _DevicePollThread(QtCore.QThread):
                 }
 
         try:
-
-            if hasattr(data.signal, "get_setpoint"):
-                setpoint = data.signal.get_setpoint()
-            elif hasattr(data.signal, "setpoint"):
-                setpoint = data.signal.setpoint
+            get_setpoint = getattr(data.signal, "get_setpoint", None)
+            if callable(get_setpoint):
+                setpoint = get_setpoint()
+            else:
+                setpoint = getattr(data.signal, "setpoint", None)
             readback = data.signal.get()
         except TimeoutError as ex:
             # Don't spam on failure to connect
@@ -164,7 +194,7 @@ class _DevicePollThread(QtCore.QThread):
             self._attrs.remove(attr)
             return
 
-        new_data = {}
+        new_data: Dict[str, Any] = {}
         if readback is not None:
             units = data.description.get("units", "") or ""
             new_data["readback"] = f"{readback} {units}"
@@ -186,6 +216,7 @@ class _DevicePollThread(QtCore.QThread):
                     return
 
     def run(self):
+        """The thread polling loop."""
         self.running = True
         self._attrs = self._instantiate_device()
 
@@ -193,6 +224,8 @@ class _DevicePollThread(QtCore.QThread):
             t0 = time.monotonic()
             for attr in list(self._attrs):
                 self._update_attr(attr)
+                if not self.running:
+                    break
                 time.sleep(0.001)
 
             elapsed = time.monotonic() - t0
@@ -200,16 +233,36 @@ class _DevicePollThread(QtCore.QThread):
 
 
 class PolledDeviceModel(QtCore.QAbstractTableModel):
-    """A table model representing an ophyd Device with periodic data polling."""
+    """
+    A table model representing an ophyd Device with periodic data polling.
 
-    device: ophyd.Device
-    poll_rate: float
+    Parameters
+    ----------
+    device : ophyd.Device
+        The ophyd device to poll.
+
+    data : dict of attr to OphydAttributeData
+        Per-attribute OphydAttributeData, generated previously.
+
+    poll_rate : float, optional, keyword-only
+        The poll rate in seconds.
+
+    read_only : bool, optional
+        Defaults to read-only or ``True``. Allow for puts to the control system
+        via ophyd if ``read_only`` is ``False``.
+
+    parent : QWidget, optional, keyword-only
+        The parent widget.
+    """
+
+    _data: Dict[str, OphydAttributeData]
     _polling: bool
+    _row_to_data: Dict[int, OphydAttributeData]
+    device: ophyd.Device
+    horizontal_header: List[str]
+    poll_rate: float
     poll_thread: Optional[QtCore.QThread]
     read_only: bool
-    _data: Dict[str, OphydAttributeData]
-    _row_to_data: Dict[int, OphydAttributeData]
-    horizontal_header: List[str]
 
     def __init__(
         self,
@@ -221,9 +274,9 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         **kwargs
     ):
         super().__init__(parent=parent, **kwargs)
+        self._polling = False
         self.device = device
         self.poll_rate = float(poll_rate)
-        self._polling = False
         self.poll_thread = None
         self.read_only = read_only
 
@@ -251,13 +304,16 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         self._poll_thread.data_changed.connect(self._data_changed)
         self._poll_thread.start()
 
+    @QtCore.Slot(str)
     def _data_changed(self, attr: str) -> None:
+        """Slot: data changed for the given attribute in the thread."""
         row = list(self._data).index(attr)
         self.dataChanged.emit(
             self.createIndex(row, 0), self.createIndex(row, self.columnCount(0))
         )
 
     def stop(self) -> None:
+        """Stop the polling thread for the model."""
         thread = self._poll_thread
         if self._polling or not thread:
             return
@@ -267,10 +323,14 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         self._polling = False
 
     def hasChildren(self, index: QtCore.QModelIndex) -> bool:
+        """Qt hook: does the index have children?"""
         # TODO sub-devices?
         return False
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole) -> Optional[str]:
+    def headerData(
+        self, section: int, orientation: Qt.Orientation, role=Qt.DisplayRole
+    ) -> Optional[str]:
+        """Qt hook: header information."""
         if role == Qt.DisplayRole and orientation == Qt.Horizontal:
             return self.horizontal_header[section]
         return None
@@ -278,6 +338,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
     def setData(
         self, index: QtCore.QModelIndex, value: Any, role: int = Qt.EditRole
     ) -> bool:
+        """Qt hook: request to set ``index`` to ``value``."""
         row = index.row()
         column = index.column()
         info = self._row_to_data[row]
@@ -299,6 +360,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         return True
 
     def flags(self, index: QtCore.QModelIndex) -> Qt.ItemFlags:
+        """Qt hook: flags for the provided index."""
         flags = super().flags(index)
 
         row = index.row()
@@ -308,7 +370,8 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
                 return flags | Qt.ItemIsEnabled | Qt.ItemIsEditable
         return flags
 
-    def data(self, index, role):
+    def data(self, index: QtCore.QModelIndex, role: int) -> Optional[str]:
+        """Qt hook: get data for the provided index and role."""
         row = index.row()
         column = index.column()
         info = self._row_to_data[row]
@@ -339,15 +402,29 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
                     f"{idx}: {item!r}" for idx, item in enumerate(enum_strings)
                 )
 
+        return None
+
     def columnCount(self, index: QtCore.QModelIndex) -> int:
+        """Qt hook: column count for the given index."""
         return DeviceColumn.total_columns
 
     def rowCount(self, index: QtCore.QModelIndex) -> int:
+        """Qt hook: row count for the given index."""
         return len(self._data)
 
 
 class OphydDeviceTableView(QtWidgets.QTableView):
-    """A tabular view of an ophyd.Device."""
+    """
+    A tabular view of an ophyd.Device, its components, and signal values.
+
+    Parameters
+    ----------
+    parent : QWidget, optional
+        The parent widget.
+
+    device : ophyd.Device, optional
+        The ophyd device to look at.  May be set later.
+    """
 
     def __init__(
         self,
@@ -370,12 +447,15 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         self.device = device
 
     def clear(self):
+        """Clear all models and reset the device."""
         for model in self.models.values():
             model.stop()
+
         self.models.clear()
         self._device = None
 
     def _table_context_menu(self, pos: QtCore.QPoint) -> None:
+        """Context menu for the table."""
         self.menu = QtWidgets.QMenu(self)
         index: QtCore.QModelIndex = self.indexAt(pos)
         if index is not None:
@@ -389,6 +469,7 @@ class OphydDeviceTableView(QtWidgets.QTableView):
 
     @property
     def device(self) -> Optional[ophyd.Device]:
+        """The currently-configured ophyd Device."""
         return self._device
 
     @device.setter
@@ -416,7 +497,17 @@ class OphydDeviceTableView(QtWidgets.QTableView):
 
 
 class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
-    """A convenient frame with an embedded OphydDeviceTableView."""
+    """
+    A convenient frame with an embedded OphydDeviceTableView.
+
+    Parameters
+    ----------
+    parent : QWidget, optional
+        The parent widget.
+
+    device : ophyd.Device, optional
+        The ophyd device to look at.  May be set later.
+    """
     filename = "ophyd_device_tree_widget.ui"
 
     closed = QtCore.Signal()
@@ -427,7 +518,6 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
     def __init__(
         self,
         parent: Optional[QtWidgets.QWidget] = None,
-        *,
         device: Optional[ophyd.Device] = None
     ):
         super().__init__(parent=parent)
@@ -436,6 +526,8 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
         self.device = device
 
     def _setup_ui(self):
+        """Configure UI elements at init time."""
+
         def set_filter(text):
             self.device_table_view.proxy_model.setFilterRegExp(text)
 
@@ -448,6 +540,7 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
 
     @property
     def device(self) -> Optional[ophyd.Device]:
+        """The currently-configured ophyd Device."""
         return self.device_table_view.device
 
     @device.setter
