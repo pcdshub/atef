@@ -566,16 +566,24 @@ class OphydDeviceTableView(QtWidgets.QTableView):
                 copy_action = self.menu.addAction(f"&Copy: {index.data()}")
                 copy_action.triggered.connect(copy)
 
-            model = self.current_model
-            if model is not None:
-                row_data = self.proxy_model.get_data_for_row(index.row())
-                if row_data is not None:
-                    select_action = self.menu.addAction(
-                        f"&Select attribute: {row_data.attr}"
-                    )
-                    select_action.triggered.connect(select_attr)
+            row_data = self.get_data_from_proxy_index(index)
+            if row_data is not None:
+                select_action = self.menu.addAction(
+                    f"&Select attribute: {row_data.attr}"
+                )
+                select_action.triggered.connect(select_attr)
 
         self.menu.exec_(self.mapToGlobal(pos))
+
+    def get_data_from_proxy_index(
+        self, index: QtCore.QModelIndex
+    ) -> Optional[OphydAttributeData]:
+        """Proxy model index -> source model index -> OphydAttributeData."""
+        model = self.current_model
+        if model is None:
+            return None
+
+        return model.get_data_for_row(self.proxy_model.mapToSource(index).row())
 
     @property
     def current_model(self) -> Optional[PolledDeviceModel]:
@@ -691,7 +699,7 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
             if model is not None:
                 rows = sorted(
                     set(
-                        index.row()
+                        self.device_table_view.proxy_model.mapToSource(index).row()
                         for index in self.device_table_view.selectedIndexes()
                     )
                 )
