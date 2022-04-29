@@ -409,7 +409,6 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
         self._device_worker = None
         self._device_cache = {}
         self.client = client
-        # self._setup_ui()
         self.item_search_widget.happi_items_selected.connect(
             self._new_item_selection
         )
