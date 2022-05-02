@@ -1925,7 +1925,50 @@ def setup_line_edit_all(
     )
 
 
-class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
+class BasicSymbolMixin:
+    """
+    Mix-in class for very basic comparisons.
+
+    These are comparisons that can be summarized by a single
+    symbol and follow some uniform conventions for the
+    main value widget.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to a compatible dataclass.
+        This widget is expecting a "value" attribute on
+        the dataclass.
+    """
+    symbol: str
+    value_edit: QLineEdit
+    comp_symbol_label: QLabel
+
+    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bridge = bridge
+        self._setup_symbol_comparison()
+
+    def _setup_symbol_comparison(self):
+        """
+        Basic setup for these simple symbol comparisons.
+
+        - Puts the correct symbol into the GUI
+        - Sets up the "value_edit" line edit to resize
+          and be linked to the dataclass's value.
+        """
+        self.comp_symbol_label.setText(self.symbol)
+        setup_line_edit_all(
+            line_edit=self.value_edit,
+            value_obj=self.bridge.value,
+            from_str=float,
+            to_str=str,
+            minimum=30,
+            buffer=15,
+        )
+
+
+class EqualsWidget(CompMixin, BasicSymbolMixin, AtefCfgDisplay, QWidget):
     """
     Widget to handle the fields unique to the "Equals" Comparison.
 
@@ -1955,8 +1998,6 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
     }
     cast_from_user_str[bool] = user_string_to_bool
 
-    comp_symbol_label: QLabel
-    value_edit: QLineEdit
     range_label: QLabel
     atol_label: QLabel
     atol_edit: QLineEdit
@@ -1965,9 +2006,8 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
     data_type_label: QLabel
     data_type_combo: QComboBox
 
-    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bridge = bridge
         self.setup_equals_widget()
 
     def setup_equals_widget(self) -> None:
@@ -1979,21 +2019,13 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
           atol/rtol/range means anything and so that we can allow
           things like numeric strings. Use this selection to cast
           the input from the value text box.
-        - Fill in the starting values for value, atol, and rtol.
+        - Fill in the starting values for atol and rtol.
         - Connect the various edit widgets to their correspoinding
           data fields
         - Set up the range_label for a summary of the allowed range
         """
         for option in self.label_to_type:
             self.data_type_combo.addItem(option)
-        setup_line_edit_all(
-            line_edit=self.value_edit,
-            value_obj=self.bridge.value,
-            from_str=self.value_from_str,
-            to_str=str,
-            minimum=30,
-            buffer=15,
-        )
         setup_line_edit_data(
             line_edit=self.atol_edit,
             value_obj=self.bridge.atol,
@@ -2015,7 +2047,6 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.bridge.value.changed_value.connect(self.update_range_label)
         self.bridge.atol.changed_value.connect(self.update_range_label)
         self.bridge.rtol.changed_value.connect(self.update_range_label)
-        self.comp_symbol_label.setText(self.symbol)
 
     def update_range_label(self, *args, **kwargs) -> None:
         """
@@ -2120,7 +2151,7 @@ class NotEqualsWidget(EqualsWidget):
     symbol = '≠'
 
 
-class GtLtBaseWidget(AtefCfgDisplay, QWidget):
+class GtLtBaseWidget(BasicSymbolMixin, AtefCfgDisplay, QWidget):
     """
     Base widget for comparisons like greater, less, etc.
 
@@ -2133,34 +2164,6 @@ class GtLtBaseWidget(AtefCfgDisplay, QWidget):
     - The comparison can be represented by a single symbol
     """
     filename = 'comp_float_gtlt.ui'
-
-    symbol: str
-    value_edit: QLineEdit
-    comp_symbol_label: QLabel
-
-    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.bridge = bridge
-        self.setup_gtlt_widget()
-
-    def setup_gtlt_widget(self) -> None:
-        """
-        Do all the setup needed to make this widget functional.
-
-        Things handled here:
-        - Set the comparison symbol character
-        - Fill in the starting value
-        - Connect the edit widget to its data field
-        """
-        self.comp_symbol_label.setText(self.symbol)
-        setup_line_edit_all(
-            line_edit=self.value_edit,
-            value_obj=self.bridge.value,
-            from_str=float,
-            to_str=str,
-            minimum=30,
-            buffer=15,
-        )
 
 
 class GreaterWidget(CompMixin, GtLtBaseWidget):
