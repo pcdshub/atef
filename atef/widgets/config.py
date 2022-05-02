@@ -1940,6 +1940,7 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
     """
     filename = 'comp_equals.ui'
     data_type = Equals
+    symbol = '='
     label_to_type: Dict[str, type] = {
         'float': float,
         'integer': int,
@@ -1954,7 +1955,7 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
     }
     cast_from_user_str[bool] = user_string_to_bool
 
-    equals_label: QLabel
+    comp_symbol_label: QLabel
     value_edit: QLineEdit
     range_label: QLabel
     atol_label: QLabel
@@ -2014,6 +2015,7 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
         self.bridge.value.changed_value.connect(self.update_range_label)
         self.bridge.atol.changed_value.connect(self.update_range_label)
         self.bridge.rtol.changed_value.connect(self.update_range_label)
+        self.comp_symbol_label.setText(self.symbol)
 
     def update_range_label(self, *args, **kwargs) -> None:
         """
@@ -2036,7 +2038,7 @@ class EqualsWidget(CompMixin, AtefCfgDisplay, QWidget):
             rtol = self.bridge.rtol.get() or 0
 
             diff = atol + abs(rtol * value)
-            text = f' ± {diff:.3g}'
+            text = f'± {diff:.3g}'
         self.range_label.setText(text)
 
     def value_from_str(
@@ -2115,15 +2117,7 @@ class NotEqualsWidget(EqualsWidget):
         The normal qt parent argument
     """
     data_type = NotEquals
-
-    def setup_equals_widget(self) -> None:
-        """
-        After the equals widget setup, change the symbol.
-        """
-        super().setup_equals_widget()
-        self.equals_label.setText(
-            self.equals_label.text().replace('=', '≠')
-        )
+    symbol = '≠'
 
 
 class GtLtBaseWidget(AtefCfgDisplay, QWidget):
