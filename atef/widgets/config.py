@@ -8,7 +8,6 @@ import json
 import logging
 import os.path
 from functools import partial
-from pathlib import Path
 from pprint import pprint
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
@@ -21,7 +20,6 @@ from qtpy.QtWidgets import (QAction, QComboBox, QFileDialog, QFormLayout,
                             QMainWindow, QMessageBox, QPlainTextEdit,
                             QPushButton, QTabWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
-from qtpy.uic import loadUiType
 
 from ..check import (Comparison, Configuration, ConfigurationFile,
                      DeviceConfiguration, Equals, Greater, GreaterOrEqual,
@@ -31,32 +29,12 @@ from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod
 from ..type_hints import PrimitiveType
+from .core import DesignerDisplay
 
 logger = logging.getLogger(__name__)
 
 
-class AtefCfgDisplay:
-    """Helper class for loading the .ui files and adding logic."""
-    filename: str
-
-    def __init_subclass__(cls):
-        """Read the file when the class is created"""
-        super().__init_subclass__()
-        cls.ui_form, _ = loadUiType(
-            str(Path(__file__).parent.parent / 'ui' / cls.filename)
-        )
-
-    def __init__(self, *args, **kwargs):
-        """Apply the file to this widget when the instance is created"""
-        super().__init__(*args, **kwargs)
-        self.ui_form.setupUi(self, self)
-
-    def retranslateUi(self, *args, **kwargs):
-        """Required function for setupUi to work in __init__"""
-        self.ui_form.retranslateUi(self, *args, **kwargs)
-
-
-class Window(AtefCfgDisplay, QMainWindow):
+class Window(DesignerDisplay, QMainWindow):
     """
     Main atef config window
 
@@ -236,7 +214,7 @@ class Window(AtefCfgDisplay, QMainWindow):
         pprint(self.serialize_tree(self.get_current_tree()))
 
 
-class Tree(AtefCfgDisplay, QWidget):
+class Tree(DesignerDisplay, QWidget):
     """
     The main per-file widget as a "native" view into the file.
 
@@ -350,7 +328,7 @@ class AtefItem(QTreeWidgetItem):
         return self.widget_cached
 
 
-class Overview(AtefCfgDisplay, QWidget):
+class Overview(DesignerDisplay, QWidget):
     """
     A view of all the top-level "Configuration" objects.
 
@@ -617,7 +595,7 @@ class ConfigTextMixin:
         self.desc_edit.setFixedHeight(line_count * 13 + 12)
 
 
-class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
+class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
     """
     A single row in the overview widget.
 
@@ -746,7 +724,7 @@ class OverviewRow(ConfigTextMixin, AtefCfgDisplay, QWidget):
         self.overview.delete_row(self)
 
 
-class Group(ConfigTextMixin, AtefCfgDisplay, QWidget):
+class Group(ConfigTextMixin, DesignerDisplay, QWidget):
     """
     The group of checklists and devices associated with a Configuration.
 
@@ -1175,7 +1153,7 @@ class NamedDataclassList(StrList):
         self.data_list.put_to_index(index, new_bridge.data)
 
 
-class StrListElem(AtefCfgDisplay, QWidget):
+class StrListElem(DesignerDisplay, QWidget):
     """
     A single element for the StrList widget.
 
@@ -1273,7 +1251,7 @@ class FrameOnEditFilter(QObject):
         return False
 
 
-class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
+class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
     """
     A widget to manage the ids and comparisons associated with a checklist.
 
@@ -1458,7 +1436,7 @@ class IdAndCompWidget(ConfigTextMixin, AtefCfgDisplay, QWidget):
         bridge.deleteLater()
 
 
-class CompView(ConfigTextMixin, AtefCfgDisplay, QWidget):
+class CompView(ConfigTextMixin, DesignerDisplay, QWidget):
     """
     Widget to view and edit a single Comparison subclass.
 
@@ -1968,7 +1946,7 @@ class BasicSymbolMixin:
         )
 
 
-class EqualsWidget(CompMixin, BasicSymbolMixin, AtefCfgDisplay, QWidget):
+class EqualsWidget(CompMixin, BasicSymbolMixin, DesignerDisplay, QWidget):
     """
     Widget to handle the fields unique to the "Equals" Comparison.
 
@@ -2151,7 +2129,7 @@ class NotEqualsWidget(EqualsWidget):
     symbol = '≠'
 
 
-class GtLtBaseWidget(BasicSymbolMixin, AtefCfgDisplay, QWidget):
+class GtLtBaseWidget(BasicSymbolMixin, DesignerDisplay, QWidget):
     """
     Base widget for comparisons like greater, less, etc.
 
