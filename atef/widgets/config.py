@@ -13,18 +13,21 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
 
 from apischema import deserialize, serialize
+from pydm.widgets.drawing import PyDMDrawingLine
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtWidgets import (QAction, QComboBox, QFileDialog, QFormLayout,
-                            QHBoxLayout, QLabel, QLayout, QLineEdit,
-                            QMainWindow, QMessageBox, QPlainTextEdit,
-                            QPushButton, QTabWidget, QToolButton, QTreeWidget,
-                            QTreeWidgetItem, QVBoxLayout, QWidget)
+from qtpy.QtGui import QColor
+from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
+                            QFormLayout, QHBoxLayout, QLabel, QLayout,
+                            QLineEdit, QMainWindow, QMessageBox,
+                            QPlainTextEdit, QPushButton, QTabWidget,
+                            QToolButton, QTreeWidget, QTreeWidgetItem,
+                            QVBoxLayout, QWidget)
 
 from ..check import (Comparison, Configuration, ConfigurationFile,
                      DeviceConfiguration, Equals, Greater, GreaterOrEqual,
                      IdentifierAndComparison, Less, LessOrEqual, NotEquals,
-                     PVConfiguration)
+                     PVConfiguration, Range)
 from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod
@@ -2210,3 +2213,224 @@ class LessOrEqualWidget(CompMixin, GtLtBaseWidget):
     """
     data_type = LessOrEqual
     symbol = '≤'
+
+
+class RangeWidget(CompMixin, DesignerDisplay, QWidget):
+    """
+    Widget to handle the "Range" comparison.
+
+    Contains graphical representations of what the
+    range means, since it might not always be clear
+    to the user what a warning range means.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        Dataclass bridge to an "Range" object.
+    parent : QObject, keyword-only
+        The normal qt parent argument
+    """
+    filename = 'comp_range.ui'
+    data_type = Range
+
+    _intensity = 200
+    red = QColor.fromRgb(_intensity, 0, 0)
+    yellow = QColor.fromRgb(_intensity, _intensity, 0)
+    green = QColor.fromRgb(0, _intensity, 0)
+
+    bridge: QDataclassBridge
+
+    # Core
+    low_edit: QLineEdit
+    high_edit: QLineEdit
+    warn_low_edit: QLineEdit
+    warn_high_edit: QLineEdit
+    inclusive_check: QCheckBox
+
+    # Symbols
+    comp_symbol_label_1: QLabel
+    comp_symbol_label_2: QLabel
+    comp_symbol_label_3: QLabel
+    comp_symbol_label_4: QLabel
+
+    # Graphical
+    low_label: QLabel
+    high_label: QLabel
+    warn_low_label: QLabel
+    warn_high_label: QLabel
+    left_red_line: PyDMDrawingLine
+    left_yellow_line: PyDMDrawingLine
+    green_line: PyDMDrawingLine
+    right_yellow_line: PyDMDrawingLine
+    right_red_line: PyDMDrawingLine
+    vertical_line_1: PyDMDrawingLine
+    vertical_line_2: PyDMDrawingLine
+    vertical_line_3: PyDMDrawingLine
+    vertical_line_4: PyDMDrawingLine
+
+    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bridge = bridge
+        self.setup_range_widget()
+
+    def setup_range_widget(self) -> None:
+        """
+        Do all the setup required for a range widget.
+
+        - Connect the text entry fields and set the dynamic expand/contract
+        - Set up the inclusive checkbox
+        - Set up the symbols based on the inclusive checkbox
+        - Set up the dynamic behavior of the visualization
+        """
+        # Line edits and visualization
+        for ident in ('low', 'high', 'warn_low', 'warn_high'):
+            line_edit = getattr(self, f'{ident}_edit')
+            value_obj = getattr(self.bridge, ident)
+            # Copy all changes to the visualization labels
+            label = getattr(self, f'{ident}_label')
+            line_edit.textChanged.connect(label.setText)
+            # Trigger the visualization update on any update
+            value_obj.changed_value.connect(self.update_visualization)
+            # Standard setup and initialization
+            setup_line_edit_all(
+                line_edit=line_edit,
+                value_obj=value_obj,
+                from_str=float,
+                to_str=str,
+                minimum=100,
+                buffer=15
+            )
+        # Checkbox
+        self.bridge.inclusive.changed_value.connect(
+            self.inclusive_check.setChecked
+        )
+        self.bridge.inclusive.changed_value.connect(
+            self.update_visualization
+        )
+        self.inclusive_check.clicked.connect(self.bridge.inclusive.put)
+        self.inclusive_check.setChecked(self.bridge.inclusive.get())
+        # Symbols
+        self.bridge.inclusive.changed_value.connect(self.update_symbols)
+        self.update_symbols(self.bridge.inclusive.get())
+        # One additional visual update on inversion
+        self.bridge.invert.changed_value.connect(self.update_visualization)
+        # Make sure this was called at least once
+        self.update_visualization()
+
+    def update_symbols(self, inclusive: bool) -> None:
+        """
+        Pick the symbol type based on range inclusiveness.
+
+        Use the less than symbol if not inclusive, and the the
+        less than or equals symbol if inclusive.
+
+        Parameters
+        ----------
+        inclusive : bool
+            True if the range should be inclusive and False otherwise.
+        """
+        if inclusive:
+            symbol = '≤'
+        else:
+            symbol = '<'
+        for index in range(1, 5):
+            label = getattr(self, f'comp_symbol_label_{index}')
+            label.setText(symbol)
+
+    def resizeEvent(self, *args, **kwargs) -> None:
+        """
+        Override resizeEvent to update the visualization when we resize.
+        """
+        self.update_visualization()
+        return super().resizeEvent(*args, **kwargs)
+
+    def update_visualization(self, *args, **kwargs):
+        """
+        Make the visualization match the current data state.
+        """
+        # Cute trick: swap red and green if we're inverted
+        if self.bridge.invert.get():
+            green = self.red
+            red = self.green
+        else:
+            green = self.green
+            red = self.red
+        yellow = self.yellow
+        self.left_red_line.penColor = red
+        self.left_yellow_line.penColor = yellow
+        self.green_line.penColor = green
+        self.right_yellow_line.penColor = yellow
+        self.right_red_line.penColor = red
+        # The boundary lines should be colored to indicate inclusive/not
+        if self.bridge.inclusive.get():
+            # boundaries are the same as the inner
+            self.vertical_line_1.penColor = yellow
+            self.vertical_line_2.penColor = green
+            self.vertical_line_3.penColor = green
+            self.vertical_line_4.penColor = yellow
+        else:
+            # boundaries are the same as the outer
+            self.vertical_line_1.penColor = red
+            self.vertical_line_2.penColor = yellow
+            self.vertical_line_3.penColor = yellow
+            self.vertical_line_4.penColor = red
+
+        # Get static variables to work with for the resize
+        low_mark = self.bridge.low.get()
+        warn_low_mark = self.bridge.warn_low.get()
+        warn_high_mark = self.bridge.warn_high.get()
+        high_mark = self.bridge.high.get()
+        # Make sure the ranges make sense
+        # Nonsense ranges or no warning set: hide the warnings and skip rest
+        try:
+            ordered = low_mark < warn_low_mark < warn_high_mark < high_mark
+        except TypeError:
+            # Something is still None
+            ordered = False
+        real_space = self.width() * 0.7
+
+        if not ordered or self.bridge.invert.get():
+            # No warning bounds, something is nonphysical, or we are inverted
+            # Note: inversion implies a nonsensical "fail and warn" region
+            # that should be ignored.
+            # Hide warnings, scale green, set bound colors, and end
+            self.left_yellow_line.hide()
+            self.right_yellow_line.hide()
+            self.vertical_line_2.hide()
+            self.vertical_line_3.hide()
+            self.warn_low_label.hide()
+            self.warn_high_label.hide()
+            self.green_line.setFixedWidth(int(real_space))
+            # Only red and green are available in this case
+            # So we need to do the full check again
+            if self.bridge.inclusive.get():
+                # boundaries are the same as the inner
+                self.vertical_line_1.penColor = green
+                self.vertical_line_4.penColor = green
+            else:
+                # boundaries are the same as the outer
+                self.vertical_line_1.penColor = red
+                self.vertical_line_4.penColor = red
+            return
+        else:
+            # Looks OK, show everything
+            self.left_yellow_line.show()
+            self.right_yellow_line.show()
+            self.vertical_line_2.show()
+            self.vertical_line_3.show()
+            self.warn_low_label.show()
+            self.warn_high_label.show()
+        # The yellow and green lines should be sized relative to each other
+        total_range = high_mark - low_mark
+        left_range = warn_low_mark - low_mark
+        mid_range = warn_high_mark - warn_low_mark
+        right_range = high_mark - warn_high_mark
+        self.left_yellow_line.setFixedWidth(int(
+            real_space * left_range/total_range
+        ))
+        self.green_line.setFixedWidth(int(
+            real_space * mid_range/total_range
+        ))
+        self.right_yellow_line.setFixedWidth(int(
+            real_space * right_range/total_range
+        ))
