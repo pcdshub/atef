@@ -12,7 +12,6 @@ from pprint import pprint
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
 
-import happi
 from apischema import deserialize, serialize
 from qtpy import QtWidgets
 from qtpy.QtCore import QEvent, QObject, QTimer
@@ -23,6 +22,7 @@ from qtpy.QtWidgets import (QAction, QComboBox, QFileDialog, QFormLayout,
                             QPushButton, QTabWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 
+from .. import util
 from ..check import (Comparison, Configuration, ConfigurationFile,
                      DeviceConfiguration, Equals, Greater, GreaterOrEqual,
                      IdentifierAndComparison, Less, LessOrEqual, NotEquals,
@@ -1105,7 +1105,6 @@ class DeviceListWidget(StringListWithDialog):
     Device list widget, with ``HappiSearchWidget`` for adding new devices.
     """
 
-    _client: ClassVar[Optional[happi.Client]] = None
     _search_widget: Optional[HappiSearchWidget] = None
 
     def _setup_ui(self):
@@ -1122,13 +1121,7 @@ class DeviceListWidget(StringListWithDialog):
         to_select : list of str, optional
             If provided, the device chooser will filter for these items.
         """
-        if DeviceListWidget._client is None:
-            DeviceListWidget._client = happi.Client.from_config()
-
-        self._search_widget = HappiSearchWidget(
-            client=DeviceListWidget._client,
-        )
-
+        self._search_widget = HappiSearchWidget(client=util.get_happi_client())
         self._search_widget.happi_items_chosen.connect(self.add_items)
         self._search_widget.show()
         self._search_widget.activateWindow()
