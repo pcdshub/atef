@@ -12,7 +12,9 @@ from pprint import pprint
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
 
+import happi
 from apischema import deserialize, serialize
+from qtpy import QtWidgets
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtWidgets import (QAction, QComboBox, QFileDialog, QFormLayout,
@@ -30,6 +32,7 @@ from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod
 from ..type_hints import PrimitiveType
 from .core import DesignerDisplay
+from .happi import HappiSearchWidget
 
 logger = logging.getLogger(__name__)
 
@@ -750,7 +753,6 @@ class Group(ConfigTextMixin, DesignerDisplay, QWidget):
     add_tag_button: QToolButton
     devices_container: QWidget
     devices_content: QVBoxLayout
-    add_devices_button: QPushButton
     checklists_container: QWidget
     checklists_content: QVBoxLayout
     add_checklist_button: QPushButton
@@ -794,14 +796,10 @@ class Group(ConfigTextMixin, DesignerDisplay, QWidget):
             self.devices_container.hide()
             self.line_between_adds.hide()
         else:
-            devices_list = StrList(
+            devices_list = DeviceListWidget(
                 data_list=self.bridge.devices,
-                layout=QVBoxLayout(),
             )
             self.devices_content.addWidget(devices_list)
-            self.add_devices_button.clicked.connect(
-                partial(devices_list.add_item, '')
-            )
         self.checklist_list = NamedDataclassList(
             data_list=self.bridge.checklist,
             layout=QVBoxLayout(),
@@ -987,6 +985,157 @@ class StrList(QWidget):
         self.widgets.remove(item)
         self.data_list.remove_index(index)
         item.deleteLater()
+
+
+class StringListWithDialog(DesignerDisplay, QWidget):
+    """
+    A widget used to modify the str variant of QDataclassList, tied to a
+    specific dialog that helps with selection of strings.
+
+    The ``item_add_request`` signal must be hooked into with the
+    caller-specific dialog tool.  This class may be subclassed to add this
+    functionality.
+
+    Parameters
+    ----------
+    data_list : QDataclassList
+        The dataclass list to edit using this widget.
+
+    allow_duplicates : bool, optional
+        Allow duplicate entries in the list.  Defaults to False.
+    """
+    filename: ClassVar[str] = "string_list_with_dialog.ui"
+    item_add_request: ClassVar[QSignal] = QSignal()
+    item_edit_request: ClassVar[QSignal] = QSignal(list)  # List[str]
+
+    button_add: QtWidgets.QToolButton
+    button_layout: QtWidgets.QVBoxLayout
+    button_remove: QtWidgets.QToolButton
+    list_strings: QtWidgets.QListWidget
+
+    def __init__(
+        self,
+        data_list: QDataclassList,
+        allow_duplicates: bool = False,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        print(self.show_type_hints())  # TODO: remove
+        self.data_list = data_list
+        self.allow_duplicates = allow_duplicates
+        self._setup_ui()
+
+    def _setup_ui(self):
+        starting_list = self.data_list.get()
+        for starting_value in starting_list or []:
+            self._add_item(starting_value, init=True)
+
+        # def test():
+        #     text, success = QtWidgets.QInputDialog.getText(
+        #         self, "Device name", "Device name?"
+        #     )
+        #     if success:
+        #         self.add_items([item for item in text.strip().split() if item])
+
+        self.button_add.clicked.connect(self.item_add_request.emit)
+        self.button_remove.clicked.connect(self._remove_item_request)
+
+        def _edit_item_request():
+            self.item_edit_request.emit(self.selected_items_text)
+
+        self.list_strings.doubleClicked.connect(_edit_item_request)
+
+    def _add_item(self, item: str, *, init: bool = False):
+        """
+        Add an item to the QListWidget and the bridge (if init is not set).
+
+        Parameters
+        ----------
+        item : str
+            The item to add.
+
+        init : bool, optional
+            Whether or not this is the initial initialization of this widget.
+            This will be set to True in __init__ so that we don't mutate
+            the underlying dataclass. False, the default, means that we're
+            adding a new dataclass to the list, which means we should
+            definitely append it.
+        """
+        if not self.allow_duplicates and item in self.data_list.get():
+            return
+
+        if not init:
+            self.data_list.append(item)
+
+        self.list_strings.addItem(QtWidgets.QListWidgetItem(item))
+
+    def add_items(self, items: List[str]) -> None:
+        """
+        Add one or more strings to the QListWidget and the bridge.
+
+        Parameters
+        ----------
+        item : list of str
+            The item(s) to add.
+        """
+        for item in items:
+            self._add_item(item)
+
+    @property
+    def selected_items_text(self) -> List[str]:
+        """
+        The text of item(s) currently selected in the QListWidget.
+
+        Returns
+        -------
+        selected : list of str
+        """
+        return [item.text() for item in list(self.list_strings.selectedItems())]
+
+    def _remove_item_request(self):
+        """Qt hook: user requested item removal."""
+        for item in list(self.list_strings.selectedItems()):
+            self.data_list.remove_value(item.text())
+            self.list_strings.removeItemWidget(item)
+
+
+class DeviceListWidget(StringListWithDialog):
+    """
+    Device list widget, with ``HappiSearchWidget`` for adding new devices.
+    """
+
+    _client: ClassVar[Optional[happi.Client]] = None
+    _search_widget: Optional[HappiSearchWidget] = None
+
+    def _setup_ui(self):
+        super()._setup_ui()
+        self.item_add_request.connect(self._open_device_chooser)
+        self.item_edit_request.connect(self._open_device_chooser)
+
+    def _open_device_chooser(self, to_select: Optional[List[str]] = None):
+        """
+        Hook: User requested adding/editing an existing device.
+
+        Parameters
+        ----------
+        to_select : list of str, optional
+            If provided, the device chooser will filter for these items.
+        """
+        if DeviceListWidget._client is None:
+            DeviceListWidget._client = happi.Client.from_config()
+
+        self._search_widget = HappiSearchWidget(
+            client=DeviceListWidget._client,
+        )
+
+        self._search_widget.happi_items_chosen.connect(self.add_items)
+        self._search_widget.show()
+        self._search_widget.activateWindow()
+
+        self._search_widget.edit_filter.setText(
+            "|".join(to_select or []),
+        )
 
 
 class NamedDataclassList(StrList):
