@@ -1,3 +1,4 @@
+import functools
 import logging
 import pathlib
 from typing import Optional, Sequence
@@ -18,6 +19,12 @@ def ophyd_cleanup():
     dispatcher = ophyd.cl.get_dispatcher()
     if dispatcher is not None:
         dispatcher.stop()
+
+
+@functools.lru_cache(None)
+def get_happi_client() -> happi.Client:
+    """Get the atef-configured happi client or the one as-configured by happi."""
+    return happi.Client.from_config()
 
 
 def get_happi_device_by_name(
