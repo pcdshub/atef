@@ -24,70 +24,7 @@
        <property name="horizontalSpacing">
         <number>9</number>
        </property>
-       <item row="0" column="3">
-        <widget class="QLabel" name="comp_symbol_label_2">
-         <property name="font">
-          <font>
-           <pointsize>16</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>?</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QLabel" name="comp_symbol_label_1">
-         <property name="font">
-          <font>
-           <pointsize>16</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>?</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="2">
-        <widget class="QLabel" name="x_label_1">
-         <property name="font">
-          <font>
-           <pointsize>16</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>x</string>
-         </property>
-        </widget>
-       </item>
        <item row="1" column="1">
-        <widget class="QLabel" name="comp_symbol_label_3">
-         <property name="font">
-          <font>
-           <pointsize>16</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>?</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="4">
-        <widget class="QLineEdit" name="high_edit">
-         <property name="font">
-          <font>
-           <pointsize>16</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string/>
-         </property>
-         <property name="placeholderText">
-          <string>0.0</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
         <widget class="QLineEdit" name="warn_low_edit">
          <property name="font">
           <font>
@@ -102,7 +39,31 @@
          </property>
         </widget>
        </item>
-       <item row="1" column="4">
+       <item row="0" column="4">
+        <widget class="QLabel" name="comp_symbol_label_2">
+         <property name="font">
+          <font>
+           <pointsize>16</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>?</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QLabel" name="comp_symbol_label_1">
+         <property name="font">
+          <font>
+           <pointsize>16</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>?</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="5">
         <widget class="QLineEdit" name="warn_high_edit">
          <property name="font">
           <font>
@@ -118,18 +79,18 @@
         </widget>
        </item>
        <item row="1" column="3">
-        <widget class="QLabel" name="comp_symbol_label_4">
+        <widget class="QLabel" name="x_label_2">
          <property name="font">
           <font>
            <pointsize>16</pointsize>
           </font>
          </property>
          <property name="text">
-          <string>?</string>
+          <string>x</string>
          </property>
         </widget>
        </item>
-       <item row="0" column="0">
+       <item row="0" column="1">
         <widget class="QLineEdit" name="low_edit">
          <property name="font">
           <font>
@@ -144,8 +105,8 @@
          </property>
         </widget>
        </item>
-       <item row="1" column="2">
-        <widget class="QLabel" name="x_label_2">
+       <item row="0" column="3">
+        <widget class="QLabel" name="x_label_1">
          <property name="font">
           <font>
            <pointsize>16</pointsize>
@@ -157,6 +118,45 @@
         </widget>
        </item>
        <item row="0" column="5">
+        <widget class="QLineEdit" name="high_edit">
+         <property name="font">
+          <font>
+           <pointsize>16</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="placeholderText">
+          <string>0.0</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="4">
+        <widget class="QLabel" name="comp_symbol_label_4">
+         <property name="font">
+          <font>
+           <pointsize>16</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>?</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QLabel" name="comp_symbol_label_3">
+         <property name="font">
+          <font>
+           <pointsize>16</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>?</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
         <widget class="QLabel" name="pass_fail_label">
          <property name="font">
           <font>
@@ -168,7 +168,7 @@
          </property>
         </widget>
        </item>
-       <item row="1" column="5">
+       <item row="1" column="0">
         <widget class="QLabel" name="warning_label">
          <property name="font">
           <font>
@@ -199,6 +199,9 @@
    </item>
    <item>
     <layout class="QGridLayout" name="gridLayout_2">
+     <property name="horizontalSpacing">
+      <number>0</number>
+     </property>
      <item row="1" column="3">
       <widget class="QLabel" name="warn_low_label">
        <property name="text">
@@ -475,7 +478,7 @@
     </layout>
    </item>
    <item>
-    <widget class="QCheckBox" name="checkBox">
+    <widget class="QCheckBox" name="inclusive_check">
      <property name="font">
       <font>
        <pointsize>16</pointsize>
