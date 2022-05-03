@@ -789,9 +789,17 @@ class Group(ConfigTextMixin, DesignerDisplay, QWidget):
             layout=QHBoxLayout(),
         )
         self.tags_content.addWidget(tags_list)
-        self.add_tag_button.clicked.connect(
-            partial(tags_list.add_item, '')
-        )
+
+        def add_tag():
+            if tags_list.widgets and not tags_list.widgets[-1].line_edit.text().strip():
+                # Don't add another tag if we haven't filled out the last one
+                return
+
+            elem = tags_list.add_item('')
+            elem.line_edit.setFocus()
+
+        self.add_tag_button.clicked.connect(add_tag)
+
         if isinstance(self.bridge.data, PVConfiguration):
             self.devices_container.hide()
             self.line_between_adds.hide()
@@ -1021,7 +1029,6 @@ class StringListWithDialog(DesignerDisplay, QWidget):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        print(self.show_type_hints())  # TODO: remove
         self.data_list = data_list
         self.allow_duplicates = allow_duplicates
         self._setup_ui()
@@ -1497,9 +1504,17 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
                 data_list=self.bridge.ids,
                 layout=QVBoxLayout(),
             )
-            self.add_id_button.clicked.connect(
-                partial(identifiers_list.add_item, '')
-            )
+
+            def add_pv():
+                if identifiers_list.widgets:
+                    if not identifiers_list.widgets[-1].line_edit.text().strip():
+                        # Don't add another id if we haven't filled out the last one
+                        return
+
+                widget = identifiers_list.add_item('')
+                widget.line_edit.setFocus()
+
+            self.add_id_button.clicked.connect(add_pv)
 
         self.id_content.addWidget(identifiers_list)
         # Adjust the identifier text appropriately for config type
