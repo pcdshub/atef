@@ -1197,7 +1197,7 @@ class NamedDataclassList(StrList):
         vertically, etc.
     """
     bridge_item_removed = QSignal(QDataclassBridge)
-    bridges = List[QDataclassBridge]
+    bridges: List[QDataclassBridge]
 
     def __init__(self, *args, **kwargs):
         self.bridges = []
