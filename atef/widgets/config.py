@@ -32,7 +32,7 @@ from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod
 from ..type_hints import PrimitiveType
 from .core import DesignerDisplay
-from .happi import HappiSearchWidget
+from .happi import HappiDeviceComponentWidget, HappiSearchWidget
 
 logger = logging.getLogger(__name__)
 
@@ -1131,6 +1131,46 @@ class DeviceListWidget(StringListWithDialog):
         )
 
 
+class ComponentListWidget(StringListWithDialog):
+    """
+    Component list widget using a ``HappiDeviceComponentWidget``.
+    """
+
+    _search_widget: Optional[HappiDeviceComponentWidget] = None
+
+    def _setup_ui(self):
+        super()._setup_ui()
+        self.item_add_request.connect(self._open_component_chooser)
+        self.item_edit_request.connect(self._open_component_chooser)
+
+    def _open_component_chooser(self, to_select: Optional[List[str]] = None):
+        """
+        Hook: User requested adding/editing a componen.
+
+        Parameters
+        ----------
+        to_select : list of str, optional
+            If provided, the device chooser will filter for these items.
+        """
+
+        widget = HappiDeviceComponentWidget(
+            client=util.get_happi_client()
+        )
+        self._search_widget = widget
+        # widget.item_search_widget.happi_items_chosen.connect(
+        #    self.add_items
+        # )
+        widget.show()
+        widget.activateWindow()
+        widget.device_widget.attributes_selected.connect(
+            self.add_items
+        )
+        # TODO: any way to access the device names?
+        # widget.item_search_widget.edit_filter.setText(
+        #     "|".join(to_select or []),
+        # )
+
+
 class NamedDataclassList(StrList):
     """
     A widget used to modify a QDataclassList with named dataclass elements.
@@ -1447,14 +1487,21 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
         # Connect the name to the dataclass
         self.initialize_config_name()
         # Set up editing of the identifiers list
-        identifiers_list = StrList(
-            data_list=self.bridge.ids,
-            layout=QVBoxLayout(),
-        )
+        if issubclass(self.config_type, DeviceConfiguration):
+            identifiers_list = ComponentListWidget(
+                data_list=self.bridge.ids,
+            )
+            self.add_id_button.setVisible(False)
+        elif issubclass(self.config_type, PVConfiguration):
+            identifiers_list = StrList(
+                data_list=self.bridge.ids,
+                layout=QVBoxLayout(),
+            )
+            self.add_id_button.clicked.connect(
+                partial(identifiers_list.add_item, '')
+            )
+
         self.id_content.addWidget(identifiers_list)
-        self.add_id_button.clicked.connect(
-            partial(identifiers_list.add_item, '')
-        )
         # Adjust the identifier text appropriately for config type
         if issubclass(self.config_type, DeviceConfiguration):
             self.id_label.setText('Device Signals')
