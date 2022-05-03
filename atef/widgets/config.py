@@ -1105,9 +1105,9 @@ class StringListWithDialog(DesignerDisplay, QWidget):
 
     def _remove_item_request(self):
         """Qt hook: user requested item removal."""
-        for item in list(self.list_strings.selectedItems()):
+        for item in self.list_strings.selectedItems():
             self.data_list.remove_value(item.text())
-            self.list_strings.removeItemWidget(item)
+            self.list_strings.takeItem(self.list_strings.row(item))
 
 
 class DeviceListWidget(StringListWithDialog):
