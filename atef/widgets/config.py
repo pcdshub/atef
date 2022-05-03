@@ -2388,16 +2388,12 @@ class RangeWidget(CompMixin, DesignerDisplay, QWidget):
             # Something is still None
             ordered = False
         real_space = self.width() * 0.7
-        if ordered:
-            # Looks OK, show everything
-            self.left_yellow_line.show()
-            self.right_yellow_line.show()
-            self.vertical_line_2.show()
-            self.vertical_line_3.show()
-            self.warn_low_label.show()
-            self.warn_high_label.show()
-        else:
-            # Not OK, hide warnings, scale green, set bound colors, and end
+
+        if not ordered or self.bridge.invert.get():
+            # No warning bounds, something is nonphysical, or we are inverted
+            # Note: inversion implies a nonsensical "fail and warn" region
+            # that should be ignored.
+            # Hide warnings, scale green, set bound colors, and end
             self.left_yellow_line.hide()
             self.right_yellow_line.hide()
             self.vertical_line_2.hide()
@@ -2416,6 +2412,14 @@ class RangeWidget(CompMixin, DesignerDisplay, QWidget):
                 self.vertical_line_1.penColor = red
                 self.vertical_line_4.penColor = red
             return
+        else:
+            # Looks OK, show everything
+            self.left_yellow_line.show()
+            self.right_yellow_line.show()
+            self.vertical_line_2.show()
+            self.vertical_line_3.show()
+            self.warn_low_label.show()
+            self.warn_high_label.show()
         # The yellow and green lines should be sized relative to each other
         total_range = high_mark - low_mark
         left_range = warn_low_mark - low_mark
