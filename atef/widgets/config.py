@@ -254,8 +254,10 @@ class Tree(DesignerDisplay, QWidget):
         self.last_selection: Optional[AtefItem] = None
         self.built_widgets = set()
         self.assemble_tree()
-        self.show_selected_display(self.overview_item)
-        self.tree_widget.itemPressed.connect(self.show_selected_display)
+        self.tree_widget.itemSelectionChanged.connect(
+            self.show_selected_display
+        )
+        self.tree_widget.setCurrentItem(self.overview_item)
 
     def assemble_tree(self):
         """
@@ -271,20 +273,14 @@ class Tree(DesignerDisplay, QWidget):
         )
         self.tree_widget.insertTopLevelItem(0, self.overview_item)
 
-    def show_selected_display(self, item: AtefItem, *args, **kwargs):
+    def show_selected_display(self, *args, **kwargs):
         """
         Show the proper widget on the right when a tree row is selected.
 
         This works by hiding the previous widget and showing the new
         selection, creating the widget object if needed.
-
-        Parameters
-        ----------
-        item : AtefItem
-            The selected item in the tree. This contains information like
-            the textual annotation, cached widget references, and
-            arguments for creating a new widget if needed.
         """
+        item = self.tree_widget.currentItem()
         if item is self.last_selection:
             return
         if self.last_selection is not None:
