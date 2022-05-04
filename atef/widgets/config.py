@@ -21,7 +21,7 @@ from qtpy.QtGui import QColor
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QLabel, QLayout,
                             QLineEdit, QMainWindow, QMessageBox,
-                            QPlainTextEdit, QPushButton, QTabWidget,
+                            QPlainTextEdit, QPushButton, QStyle, QTabWidget,
                             QToolButton, QTreeWidget, QTreeWidgetItem,
                             QVBoxLayout, QWidget)
 
@@ -726,7 +726,37 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
         self.overview.delete_row(self)
 
 
-class Group(ConfigTextMixin, DesignerDisplay, QWidget):
+class TreeParentMixin:
+    """
+    Mix-in class for displays that have a tree parent display.
+
+    These displays should contain a QToolButton named "parent_button"
+    and should have a reference to their AtefItem named "tree_item"
+    for easy access to the tree structure.
+
+    This mix-in will put an icon on that button and will make the
+    tree select and display the parent in the tree when the
+    button in pressed.
+    """
+    parent_button: QToolButton
+    tree_item: AtefItem
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_parent_button()
+
+    def setup_parent_button(self):
+        self.parent_button.clicked.connect(self.navigate_to_parent)
+        icon = self.style().standardIcon(QStyle.SP_FileDialogToParent)
+        self.parent_button.setIcon(icon)
+
+    def navigate_to_parent(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Still need to get a reference to the tree widget"
+        )
+
+
+class Group(TreeParentMixin, ConfigTextMixin, DesignerDisplay, QWidget):
     """
     The group of checklists and devices associated with a Configuration.
 
