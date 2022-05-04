@@ -1421,7 +1421,7 @@ class DeviceListWidget(StringListWithDialog):
     Device list widget, with ``HappiSearchWidget`` for adding new devices.
     """
 
-    _search_widget: Optional[HappiSearchWidget] = None
+    _search_widget: Optional[HappiDeviceComponentWidget] = None
 
     def _setup_ui(self):
         super()._setup_ui()

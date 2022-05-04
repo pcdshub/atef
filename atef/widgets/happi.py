@@ -345,16 +345,26 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         if self.client is None or self.item_name is None:
             return
 
-        try:
-            self.item = self.client[self.item_name]
-        except KeyError:
-            self.item = None
+        def get_metadata():
+            if self.client is None:
+                return {}
 
-        metadata = dict(self.item or {})
+            try:
+                self.item = self.client[self.item_name]
+            except KeyError:
+                self.item = None
+            return dict(self.item or {})
+
+        self._worker = ThreadWorker(get_metadata)
+        self._worker.returned.connect(self._got_metadata)
+        self._worker.start()
+
+    def _got_metadata(self, metadata: dict) -> None:
+        """Got metadata from the background thread."""
         self._metadata = metadata
         self.updated_metadata.emit(self.item_name, metadata)
         self.model.clear()
-        if self.item is None:
+        if not self.item_name:
             self.label_title.setText("")
             return
 
@@ -414,6 +424,10 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
     client : happi.Client, optional
         Happi client instance.  One will be created using ``from_config`` if
         not supplied.
+
+    show_device_components : bool, optional
+        Toggle the visibility of the device component widget.  Defaults to
+        True.
     """
     filename: ClassVar[str] = 'happi_device_component.ui'
 
@@ -423,21 +437,27 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
     _client: Optional[happi.client.Client]
     _device_worker: Optional[ThreadWorker]
     _device_cache: Dict[str, ophyd.Device]
+    group_happi_md: QtWidgets.QGroupBox
+    group_components: QtWidgets.QGroupBox
+    group_device_search: QtWidgets.QGroupBox
 
     def __init__(
         self,
         parent: Optional[QWidget] = None,
         client: Optional[happi.Client] = None,
+        show_device_components: bool = True,
     ):
         super().__init__(parent=parent)
         self._client = None
         self._device_worker = None
         self._device_cache = {}
         self.client = client
+        self.show_device_components = show_device_components
         self.item_search_widget.happi_items_selected.connect(
             self._new_item_selection
         )
         self.item_search_widget.button_choose.setVisible(False)
+        self.group_components.setVisible(show_device_components)
 
     @QtCore.Slot(list)
     def _new_item_selection(self, items: List[str]) -> None:
@@ -476,6 +496,10 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
 
         # Set metadata early, even if instantiation fails
         self.metadata_widget.item_name = item
+
+        if not self.show_device_components:
+            # User can request to never instantiate a device this way
+            return
 
         worker = ThreadWorker(get_device)
         self._device_worker = worker
