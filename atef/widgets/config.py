@@ -1072,10 +1072,10 @@ class StringListWithDialog(DesignerDisplay, QWidget):
             adding a new dataclass to the list, which means we should
             definitely append it.
         """
-        if not self.allow_duplicates and item in self.data_list.get():
-            return
-
         if not init:
+            if not self.allow_duplicates and item in self.data_list.get():
+                return
+
             self.data_list.append(item)
 
         self.list_strings.addItem(QtWidgets.QListWidgetItem(item))
