@@ -731,29 +731,45 @@ class TreeParentMixin:
     Mix-in class for displays that have a tree parent display.
 
     These displays should contain a QToolButton named "parent_button"
-    and should have a reference to their AtefItem named "tree_item"
-    for easy access to the tree structure.
+    and, should have a reference to their AtefItem named
+    "parent_tree_item", and should have a reference to the overall
+    QTreeWidget "tree_ref".
+
+    AtefItem attempts to add the tree_ref and parent_tree_item
+    attributes after initialization to be helpful. This way, we
+    don't have to pass information about the tree or the items
+    up or down the init chains except when needed for special
+    initialization purposes.
 
     This mix-in will put an icon on that button and will make the
     tree select and display the parent in the tree when the
     button in pressed.
     """
     parent_button: QToolButton
-    tree_item: AtefItem
+
+    tree_ref: QTreeWidget
+    parent_tree_item: AtefItem
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setup_parent_button()
+        self._setup_parent_button()
 
-    def setup_parent_button(self):
-        self.parent_button.clicked.connect(self.navigate_to_parent)
+    def _setup_parent_button(self):
+        """
+        Common setup for the "go to parent" button at the top right.
+
+        Adds an icon to the button and sets it up to help us navigate
+        to the correct tree destination.
+        """
+        self.parent_button.clicked.connect(self._navigate_to_parent)
         icon = self.style().standardIcon(QStyle.SP_FileDialogToParent)
         self.parent_button.setIcon(icon)
 
-    def navigate_to_parent(self, *args, **kwargs):
-        raise NotImplementedError(
-            "Still need to get a reference to the tree widget"
-        )
+    def _navigate_to_parent(self, *args, **kwargs):
+        """
+        Make the tree switch to this widget's parent in the tree.
+        """
+        self.tree_ref.setCurrentItem(self.parent_tree_item)
 
 
 class Group(TreeParentMixin, ConfigTextMixin, DesignerDisplay, QWidget):
