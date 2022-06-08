@@ -1790,7 +1790,7 @@ class CompView(ConfigTextMixin, DesignerDisplay, PageWidget):
         self,
         bridge: QDataclassBridge,
         id_and_comp: IdAndCompWidget,
-        parent: Optional(QWidget) = None,
+        parent: Optional[QWidget] = None,
     ):
         super().__init__(bridge, parent=parent)
         self.id_and_comp = id_and_comp
