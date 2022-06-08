@@ -4,7 +4,6 @@ coverage
 flake8
 pytest
 pytest-timeout
-
 # sphinx-related dependencies:
 sphinx
 numpydoc
@@ -13,5 +12,5 @@ sphinx_rtd_theme
 doctr
 docs-versions-menu
 recommonmark
-
+# for happi loading at lcls
 pcdsdevices
