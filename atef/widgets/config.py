@@ -1571,9 +1571,11 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
 
     name_edit: QLineEdit
     id_label: QLabel
+    id_container: QWidget
     id_content: QVBoxLayout
     add_id_button: QPushButton
     comp_label: QLabel
+    comp_container: QWidget
     comp_content: QVBoxLayout
     add_comp_button: QPushButton
 
@@ -1645,6 +1647,23 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         for bridge in self.comparison_list.bridges:
             self.setup_comparison_item_bridge(bridge)
         self.add_comp_button.clicked.connect(self.add_comparison)
+        self.resize_columns()
+
+    def resize_columns(self) -> None:
+        """
+        Set the column widths to be equal and less than half the full width.
+        """
+        full_width = self.width()
+        col_width = int(full_width*0.45)
+        self.id_container.setFixedWidth(col_width)
+        self.comp_container.setFixedWidth(col_width)
+
+    def resizeEvent(self, *args, **kwargs) -> None:
+        """
+        Override resizeEvent to update the column widths when we resize.
+        """
+        self.resize_columns()
+        return super().resizeEvent(*args, **kwargs)
 
     def setup_comparison_item_bridge(self, bridge: QDataclassBridge) -> None:
         """
