@@ -417,8 +417,18 @@ class PageWidget(DesignerDisplay, QWidget):
     def navigate_to_parent(self, *args, **kwargs):
         """
         Make the tree switch to this widget's parent in the tree.
+
+        If there is no parent, this should instead go to the overview
+        widget. This is for the top-level widgets whose parents are
+        technically the invisible root item. Logically the overview
+        item is the main parent but visually in the tree it's annoying
+        to have all configs grouped under the same item.
         """
-        self.navigate_to(self.parent_tree_item)
+        if isinstance(self.parent_tree_item, AtefItem):
+            self.navigate_to(self.parent_tree_item)
+        else:
+            overview_item = self.full_tree.topLevelItem(0)
+            self.navigate_to(overview_item)
 
 
 def link_page(item: AtefItem, widget: PageWidget):
