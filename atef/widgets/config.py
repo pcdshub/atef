@@ -270,7 +270,7 @@ class Tree(DesignerDisplay, QWidget):
             name='Overview',
             func_name='overview'
         )
-        overview = Overview(self.bridge.config)
+        overview = Overview(self.bridge.configs)
         link_page(item=self.overview_item, widget=overview)
 
     def show_selected_display(self, *args, **kwargs):
@@ -579,7 +579,7 @@ class Overview(DesignerDisplay, PageWidget):
         # Note: this is the only place in the UI where
         # we add new config data
         if update_data:
-            self.config_list.append(config)
+            self.bridge.append(config)
 
     def delete_row(self, row: OverviewRow) -> None:
         """
@@ -597,8 +597,8 @@ class Overview(DesignerDisplay, PageWidget):
             dataclass.
         """
         config, tree_item = self.row_mapping[row]
-        self.config_list.remove_value(config)
-        self.tree_ref.invisibleRootItem().removeChild(tree_item)
+        self.bridge.remove_value(config)
+        self.full_tree.invisibleRootItem().removeChild(tree_item)
         self.row_count -= 1
         del self.row_mapping[row]
         row.deleteLater()
