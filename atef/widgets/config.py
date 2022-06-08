@@ -339,7 +339,7 @@ class AtefItem(QTreeWidgetItem):
         self.widget = widget
 
 
-class PageWidget(QWidget):
+class PageWidget(DesignerDisplay, QWidget):
     """
     Interface for widgets that correspond to a tree node.
 
@@ -367,6 +367,10 @@ class PageWidget(QWidget):
     full_tree: QTreeWidget
 
     parent_button: QToolButton
+
+    # Placeholder for DesignerDisplay's __init_subclass__
+    # Must be overriden properly in PageWidget subclasses
+    filename = ''
 
     def __init__(
         self,
@@ -436,7 +440,7 @@ def link_page(item: AtefItem, widget: PageWidget):
     widget.assign_tree_item(item)
 
 
-class Overview(DesignerDisplay, PageWidget):
+class Overview(PageWidget):
     """
     A view of all the top-level "Configuration" objects.
 
@@ -814,7 +818,7 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
         self.overview.delete_row(self)
 
 
-class Group(ConfigTextMixin, DesignerDisplay, PageWidget):
+class Group(ConfigTextMixin, PageWidget):
     """
     The group of checklists and devices associated with a Configuration.
 
@@ -1518,7 +1522,7 @@ class FrameOnEditFilter(QObject):
         return False
 
 
-class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, PageWidget):
+class IdAndCompWidget(ConfigTextMixin, PageWidget):
     """
     A widget to manage the ids and comparisons associated with a checklist.
 
@@ -1714,7 +1718,7 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, PageWidget):
         bridge.deleteLater()
 
 
-class CompView(ConfigTextMixin, DesignerDisplay, PageWidget):
+class CompView(ConfigTextMixin, PageWidget):
     """
     Widget to view and edit a single Comparison subclass.
 
@@ -2221,7 +2225,7 @@ class BasicSymbolMixin:
         )
 
 
-class EqualsWidget(CompMixin, BasicSymbolMixin, DesignerDisplay, PageWidget):
+class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
     """
     Widget to handle the fields unique to the "Equals" Comparison.
 
@@ -2404,7 +2408,7 @@ class NotEqualsWidget(EqualsWidget):
     symbol = '≠'
 
 
-class GtLtBaseWidget(BasicSymbolMixin, DesignerDisplay, PageWidget):
+class GtLtBaseWidget(BasicSymbolMixin, PageWidget):
     """
     Base widget for comparisons like greater, less, etc.
 
@@ -2487,7 +2491,7 @@ class LessOrEqualWidget(CompMixin, GtLtBaseWidget):
     symbol = '≤'
 
 
-class RangeWidget(CompMixin, DesignerDisplay, PageWidget):
+class RangeWidget(CompMixin, PageWidget):
     """
     Widget to handle the "Range" comparison.
 
