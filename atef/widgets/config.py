@@ -1639,6 +1639,7 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
                 data_list=self.bridge.ids,
                 layout=QVBoxLayout(),
             )
+            self.id_container.layout().addStretch(10)
 
             def add_pv():
                 if identifiers_list.widgets:
