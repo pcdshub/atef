@@ -2200,9 +2200,8 @@ class BasicSymbolMixin:
     value_edit: QLineEdit
     comp_symbol_label: QLabel
 
-    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bridge = bridge
         self._setup_symbol_comparison()
 
     def _setup_symbol_comparison(self):
@@ -2543,7 +2542,7 @@ class RangeWidget(CompMixin, DesignerDisplay, PageWidget):
     vertical_line_3: PyDMDrawingLine
     vertical_line_4: PyDMDrawingLine
 
-    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setup_range_widget()
 
