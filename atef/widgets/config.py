@@ -1552,7 +1552,7 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, PageWidget):
         self,
         bridge: QDataclassBridge,
         config_type: Type[Configuration],
-        parent: Optional[QWidget]
+        parent: Optional[QWidget] = None,
     ):
         super().__init__(bridge, parent=parent)
         self.config_type = config_type
