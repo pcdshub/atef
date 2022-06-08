@@ -917,12 +917,16 @@ class Group(ConfigTextMixin, PageWidget):
 
     def resize_columns(self) -> None:
         """
-        Set the column widths to be equal and less than half the full weidth.
+        Set the column widths to be equal and less than half the full width.
+
+        This only needs to be done for the device configuration. For PV
+        configuration we only have one column.
         """
-        full_width = self.width()
-        col_width = int(full_width*0.45)
-        self.checklists_container.setFixedWidth(col_width)
-        self.devices_container.setFixedWidth(col_width)
+        if isinstance(self.bridge.data, DeviceConfiguration):
+            full_width = self.width()
+            col_width = int(full_width*0.45)
+            self.checklists_container.setFixedWidth(col_width)
+            self.devices_container.setFixedWidth(col_width)
 
     def resizeEvent(self, *args, **kwargs) -> None:
         """
