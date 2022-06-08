@@ -875,6 +875,7 @@ class Group(ConfigTextMixin, PageWidget):
         - Hide the devices layout for PVConfiguration
         - Set up the devices widget for DeviceConfiguration
         - Set up the list of checklists widget
+        - Set the sizing rules for the two columns
         """
         self.initialize_config_text()
         tags_list = StrList(
@@ -912,6 +913,23 @@ class Group(ConfigTextMixin, PageWidget):
         for bridge in self.checklist_list.bridges:
             self.setup_checklist_item_bridge(bridge)
         self.add_checklist_button.clicked.connect(self.add_checklist)
+        self.resize_columns()
+
+    def resize_columns(self) -> None:
+        """
+        Set the column widths to be equal and less than half the full weidth.
+        """
+        full_width = self.width()
+        col_width = int(full_width*0.45)
+        self.checklists_container.setFixedWidth(col_width)
+        self.devices_container.setFixedWidth(col_width)
+
+    def resizeEvent(self, *args, **kwargs) -> None:
+        """
+        Override resizeEvent to update the column widths when we resize.
+        """
+        self.resize_columns()
+        return super().resizeEvent(*args, **kwargs)
 
     def setup_checklist_item_bridge(self, bridge: QDataclassBridge) -> None:
         """
