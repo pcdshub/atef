@@ -438,6 +438,7 @@ class PageWidget(DesignerDisplay, QWidget):
         button.clicked.connect(partial(self.navigate_to, item))
         icon = self.style().standardIcon(QStyle.SP_ArrowRight)
         button.setIcon(icon)
+        button.show()
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -921,8 +922,12 @@ class Group(ConfigTextMixin, PageWidget):
             self._cleanup_bridge_node,
         )
         self.checklists_content.addWidget(self.checklist_list)
-        for bridge in self.checklist_list.bridges:
-            self.setup_checklist_item_bridge(bridge)
+        for bridge, widget in zip(
+            self.checklist_list.bridges,
+            self.checklist_list.widgets,
+        ):
+            item = self.setup_checklist_item_bridge(bridge)
+            self.setup_child_nav_button(widget.child_button, item)
         self.add_checklist_button.clicked.connect(self.add_checklist)
         self.resize_columns()
 
@@ -946,7 +951,10 @@ class Group(ConfigTextMixin, PageWidget):
         self.resize_columns()
         return super().resizeEvent(*args, **kwargs)
 
-    def setup_checklist_item_bridge(self, bridge: QDataclassBridge) -> None:
+    def setup_checklist_item_bridge(
+        self,
+        bridge: QDataclassBridge,
+    ) -> AtefItem:
         """
         Set up a single checklist item with a dataclass bridge.
 
@@ -967,6 +975,7 @@ class Group(ConfigTextMixin, PageWidget):
         bridge.name.changed_value.connect(
             partial(item.setText, 0)
         )
+        return item
 
     def add_checklist(
         self,
@@ -986,8 +995,9 @@ class Group(ConfigTextMixin, PageWidget):
         """
         if id_and_comp is None:
             id_and_comp = IdentifierAndComparison()
-        bridge = self.checklist_list.add_item(id_and_comp)
-        self.setup_checklist_item_bridge(bridge)
+        widget, bridge = self.checklist_list.add_item(id_and_comp)
+        item = self.setup_checklist_item_bridge(bridge)
+        self.setup_child_nav_button(widget.child_button, item)
 
     def _cleanup_bridge_node(
         self,
@@ -1333,7 +1343,7 @@ class NamedDataclassList(StrList):
         starting_value: Any,
         checked: Optional[bool] = None,
         init: bool = False,
-    ) -> QDataclassBridge:
+    ) -> Tuple[QWidget, QDataclassBridge]:
         """
         Create and add new editable widget element to this widget's layout.
 
@@ -1378,7 +1388,7 @@ class NamedDataclassList(StrList):
         bridge = QDataclassBridge(starting_value, parent=self)
         self._setup_bridge_signals(bridge, new_widget)
         self.bridges.append(bridge)
-        return bridge
+        return new_widget, bridge
 
     def _setup_bridge_signals(
         self,
@@ -1482,6 +1492,7 @@ class StrListElem(DesignerDisplay, QWidget):
 
     line_edit: QLineEdit
     del_button: QToolButton
+    child_button: QToolButton
 
     def __init__(self, start_text: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1491,6 +1502,7 @@ class StrListElem(DesignerDisplay, QWidget):
         self.line_edit.installEventFilter(edit_filter)
         self.on_text_changed(start_text)
         self.line_edit.textChanged.connect(self.on_text_changed)
+        self.child_button.hide()
 
     def on_text_changed(self, text: str) -> None:
         """
@@ -1655,8 +1667,12 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
             self._cleanup_bridge_node,
         )
         self.comp_content.addWidget(self.comparison_list)
-        for bridge in self.comparison_list.bridges:
-            self.setup_comparison_item_bridge(bridge)
+        for bridge, widget in zip(
+            self.comparison_list.bridges,
+            self.comparison_list.widgets,
+        ):
+            item = self.setup_comparison_item_bridge(bridge)
+            self.setup_child_nav_button(widget.child_button, item)
         self.add_comp_button.clicked.connect(self.add_comparison)
         self.resize_columns()
 
@@ -1676,7 +1692,10 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         self.resize_columns()
         return super().resizeEvent(*args, **kwargs)
 
-    def setup_comparison_item_bridge(self, bridge: QDataclassBridge) -> None:
+    def setup_comparison_item_bridge(
+        self,
+        bridge: QDataclassBridge,
+    ) -> AtefItem:
         """
         Create the AtefItem associated with a bridge and set it up.
 
@@ -1697,6 +1716,7 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         link_page(item, page)
         self.bridge_item_map[bridge] = item
         self._setup_bridge_signals(bridge)
+        return item
 
     def _setup_bridge_signals(self, bridge: QDataclassBridge) -> None:
         """
@@ -1758,8 +1778,9 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         if comparison is None:
             # Empty default
             comparison = Equals()
-        bridge = self.comparison_list.add_item(comparison)
-        self.setup_comparison_item_bridge(bridge)
+        widget, bridge = self.comparison_list.add_item(comparison)
+        item = self.setup_comparison_item_bridge(bridge)
+        self.setup_child_nav_button(widget.child_button, item)
 
     def _cleanup_bridge_node(
         self,
