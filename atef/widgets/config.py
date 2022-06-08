@@ -320,13 +320,12 @@ class AtefItem(QTreeWidgetItem):
         if func_name is not None:
             self.setText(1, func_name)
         if isinstance(tree_parent, QTreeWidget):
-            tree_parent.insertTopLevelItem(0, self)
             self.parent_tree_item = tree_parent.invisibleRootItem()
             self.full_tree = tree_parent
         else:
-            tree_parent.addChild(self)
             self.parent_tree_item = tree_parent
             self.full_tree = tree_parent.full_tree
+        self.parent_tree_item.addChild(self)
 
     def assign_widget(self, widget: PageWidget) -> None:
         """
