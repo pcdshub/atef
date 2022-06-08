@@ -401,7 +401,7 @@ class PageWidget(DesignerDisplay, QWidget):
         self.parent_tree_item = item.parent_tree_item
         self.full_tree = item.full_tree
 
-    def navigate_to(self, item: AtefItem):
+    def navigate_to(self, item: AtefItem, *args, **kwargs):
         """
         Make the tree switch to a specific item.
 
@@ -429,6 +429,15 @@ class PageWidget(DesignerDisplay, QWidget):
         else:
             overview_item = self.full_tree.topLevelItem(0)
             self.navigate_to(overview_item)
+
+    def setup_child_nav_button(
+        self,
+        button: QToolButton,
+        item: AtefItem,
+    ) -> None:
+        button.clicked.connect(partial(self.navigate_to, item))
+        icon = self.style().standardIcon(QStyle.SP_ArrowRight)
+        button.setIcon(icon)
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -579,6 +588,7 @@ class Overview(PageWidget):
         )
         page = Group(row.bridge)
         link_page(item, page)
+        self.setup_child_nav_button(row.child_button, item)
         self.row_count += 1
 
         self.row_mapping[row] = (config, item)
@@ -721,6 +731,7 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
     lock_button: QPushButton
     desc_edit: QPlainTextEdit
     delete_button: QPushButton
+    child_button: QToolButton
 
     def __init__(
         self,
