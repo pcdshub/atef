@@ -423,11 +423,24 @@ class PageWidget(QWidget):
         self.parent_tree_item = item.parent_tree_item
         self.full_tree = item.full_tree
 
+    def navigate_to(self, item: AtefItem):
+        """
+        Make the tree switch to a specific item.
+
+        This can be used to navigate to child items, for example.
+
+        Parameters
+        ----------
+        item : AtefItem
+            The tree node to navigate to.
+        """
+        self.full_tree.setCurrentItem(item)
+
     def navigate_to_parent(self, *args, **kwargs):
         """
         Make the tree switch to this widget's parent in the tree.
         """
-        self.tree_ref.setCurrentItem(self.parent_tree_item)
+        self.navigate_to(self.parent_tree_item)
 
 
 def link_page(item: AtefItem, widget: PageWidget):
