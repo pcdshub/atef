@@ -442,8 +442,6 @@ class Overview(DesignerDisplay, PageWidget):
 
     This widget allows us to browse our config names, classes, and
     descriptions, as well as add new configs.
-
-    TODO: add a way to delete configs.
     """
     filename = 'config_overview.ui'
 
