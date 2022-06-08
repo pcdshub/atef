@@ -40,31 +40,6 @@ from .happi import HappiDeviceComponentWidget, HappiSearchWidget
 logger = logging.getLogger(__name__)
 
 
-"""
-Some refactor planning: to remove later when it is no longer needed
-
-Problem is that the code here is confusing and difficult to extend
-I want to apply some order/uniformity and use that order to
-improve the navigation.
-
-I will have three kinds of widgets here:
-1. One/few-offs: the big ones (Window, Tree, etc)
-   - no special unifying elements are needed
-2. Embeddables: the small ones (repeated/reused elements, etc)
-   - no special unifying elements are needed
-3. Pages: the bit that goes on the right, corresponse to a tree node
-   - let's give them some consistent methods
-     def __init__(self, bridge, container_bridge):
-         ...
-     def assign_tree_item(self, tree_item):
-         ...
-
-And then our tree items need some additional methods:
-def assign_widget(self, widget):
-    ...
-"""
-
-
 class Window(DesignerDisplay, QMainWindow):
     """
     Main atef config window
