@@ -63,6 +63,9 @@
        <height>0</height>
       </size>
      </property>
+     <property name="toolTip">
+      <string>Delete item</string>
+     </property>
      <property name="text">
       <string>X</string>
      </property>

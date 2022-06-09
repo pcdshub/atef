@@ -144,6 +144,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="delete_button">
+          <property name="toolTip">
+           <string>Delete configuration</string>
+          </property>
           <property name="text">
            <string>X</string>
           </property>

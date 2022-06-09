@@ -803,6 +803,8 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
         if self.name_edit.text():
             # Start locked if we are reading from file
             self.lock_button.toggle()
+        icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
+        self.delete_button.setIcon(icon)
 
     def lock_editing(self, locked: bool):
         """
@@ -1542,6 +1544,8 @@ class StrListElem(DesignerDisplay, QWidget):
         self.on_text_changed(start_text)
         self.line_edit.textChanged.connect(self.on_text_changed)
         self.child_button.hide()
+        icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
+        self.del_button.setIcon(icon)
 
     def on_text_changed(self, text: str) -> None:
         """
