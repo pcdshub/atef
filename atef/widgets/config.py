@@ -59,7 +59,7 @@ class Window(DesignerDisplay, QMainWindow):
     action_print_dataclass: QAction
     action_print_serialized: QAction
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, show_welcome: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
         self.setWindowTitle('atef config')
         self.action_new_file.triggered.connect(self.new_file)
@@ -68,7 +68,8 @@ class Window(DesignerDisplay, QMainWindow):
         self.action_save_as.triggered.connect(self.save_as)
         self.action_print_dataclass.triggered.connect(self.print_dataclass)
         self.action_print_serialized.triggered.connect(self.print_serialized)
-        QTimer.singleShot(0, self.welcome_user)
+        if show_welcome:
+            QTimer.singleShot(0, self.welcome_user)
 
     def welcome_user(self):
         """
@@ -1204,10 +1205,10 @@ class StringListWithDialog(DesignerDisplay, QWidget):
             adding a new dataclass to the list, which means we should
             definitely append it.
         """
-        if not self.allow_duplicates and item in self.data_list.get():
-            return
-
         if not init:
+            if not self.allow_duplicates and item in self.data_list.get():
+                return
+
             self.data_list.append(item)
 
         self.list_strings.addItem(QtWidgets.QListWidgetItem(item))
