@@ -523,9 +523,12 @@ class Overview(PageWidget):
         super().__init__(bridge, parent=parent)
         self.row_count = 0
         self.row_mapping = {}
-        self.initialize_overview()
         self.add_device_button.clicked.connect(self.add_device_config)
         self.add_pv_button.clicked.connect(self.add_pv_config)
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
+        self.initialize_overview()
 
     def initialize_overview(self):
         """
@@ -917,6 +920,9 @@ class Group(ConfigTextMixin, PageWidget):
     ):
         super().__init__(bridge, parent=parent)
         self.bridge_item_map = {}
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
         self.initialize_group()
 
     def initialize_group(self) -> None:
@@ -1658,6 +1664,9 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         super().__init__(bridge, parent=parent)
         self.config_type = config_type
         self.bridge_item_map = {}
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
         self.initialize_idcomp()
 
     def initialize_idcomp(self) -> None:
@@ -1924,6 +1933,9 @@ class CompView(ConfigTextMixin, PageWidget):
         super().__init__(bridge, parent=parent)
         self.id_and_comp = id_and_comp
         self.comparison_setup_done = False
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
         self.initialize_comp_view()
 
     def initialize_comp_view(self) -> None:
