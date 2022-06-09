@@ -21,7 +21,7 @@ from qtpy.QtGui import QColor
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QLabel, QLayout,
                             QLineEdit, QMainWindow, QMessageBox,
-                            QPlainTextEdit, QPushButton, QTabWidget,
+                            QPlainTextEdit, QPushButton, QStyle, QTabWidget,
                             QToolButton, QTreeWidget, QTreeWidgetItem,
                             QVBoxLayout, QWidget)
 
@@ -255,8 +255,10 @@ class Tree(DesignerDisplay, QWidget):
         self.last_selection: Optional[AtefItem] = None
         self.built_widgets = set()
         self.assemble_tree()
-        self.show_selected_display(self.overview_item)
-        self.tree_widget.itemPressed.connect(self.show_selected_display)
+        self.tree_widget.itemSelectionChanged.connect(
+            self.show_selected_display
+        )
+        self.tree_widget.setCurrentItem(self.overview_item)
 
     def assemble_tree(self):
         """
@@ -265,32 +267,26 @@ class Tree(DesignerDisplay, QWidget):
         self.tree_widget.setColumnCount(2)
         self.tree_widget.setHeaderLabels(['Node', 'Type'])
         self.overview_item = AtefItem(
-            widget_class=Overview,
-            widget_args=[self.bridge.configs, self.tree_widget],
+            tree_parent=self.tree_widget,
             name='Overview',
             func_name='overview'
         )
-        self.tree_widget.insertTopLevelItem(0, self.overview_item)
+        overview = Overview(self.bridge.configs)
+        link_page(item=self.overview_item, widget=overview)
 
-    def show_selected_display(self, item: AtefItem, *args, **kwargs):
+    def show_selected_display(self, *args, **kwargs):
         """
         Show the proper widget on the right when a tree row is selected.
 
         This works by hiding the previous widget and showing the new
         selection, creating the widget object if needed.
-
-        Parameters
-        ----------
-        item : AtefItem
-            The selected item in the tree. This contains information like
-            the textual annotation, cached widget references, and
-            arguments for creating a new widget if needed.
         """
+        item = self.tree_widget.currentItem()
         if item is self.last_selection:
             return
         if self.last_selection is not None:
-            self.last_selection.get_widget().setVisible(False)
-        widget = item.get_widget()
+            self.last_selection.widget.setVisible(False)
+        widget = item.widget
         if widget not in self.built_widgets:
             self.layout().addWidget(widget)
             self.built_widgets.add(widget)
@@ -302,56 +298,213 @@ class AtefItem(QTreeWidgetItem):
     """
     A QTreeWidget item with some convenience methods.
 
-    Facilitates the widget creation/caching mechanisms.
+    Parameters
+    ----------
+    name : str
+        The text on the left column of the tree view.
+    func_name : str
+        The text on the right column of the tree view.
     """
-    widget_class: type[QWidget]
-    widget_args: list[Any]
-    widget_cached: QWidget
+    widget: Optional[PageWidget]
+    parent_tree_item: QTreeWidgetItem
+    full_tree: QTreeWidget
 
     def __init__(
         self,
-        *args,
-        widget_class: type[QWidget],
-        widget_args: Optional[list[Any]],
+        tree_parent: Union[AtefItem, QTreeWidget],
         name: str,
         func_name: Optional[str] = None,
-        append_item_arg: bool = False,
-        **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__()
+        self.widget = None
         self.setText(0, name)
         if func_name is not None:
             self.setText(1, func_name)
-        self.widget_class = widget_class
-        self.widget_args = widget_args or []
-        if append_item_arg:
-            self.widget_args.append(self)
-        self.widget_cached = self.widget_class(*self.widget_args)
+        if isinstance(tree_parent, QTreeWidget):
+            self.parent_tree_item = tree_parent.invisibleRootItem()
+            self.full_tree = tree_parent
+        else:
+            self.parent_tree_item = tree_parent
+            self.full_tree = tree_parent.full_tree
+        self.parent_tree_item.addChild(self)
 
-    def get_widget(self) -> QWidget:
+    def assign_widget(self, widget: PageWidget) -> None:
         """
-        Return the edit widget associated with this tree node.
+        Updates this tree item with a reference to the corresponding page.
+
+        Parameters
+        ----------
+        widget : PageWidget
+            The page to show when this tree item is selected.
         """
-        return self.widget_cached
+        self.widget = widget
 
 
-class Overview(DesignerDisplay, QWidget):
+class PageWidget(DesignerDisplay, QWidget):
+    """
+    Interface for widgets that correspond to a tree node.
+
+    The core thing this enforces is that all PageWidget instances
+    will have their main dataclass manipulated through the
+    bridge attribute.
+
+    Once linked to a tree item using the ``link_page`` function,
+    these widgets will have knowledge over their place in the tree
+    and will be able to use that in various ways.
+
+    These displays should have a QToolButton named "parent_button"
+    to help navigate up to the parent node in the tree.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        The interface that lets us manipulate the data structure
+    parent : QWidget
+        Standard qt parent argument
+    """
+    bridge: QDataclassBridge
+    tree_item: AtefItem
+    parent_tree_item: AtefItem
+    full_tree: QTreeWidget
+
+    parent_button: QToolButton
+
+    # Placeholder for DesignerDisplay's __init_subclass__
+    # Must be overriden properly in PageWidget subclasses
+    filename = ''
+
+    def __init__(
+        self,
+        bridge: QDataclassBridge,
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(parent=parent)
+        self.bridge = bridge
+        try:
+            parent_button = self.parent_button
+        except AttributeError:
+            pass
+        else:
+            parent_button.clicked.connect(self.navigate_to_parent)
+            icon = self.style().standardIcon(QStyle.SP_FileDialogToParent)
+            parent_button.setIcon(icon)
+
+    def assign_tree_item(self, item: AtefItem):
+        """
+        Updates this page with references to the tree.
+
+        Parameters
+        ----------
+        item : AtefItem
+            The item that should be showing this page.
+        """
+        self.tree_item = item
+        self.parent_tree_item = item.parent_tree_item
+        self.full_tree = item.full_tree
+        self.full_tree.itemChanged.connect(
+            self._update_parent_tooltip_from_tree,
+        )
+        self.update_parent_tooltip()
+
+    def _update_parent_tooltip_from_tree(
+        self,
+        item: QTreeWidgetItem,
+        column: int,
+    ):
+        """
+        Update the parent tooltip if our parent's name changes.
+        """
+        if item is self.parent_tree_item:
+            self.update_parent_tooltip()
+
+    def update_parent_tooltip(self):
+        """
+        Ensure that the to-parent tooltip is updated, accurate, and helpful.
+        """
+        try:
+            parent_button = self.parent_button
+        except AttributeError:
+            pass
+        else:
+            nav_parent = self.get_nav_parent()
+            parent_button.setToolTip(
+                "Navigate to parent item "
+                f"{nav_parent.text(0)} "
+                f"({nav_parent.text(1)})"
+            )
+
+    def navigate_to(self, item: AtefItem, *args, **kwargs):
+        """
+        Make the tree switch to a specific item.
+
+        This can be used to navigate to child items, for example.
+
+        Parameters
+        ----------
+        item : AtefItem
+            The tree node to navigate to.
+        """
+        self.full_tree.setCurrentItem(item)
+
+    def navigate_to_parent(self, *args, **kwargs):
+        """
+        Make the tree switch to this widget's parent in the tree.
+        """
+        self.navigate_to(self.get_nav_parent())
+
+    def get_nav_parent(self) -> AtefItem:
+        """
+        Get the navigation parent target item.
+
+        This is self.parent_tree_item normally except when we are
+        a top-level item, in which case the target should be the
+        overview widget because otherwise there isn't any parent
+        to navigate to.
+        """
+        if isinstance(self.parent_tree_item, AtefItem):
+            return self.parent_tree_item
+        else:
+            return self.full_tree.topLevelItem(0)
+
+    def setup_child_nav_button(
+        self,
+        button: QToolButton,
+        item: AtefItem,
+    ) -> None:
+        button.clicked.connect(partial(self.navigate_to, item))
+        icon = self.style().standardIcon(QStyle.SP_ArrowRight)
+        button.setIcon(icon)
+        button.show()
+        button.setToolTip(
+            f"Navigate to child {item.text(1)}"
+        )
+
+
+def link_page(item: AtefItem, widget: PageWidget):
+    """
+    Link a page widget to an atef tree item.
+
+    All linkage calls should go through here to remove ambiguity
+    about ordering, etc. and so each object only has to worry about
+    how to update itself.
+
+    Parameters
+    ----------
+    item : AtefItem
+        The tree item to link.
+    widget : PageWidget
+        The widget to link.
+    """
+    item.assign_widget(widget)
+    widget.assign_tree_item(item)
+
+
+class Overview(PageWidget):
     """
     A view of all the top-level "Configuration" objects.
 
     This widget allows us to browse our config names, classes, and
     descriptions, as well as add new configs.
-
-    TODO: add a way to delete configs.
-
-    Parameters
-    ----------
-    config_file : ConfigurationFile
-        A reference to the full config file dataclass to read from
-        and update to as we do edits.
-    tree_ref : QTreeWidget
-        A reference to the entire tree widget so we can update the
-        top-level names in the tree as they are edited here.
     """
     filename = 'config_overview.ui'
 
@@ -359,32 +512,29 @@ class Overview(DesignerDisplay, QWidget):
     add_pv_button: QPushButton
     scroll_content: QWidget
 
-    config_list: QDataclassList
-    tree_ref: QTreeWidget
     row_count: int
     row_mapping: Dict[OverviewRow, Tuple[Configuration, AtefItem]]
 
     def __init__(
         self,
-        config_list: QDataclassList,
-        tree_ref: QTreeWidget,
-        *args,
-        **kwargs,
+        bridge: QDataclassBridge,
+        parent: Optional[QWidget] = None,
     ):
-        super().__init__(*args, **kwargs)
-        self.config_list = config_list
-        self.tree_ref = tree_ref
+        super().__init__(bridge, parent=parent)
         self.row_count = 0
         self.row_mapping = {}
-        self.initialize_overview()
         self.add_device_button.clicked.connect(self.add_device_config)
         self.add_pv_button.clicked.connect(self.add_pv_config)
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
+        self.initialize_overview()
 
     def initialize_overview(self):
         """
         Read the configuration data and create the overview rows.
         """
-        for config in self.config_list.get():
+        for config in self.bridge.get():
             if isinstance(config, DeviceConfiguration):
                 self.add_device_config(config=config, update_data=False)
             elif isinstance(config, PVConfiguration):
@@ -475,13 +625,13 @@ class Overview(DesignerDisplay, QWidget):
             row,
         )
         item = AtefItem(
-            widget_class=Group,
-            widget_args=[row.bridge],
+            tree_parent=self.full_tree,
             name=config.name or 'untitled',
             func_name=func_name,
-            append_item_arg=True,
         )
-        self.tree_ref.addTopLevelItem(item)
+        page = Group(row.bridge)
+        link_page(item, page)
+        self.setup_child_nav_button(row.child_button, item)
         self.row_count += 1
 
         self.row_mapping[row] = (config, item)
@@ -493,7 +643,7 @@ class Overview(DesignerDisplay, QWidget):
         # Note: this is the only place in the UI where
         # we add new config data
         if update_data:
-            self.config_list.append(config)
+            self.bridge.append(config)
 
     def delete_row(self, row: OverviewRow) -> None:
         """
@@ -511,8 +661,8 @@ class Overview(DesignerDisplay, QWidget):
             dataclass.
         """
         config, tree_item = self.row_mapping[row]
-        self.config_list.remove_value(config)
-        self.tree_ref.invisibleRootItem().removeChild(tree_item)
+        self.bridge.remove_value(config)
+        self.full_tree.invisibleRootItem().removeChild(tree_item)
         self.row_count -= 1
         del self.row_mapping[row]
         row.deleteLater()
@@ -623,7 +773,8 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
     config_type: QLabel
     lock_button: QPushButton
     desc_edit: QPlainTextEdit
-    delete_button: QPushButton
+    delete_button: QToolButton
+    child_button: QToolButton
 
     def __init__(
         self,
@@ -655,6 +806,8 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
         if self.name_edit.text():
             # Start locked if we are reading from file
             self.lock_button.toggle()
+        icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
+        self.delete_button.setIcon(icon)
 
     def lock_editing(self, locked: bool):
         """
@@ -690,21 +843,21 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
             self.setStyleSheet(
                 "QLineEdit, QPlainTextEdit { background: transparent }"
             )
-            self.delete_button.hide()
+            self.delete_button.setEnabled(False)
         else:
             self.desc_edit.setFrameShape(self.desc_edit.StyledPanel)
             self.setStyleSheet(
                 "QLineEdit, QPlainTextEdit { background: white }"
             )
             if not self.name_edit.text():
-                self.delete_button.show()
+                self.delete_button.setEnabled(True)
 
     def on_name_changed(self, name: str) -> None:
         """
         Actions to perform when the name field changes.
 
-        This will hide/show the delete button as appropriate.
-        Only show the delete button in an unlocked state with an
+        This will disable the delete button as appropriate.
+        Only enable the delete button in an unlocked state with an
         empty name. This is to help prevent someone from
         accidentally nuking their entire config tree.
 
@@ -714,9 +867,9 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
             The updated configuration name.
         """
         if not name and not self.lock_button.isChecked():
-            self.delete_button.show()
+            self.delete_button.setEnabled(True)
         else:
-            self.delete_button.hide()
+            self.delete_button.setEnabled(False)
 
     def delete_this_config(self, checked: Optional[bool] = None) -> None:
         """
@@ -731,7 +884,7 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
         self.overview.delete_row(self)
 
 
-class Group(ConfigTextMixin, DesignerDisplay, QWidget):
+class Group(ConfigTextMixin, PageWidget):
     """
     The group of checklists and devices associated with a Configuration.
 
@@ -744,10 +897,6 @@ class Group(ConfigTextMixin, DesignerDisplay, QWidget):
         A dataclass bridge to an atef.check.Configuration dataclass.
         This will be used to update the dataclass and to listen for
         dataclass updates.
-    tree_item : AtefItem
-        The item in the atef config tree view that corresponds with
-        this widget. We'll use this to modify the tree as the user
-        adds, removes, or edits the contained checklists.
     """
     filename = 'config_group.ui'
 
@@ -767,14 +916,13 @@ class Group(ConfigTextMixin, DesignerDisplay, QWidget):
     def __init__(
         self,
         bridge: QDataclassBridge,
-        tree_item: AtefItem,
-        *args,
-        **kwargs
+        parent: Optional[QWidget] = None,
     ):
-        super().__init__(*args, **kwargs)
-        self.bridge = bridge
-        self.tree_item = tree_item
+        super().__init__(bridge, parent=parent)
         self.bridge_item_map = {}
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
         self.initialize_group()
 
     def initialize_group(self) -> None:
@@ -786,6 +934,7 @@ class Group(ConfigTextMixin, DesignerDisplay, QWidget):
         - Hide the devices layout for PVConfiguration
         - Set up the devices widget for DeviceConfiguration
         - Set up the list of checklists widget
+        - Set the sizing rules for the two columns
         """
         self.initialize_config_text()
         tags_list = StrList(
@@ -820,11 +969,39 @@ class Group(ConfigTextMixin, DesignerDisplay, QWidget):
             self._cleanup_bridge_node,
         )
         self.checklists_content.addWidget(self.checklist_list)
-        for bridge in self.checklist_list.bridges:
-            self.setup_checklist_item_bridge(bridge)
+        for bridge, widget in zip(
+            self.checklist_list.bridges,
+            self.checklist_list.widgets,
+        ):
+            item = self.setup_checklist_item_bridge(bridge)
+            self.setup_child_nav_button(widget.child_button, item)
         self.add_checklist_button.clicked.connect(self.add_checklist)
+        self.resize_columns()
 
-    def setup_checklist_item_bridge(self, bridge: QDataclassBridge) -> None:
+    def resize_columns(self) -> None:
+        """
+        Set the column widths to be equal and less than half the full width.
+
+        This only needs to be done for the device configuration. For PV
+        configuration we only have one column.
+        """
+        if isinstance(self.bridge.data, DeviceConfiguration):
+            full_width = self.width()
+            col_width = int(full_width*0.45)
+            self.checklists_container.setFixedWidth(col_width)
+            self.devices_container.setFixedWidth(col_width)
+
+    def resizeEvent(self, *args, **kwargs) -> None:
+        """
+        Override resizeEvent to update the column widths when we resize.
+        """
+        self.resize_columns()
+        return super().resizeEvent(*args, **kwargs)
+
+    def setup_checklist_item_bridge(
+        self,
+        bridge: QDataclassBridge,
+    ) -> AtefItem:
         """
         Set up a single checklist item with a dataclass bridge.
 
@@ -835,17 +1012,17 @@ class Group(ConfigTextMixin, DesignerDisplay, QWidget):
             atef.check.IdentifierAndComparison
         """
         item = AtefItem(
-            widget_class=IdAndCompWidget,
-            widget_args=[bridge, type(self.bridge.data)],
+            tree_parent=self.tree_item,
             name=bridge.name.get() or 'untitled',
             func_name='checklist',
-            append_item_arg=True,
         )
-        self.tree_item.addChild(item)
+        page = IdAndCompWidget(bridge, type(self.bridge.data))
+        link_page(item, page)
         self.bridge_item_map[bridge] = item
         bridge.name.changed_value.connect(
             partial(item.setText, 0)
         )
+        return item
 
     def add_checklist(
         self,
@@ -865,8 +1042,9 @@ class Group(ConfigTextMixin, DesignerDisplay, QWidget):
         """
         if id_and_comp is None:
             id_and_comp = IdentifierAndComparison()
-        bridge = self.checklist_list.add_item(id_and_comp)
-        self.setup_checklist_item_bridge(bridge)
+        widget, bridge = self.checklist_list.add_item(id_and_comp)
+        item = self.setup_checklist_item_bridge(bridge)
+        self.setup_child_nav_button(widget.child_button, item)
 
     def _cleanup_bridge_node(
         self,
@@ -1212,7 +1390,7 @@ class NamedDataclassList(StrList):
         starting_value: Any,
         checked: Optional[bool] = None,
         init: bool = False,
-    ) -> QDataclassBridge:
+    ) -> Tuple[QWidget, QDataclassBridge]:
         """
         Create and add new editable widget element to this widget's layout.
 
@@ -1257,7 +1435,7 @@ class NamedDataclassList(StrList):
         bridge = QDataclassBridge(starting_value, parent=self)
         self._setup_bridge_signals(bridge, new_widget)
         self.bridges.append(bridge)
-        return bridge
+        return new_widget, bridge
 
     def _setup_bridge_signals(
         self,
@@ -1361,6 +1539,7 @@ class StrListElem(DesignerDisplay, QWidget):
 
     line_edit: QLineEdit
     del_button: QToolButton
+    child_button: QToolButton
 
     def __init__(self, start_text: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1370,6 +1549,9 @@ class StrListElem(DesignerDisplay, QWidget):
         self.line_edit.installEventFilter(edit_filter)
         self.on_text_changed(start_text)
         self.line_edit.textChanged.connect(self.on_text_changed)
+        self.child_button.hide()
+        icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
+        self.del_button.setIcon(icon)
 
     def on_text_changed(self, text: str) -> None:
         """
@@ -1444,7 +1626,7 @@ class FrameOnEditFilter(QObject):
         return False
 
 
-class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
+class IdAndCompWidget(ConfigTextMixin, PageWidget):
     """
     A widget to manage the ids and comparisons associated with a checklist.
 
@@ -1461,9 +1643,11 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
 
     name_edit: QLineEdit
     id_label: QLabel
+    id_container: QWidget
     id_content: QVBoxLayout
     add_id_button: QPushButton
     comp_label: QLabel
+    comp_container: QWidget
     comp_content: QVBoxLayout
     add_comp_button: QPushButton
 
@@ -1475,15 +1659,14 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
         self,
         bridge: QDataclassBridge,
         config_type: Type[Configuration],
-        tree_item: AtefItem,
-        *args,
-        **kwargs,
+        parent: Optional[QWidget] = None,
     ):
-        super().__init__(*args, **kwargs)
-        self.bridge = bridge
+        super().__init__(bridge, parent=parent)
         self.config_type = config_type
-        self.tree_item = tree_item
         self.bridge_item_map = {}
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
         self.initialize_idcomp()
 
     def initialize_idcomp(self) -> None:
@@ -1508,6 +1691,7 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
                 data_list=self.bridge.ids,
                 layout=QVBoxLayout(),
             )
+            self.id_container.layout().addStretch(10)
 
             def add_pv():
                 if identifiers_list.widgets:
@@ -1536,11 +1720,35 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
             self._cleanup_bridge_node,
         )
         self.comp_content.addWidget(self.comparison_list)
-        for bridge in self.comparison_list.bridges:
-            self.setup_comparison_item_bridge(bridge)
+        for bridge, widget in zip(
+            self.comparison_list.bridges,
+            self.comparison_list.widgets,
+        ):
+            item = self.setup_comparison_item_bridge(bridge)
+            self.setup_child_nav_button(widget.child_button, item)
         self.add_comp_button.clicked.connect(self.add_comparison)
+        self.resize_columns()
 
-    def setup_comparison_item_bridge(self, bridge: QDataclassBridge) -> None:
+    def resize_columns(self) -> None:
+        """
+        Set the column widths to be equal and less than half the full width.
+        """
+        full_width = self.width()
+        col_width = int(full_width*0.45)
+        self.id_container.setFixedWidth(col_width)
+        self.comp_container.setFixedWidth(col_width)
+
+    def resizeEvent(self, *args, **kwargs) -> None:
+        """
+        Override resizeEvent to update the column widths when we resize.
+        """
+        self.resize_columns()
+        return super().resizeEvent(*args, **kwargs)
+
+    def setup_comparison_item_bridge(
+        self,
+        bridge: QDataclassBridge,
+    ) -> AtefItem:
         """
         Create the AtefItem associated with a bridge and set it up.
 
@@ -1553,14 +1761,15 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
             atef.check.IdentifierAndComparison
         """
         item = AtefItem(
-            widget_class=CompView,
-            widget_args=[bridge, self],
+            tree_parent=self.tree_item,
             name=bridge.name.get() or 'untitled',
             func_name='comparison',
         )
-        self.tree_item.addChild(item)
+        page = CompView(bridge, self)
+        link_page(item, page)
         self.bridge_item_map[bridge] = item
         self._setup_bridge_signals(bridge)
+        return item
 
     def _setup_bridge_signals(self, bridge: QDataclassBridge) -> None:
         """
@@ -1622,8 +1831,9 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
         if comparison is None:
             # Empty default
             comparison = Equals()
-        bridge = self.comparison_list.add_item(comparison)
-        self.setup_comparison_item_bridge(bridge)
+        widget, bridge = self.comparison_list.add_item(comparison)
+        item = self.setup_comparison_item_bridge(bridge)
+        self.setup_child_nav_button(widget.child_button, item)
 
     def _cleanup_bridge_node(
         self,
@@ -1644,7 +1854,7 @@ class IdAndCompWidget(ConfigTextMixin, DesignerDisplay, QWidget):
         bridge.deleteLater()
 
 
-class CompView(ConfigTextMixin, DesignerDisplay, QWidget):
+class CompView(ConfigTextMixin, PageWidget):
     """
     Widget to view and edit a single Comparison subclass.
 
@@ -1718,13 +1928,14 @@ class CompView(ConfigTextMixin, DesignerDisplay, QWidget):
         self,
         bridge: QDataclassBridge,
         id_and_comp: IdAndCompWidget,
-        *args,
-        **kwargs,
+        parent: Optional[QWidget] = None,
     ):
-        super().__init__(*args, **kwargs)
-        self.bridge = bridge
+        super().__init__(bridge, parent=parent)
         self.id_and_comp = id_and_comp
         self.comparison_setup_done = False
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
         self.initialize_comp_view()
 
     def initialize_comp_view(self) -> None:
@@ -2130,9 +2341,8 @@ class BasicSymbolMixin:
     value_edit: QLineEdit
     comp_symbol_label: QLabel
 
-    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bridge = bridge
         self._setup_symbol_comparison()
 
     def _setup_symbol_comparison(self):
@@ -2154,7 +2364,7 @@ class BasicSymbolMixin:
         )
 
 
-class EqualsWidget(CompMixin, BasicSymbolMixin, DesignerDisplay, QWidget):
+class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
     """
     Widget to handle the fields unique to the "Equals" Comparison.
 
@@ -2337,7 +2547,7 @@ class NotEqualsWidget(EqualsWidget):
     symbol = '≠'
 
 
-class GtLtBaseWidget(BasicSymbolMixin, DesignerDisplay, QWidget):
+class GtLtBaseWidget(BasicSymbolMixin, PageWidget):
     """
     Base widget for comparisons like greater, less, etc.
 
@@ -2420,7 +2630,7 @@ class LessOrEqualWidget(CompMixin, GtLtBaseWidget):
     symbol = '≤'
 
 
-class RangeWidget(CompMixin, DesignerDisplay, QWidget):
+class RangeWidget(CompMixin, PageWidget):
     """
     Widget to handle the "Range" comparison.
 
@@ -2473,9 +2683,8 @@ class RangeWidget(CompMixin, DesignerDisplay, QWidget):
     vertical_line_3: PyDMDrawingLine
     vertical_line_4: PyDMDrawingLine
 
-    def __init__(self, bridge: QDataclassBridge, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bridge = bridge
         self.setup_range_widget()
 
     def setup_range_widget(self) -> None:
