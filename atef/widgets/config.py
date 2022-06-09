@@ -401,6 +401,37 @@ class PageWidget(DesignerDisplay, QWidget):
         self.tree_item = item
         self.parent_tree_item = item.parent_tree_item
         self.full_tree = item.full_tree
+        self.full_tree.itemChanged.connect(
+            self._update_parent_tooltip_from_tree,
+        )
+        self.update_parent_tooltip()
+
+    def _update_parent_tooltip_from_tree(
+        self,
+        item: QTreeWidgetItem,
+        column: int,
+    ):
+        """
+        Update the parent tooltip if our parent's name changes.
+        """
+        if item is self.parent_tree_item:
+            self.update_parent_tooltip()
+
+    def update_parent_tooltip(self):
+        """
+        Ensure that the to-parent tooltip is updated, accurate, and helpful.
+        """
+        try:
+            parent_button = self.parent_button
+        except AttributeError:
+            pass
+        else:
+            nav_parent = self.get_nav_parent()
+            parent_button.setToolTip(
+                "Navigate to parent item "
+                f"{nav_parent.text(0)} "
+                f"({nav_parent.text(1)})"
+            )
 
     def navigate_to(self, item: AtefItem, *args, **kwargs):
         """
@@ -418,18 +449,22 @@ class PageWidget(DesignerDisplay, QWidget):
     def navigate_to_parent(self, *args, **kwargs):
         """
         Make the tree switch to this widget's parent in the tree.
+        """
+        self.navigate_to(self.get_nav_parent())
 
-        If there is no parent, this should instead go to the overview
-        widget. This is for the top-level widgets whose parents are
-        technically the invisible root item. Logically the overview
-        item is the main parent but visually in the tree it's annoying
-        to have all configs grouped under the same item.
+    def get_nav_parent(self) -> AtefItem:
+        """
+        Get the navigation parent target item.
+
+        This is self.parent_tree_item normally except when we are
+        a top-level item, in which case the target should be the
+        overview widget because otherwise there isn't any parent
+        to navigate to.
         """
         if isinstance(self.parent_tree_item, AtefItem):
-            self.navigate_to(self.parent_tree_item)
+            return self.parent_tree_item
         else:
-            overview_item = self.full_tree.topLevelItem(0)
-            self.navigate_to(overview_item)
+            return self.full_tree.topLevelItem(0)
 
     def setup_child_nav_button(
         self,
@@ -440,6 +475,9 @@ class PageWidget(DesignerDisplay, QWidget):
         icon = self.style().standardIcon(QStyle.SP_ArrowRight)
         button.setIcon(icon)
         button.show()
+        button.setToolTip(
+            f"Navigate to child {item.text(1)}"
+        )
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -732,7 +770,7 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
     config_type: QLabel
     lock_button: QPushButton
     desc_edit: QPlainTextEdit
-    delete_button: QPushButton
+    delete_button: QToolButton
     child_button: QToolButton
 
     def __init__(
