@@ -838,21 +838,21 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
             self.setStyleSheet(
                 "QLineEdit, QPlainTextEdit { background: transparent }"
             )
-            self.delete_button.hide()
+            self.delete_button.setEnabled(False)
         else:
             self.desc_edit.setFrameShape(self.desc_edit.StyledPanel)
             self.setStyleSheet(
                 "QLineEdit, QPlainTextEdit { background: white }"
             )
             if not self.name_edit.text():
-                self.delete_button.show()
+                self.delete_button.setEnabled(True)
 
     def on_name_changed(self, name: str) -> None:
         """
         Actions to perform when the name field changes.
 
-        This will hide/show the delete button as appropriate.
-        Only show the delete button in an unlocked state with an
+        This will disable the delete button as appropriate.
+        Only enable the delete button in an unlocked state with an
         empty name. This is to help prevent someone from
         accidentally nuking their entire config tree.
 
@@ -862,9 +862,9 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
             The updated configuration name.
         """
         if not name and not self.lock_button.isChecked():
-            self.delete_button.show()
+            self.delete_button.setEnabled(True)
         else:
-            self.delete_button.hide()
+            self.delete_button.setEnabled(False)
 
     def delete_this_config(self, checked: Optional[bool] = None) -> None:
         """
