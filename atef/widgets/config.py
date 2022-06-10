@@ -19,8 +19,8 @@ from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import QColor
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
-                            QFormLayout, QHBoxLayout, QLabel, QLayout,
-                            QLineEdit, QMainWindow, QMessageBox,
+                            QFormLayout, QHBoxLayout, QInputDialog, QLabel,
+                            QLayout, QLineEdit, QMainWindow, QMessageBox,
                             QPlainTextEdit, QPushButton, QStyle, QTabWidget,
                             QToolButton, QTreeWidget, QTreeWidgetItem,
                             QVBoxLayout, QWidget)
@@ -1288,6 +1288,19 @@ class StringListWithDialog(DesignerDisplay, QWidget):
             self.data_list.remove_value(item.text())
             self.list_strings.takeItem(self.list_strings.row(item))
 
+    def _remove_item(self, item: str):
+        """
+        Remove an item from the QListWidget and the bridge.
+
+        Parameters
+        ----------
+        item : str
+            The item to remove.
+        """
+        index = self.data_list.get().index(item)
+        self.data_list.remove_value(item)
+        self.list_strings.takeItem(index)
+
 
 class DeviceListWidget(StringListWithDialog):
     """
@@ -1358,6 +1371,50 @@ class ComponentListWidget(StringListWithDialog):
         # widget.item_search_widget.edit_filter.setText(
         #     "|".join(to_select or []),
         # )
+
+
+class BulkListWidget(StringListWithDialog):
+    """
+    String list widget that uses a multi-line text box for entry and edit.
+    """
+
+    def _setup_ui(self):
+        super()._setup_ui()
+        self.item_add_request.connect(self._open_multiline)
+        self.item_edit_request.connect(self._open_multiline)
+
+    def _open_multiline(self, to_select: Optional[List[str]] = None):
+        """
+        User requested adding new strings or editing existing ones.
+
+        Parameters
+        ----------
+        to_select : list of str, optional
+            For editing, this will contain the string items that are
+            selected so that we can pre-populate the edit box
+            appropriately.
+        """
+        to_select = to_select or []
+        if to_select:
+            title = 'Edit PVs Dialog'
+            label = 'Add to or edit these PVs as appropriate:'
+            text = '\n'.join(to_select)
+        else:
+            title = 'Add PVs Dialog'
+            label = 'Which PVs should be included?'
+            text = ''
+        user_input, ok = QInputDialog.getMultiLineText(
+            self, title, label, text
+        )
+        if not ok:
+            return
+        new_pvs = [pv.strip() for pv in user_input.splitlines() if pv.strip()]
+        for pv in new_pvs:
+            if pv not in to_select:
+                self._add_item(pv)
+        for pv in to_select:
+            if pv not in new_pvs:
+                self._remove_item(pv)
 
 
 class NamedDataclassList(StrList):
@@ -1645,7 +1702,6 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
     id_label: QLabel
     id_container: QWidget
     id_content: QVBoxLayout
-    add_id_button: QPushButton
     comp_label: QLabel
     comp_container: QWidget
     comp_content: QVBoxLayout
@@ -1685,33 +1741,17 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
             identifiers_list = ComponentListWidget(
                 data_list=self.bridge.ids,
             )
-            self.add_id_button.setVisible(False)
         elif issubclass(self.config_type, PVConfiguration):
-            identifiers_list = StrList(
+            identifiers_list = BulkListWidget(
                 data_list=self.bridge.ids,
-                layout=QVBoxLayout(),
             )
-            self.id_container.layout().addStretch(10)
-
-            def add_pv():
-                if identifiers_list.widgets:
-                    if not identifiers_list.widgets[-1].line_edit.text().strip():
-                        # Don't add another id if we haven't filled out the last one
-                        return
-
-                widget = identifiers_list.add_item('')
-                widget.line_edit.setFocus()
-
-            self.add_id_button.clicked.connect(add_pv)
 
         self.id_content.addWidget(identifiers_list)
         # Adjust the identifier text appropriately for config type
         if issubclass(self.config_type, DeviceConfiguration):
             self.id_label.setText('Device Signals')
-            self.add_id_button.setText('Add Signal')
         elif issubclass(self.config_type, PVConfiguration):
             self.id_label.setText('PV Names')
-            self.add_id_button.setText('Add PV')
         self.comparison_list = NamedDataclassList(
             data_list=self.bridge.comparisons,
             layout=QVBoxLayout(),
