@@ -8,6 +8,7 @@ import json
 import logging
 import os.path
 from functools import partial
+from itertools import zip_longest
 from pprint import pprint
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
@@ -19,8 +20,8 @@ from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import QColor
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
-                            QFormLayout, QHBoxLayout, QLabel, QLayout,
-                            QLineEdit, QMainWindow, QMessageBox,
+                            QFormLayout, QHBoxLayout, QInputDialog, QLabel,
+                            QLayout, QLineEdit, QMainWindow, QMessageBox,
                             QPlainTextEdit, QPushButton, QStyle, QTabWidget,
                             QToolButton, QTreeWidget, QTreeWidgetItem,
                             QVBoxLayout, QWidget)
@@ -1288,6 +1289,88 @@ class StringListWithDialog(DesignerDisplay, QWidget):
             self.data_list.remove_value(item.text())
             self.list_strings.takeItem(self.list_strings.row(item))
 
+    def _remove_item(self, item: str) -> None:
+        """
+        Remove an item from the QListWidget and the bridge.
+
+        Parameters
+        ----------
+        items : str
+            The item to remove.
+        """
+        self.data_list.remove_value(item)
+        for row in range(self.list_strings.count()):
+            if self.list_strings.item(row).text() == item:
+                self.list_strings.takeItem(row)
+                return
+
+    def remove_items(self, items: List[str]) -> None:
+        """
+        Remove items from the QListWidget and the bridge.
+
+        Parameters
+        ----------
+        items : list of str
+            The items to remove.
+        """
+        for item in items:
+            self._remove_item(item)
+
+    def _edit_item(self, old: str, new: str) -> None:
+        """
+        Edit an item in place in the QListWidget and the bridge.
+
+        If we don't allow duplicates and new already exists, we
+        need to remove old instead.
+
+        Parameters
+        ----------
+        old : str
+            The original item to replace
+        new : str
+            The new item to replace it with
+        """
+        if old == new:
+            return
+        if not self.allow_duplicates and new in self.data_list.get():
+            return self._remove_item(old)
+        self.data_list.put_to_index(
+            index=self.data_list.get().index(old),
+            new_value=new,
+        )
+        for row in range(self.list_strings.count()):
+            if self.list_strings.item(row).text() == old:
+                self.list_strings.item(row).setText(new)
+                return
+
+    def edit_items(self, old_items: List[str], new_items: List[str]) -> None:
+        """
+        Best-effort edit of items in place in the QListWidget and the bridge.
+
+        The goal is to replace each instance of old with each instance of
+        new, in order.
+        """
+        # Ignore items that exist in both lists
+        old_uniques = [item for item in old_items if item not in new_items]
+        new_uniques = [item for item in new_items if item not in old_items]
+        # Remove items from new if duplicates aren't allowed and they exist
+        if not self.allow_duplicates:
+            new_uniques = [
+                item for item in new_uniques if item not in self.data_list.get()
+            ]
+        # Add, remove, edit in place as necessary
+        # This will edit everything in place if the lists are equal length
+        # If old_uniques is longer, we'll remove when we exhaust new_uniques
+        # If new_uniques is longer, we'll add when we exhaust old_uniques
+        # TODO find a way to add these at the selected index
+        for old, new in zip_longest(old_uniques, new_uniques, fillvalue=None):
+            if old is None:
+                self._add_item(new)
+            elif new is None:
+                self._remove_item(old)
+            else:
+                self._edit_item(old, new)
+
 
 class DeviceListWidget(StringListWithDialog):
     """
@@ -1358,6 +1441,45 @@ class ComponentListWidget(StringListWithDialog):
         # widget.item_search_widget.edit_filter.setText(
         #     "|".join(to_select or []),
         # )
+
+
+class BulkListWidget(StringListWithDialog):
+    """
+    String list widget that uses a multi-line text box for entry and edit.
+    """
+
+    def _setup_ui(self):
+        super()._setup_ui()
+        self.item_add_request.connect(self._open_multiline)
+        self.item_edit_request.connect(self._open_multiline)
+
+    def _open_multiline(self, to_select: Optional[List[str]] = None):
+        """
+        User requested adding new strings or editing existing ones.
+
+        Parameters
+        ----------
+        to_select : list of str, optional
+            For editing, this will contain the string items that are
+            selected so that we can pre-populate the edit box
+            appropriately.
+        """
+        to_select = to_select or []
+        if to_select:
+            title = 'Edit PVs Dialog'
+            label = 'Add to or edit these PVs as appropriate:'
+            text = '\n'.join(to_select)
+        else:
+            title = 'Add PVs Dialog'
+            label = 'Which PVs should be included?'
+            text = ''
+        user_input, ok = QInputDialog.getMultiLineText(
+            self, title, label, text
+        )
+        if not ok:
+            return
+        new_pvs = [pv.strip() for pv in user_input.splitlines() if pv.strip()]
+        self.edit_items(to_select, new_pvs)
 
 
 class NamedDataclassList(StrList):
@@ -1645,7 +1767,6 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
     id_label: QLabel
     id_container: QWidget
     id_content: QVBoxLayout
-    add_id_button: QPushButton
     comp_label: QLabel
     comp_container: QWidget
     comp_content: QVBoxLayout
@@ -1685,33 +1806,17 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
             identifiers_list = ComponentListWidget(
                 data_list=self.bridge.ids,
             )
-            self.add_id_button.setVisible(False)
         elif issubclass(self.config_type, PVConfiguration):
-            identifiers_list = StrList(
+            identifiers_list = BulkListWidget(
                 data_list=self.bridge.ids,
-                layout=QVBoxLayout(),
             )
-            self.id_container.layout().addStretch(10)
-
-            def add_pv():
-                if identifiers_list.widgets:
-                    if not identifiers_list.widgets[-1].line_edit.text().strip():
-                        # Don't add another id if we haven't filled out the last one
-                        return
-
-                widget = identifiers_list.add_item('')
-                widget.line_edit.setFocus()
-
-            self.add_id_button.clicked.connect(add_pv)
 
         self.id_content.addWidget(identifiers_list)
         # Adjust the identifier text appropriately for config type
         if issubclass(self.config_type, DeviceConfiguration):
             self.id_label.setText('Device Signals')
-            self.add_id_button.setText('Add Signal')
         elif issubclass(self.config_type, PVConfiguration):
             self.id_label.setText('PV Names')
-            self.add_id_button.setText('Add PV')
         self.comparison_list = NamedDataclassList(
             data_list=self.bridge.comparisons,
             layout=QVBoxLayout(),

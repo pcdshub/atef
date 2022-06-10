@@ -92,13 +92,6 @@
         <item>
          <layout class="QVBoxLayout" name="id_content"/>
         </item>
-        <item>
-         <widget class="QPushButton" name="add_id_button">
-          <property name="text">
-           <string>Add Identifier</string>
-          </property>
-         </widget>
-        </item>
        </layout>
       </widget>
      </item>
