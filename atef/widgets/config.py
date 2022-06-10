@@ -1330,6 +1330,8 @@ class StringListWithDialog(DesignerDisplay, QWidget):
         new : str
             The new item to replace it with
         """
+        if old == new:
+            return
         if not self.allow_duplicates and new in self.data_list.get():
             return self._remove_item(old)
         self.data_list.put_to_index(
@@ -1348,7 +1350,20 @@ class StringListWithDialog(DesignerDisplay, QWidget):
         The goal is to replace each instance of old with each instance of
         new, in order.
         """
-        for old, new in zip_longest(old_items, new_items, fillvalue=None):
+        # Ignore items that exist in both lists
+        old_uniques = [item for item in old_items if item not in new_items]
+        new_uniques = [item for item in new_items if item not in old_items]
+        # Remove items from new if duplicates aren't allowed and they exist
+        if not self.allow_duplicates:
+            new_uniques = [
+                item for item in new_uniques if item not in self.data_list.get()
+            ]
+        # Add, remove, edit in place as necessary
+        # This will edit everything in place if the lists are equal length
+        # If old_uniques is longer, we'll remove when we exhaust new_uniques
+        # If new_uniques is longer, we'll add when we exhaust old_uniques
+        # TODO find a way to add these at the selected index
+        for old, new in zip_longest(old_uniques, new_uniques, fillvalue=None):
             if old is None:
                 self._add_item(new)
             elif new is None:
