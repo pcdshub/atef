@@ -8,6 +8,7 @@ import json
 import logging
 import os.path
 from functools import partial
+from itertools import zip_longest
 from pprint import pprint
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
@@ -1288,18 +1289,72 @@ class StringListWithDialog(DesignerDisplay, QWidget):
             self.data_list.remove_value(item.text())
             self.list_strings.takeItem(self.list_strings.row(item))
 
-    def _remove_item(self, item: str):
+    def _remove_item(self, item: str) -> None:
         """
         Remove an item from the QListWidget and the bridge.
 
         Parameters
         ----------
-        item : str
+        items : str
             The item to remove.
         """
-        index = self.data_list.get().index(item)
         self.data_list.remove_value(item)
-        self.list_strings.takeItem(index)
+        for row in range(self.list_strings.count()):
+            if self.list_strings.item(row).text() == item:
+                self.list_strings.takeItem(row)
+                return
+
+    def remove_items(self, items: List[str]) -> None:
+        """
+        Remove items from the QListWidget and the bridge.
+
+        Parameters
+        ----------
+        items : list of str
+            The items to remove.
+        """
+        for item in items:
+            self._remove_item(item)
+
+    def _edit_item(self, old: str, new: str) -> None:
+        """
+        Edit an item in place in the QListWidget and the bridge.
+
+        If we don't allow duplicates and new already exists, we
+        need to remove old instead.
+
+        Parameters
+        ----------
+        old : str
+            The original item to replace
+        new : str
+            The new item to replace it with
+        """
+        if not self.allow_duplicates and new in self.data_list.get():
+            return self._remove_item(old)
+        self.data_list.put_to_index(
+            index=self.data_list.get().index(old),
+            new_value=new,
+        )
+        for row in range(self.list_strings.count()):
+            if self.list_strings.item(row).text() == old:
+                self.list_strings.item(row).setText(new)
+                return
+
+    def edit_items(self, old_items: List[str], new_items: List[str]) -> None:
+        """
+        Best-effort edit of items in place in the QListWidget and the bridge.
+
+        The goal is to replace each instance of old with each instance of
+        new, in order.
+        """
+        for old, new in zip_longest(old_items, new_items, fillvalue=None):
+            if old is None:
+                self._add_item(new)
+            elif new is None:
+                self._remove_item(old)
+            else:
+                self._edit_item(old, new)
 
 
 class DeviceListWidget(StringListWithDialog):
@@ -1409,12 +1464,7 @@ class BulkListWidget(StringListWithDialog):
         if not ok:
             return
         new_pvs = [pv.strip() for pv in user_input.splitlines() if pv.strip()]
-        for pv in new_pvs:
-            if pv not in to_select:
-                self._add_item(pv)
-        for pv in to_select:
-            if pv not in new_pvs:
-                self._remove_item(pv)
+        self.edit_items(to_select, new_pvs)
 
 
 class NamedDataclassList(StrList):
