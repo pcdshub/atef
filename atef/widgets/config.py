@@ -240,6 +240,7 @@ class Tree(DesignerDisplay, QWidget):
 
     bridge: QDataclassBridge
     tree_widget: QTreeWidget
+    splitter: QtWidgets.QSplitter
 
     full_path: str
 
@@ -285,12 +286,18 @@ class Tree(DesignerDisplay, QWidget):
         item = self.tree_widget.currentItem()
         if item is self.last_selection:
             return
+
+        replace = bool(self.last_selection is not None)
         if self.last_selection is not None:
             self.last_selection.widget.setVisible(False)
         widget = item.widget
         if widget not in self.built_widgets:
-            self.layout().addWidget(widget)
             self.built_widgets.add(widget)
+
+        if replace:
+            self.splitter.replaceWidget(1, widget)
+        else:
+            self.splitter.addWidget(widget)
         widget.setVisible(True)
         self.last_selection = item
 
