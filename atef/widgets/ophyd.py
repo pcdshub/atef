@@ -31,6 +31,7 @@ class OphydAttributeData:
     read_only: bool
     readback: Any
     setpoint: Any
+    units: Optional[str]
     signal: ophyd.Signal
 
     @classmethod
@@ -50,6 +51,7 @@ class OphydAttributeData:
             readback=None,
             setpoint=None,
             signal=inst,
+            units=None,
         )
 
     @classmethod
@@ -198,9 +200,9 @@ class _DevicePollThread(QtCore.QThread):
             return
 
         new_data: Dict[str, Any] = {}
+        new_data["units"] = data.description.get("units", "") or ""
         if readback is not None:
-            units = data.description.get("units", "") or ""
-            new_data["readback"] = f"{readback} {units}"
+            new_data["readback"] = readback
         if setpoint is not None:
             new_data["setpoint"] = setpoint
 
@@ -451,13 +453,16 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
             setpoint = info.setpoint
             if setpoint is None or np.size(setpoint) == 0:
                 setpoint = ""
-            columns = {
-                0: info.attr,
-                1: info.readback,
-                2: setpoint,
-                3: info.pvname,
-            }
-            return str(columns[column])
+            if column == DeviceColumn.attribute:
+                return info.attr
+            if column == DeviceColumn.readback:
+                units = info.units or ""
+                return f"{info.readback} {units}"
+            if column == DeviceColumn.setpoint:
+                return f"{info.setpoint}"
+            if column == DeviceColumn.pvname:
+                return info.pvname
+            return ""
 
         if role == Qt.ToolTipRole:
             if column in (0,):
@@ -503,7 +508,13 @@ class OphydDeviceTableView(QtWidgets.QTableView):
     #: Signal indicating the model's poll thread has finished executing.
     data_updates_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
     #: Signal indicating the attributes have been selected by the user.
-    attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)  # List[str]
+    attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(
+        list  # List[OphydAttributeData]
+    )
+    #: Signal indicating the attributes have been selected by the user.
+    attributes_selected_with_values: ClassVar[QtCore.Signal] = QtCore.Signal(
+        dict
+    )  # Dict[str, Any]
 
     def __init__(
         self,
@@ -560,7 +571,7 @@ class OphydDeviceTableView(QtWidgets.QTableView):
                 copy_to_clipboard(index.data())
 
             def select_attr(*_):
-                self.attributes_selected.emit([row_data.attr])
+                self.attributes_selected.emit([row_data])
 
             if index.data() is not None:
                 copy_action = self.menu.addAction(f"&Copy: {index.data()}")
@@ -644,7 +655,9 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
     filename = "ophyd_device_tree_widget.ui"
 
     closed: ClassVar[QtCore.Signal] = QtCore.Signal()
-    attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)  # List[str]
+    attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(
+        list  # List[OphydAttributeData]
+    )
 
     label_filter: QtWidgets.QLabel
     edit_filter: QtWidgets.QLineEdit
@@ -692,7 +705,7 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
         def table_selection_changed(
             selected: QtCore.QItemSelection, deselected: QtCore.QItemSelection
         ):
-            self.button_select_attrs.setEnabled(len(selected.indexes()))
+            self.button_select_attrs.setEnabled(bool(len(selected.indexes())))
 
         def select_attrs():
             model = self.device_table_view.current_model
@@ -704,8 +717,9 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
                     )
                 )
                 data = [model.get_data_for_row(row) for row in rows]
-                attrs = [datum.attr for datum in data if datum is not None]
-                self.attributes_selected.emit(attrs)
+                self.attributes_selected.emit(
+                    [datum for datum in data if datum is not None]
+                )
 
         self.button_select_attrs.clicked.connect(select_attrs)
         self.device_table_view.attributes_selected.connect(

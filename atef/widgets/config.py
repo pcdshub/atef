@@ -37,6 +37,7 @@ from ..reduce import ReduceMethod
 from ..type_hints import PrimitiveType
 from .core import DesignerDisplay
 from .happi import HappiDeviceComponentWidget, HappiSearchWidget
+from .ophyd import OphydAttributeData
 
 logger = logging.getLogger(__name__)
 
@@ -1416,11 +1417,39 @@ class ComponentListWidget(StringListWithDialog):
     """
 
     _search_widget: Optional[HappiDeviceComponentWidget] = None
+    suggest_comparison: QSignal = QSignal(Comparison)
 
     def _setup_ui(self):
         super()._setup_ui()
         self.item_add_request.connect(self._open_component_chooser)
         self.item_edit_request.connect(self._open_component_chooser)
+
+    def _add_attribute_data_items(self, items: List[OphydAttributeData]):
+        for item in items:
+            self._add_item(item.attr)
+
+        try:
+            values = set(
+                item.readback
+                for item in items
+                if item.readback is not None
+            )
+        except TypeError:
+            # Unhashable readback values
+            return
+
+        values.discard(None)
+        if not values:
+            return
+
+        if len(values) == 1:
+            self.suggest_comparison.emit(
+                Equals(value=list(values)[0])
+            )
+        else:
+            self.suggest_comparison.emit(
+                Range(low=min(values), high=max(values), inclusive=True)
+            )
 
     def _open_component_chooser(self, to_select: Optional[List[str]] = None):
         """
@@ -1441,9 +1470,8 @@ class ComponentListWidget(StringListWithDialog):
         # )
         widget.show()
         widget.activateWindow()
-        widget.device_widget.attributes_selected.connect(
-            self.add_items
-        )
+
+        widget.device_widget.attributes_selected.connect(self._add_attribute_data_items)
         # TODO: any way to access the device names?
         # widget.item_search_widget.edit_filter.setText(
         #     "|".join(to_select or []),
@@ -1797,6 +1825,9 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         super().assign_tree_item(item)
         self.initialize_idcomp()
 
+    def _add_suggested_comparison(self, comparison: Comparison):
+        self.add_comparison(comparison=comparison)
+
     def initialize_idcomp(self) -> None:
         """
         Perform first-time setup of this widget.
@@ -1810,20 +1841,18 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         self.initialize_config_name()
         # Set up editing of the identifiers list
         if issubclass(self.config_type, DeviceConfiguration):
+            self.id_label.setText("Device Signals")
             identifiers_list = ComponentListWidget(
                 data_list=self.bridge.ids,
             )
+            identifiers_list.suggest_comparison.connect(self._add_suggested_comparison)
         elif issubclass(self.config_type, PVConfiguration):
+            self.id_label.setText("PV Names")
             identifiers_list = BulkListWidget(
                 data_list=self.bridge.ids,
             )
 
         self.id_content.addWidget(identifiers_list)
-        # Adjust the identifier text appropriately for config type
-        if issubclass(self.config_type, DeviceConfiguration):
-            self.id_label.setText('Device Signals')
-        elif issubclass(self.config_type, PVConfiguration):
-            self.id_label.setText('PV Names')
         self.comparison_list = NamedDataclassList(
             data_list=self.bridge.comparisons,
             layout=QVBoxLayout(),
