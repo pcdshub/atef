@@ -15,7 +15,7 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
 
 from apischema import deserialize, serialize
 from pydm.widgets.drawing import PyDMDrawingLine
-from qtpy import QtCore, QtWidgets
+from qtpy import QtWidgets
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import QColor
@@ -1445,17 +1445,6 @@ class DeviceListWidget(StringListWithDialog):
         self._search_widget.edit_filter.setText(
             "|".join(to_select or []),
         )
-
-
-def find_widget_ancestor(widget: QtWidgets.QWidget, ancestor_cls: Type[QtCore.QObject]):
-    """Find an ancestor widget of the given type."""
-    ancestor = widget.parent()
-    while ancestor is not None:
-        if isinstance(ancestor, ancestor_cls):
-            return ancestor
-        ancestor = ancestor.parent()
-
-    return None
 
 
 class ComponentListWidget(StringListWithDialog):
