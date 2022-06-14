@@ -11,11 +11,11 @@ from functools import partial
 from itertools import zip_longest
 from pprint import pprint
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
-                    Union)
+                    Union, cast)
 
 from apischema import deserialize, serialize
 from pydm.widgets.drawing import PyDMDrawingLine
-from qtpy import QtWidgets
+from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import QColor
@@ -348,6 +348,27 @@ class AtefItem(QTreeWidgetItem):
         """
         self.widget = widget
 
+    def find_ancestor_by_widget(self, cls: Type[QtWidgets.QWidget]) -> Optional[AtefItem]:
+        """Find an ancestor widget of the given type."""
+        ancestor = self.parent_tree_item
+        while hasattr(ancestor, "parent_tree_item"):
+            widget = getattr(ancestor, "widget", None)
+            if isinstance(widget, cls):
+                return ancestor
+            ancestor = ancestor.parent_tree_item
+
+        return None
+
+    def find_ancestor_by_item(self, cls: Type[AtefItem]) -> Optional[AtefItem]:
+        """Find an ancestor widget of the given type."""
+        ancestor = self.parent_tree_item
+        while hasattr(ancestor, "parent_tree_item"):
+            if isinstance(ancestor, cls):
+                return ancestor
+            ancestor = ancestor.parent_tree_item
+
+        return None
+
 
 class PageWidget(DesignerDisplay, QWidget):
     """
@@ -487,6 +508,21 @@ class PageWidget(DesignerDisplay, QWidget):
         button.setToolTip(
             f"Navigate to child {item.text(1)}"
         )
+
+    def get_configuration(self) -> Optional[Union[DeviceConfiguration, PVConfiguration]]:
+        """Get an applicable `Configuration`, if available."""
+        if isinstance(self, Group):
+            item = self
+        else:
+            item = self.tree_item.find_ancestor_by_widget(Group)
+
+        if item is None or item.widget is None:
+            return None
+
+        group = cast(Group, item.widget)
+        if isinstance(group.bridge.data, (PVConfiguration, DeviceConfiguration)):
+            return group.bridge.data
+        return None
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -1411,6 +1447,17 @@ class DeviceListWidget(StringListWithDialog):
         )
 
 
+def find_widget_ancestor(widget: QtWidgets.QWidget, ancestor_cls: Type[QtCore.QObject]):
+    """Find an ancestor widget of the given type."""
+    ancestor = widget.parent()
+    while ancestor is not None:
+        if isinstance(ancestor, ancestor_cls):
+            return ancestor
+        ancestor = ancestor.parent()
+
+    return None
+
+
 class ComponentListWidget(StringListWithDialog):
     """
     Component list widget using a ``HappiDeviceComponentWidget``.
@@ -1418,6 +1465,17 @@ class ComponentListWidget(StringListWithDialog):
 
     _search_widget: Optional[HappiDeviceComponentWidget] = None
     suggest_comparison: QSignal = QSignal(Comparison)
+    get_device_list: Optional[Callable[[], List[str]]]
+
+    def __init__(
+        self,
+        data_list: QDataclassList,
+        get_device_list: Optional[Callable[[], List[str]]] = None,
+        allow_duplicates: bool = False,
+        **kwargs,
+    ):
+        self.get_device_list = get_device_list
+        super().__init__(data_list=data_list, allow_duplicates=allow_duplicates, **kwargs)
 
     def _setup_ui(self):
         super()._setup_ui()
@@ -1472,10 +1530,17 @@ class ComponentListWidget(StringListWithDialog):
         widget.activateWindow()
 
         widget.device_widget.attributes_selected.connect(self._add_attribute_data_items)
-        # TODO: any way to access the device names?
-        # widget.item_search_widget.edit_filter.setText(
-        #     "|".join(to_select or []),
-        # )
+
+        if self.get_device_list is not None:
+            try:
+                device_list = self.get_device_list()
+            except Exception as ex:
+                device_list = []
+                logger.debug("Failed to get device list", exc_info=ex)
+
+            widget.item_search_widget.edit_filter.setText(
+                "|".join(device_list),
+            )
 
 
 class BulkListWidget(StringListWithDialog):
@@ -1828,6 +1893,14 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
     def _add_suggested_comparison(self, comparison: Comparison):
         self.add_comparison(comparison=comparison)
 
+    def get_device_list(self) -> List[str]:
+        """Get the device list, if applicable."""
+        config = self.get_configuration()
+        if isinstance(config, DeviceConfiguration):
+            return config.devices
+
+        return []
+
     def initialize_idcomp(self) -> None:
         """
         Perform first-time setup of this widget.
@@ -1843,6 +1916,7 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         if issubclass(self.config_type, DeviceConfiguration):
             self.id_label.setText("Device Signals")
             identifiers_list = ComponentListWidget(
+                get_device_list=self.get_device_list,
                 data_list=self.bridge.ids,
             )
             identifiers_list.suggest_comparison.connect(self._add_suggested_comparison)
