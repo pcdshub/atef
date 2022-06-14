@@ -511,10 +511,6 @@ class OphydDeviceTableView(QtWidgets.QTableView):
     attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(
         list  # List[OphydAttributeData]
     )
-    #: Signal indicating the attributes have been selected by the user.
-    attributes_selected_with_values: ClassVar[QtCore.Signal] = QtCore.Signal(
-        dict
-    )  # Dict[str, Any]
 
     def __init__(
         self,
@@ -722,6 +718,13 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
                 )
 
         self.button_select_attrs.clicked.connect(select_attrs)
+
+        def select_single_attr(index: QtCore.QModelIndex) -> None:
+            data = self.device_table_view.get_data_from_proxy_index(index)
+            if data is not None:
+                self.attributes_selected.emit([data])
+
+        self.device_table_view.doubleClicked.connect(select_single_attr)
         self.device_table_view.attributes_selected.connect(
             self.attributes_selected.emit
         )
