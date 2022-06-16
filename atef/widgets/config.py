@@ -1554,7 +1554,7 @@ class ComponentListWidget(StringListWithDialog):
 
         menu.addSection("Add single attribute")
         for attr in data:
-            def add_single_attr(attr_name: str = attr.attr):
+            def add_single_attr(*, attr_name: str = attr.attr):
                 self._add_item(attr_name)
 
             action = menu.addAction(f"Add {attr.attr}")
