@@ -529,6 +529,8 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         self.models = {}
         self._device = None
 
+        self.sortByColumn(0, Qt.AscendingOrder)
+
         # Set the property last
         self.device = device
 
