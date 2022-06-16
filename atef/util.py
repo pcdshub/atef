@@ -84,8 +84,4 @@ def get_maximum_severity(severities: Sequence[Severity]) -> Severity:
 def regex_for_devices(names: Optional[Sequence[str]]) -> str:
     """Get a regular expression that matches all the given device names."""
     names = list(names or [])
-    if not names:
-        return ""
-
-    regex = "|".join(names)
-    return f"^{regex}$"
+    return "|".join(f"^{name}$" for name in names)
