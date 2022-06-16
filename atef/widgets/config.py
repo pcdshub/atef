@@ -37,7 +37,7 @@ from ..reduce import ReduceMethod
 from ..type_hints import PrimitiveType
 from .core import DesignerDisplay
 from .happi import HappiDeviceComponentWidget, HappiSearchWidget
-from .ophyd import OphydAttributeData
+from .ophyd import OphydAttributeData, OphydAttributeDataSummary
 
 logger = logging.getLogger(__name__)
 
@@ -1471,33 +1471,6 @@ class ComponentListWidget(StringListWithDialog):
         self.item_add_request.connect(self._open_component_chooser)
         self.item_edit_request.connect(self._open_component_chooser)
 
-    def _add_attribute_data_items(self, items: List[OphydAttributeData]):
-        for item in items:
-            self._add_item(item.attr)
-
-        try:
-            values = set(
-                item.readback
-                for item in items
-                if item.readback is not None
-            )
-        except TypeError:
-            # Unhashable readback values
-            return
-
-        values.discard(None)
-        if not values:
-            return
-
-        if len(values) == 1:
-            self.suggest_comparison.emit(
-                Equals(value=list(values)[0])
-            )
-        else:
-            self.suggest_comparison.emit(
-                Range(low=min(values), high=max(values), inclusive=True)
-            )
-
     def _open_component_chooser(self, to_select: Optional[List[str]] = None):
         """
         Hook: User requested adding/editing a componen.
@@ -1511,14 +1484,13 @@ class ComponentListWidget(StringListWithDialog):
         widget = HappiDeviceComponentWidget(
             client=util.get_happi_client()
         )
+        widget.device_widget.custom_menu_helper = self._attr_menu_helper
         self._search_widget = widget
         # widget.item_search_widget.happi_items_chosen.connect(
         #    self.add_items
         # )
         widget.show()
         widget.activateWindow()
-
-        widget.device_widget.attributes_selected.connect(self._add_attribute_data_items)
 
         if self.get_device_list is not None:
             try:
@@ -1530,6 +1502,65 @@ class ComponentListWidget(StringListWithDialog):
             widget.item_search_widget.edit_filter.setText(
                 "|".join(device_list),
             )
+
+    def _attr_menu_helper(self, data: List[OphydAttributeData]) -> QtWidgets.QMenu:
+        menu = QtWidgets.QMenu()
+
+        summary = OphydAttributeDataSummary.from_attr_data(*data)
+        short_attrs = [datum.attr.split(".")[-1] for datum in data]
+
+        def add_attrs():
+            for datum in data:
+                self._add_item(datum.attr)
+
+        def add_without():
+            add_attrs()
+
+        def add_with_equals():
+            add_attrs()
+            comparison = Equals(
+                name=f'{"_".join(short_attrs)}_auto',
+                description=f'Comparison from: {", ".join(short_attrs)}',
+                value=summary.average,
+            )
+            self.suggest_comparison.emit(comparison)
+
+        def add_with_range():
+            add_attrs()
+            comparison = Range(
+                name=f'{"_".join(short_attrs)}_auto',
+                description=f'Comparison from: {", ".join(short_attrs)}',
+                low=summary.minimum,
+                high=summary.maximum,
+            )
+            self.suggest_comparison.emit(comparison)
+
+        menu.addSection("Add all selected")
+        add_without_action = menu.addAction("Add selected without comparison")
+        add_without_action.triggered.connect(add_without)
+
+        if summary.average is not None:
+            add_with_equals_action = menu.addAction(
+                f"Add selected with Equals comparison (={summary.average})"
+            )
+            add_with_equals_action.triggered.connect(add_with_equals)
+
+        if summary.minimum is not None:
+            add_with_range_action = menu.addAction(
+                f"Add selected with Range comparison "
+                f"[{summary.minimum}, {summary.maximum}]"
+            )
+            add_with_range_action.triggered.connect(add_with_range)
+
+        menu.addSection("Add single attribute")
+        for attr in data:
+            def add_single_attr(attr_name: str = attr.attr):
+                self._add_item(attr_name)
+
+            action = menu.addAction(f"Add {attr.attr}")
+            action.triggered.connect(add_single_attr)
+
+        return menu
 
 
 class BulkListWidget(StringListWithDialog):

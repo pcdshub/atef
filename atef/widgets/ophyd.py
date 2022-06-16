@@ -8,7 +8,7 @@ import enum
 import logging
 import threading
 import time
-from typing import Any, ClassVar, Dict, List, Optional, Set
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
 import ophyd
@@ -20,6 +20,46 @@ from ..qt_helpers import copy_to_clipboard
 from .core import DesignerDisplay
 
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class OphydAttributeDataSummary:
+    minimum: Optional[Any] = None
+    maximum: Optional[Any] = None
+    average: Optional[Any] = None
+
+    @classmethod
+    def from_attr_data(cls, *items: OphydAttributeData) -> OphydAttributeDataSummary:
+        try:
+            values = set(
+                item.readback
+                for item in items
+                if item.readback is not None
+            )
+        except TypeError:
+            # Unhashable readback values
+            values = set()
+
+        if not values:
+            return OphydAttributeDataSummary()
+
+        def ignore_type_errors(func: Callable) -> Optional[Any]:
+            try:
+                return func(values)
+            except Exception:
+                return None
+
+        sum_ = ignore_type_errors(sum)
+        if isinstance(sum_, (int, float)):
+            average = sum_ / len(values)
+        else:
+            average = None
+
+        return OphydAttributeDataSummary(
+            minimum=ignore_type_errors(min),
+            maximum=ignore_type_errors(max),
+            average=average
+        )
 
 
 @dataclasses.dataclass
@@ -637,6 +677,18 @@ class OphydDeviceTableView(QtWidgets.QTableView):
             # about the device
             model.start()
 
+    @property
+    def selected_attribute_data(self) -> List[OphydAttributeData]:
+        """The OphydAttributeData items that correspond to the selection."""
+        data = [
+            self.get_data_from_proxy_index(index)
+            for index in self.selectedIndexes()
+        ]
+        return [datum for datum in data if datum is not None]
+
+
+CustomMenuHelper = Callable[[List[OphydAttributeData]], QtWidgets.QMenu]
+
 
 class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
     """
@@ -646,6 +698,10 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
     ----------
     parent : QWidget, optional
         The parent widget.
+
+    custom_menu_helper : callable, optional
+        A callable which creates a drop-down menu for selection of attributes.
+        Signature is ``callable(List[OphydAttributeData]) -> QMenu``.
 
     device : ophyd.Device, optional
         The ophyd device to look at.  May be set later.
@@ -657,6 +713,8 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
         list  # List[OphydAttributeData]
     )
 
+    _custom_menu: Optional[QtWidgets.QMenu]
+    custom_menu_helper: Optional[CustomMenuHelper]
     label_filter: QtWidgets.QLabel
     edit_filter: QtWidgets.QLineEdit
     device_table_view: OphydDeviceTableView
@@ -666,12 +724,15 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
     def __init__(
         self,
         parent: Optional[QtWidgets.QWidget] = None,
+        custom_menu_helper: Optional[CustomMenuHelper] = None,
         device: Optional[ophyd.Device] = None
     ):
         super().__init__(parent=parent)
 
         self._setup_ui()
         self.device = device
+        self.custom_menu_helper = custom_menu_helper
+        self._custom_menu = None
 
     def _setup_ui(self):
         """Configure UI elements at init time."""
@@ -705,21 +766,7 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
         ):
             self.button_select_attrs.setEnabled(bool(len(selected.indexes())))
 
-        def select_attrs():
-            model = self.device_table_view.current_model
-            if model is not None:
-                rows = sorted(
-                    set(
-                        self.device_table_view.proxy_model.mapToSource(index).row()
-                        for index in self.device_table_view.selectedIndexes()
-                    )
-                )
-                data = [model.get_data_for_row(row) for row in rows]
-                self.attributes_selected.emit(
-                    [datum for datum in data if datum is not None]
-                )
-
-        self.button_select_attrs.clicked.connect(select_attrs)
+        self.button_select_attrs.clicked.connect(self._select_attrs_clicked)
 
         def select_single_attr(index: QtCore.QModelIndex) -> None:
             data = self.device_table_view.get_data_from_proxy_index(index)
@@ -730,6 +777,19 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
         self.device_table_view.attributes_selected.connect(
             self.attributes_selected.emit
         )
+
+    def _select_attrs_clicked(self):
+        """Handler for when attributes are selected."""
+        attrs = self.device_table_view.selected_attribute_data
+        if not attrs:
+            return
+
+        if self.custom_menu_helper:
+            top_left = self.button_select_attrs.mapToGlobal(QtCore.QPoint(0, 0))
+            self._custom_menu = self.custom_menu_helper(attrs)
+            self._custom_menu.exec_(top_left)
+        else:
+            self.attributes_selected.emit(attrs)
 
     def closeEvent(self, ev: QtGui.QCloseEvent):
         super().closeEvent(ev)
