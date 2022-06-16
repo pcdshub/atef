@@ -16,8 +16,11 @@
   <layout class="QGridLayout" name="gridLayout">
    <item row="2" column="2">
     <widget class="QPushButton" name="button_update_data">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Read device data - readbacks and setpoints - from the control system.&lt;/p&gt;&lt;p&gt;This may require network access to the selected device.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="text">
-      <string>Refresh data</string>
+      <string>Update data</string>
      </property>
     </widget>
    </item>
