@@ -1441,10 +1441,7 @@ class DeviceListWidget(StringListWithDialog):
         self._search_widget.happi_items_chosen.connect(self.add_items)
         self._search_widget.show()
         self._search_widget.activateWindow()
-
-        self._search_widget.edit_filter.setText(
-            "|".join(to_select or []),
-        )
+        self._search_widget.edit_filter.setText(util.regex_for_devices(to_select))
 
 
 class ComponentListWidget(StringListWithDialog):
@@ -1500,7 +1497,7 @@ class ComponentListWidget(StringListWithDialog):
                 logger.debug("Failed to get device list", exc_info=ex)
 
             widget.item_search_widget.edit_filter.setText(
-                "|".join(device_list),
+                util.regex_for_devices(device_list)
             )
 
     def _attr_menu_helper(self, data: List[OphydAttributeData]) -> QtWidgets.QMenu:
