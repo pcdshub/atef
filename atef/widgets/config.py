@@ -11,7 +11,7 @@ from functools import partial
 from itertools import zip_longest
 from pprint import pprint
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
-                    Union)
+                    Union, cast)
 
 from apischema import deserialize, serialize
 from pydm.widgets.drawing import PyDMDrawingLine
@@ -37,6 +37,7 @@ from ..reduce import ReduceMethod
 from ..type_hints import PrimitiveType
 from .core import DesignerDisplay
 from .happi import HappiDeviceComponentWidget, HappiSearchWidget
+from .ophyd import OphydAttributeData, OphydAttributeDataSummary
 
 logger = logging.getLogger(__name__)
 
@@ -347,6 +348,27 @@ class AtefItem(QTreeWidgetItem):
         """
         self.widget = widget
 
+    def find_ancestor_by_widget(self, cls: Type[QtWidgets.QWidget]) -> Optional[AtefItem]:
+        """Find an ancestor widget of the given type."""
+        ancestor = self.parent_tree_item
+        while hasattr(ancestor, "parent_tree_item"):
+            widget = getattr(ancestor, "widget", None)
+            if isinstance(widget, cls):
+                return ancestor
+            ancestor = ancestor.parent_tree_item
+
+        return None
+
+    def find_ancestor_by_item(self, cls: Type[AtefItem]) -> Optional[AtefItem]:
+        """Find an ancestor widget of the given type."""
+        ancestor = self.parent_tree_item
+        while hasattr(ancestor, "parent_tree_item"):
+            if isinstance(ancestor, cls):
+                return ancestor
+            ancestor = ancestor.parent_tree_item
+
+        return None
+
 
 class PageWidget(DesignerDisplay, QWidget):
     """
@@ -486,6 +508,21 @@ class PageWidget(DesignerDisplay, QWidget):
         button.setToolTip(
             f"Navigate to child {item.text(1)}"
         )
+
+    def get_configuration(self) -> Optional[Union[DeviceConfiguration, PVConfiguration]]:
+        """Get an applicable `Configuration`, if available."""
+        if isinstance(self, Group):
+            item = self
+        else:
+            item = self.tree_item.find_ancestor_by_widget(Group)
+
+        if item is None or item.widget is None:
+            return None
+
+        group = cast(Group, item.widget)
+        if isinstance(group.bridge.data, (PVConfiguration, DeviceConfiguration)):
+            return group.bridge.data
+        return None
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -1404,10 +1441,7 @@ class DeviceListWidget(StringListWithDialog):
         self._search_widget.happi_items_chosen.connect(self.add_items)
         self._search_widget.show()
         self._search_widget.activateWindow()
-
-        self._search_widget.edit_filter.setText(
-            "|".join(to_select or []),
-        )
+        self._search_widget.edit_filter.setText(util.regex_for_devices(to_select))
 
 
 class ComponentListWidget(StringListWithDialog):
@@ -1416,6 +1450,18 @@ class ComponentListWidget(StringListWithDialog):
     """
 
     _search_widget: Optional[HappiDeviceComponentWidget] = None
+    suggest_comparison: QSignal = QSignal(Comparison)
+    get_device_list: Optional[Callable[[], List[str]]]
+
+    def __init__(
+        self,
+        data_list: QDataclassList,
+        get_device_list: Optional[Callable[[], List[str]]] = None,
+        allow_duplicates: bool = False,
+        **kwargs,
+    ):
+        self.get_device_list = get_device_list
+        super().__init__(data_list=data_list, allow_duplicates=allow_duplicates, **kwargs)
 
     def _setup_ui(self):
         super()._setup_ui()
@@ -1435,19 +1481,83 @@ class ComponentListWidget(StringListWithDialog):
         widget = HappiDeviceComponentWidget(
             client=util.get_happi_client()
         )
+        widget.device_widget.custom_menu_helper = self._attr_menu_helper
         self._search_widget = widget
         # widget.item_search_widget.happi_items_chosen.connect(
         #    self.add_items
         # )
         widget.show()
         widget.activateWindow()
-        widget.device_widget.attributes_selected.connect(
-            self.add_items
-        )
-        # TODO: any way to access the device names?
-        # widget.item_search_widget.edit_filter.setText(
-        #     "|".join(to_select or []),
-        # )
+
+        if self.get_device_list is not None:
+            try:
+                device_list = self.get_device_list()
+            except Exception as ex:
+                device_list = []
+                logger.debug("Failed to get device list", exc_info=ex)
+
+            widget.item_search_widget.edit_filter.setText(
+                util.regex_for_devices(device_list)
+            )
+
+    def _attr_menu_helper(self, data: List[OphydAttributeData]) -> QtWidgets.QMenu:
+        menu = QtWidgets.QMenu()
+
+        summary = OphydAttributeDataSummary.from_attr_data(*data)
+        short_attrs = [datum.attr.split(".")[-1] for datum in data]
+
+        def add_attrs():
+            for datum in data:
+                self._add_item(datum.attr)
+
+        def add_without():
+            add_attrs()
+
+        def add_with_equals():
+            add_attrs()
+            comparison = Equals(
+                name=f'{"_".join(short_attrs)}_auto',
+                description=f'Comparison from: {", ".join(short_attrs)}',
+                value=summary.average,
+            )
+            self.suggest_comparison.emit(comparison)
+
+        def add_with_range():
+            add_attrs()
+            comparison = Range(
+                name=f'{"_".join(short_attrs)}_auto',
+                description=f'Comparison from: {", ".join(short_attrs)}',
+                low=summary.minimum,
+                high=summary.maximum,
+            )
+            self.suggest_comparison.emit(comparison)
+
+        menu.addSection("Add all selected")
+        add_without_action = menu.addAction("Add selected without comparison")
+        add_without_action.triggered.connect(add_without)
+
+        if summary.average is not None:
+            add_with_equals_action = menu.addAction(
+                f"Add selected with Equals comparison (={summary.average})"
+            )
+            add_with_equals_action.triggered.connect(add_with_equals)
+
+        if summary.minimum is not None:
+            add_with_range_action = menu.addAction(
+                f"Add selected with Range comparison "
+                f"[{summary.minimum}, {summary.maximum}]"
+            )
+            add_with_range_action.triggered.connect(add_with_range)
+
+        menu.addSection("Add single attribute")
+        for attr in data:
+            def add_single_attr(*, attr_name: str = attr.attr):
+                self._add_item(attr_name)
+
+            action = menu.addAction(f"Add {attr.attr}")
+            action.triggered.connect(add_single_attr)
+
+        return menu
 
 
 class BulkListWidget(StringListWithDialog):
@@ -1797,6 +1907,17 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         super().assign_tree_item(item)
         self.initialize_idcomp()
 
+    def _add_suggested_comparison(self, comparison: Comparison):
+        self.add_comparison(comparison=comparison)
+
+    def get_device_list(self) -> List[str]:
+        """Get the device list, if applicable."""
+        config = self.get_configuration()
+        if isinstance(config, DeviceConfiguration):
+            return config.devices
+
+        return []
+
     def initialize_idcomp(self) -> None:
         """
         Perform first-time setup of this widget.
@@ -1810,20 +1931,19 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         self.initialize_config_name()
         # Set up editing of the identifiers list
         if issubclass(self.config_type, DeviceConfiguration):
+            self.id_label.setText("Device Signals")
             identifiers_list = ComponentListWidget(
+                get_device_list=self.get_device_list,
                 data_list=self.bridge.ids,
             )
+            identifiers_list.suggest_comparison.connect(self._add_suggested_comparison)
         elif issubclass(self.config_type, PVConfiguration):
+            self.id_label.setText("PV Names")
             identifiers_list = BulkListWidget(
                 data_list=self.bridge.ids,
             )
 
         self.id_content.addWidget(identifiers_list)
-        # Adjust the identifier text appropriately for config type
-        if issubclass(self.config_type, DeviceConfiguration):
-            self.id_label.setText('Device Signals')
-        elif issubclass(self.config_type, PVConfiguration):
-            self.id_label.setText('PV Names')
         self.comparison_list = NamedDataclassList(
             data_list=self.bridge.comparisons,
             layout=QVBoxLayout(),
