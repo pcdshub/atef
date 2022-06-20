@@ -5,7 +5,7 @@ Widget classes designed for atef-to-happi interaction.
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar, Dict, List, Optional, Union
+from typing import Any, ClassVar, Dict, List, Optional, Union, cast
 
 import happi
 import ophyd
@@ -264,6 +264,19 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.happi_list_view.client = client
         self.refresh_happi()
 
+    def search_results_by_key(self, key: str) -> Dict[str, happi.SearchResult]:
+        """Cached happi item search results by the provided key."""
+
+        def get_entries():
+            for result in self.happi_list_view.entries():
+                result = cast(happi.client.SearchResult, result)
+                try:
+                    yield (result.metadata[key], result)
+                except KeyError:
+                    continue
+
+        return dict(get_entries())
+
 
 class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
     """
@@ -364,9 +377,6 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         self._metadata = metadata
         self.updated_metadata.emit(self.item_name, metadata)
         self.model.clear()
-        if not self.item_name:
-            self.label_title.setText("")
-            return
 
         self.label_title.setText(metadata["name"])
         self.model.setHorizontalHeaderLabels(["Key", "Value"])
@@ -406,6 +416,11 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
         """The current happi item metadata, as a dictionary."""
         return dict(self._metadata)
 
+    @metadata.setter
+    def metadata(self, md: Dict[str, Any]) -> None:
+        """The current happi item metadata, as a dictionary."""
+        self._got_metadata(md)
+
 
 class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
     """
@@ -426,8 +441,9 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
         not supplied.
 
     show_device_components : bool, optional
-        Toggle the visibility of the device component widget.  Defaults to
-        True.
+        Toggle the visibility of the device component tab.  This allows for
+        reuse of the HappiDeviceComponentWidget when only the device search
+        and happi metadata information are desirable. Defaults to True.
     """
     filename: ClassVar[str] = 'happi_device_component.ui'
 
@@ -476,8 +492,7 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
             if item in self._device_cache:
                 return self._device_cache[item]
 
-            container = client[item]
-            device = container.get()
+            device = search_result.get()
             self._device_cache[item] = device
             return device
 
@@ -497,7 +512,19 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
         item, *_ = items
 
         # Set metadata early, even if instantiation fails
-        self.metadata_widget.item_name = item
+        # self.metadata_widget.item_name = item
+
+        try:
+            by_name = self.item_search_widget.search_results_by_key("name")
+            search_result = by_name[item]
+        except Exception:
+            logger.exception("Failed to retrieve happi metadata for %s", item)
+            return
+
+        try:
+            self.metadata_widget.metadata = search_result.metadata
+        except Exception:
+            logger.exception("Failed to display happi metadata")
 
         if not self.show_device_components:
             # User can request to never instantiate a device this way
