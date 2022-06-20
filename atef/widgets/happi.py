@@ -459,12 +459,13 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
         self.item_search_widget.button_choose.setVisible(False)
         if not self.show_device_components:
             self.device_tab_widget.removeTab(0)
+            self.setWindowTitle("Happi Item Search with Metadata")
 
     @QtCore.Slot(list)
     def _new_item_selection(self, items: List[str]) -> None:
         """New item selected from the happi search."""
         client = self.client
-        if not client or not items:
+        if client is None or not items:
             return
 
         def get_device() -> Optional[ophyd.Device]:
