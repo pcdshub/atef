@@ -512,7 +512,6 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
         item, *_ = items
 
         # Set metadata early, even if instantiation fails
-        # self.metadata_widget.item_name = item
 
         try:
             by_name = self.item_search_widget.search_results_by_key("name")
