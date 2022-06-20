@@ -437,9 +437,9 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
     _client: Optional[happi.client.Client]
     _device_worker: Optional[ThreadWorker]
     _device_cache: Dict[str, ophyd.Device]
-    group_happi_md: QtWidgets.QGroupBox
-    group_components: QtWidgets.QGroupBox
-    group_device_search: QtWidgets.QGroupBox
+    components_tab: QtWidgets.QWidget
+    device_tab_widget: QtWidgets.QTabWidget
+    metadata_tab: QtWidgets.QWidget
 
     def __init__(
         self,
@@ -457,7 +457,8 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
             self._new_item_selection
         )
         self.item_search_widget.button_choose.setVisible(False)
-        self.group_components.setVisible(show_device_components)
+        if not self.show_device_components:
+            self.device_tab_widget.removeTab(0)
 
     @QtCore.Slot(list)
     def _new_item_selection(self, items: List[str]) -> None:

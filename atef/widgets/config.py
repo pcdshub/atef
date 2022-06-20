@@ -36,7 +36,7 @@ from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod
 from ..type_hints import PrimitiveType
 from .core import DesignerDisplay
-from .happi import HappiDeviceComponentWidget, HappiSearchWidget
+from .happi import HappiDeviceComponentWidget
 from .ophyd import OphydAttributeData, OphydAttributeDataSummary
 
 logger = logging.getLogger(__name__)
@@ -1437,11 +1437,18 @@ class DeviceListWidget(StringListWithDialog):
         to_select : list of str, optional
             If provided, the device chooser will filter for these items.
         """
-        self._search_widget = HappiSearchWidget(client=util.get_happi_client())
-        self._search_widget.happi_items_chosen.connect(self.add_items)
+        self._search_widget = HappiDeviceComponentWidget(
+            client=util.get_happi_client(),
+            show_device_components=False,
+        )
+        self._search_widget.item_search_widget.happi_items_chosen.connect(
+            self.add_items
+        )
         self._search_widget.show()
         self._search_widget.activateWindow()
-        self._search_widget.edit_filter.setText(util.regex_for_devices(to_select))
+        self._search_widget.item_search_widget.edit_filter.setText(
+            util.regex_for_devices(to_select)
+        )
 
 
 class ComponentListWidget(StringListWithDialog):
