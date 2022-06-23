@@ -51,6 +51,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     _client: Optional[happi.client.Client]
     _last_selected: List[str]
     _search_thread: Optional[ThreadWorker]
+    _tree_view_expanded: Optional[List[QtCore.QModelIndex]]
     _tree_current_category: str
     _tree_updated: bool
     button_choose: QtWidgets.QPushButton
@@ -78,6 +79,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self._tree_current_category = "beamline"
         self._search_thread = None
         self._tree_has_data = False
+        self._tree_view_expanded = None
         self._setup_ui()
         # Set the client at the end, as this may trigger an update:
         self.client = client
@@ -166,6 +168,22 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.happi_list_view.proxy_model.setFilterRegExp(text)
         self.happi_tree_view.proxy_model.setFilterRegExp(text)
 
+        # Saves/restores the pre-search expansion state of the root nodes.
+        # All root categories are expanded during search for convenience
+        if len(text) > 0:
+            if self._tree_view_expanded is None:
+                model = self.happi_tree_view.proxy_model
+                self._tree_view_expanded = [
+                    model.index(x, 0) for x in range(model.rowCount())
+                    if self.happi_tree_view.isExpanded(model.index(x, 0))
+                ]
+            self.happi_tree_view.expandAll()
+        elif self._tree_view_expanded is not None:
+            self.happi_tree_view.collapseAll()
+            for index in self._tree_view_expanded:
+                self.happi_tree_view.expand(index)
+            self._tree_view_expanded = None
+
     def _tree_view_context_menu(self, pos: QtCore.QPoint) -> None:
         """Context menu for the happi tree view."""
         self.menu = QtWidgets.QMenu(self)
@@ -240,6 +258,9 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         def report_error(ex: Exception):
             logger.warning("Failed to update happi information: %s", ex, exc_info=ex)
             self.button_refresh.setEnabled(True)
+
+        if self._tree_view_expanded is not None:
+            self._tree_view_expanded = []
 
         if self._client is None:
             return
