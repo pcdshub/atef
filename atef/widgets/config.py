@@ -1860,6 +1860,10 @@ class FrameOnEditFilter(QObject):
     not editing it.
     """
     def eventFilter(self, object: QLineEdit, event: QEvent) -> bool:
+        # Even if we install only on line edits, this can be passed a generic
+        # QWidget when we remove and clean up the line edit widget.
+        if not isinstance(object, QLineEdit):
+            return False
         if event.type() == QEvent.FocusIn:
             object.setFrame(True)
             object.setReadOnly(False)
