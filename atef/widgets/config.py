@@ -18,7 +18,7 @@ from pydm.widgets.drawing import PyDMDrawingLine
 from qtpy import QtWidgets
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtGui import QColor
+from qtpy.QtGui import QColor, QPalette
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QInputDialog, QLabel,
                             QLayout, QLineEdit, QMainWindow, QMessageBox,
@@ -902,8 +902,10 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
             self.delete_button.setEnabled(False)
         else:
             self.desc_edit.setFrameShape(self.desc_edit.StyledPanel)
+            color = self.palette().color(QPalette.ColorRole.AlternateBase)
             self.setStyleSheet(
-                "QLineEdit, QPlainTextEdit { background: white }"
+                f"QLineEdit, QPlainTextEdit {{ background: rgba({color.red()},"
+                f"{color.green()}, {color.blue()}, 255) }}"
             )
             if not self.name_edit.text():
                 self.delete_button.setEnabled(True)
