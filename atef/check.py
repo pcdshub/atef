@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Generator, List, Optional, Sequence
+from dataclasses import dataclass, field, asdict
+from typing import Any, Generator, List, Optional, Sequence, Union, Iterator
 
 import numpy as np
 import ophyd
 
-from . import exceptions, reduce, serialization
+from . import exceptions, reduce, serialization, util
 from .enums import Severity
 from .exceptions import (ComparisonError, ComparisonException,
-                         ComparisonWarning, PreparedComparisonException)
+                         ComparisonWarning, PreparedComparisonException,
+                         DynamicValueError)
 from .type_hints import Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ success = Result()
 class Value:
     """A primitive value with optional metadata."""
     #: The value for comparison.
-    value: PrimitiveType
+    value: Union[PrimitiveType, DynamicValue]
     #: A description of what the value represents.
     description: str = ""
     #: Relative tolerance value.
@@ -102,22 +103,99 @@ class Value:
 
     def compare(self, value: PrimitiveType) -> bool:
         """Compare the provided value with this one, using tolerance settings."""
+        if isinstance(self.value, DynamicValue):
+            our_value = self.value.get()
+        else:
+            our_value = self.value
         if self.rtol is not None or self.atol is not None:
             return np.isclose(
-                value, self.value,
+                value, our_value,
                 rtol=(self.rtol or 0.0),
                 atol=(self.atol or 0.0)
             )
-        return value == self.value
+        return value == our_value
+
+
+class DynamicValue:
+    """
+    A primitive value from an external source that may change over time.
+
+    This necessarily picks up a runtime performance cost and getting
+    the value is not guaranteed to be successful. If unsuccessful,
+    This will raise a DynamicValueError from the original exception.
+    """
+    _last_value: Optional[PrimitiveType] = None
+
+    def __str__(self) -> str:
+        kwds = (f"{key}={value}" for key, value in asdict(self))
+        return f"{type(self)}({', '.join(kwds)}) [{self._last_value}]"
+
+    def get(self) -> PrimitiveType:
+        """
+        Call the child's get routine and wrap for error handling.
+
+        This also sets up a cached last value to use in the repr.
+        """
+        try:
+            self._last_value = self._get()
+        except Exception as exc:
+            raise DynamicValueError(
+                'Error loading dynamic value'
+            ) from exc
+        else:
+            return self._last_value
+
+    def _get(self) -> PrimitiveType:
+        """
+        Implement in child class to get the current value from source.
+        """
+        raise NotImplementedError()
+
+
+@dataclass
+class EpicsValue(DynamicValue):
+    """
+    A primitive value sourced from an EPICS PV.
+
+    This will create and cache an EpicsSignalRO object, and defer
+    to that signal's get handling.
+    """
+    #: The EPICS PV to use.
+    pvname: str
+
+    def _get(self) -> PrimitiveType:
+        if not hasattr(self, "_signal"):
+            self._signal = ophyd.EpicsSignalRO(self.pvname)
+        return self._signal.get()
+
+
+@dataclass
+class HappiValue(DynamicValue):
+    """
+    A primitive value sourced from a specific happi device signal.
+
+    This will query happi to cache a Signal object, and defer to
+    that signal's get handling.
+    """
+    #: The name of the device to use.
+    device_name: str
+    #: The attr name of the signal to get from.
+    signal_attr: str
+
+    def _get(self) -> PrimitiveType:
+        if not hasattr(self, "_signal"):
+            device = util.get_happi_device_by_name(self.device_name)
+            self._signal = getattr(device, self.signal_attr)
+        return self._signal.get()
 
 
 @dataclass
 class ValueRange:
     """A range of primitive values with optional metadata."""
     #: The low value for comparison.
-    low: Number
+    low: Union[Number, DynamicValue]
     #: The high value for comparison.
-    high: Number
+    high: Union[Number, DynamicValue]
     #: Should the low and high values be included in the range?
     inclusive: bool = True
     #: Check if inside the range.
@@ -138,8 +216,16 @@ class ValueRange:
 
     def compare(self, value: Number) -> bool:
         """Compare the provided value with this range."""
+        if isinstance(self.low, DynamicValue):
+            our_low = self.low.get()
+        else:
+            our_low = self.low
+        if isinstance(self.high, DynamicValue):
+            our_high = self.high.get()
+        else:
+            our_high = self.high
         in_range = _is_in_range(
-            value, low=self.low, high=self.high, inclusive=self.inclusive
+            value, low=our_low, high=our_high, inclusive=self.inclusive
         )
         if self.in_range:
             # Normal functionality - is value in the range?
@@ -322,7 +408,7 @@ class Comparison:
 
 @dataclass
 class Equals(Comparison):
-    value: PrimitiveType = 0.0
+    value: Union[PrimitiveType, DynamicValue] = 0.0
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
 
@@ -347,7 +433,7 @@ class Equals(Comparison):
 @dataclass
 class NotEquals(Comparison):
     # Less confusing shortcut for `Equals(..., invert=True)`
-    value: PrimitiveType = 0
+    value: Union[PrimitiveType, DynamicValue] = 0
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
 
@@ -397,7 +483,7 @@ class ValueSet(Comparison):
 @dataclass
 class AnyValue(Comparison):
     """Comparison passes if the value is in the ``values`` list."""
-    values: List[PrimitiveType] = field(default_factory=list)
+    values: List[Union[PrimitiveType, DynamicValue]] = field(default_factory=list)
 
     def describe(self) -> str:
         """Describe the comparison in words."""
@@ -405,7 +491,12 @@ class AnyValue(Comparison):
         return f"one of {values}"
 
     def _compare(self, value: PrimitiveType) -> bool:
-        return value in self.values
+        return value in self.values or value in self.dynamic_values()
+
+    def dynamic_values(self) -> Iterator[PrimitiveType]:
+        for value in self.values:
+            if isinstance(value, DynamicValue):
+                yield value.get()
 
 
 @dataclass
@@ -431,49 +522,65 @@ class AnyComparison(Comparison):
 @dataclass
 class Greater(Comparison):
     """Comparison: value > self.value."""
-    value: Number = 0
+    value: Union[Number, DynamicValue] = 0
 
     def describe(self) -> str:
         return f"> {self.value}"
 
     def _compare(self, value: Number) -> bool:
-        return value > self.value
+        if isinstance(self.value, DynamicValue):
+            our_value = self.value.get()
+        else:
+            our_value = self.value
+        return value > our_value
 
 
 @dataclass
 class GreaterOrEqual(Comparison):
     """Comparison: value >= self.value."""
-    value: Number = 0
+    value: Union[Number, DynamicValue] = 0
 
     def describe(self) -> str:
         return f">= {self.value}"
 
     def _compare(self, value: Number) -> bool:
-        return value >= self.value
+        if isinstance(self.value, DynamicValue):
+            our_value = self.value.get()
+        else:
+            our_value = self.value
+        return value >= our_value
 
 
 @dataclass
 class Less(Comparison):
     """Comparison: value < self.value."""
-    value: Number = 0
+    value: Union[Number, DynamicValue] = 0
 
     def describe(self) -> str:
         return f"< {self.value}"
 
     def _compare(self, value: Number) -> bool:
-        return value < self.value
+        if isinstance(self.value, DynamicValue):
+            our_value = self.value.get()
+        else:
+            our_value = self.value
+        return value < our_value
 
 
 @dataclass
 class LessOrEqual(Comparison):
     """Comparison: value <= self.value."""
-    value: Number = 0
+    value: Union[Number, DynamicValue] = 0
 
     def describe(self) -> str:
         return f"<= {self.value}"
 
     def _compare(self, value: Number) -> bool:
-        return value <= self.value
+        if isinstance(self.value, DynamicValue):
+            our_value = self.value.get()
+        else:
+            our_value = self.value
+        return value <= our_value
 
 
 @dataclass
@@ -505,13 +612,13 @@ class Range(Comparison):
         warn_high <= value <= high
     """
     #: The low end of the range, which must be <= high.
-    low: Number = 0
+    low: Union[Number, DynamicValue] = 0
     #: The high end of the range, which must be >= low.
-    high: Number = 0
+    high: Union[Number, DynamicValue] = 0
     #: The low end of the warning range, which must be <= warn_high.
-    warn_low: Optional[Number] = None
+    warn_low: Optional[Union[Number, DynamicValue]] = None
     #: The high end of the warning range, which must be >= warn_low.
-    warn_high: Optional[Number] = None
+    warn_high: Optional[Union[Number, DynamicValue]] = None
     #: Should the low and high values be included in the range?
     inclusive: bool = True
 
