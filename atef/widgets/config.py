@@ -1790,8 +1790,8 @@ class StrListElem(DesignerDisplay, QWidget):
     def __init__(self, start_text: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.line_edit.setText(start_text)
-        self.line_edit.setFrame(not start_text)
         edit_filter = FrameOnEditFilter(parent=self)
+        edit_filter.set_no_edit_style(self.line_edit)
         self.line_edit.installEventFilter(edit_filter)
         self.on_text_changed(start_text)
         self.line_edit.textChanged.connect(self.on_text_changed)
@@ -1865,15 +1865,29 @@ class FrameOnEditFilter(QObject):
         if not isinstance(object, QLineEdit):
             return False
         if event.type() == QEvent.FocusIn:
-            object.setFrame(True)
-            object.setReadOnly(False)
+            self.set_edit_style(object)
             return True
         if event.type() == QEvent.FocusOut:
-            if object.text():
-                object.setFrame(False)
-            object.setReadOnly(True)
+            self.set_no_edit_style(object)
             return True
         return False
+
+    @staticmethod
+    def set_edit_style(object: QLineEdit):
+        object.setFrame(True)
+        object.setStyleSheet(
+            "QLineEdit { background: white }"
+        )
+        object.setReadOnly(False)
+
+    @staticmethod
+    def set_no_edit_style(object: QLineEdit):
+        if object.text():
+            object.setFrame(False)
+            object.setStyleSheet(
+                "QLineEdit { background: transparent }"
+            )
+        object.setReadOnly(True)
 
 
 class IdAndCompWidget(ConfigTextMixin, PageWidget):
