@@ -746,10 +746,11 @@ class ConfigTextMixin:
         """
         # Load starting text
         load_name = self.bridge.name.get() or ''
+        self.last_name = load_name
         self.name_edit.setText(load_name)
         # Setup the name edit
         self.name_edit.textEdited.connect(self.update_saved_name)
-        self.bridge.name.changed_value.connect(self.name_edit.setText)
+        self.bridge.name.changed_value.connect(self.apply_new_name)
 
     def initialize_config_desc(self):
         """
@@ -773,7 +774,17 @@ class ConfigTextMixin:
         """
         When the user edits the name, write to the config.
         """
+        self.last_name = self.name_edit.text()
         self.bridge.name.put(name)
+
+    def apply_new_name(self, text: str):
+        """
+        If the text changed in the data, update the widget.
+
+        Only run if needed to avoid annoyance with cursor repositioning.
+        """
+        if text != self.last_name:
+            self.name_edit.setText(text)
 
     def update_saved_desc(self):
         """
@@ -1698,9 +1709,7 @@ class NamedDataclassList(StrList):
         widget : StrListElem
             The widget element to link.
         """
-        bridge.name.changed_value.connect(
-            widget.line_edit.setText
-        )
+        bridge.name.changed_value.connect(widget.on_data_changed)
 
     def save_item_update(self, item: StrListElem, new_value: str) -> None:
         """
@@ -1812,6 +1821,13 @@ class StrListElem(DesignerDisplay, QWidget):
         self.del_button.setVisible(not text)
         # Adjust the width to match the text
         match_line_edit_text_width(self.line_edit, text=text)
+
+    def on_data_changed(self, data: str) -> None:
+        """
+        Change the text displayed here using new data, if needed.
+        """
+        if self.line_edit.text() != data:
+            self.line_edit.setText(data)
 
 
 def match_line_edit_text_width(
