@@ -1874,6 +1874,14 @@ class FrameOnEditFilter(QObject):
 
     @staticmethod
     def set_edit_style(object: QLineEdit):
+        """
+        Set a QLineEdit to the look and feel we want for editing.
+
+        Parameters
+        ----------
+        object : QLineEdit
+            Any line edit widget.
+        """
         object.setFrame(True)
         object.setStyleSheet(
             "QLineEdit { background: white }"
@@ -1882,6 +1890,14 @@ class FrameOnEditFilter(QObject):
 
     @staticmethod
     def set_no_edit_style(object: QLineEdit):
+        """
+        Set a QLineEdit to the look and feel we want for not editing.
+
+        Parameters
+        ----------
+        object : QLineEdit
+            Any line edit widget.
+        """
         if object.text():
             object.setFrame(False)
             object.setStyleSheet(
