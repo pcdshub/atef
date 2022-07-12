@@ -3,9 +3,10 @@
 """
 
 import argparse
+import dataclasses
 import logging
 import pathlib
-from typing import Dict, List, Optional, Sequence, Union, cast
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
 
 import happi
 import ophyd
@@ -68,6 +69,105 @@ default_severity_to_log_level = {
 }
 
 
+def description_for_tree(
+    item: Union[PreparedComparison, Result],
+    *,
+    severity_to_rich: Optional[Dict[Severity, str]] = None,
+    verbose: int = 0,
+) -> Optional[str]:
+    """
+    Get a description for the rich Tree, given a comparison or a failed result.
+
+    Parameters
+    ----------
+    item : Union[PreparedComparison, Result]
+        The item to add to the tree.
+    severity_to_rich : Optional[Dict[Severity, str]], optional
+        A mapping of severity values to rich colors.
+    verbose : int, optional
+        The verbosity level, where 0 is not verbose.
+
+    Returns
+    -------
+    str or None
+        Returns a description to add to the tree if applicable for the given
+        verbosity level, or ``None`` if no message should be displayed.
+    """
+    severity_to_rich = severity_to_rich or default_severity_to_rich
+
+    if isinstance(item, PreparedComparison):
+        # A successfully prepared comparison
+        result = item.result
+        prepared = item
+    else:
+        # An error that was transformed into a Result with a severity
+        result = item
+        prepared = None
+
+    if result is None:
+        return (
+            f"{severity_to_rich[Severity.internal_error]}[default]: "
+            f"comparison not run"
+        )
+
+    if result.severity > Severity.success:
+        return (
+            f"{severity_to_rich[result.severity]}[default]: {result.reason}"
+        )
+
+    if verbose > 0 and prepared is not None:
+        if prepared.comparison is not None:
+            description = prepared.comparison.describe()
+        else:
+            description = "no comparison configured"
+
+        return (
+            f"{severity_to_rich[result.severity]}[default]: "
+            f"{prepared.identifier} {description}"
+        )
+
+    # According to the severity and verbosity settings, this message should
+    # not be displayed.
+    return None
+
+
+@dataclasses.dataclass
+class _RichTreeHelper:
+    """A helper for mapping to subtrees of a root ``rich.Tree``."""
+    root: rich.tree.Tree
+    path_to_tree: Dict[Tuple[str, ...], rich.tree.Tree] = dataclasses.field(
+        default_factory=dict
+    )
+    path: List[str] = dataclasses.field(default_factory=list)
+
+    def get_subtree(self, path: Iterable[str]) -> rich.tree.Tree:
+        """
+        Get a subtree based on the traversed node names along the path.
+
+        Parameters
+        ----------
+        path : Iterable[str]
+            The path of names to the subtree.
+
+        Returns
+        -------
+        rich.tree.Tree
+            The subtree depending on the provided path.
+        """
+        partial_path = ()
+        node = self.root
+        for part in path:
+            partial_path = partial_path + (part, )
+            if partial_path not in self.path_to_tree:
+                subtree = rich.tree.Tree(partial_path[-1])
+                self.path_to_tree[partial_path] = subtree
+                node.add(subtree)
+
+            node = self.path_to_tree[partial_path]
+
+        return node
+
+
 def log_results_rich(
     console: rich.console.Console,
     severity: Severity,
@@ -93,38 +193,26 @@ def log_results_rich(
     else:
         label_middle = ""
 
-    tree = rich.tree.Tree(f"{label_prefix}{label_middle}{label_suffix}")
+    root = rich.tree.Tree(f"{label_prefix}{label_middle}{label_suffix}")
+    tree_helper = _RichTreeHelper(root=root)
     for item in items:
-        if isinstance(item, PreparedComparison):
-            # A successfully prepared comparison
-            result = item.result
-            prepared = item
+        if isinstance(item, Result):
+            path = getattr(item.exception, "path", [])
         else:
-            # An error that was transformed into a Result with a severity
-            result = item
-            prepared = None
+            path = getattr(item, "path", [])
 
-        if result is None:
-            tree.add(
-                f"{severity_to_rich[Severity.internal_error]}[default]: "
-                f"comparison not run"
-            )
-        elif result.severity > Severity.success:
-            tree.add(
-                f"{severity_to_rich[result.severity]}[default]: {result.reason}"
-            )
-        elif verbose > 0 and prepared is not None:
-            if prepared.comparison is not None:
-                description = prepared.comparison.describe()
-            else:
-                description = "no comparison configured"
+        # Remove the configuration name ``path[0]`` and the final attribute
+        # in the tree ``path[-1]``
+        path = path[1:-1]
 
-            tree.add(
-                f"{severity_to_rich[result.severity]}[default]: "
-                f"{prepared.identifier} {description}"
-            )
+        desc = description_for_tree(
+            item, severity_to_rich=severity_to_rich, verbose=verbose
+        )
+        if desc:
+            node = tree_helper.get_subtree(path)
+            node.add(desc)
 
-    console.print(tree)
+    console.print(root)
 
 
 def check_and_log(

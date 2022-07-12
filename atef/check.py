@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import (Any, Dict, Generator, List, Mapping, Optional, Sequence,
-                    Tuple, TypeVar, Union)
+from typing import (Any, Dict, Generator, Iterable, List, Mapping, Optional,
+                    Sequence, Tuple, TypeVar, Union)
 
 import apischema
 import happi
@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 class Result:
     severity: Severity = Severity.success
     reason: Optional[str] = None
+    exception: Optional[Exception] = None
 
     @classmethod
     def from_exception(cls, error: Exception) -> Result:
@@ -44,6 +45,7 @@ class Result:
         return cls(
             severity=severity,
             reason=reason,
+            exception=error,
         )
 
 
@@ -672,12 +674,35 @@ class ConfigurationFile:
         return yaml.dump(self.to_json())
 
 
+def _filter_nones(values: Iterable[Optional[Any]]) -> List[Any]:
+    """
+    Filter out ``None`` values from ``values``.
+
+    Parameters
+    ----------
+    values : Iterable[Optional[Any]]
+        The values to filter.
+
+    Returns
+    -------
+    List[Any]
+        ``values`` with ``None`` removed.
+    """
+    return [value for value in values if value is not None]
+
+
 class PreparedComparisonException(Exception):
     """Exception caught during preparation of comparisons."""
+    #: The exception instance itself.
     exception: Exception
+    #: The identifier used for the comparison.
     identifier: str
+    #: The comparison itself.
     comparison: Comparison
+    #: The name of the associated configuration.
     name: Optional[str] = None
+    #: The hierarhical path that led to this prepared comparison.
+    path: List[str]
 
     def __init__(
         self,
@@ -685,12 +710,14 @@ class PreparedComparisonException(Exception):
         identifier: str,
         comparison: Comparison,
         name: Optional[str] = None,
+        path: Optional[List[str]] = None,
     ):
         super().__init__(str(exception))
         self.exception = exception
         self.identifier = identifier
         self.comparison = comparison
         self.name = name
+        self.path = path or []
 
 
 @dataclass
@@ -708,6 +735,8 @@ class PreparedComparison:
     signal: Optional[ophyd.Signal] = None
     #: The name of the associated configuration.
     name: Optional[str] = None
+    #: The hierarhical path that led to this prepared comparison.
+    path: List[str] = field(default_factory=list)
     #: The last result of the comparison, if run.
     result: Optional[Result] = None
 
@@ -748,6 +777,7 @@ class PreparedComparison:
         attr: str,
         comparison: Comparison,
         name: Optional[str] = None,
+        path: Optional[List[str]] = None,
     ) -> PreparedComparison:
         """Create a PreparedComparison from a device and comparison."""
         full_attr = f"{device.name}.{attr}"
@@ -765,6 +795,7 @@ class PreparedComparison:
             identifier=full_attr,
             comparison=comparison,
             signal=signal,
+            path=path or [],
         )
 
     @classmethod
@@ -773,6 +804,7 @@ class PreparedComparison:
         pvname: str,
         comparison: Comparison,
         name: Optional[str] = None,
+        path: Optional[List[str]] = None,
         *,
         cache: Optional[Mapping[str, ophyd.Signal]] = None,
     ) -> PreparedComparison:
@@ -786,6 +818,7 @@ class PreparedComparison:
             signal=cache[pvname],
             comparison=comparison,
             name=name,
+            path=path or [],
         )
 
     @classmethod
@@ -815,9 +848,18 @@ class PreparedComparison:
         for checklist_item in config.checklist:
             for comparison in checklist_item.comparisons:
                 for pvname in checklist_item.ids:
+                    path = _filter_nones(
+                        [
+                            config.name,
+                            checklist_item.name,
+                            comparison.name,
+                            pvname,
+                        ]
+                    )
                     try:
                         yield cls.from_pvname(
                             pvname=pvname,
+                            path=path,
                             comparison=comparison,
                             name=config.name or config.description,
                             cache=cache,
@@ -828,6 +870,7 @@ class PreparedComparison:
                             comparison=comparison,
                             name=config.name or config.description,
                             identifier=pvname,
+                            path=path,
                         )
 
     @classmethod
@@ -857,12 +900,21 @@ class PreparedComparison:
         for checklist_item in config.checklist:
             for comparison in checklist_item.comparisons:
                 for attr in checklist_item.ids:
+                    path = _filter_nones(
+                        [
+                            config.name,
+                            checklist_item.name,
+                            comparison.name,
+                            attr,
+                        ]
+                    )
                     try:
                         yield cls.from_device(
                             device=device,
                             attr=attr,
                             comparison=comparison,
                             name=config.name or config.description,
+                            path=path,
                         )
                     except Exception as ex:
                         yield PreparedComparisonException(
@@ -870,6 +922,7 @@ class PreparedComparison:
                             comparison=comparison,
                             name=config.name or config.description,
                             identifier=attr,
+                            path=path,
                         )
 
     @classmethod
@@ -920,6 +973,12 @@ class PreparedComparison:
                         comparison=None,  # TODO
                         name=config.name or config.description,
                         identifier=dev_name,
+                        path=_filter_nones(
+                            [
+                                config.name,
+                                dev_name,
+                            ]
+                        ),
                     )
                 else:
                     yield from cls._from_device_config(
