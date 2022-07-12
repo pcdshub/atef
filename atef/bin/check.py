@@ -70,7 +70,7 @@ default_severity_to_log_level = {
 
 
 def description_for_tree(
-    item: Union[PreparedComparison, Result],
+    item: Union[PreparedComparison, Exception],
     *,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
     verbose: int = 0,
@@ -80,7 +80,7 @@ def description_for_tree(
 
     Parameters
     ----------
-    item : Union[PreparedComparison, Result]
+    item : Union[PreparedComparison, Exception]
         The item to add to the tree.
     severity_to_rich : Optional[Dict[Severity, str]], optional
         A mapping of severity values to rich colors.
@@ -99,10 +99,12 @@ def description_for_tree(
         # A successfully prepared comparison
         result = item.result
         prepared = item
-    else:
+    elif isinstance(item, Exception):
         # An error that was transformed into a Result with a severity
-        result = item
+        result = Result.from_exception(item)
         prepared = None
+    else:
+        raise ValueError(f"Unexpected item type: {item}")
 
     if result is None:
         return (
@@ -172,7 +174,7 @@ def log_results_rich(
     console: rich.console.Console,
     severity: Severity,
     config: AnyConfiguration,
-    items: List[Union[Result, PreparedComparison]],
+    items: List[Union[Exception, PreparedComparison]],
     *,
     device: Optional[ophyd.Device] = None,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
@@ -196,10 +198,7 @@ def log_results_rich(
     root = rich.tree.Tree(f"{label_prefix}{label_middle}{label_suffix}")
     tree_helper = _RichTreeHelper(root=root)
     for item in items:
-        if isinstance(item, Result):
-            path = getattr(item.exception, "path", [])
-        else:
-            path = getattr(item, "path", [])
+        path = getattr(item, "path", [])
 
         # Remove the configuration name ``path[0]`` and the final attribute
         # in the tree ``path[-1]``
@@ -250,9 +249,8 @@ def check_and_log(
                 severities.append(prepared.result.severity)
         elif isinstance(prepared, Exception):
             ex = cast(Exception, prepared)
-            result = Result.from_exception(ex)
-            items.append(result)
-            severities.append(result.severity)
+            items.append(ex)
+            severities.append(Result.from_exception(ex).severity)
         else:
             logger.error(
                 "Internal error: unexpected result from PreparedComparison: %s",

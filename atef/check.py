@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 class Result:
     severity: Severity = Severity.success
     reason: Optional[str] = None
-    exception: Optional[Exception] = None
 
     @classmethod
     def from_exception(cls, error: Exception) -> Result:
@@ -45,7 +44,6 @@ class Result:
         return cls(
             severity=severity,
             reason=reason,
-            exception=error,
         )
 
 
