@@ -18,7 +18,7 @@ from pydm.widgets.drawing import PyDMDrawingLine
 from qtpy import QtWidgets
 from qtpy.QtCore import QEvent, QObject, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtGui import QColor
+from qtpy.QtGui import QColor, QPalette
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QInputDialog, QLabel,
                             QLayout, QLineEdit, QMainWindow, QMessageBox,
@@ -1883,8 +1883,10 @@ class FrameOnEditFilter(QObject):
             Any line edit widget.
         """
         object.setFrame(True)
+        color = object.palette().color(QPalette.ColorRole.Base)
         object.setStyleSheet(
-            "QLineEdit { background: white }"
+            f"QLineEdit {{ background: rgba({color.red()},"
+            f"{color.green()}, {color.blue()}, {color.alpha()})}}"
         )
         object.setReadOnly(False)
 
