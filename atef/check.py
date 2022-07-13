@@ -265,12 +265,7 @@ class Comparison:
         if passed:
             return success
 
-        desc = self.describe()
-        if self.description:
-            desc = f"{identifier_prefix}{self.description} ({desc})"
-        else:
-            desc = f"{identifier_prefix}{desc}"
-
+        desc = f"{identifier_prefix}{self.describe()}"
         return Result(
             severity=self.severity_on_failure,
             reason=(
@@ -718,6 +713,27 @@ class PreparedComparisonException(Exception):
         self.path = path or []
 
 
+def _name_and_description(obj: Union[Comparison, Configuration]) -> str:
+    """
+    Get a combined name and description for a given item.
+
+    Parameters
+    ----------
+    obj : Union[Comparison, Configuration]
+        The comparison or configuration.
+
+    Returns
+    -------
+    str
+        The displayable name.
+    """
+    if obj.name and obj.description:
+        return f"{obj.name}: {obj.description}"
+    if obj.name:
+        return obj.name
+    return obj.description or ""
+
+
 @dataclass
 class PreparedComparison:
     """
@@ -848,9 +864,9 @@ class PreparedComparison:
                 for pvname in checklist_item.ids:
                     path = _filter_nones(
                         [
-                            config.name,
+                            _name_and_description(config),
                             checklist_item.name,
-                            comparison.name,
+                            _name_and_description(comparison),
                             pvname,
                         ]
                     )
@@ -900,9 +916,9 @@ class PreparedComparison:
                 for attr in checklist_item.ids:
                     path = _filter_nones(
                         [
-                            config.name,
+                            _name_and_description(config),
                             checklist_item.name,
-                            comparison.name,
+                            _name_and_description(comparison),
                             attr,
                         ]
                     )
