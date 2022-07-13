@@ -14,8 +14,9 @@ import rich
 import rich.console
 import rich.tree
 
-from ..check import (AnyConfiguration, ConfigurationFile, PreparedComparison,
-                     Result, Severity)
+from ..check import (AnyConfiguration, Comparison, Configuration,
+                     ConfigurationFile, PathItem, PreparedComparison, Result,
+                     Severity)
 from ..util import get_maximum_severity, ophyd_cleanup
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,46 @@ def description_for_tree(
     return None
 
 
+def _get_name_and_description(obj: Union[Comparison, AnyConfiguration]) -> str:
+    """
+    Get a combined name and description for a given item.
+
+    Parameters
+    ----------
+    obj : Union[Comparison, AnyConfiguration]
+        The comparison or configuration.
+
+    Returns
+    -------
+    str
+        The displayable name.
+    """
+    if obj.name and obj.description:
+        return f"{obj.name}: {obj.description}"
+    if obj.name:
+        return obj.name
+    return obj.description or ""
+
+
+def _get_display_name_for_item(item: PathItem) -> str:
+    """
+    Get the text to show in the rich Tree for the given item.
+
+    Parameters
+    ----------
+    item : PathItem
+        The item to get the display text for.
+
+    Returns
+    -------
+    str
+        Text to display.
+    """
+    if isinstance(item, (Comparison, Configuration)):
+        return _get_name_and_description(item)
+    return getattr(item, "name", str(item)) or ""
+
+
 @dataclasses.dataclass
 class _RichTreeHelper:
     """A helper for mapping to subtrees of a root ``rich.Tree``."""
@@ -142,7 +183,7 @@ class _RichTreeHelper:
     )
     path: List[str] = dataclasses.field(default_factory=list)
 
-    def get_subtree(self, path: Iterable[str]) -> rich.tree.Tree:
+    def get_subtree(self, path: Iterable[PathItem]) -> rich.tree.Tree:
         """
         Get a subtree based on the traversed node names along the path.
 
@@ -156,9 +197,10 @@ class _RichTreeHelper:
         rich.tree.Tree
             The subtree depending on the provided path.
         """
+        displayed_path = [_get_display_name_for_item(item) for item in path]
         partial_path = ()
         node = self.root
-        for part in path:
+        for part in displayed_path:
             partial_path = partial_path + (part, )
             if partial_path not in self.path_to_tree:
                 subtree = rich.tree.Tree(partial_path[-1])
