@@ -5,8 +5,11 @@ import ophyd
 import ophyd.sim
 import pytest
 
-from .. import check, reduce
+from .. import cache, check, reduce
 from ..check import Severity
+from ..config import (ConfigurationFile, DeviceConfiguration,
+                      IdentifierAndComparison, PVConfiguration, check_device,
+                      check_pvs)
 
 
 @pytest.fixture(scope="function")
@@ -24,17 +27,17 @@ config_and_severity = pytest.mark.parametrize(
     "config, severity",
     [
         pytest.param(
-            check.DeviceConfiguration(
+            DeviceConfiguration(
                 devices=[],
                 checklist=[
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         ids=["sig1"],
                         comparisons=[check.Equals(value=1)]
                     ),
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         ids=["sig2"],
                         comparisons=[check.Equals(value=2.5)]),
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         ids=["sig3"],
                         comparisons=[check.Equals(value="abc")]
                     ),
@@ -44,10 +47,10 @@ config_and_severity = pytest.mark.parametrize(
             id="all_good",
         ),
         pytest.param(
-            check.DeviceConfiguration(
+            DeviceConfiguration(
                 devices=[],
                 checklist=[
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         ids=["sig1", "sig2"],
                         comparisons=[check.Equals(value=1, atol=0)],
                     ),
@@ -57,10 +60,10 @@ config_and_severity = pytest.mark.parametrize(
             id="multi_attr_no_tol",
         ),
         pytest.param(
-            check.DeviceConfiguration(
+            DeviceConfiguration(
                 devices=[],
                 checklist=[
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         ids=["sig1", "sig2"],
                         comparisons=[check.Equals(value=1, atol=2)],
                     ),
@@ -70,10 +73,10 @@ config_and_severity = pytest.mark.parametrize(
             id="multi_attr_ok",
         ),
         pytest.param(
-            check.DeviceConfiguration(
+            DeviceConfiguration(
                 devices=[],
                 checklist=[
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         ids=["sig1", "sig2"],
                         comparisons=[
                             check.Equals(value=1, atol=2),
@@ -86,18 +89,18 @@ config_and_severity = pytest.mark.parametrize(
             id="multi_attr_multi_test",
         ),
         pytest.param(
-            check.DeviceConfiguration(
+            DeviceConfiguration(
                 devices=[],
                 checklist=[
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         ids=["sig1"],
                         comparisons=[check.Equals(value=2)],
                     ),
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         ids=["sig2"],
                         comparisons=[check.Equals(value=2.5)],
                     ),
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         ids=["sig3"],
                         comparisons=[check.Equals(value="abc")],
                     ),
@@ -111,16 +114,16 @@ config_and_severity = pytest.mark.parametrize(
 
 
 @config_and_severity
-def test_serializable(config: check.DeviceConfiguration, severity: Severity):
+def test_serializable(config: DeviceConfiguration, severity: Severity):
     serialized = apischema.serialize(config)
-    assert apischema.deserialize(check.DeviceConfiguration, serialized) == config
+    assert apischema.deserialize(DeviceConfiguration, serialized) == config
 
 
 @config_and_severity
 def test_result_severity(
-    device, config: check.DeviceConfiguration, severity: Severity
+    device, config: DeviceConfiguration, severity: Severity
 ):
-    overall, _ = check.check_device(device=device, checklist=config.checklist)
+    overall, _ = check_device(device=device, checklist=config.checklist)
     assert overall == severity
 
 
@@ -165,7 +168,7 @@ def test_at2l0_standin(at2l0):
         3: Severity.error,
     }[state1.get()]
     checklist = [
-        check.IdentifierAndComparison(
+        IdentifierAndComparison(
             ids=at2l0.state_attrs,
             comparisons=[
                 check.NotEquals(
@@ -193,7 +196,7 @@ def test_at2l0_standin(at2l0):
         ),
     ]
 
-    overall, results = check.check_device(at2l0, checklist=checklist)
+    overall, results = check_device(at2l0, checklist=checklist)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == severity
 
@@ -202,7 +205,7 @@ def test_at2l0_standin_reduce(at2l0):
     state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
     state1.put(1.0)
     checklist = [
-        check.IdentifierAndComparison(
+        IdentifierAndComparison(
             ids=at2l0.state_attrs[:1],
             comparisons=[
                 check.Equals(
@@ -216,7 +219,7 @@ def test_at2l0_standin_reduce(at2l0):
         ),
     ]
 
-    overall, results = check.check_device(at2l0, checklist=checklist)
+    overall, results = check_device(at2l0, checklist=checklist)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == Severity.success
 
@@ -232,7 +235,7 @@ def test_at2l0_standin_value_map(at2l0):
 
     severity = value_to_severity[state1.get()]
     checklist = [
-        check.IdentifierAndComparison(
+        IdentifierAndComparison(
             ids=at2l0.state_attrs,
             comparisons=[
                 check.ValueSet(
@@ -258,18 +261,18 @@ def test_at2l0_standin_value_map(at2l0):
         )
     ]
 
-    overall, results = check.check_device(at2l0, checklist=checklist)
+    overall, results = check_device(at2l0, checklist=checklist)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == severity
 
 
 @pytest.fixture
-def mock_signal_cache() -> check._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
-    cache = check._SignalCache(ophyd.sim.FakeEpicsSignalRO)
-    cache["pv1"].sim_put(1)
-    cache["pv2"].sim_put(1)
-    cache["pv3"].sim_put(2)
-    return cache
+def mock_signal_cache() -> cache._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
+    mock_cache = cache._SignalCache(ophyd.sim.FakeEpicsSignalRO)
+    mock_cache["pv1"].sim_put(1)
+    mock_cache["pv2"].sim_put(1)
+    mock_cache["pv3"].sim_put(2)
+    return mock_cache
 
 
 @pytest.mark.parametrize(
@@ -277,11 +280,11 @@ def mock_signal_cache() -> check._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
     [
         pytest.param(
             [
-                check.IdentifierAndComparison(
+                IdentifierAndComparison(
                     ids=["pv1", "pv2"],
                     comparisons=[check.Equals(value=1)],
                 ),
-                check.IdentifierAndComparison(
+                IdentifierAndComparison(
                     ids=["pv3"],
                     comparisons=[check.Equals(value=2)],
                 )
@@ -291,7 +294,7 @@ def mock_signal_cache() -> check._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
         ),
         pytest.param(
             [
-                check.IdentifierAndComparison(
+                IdentifierAndComparison(
                     ids=["pv1", "pv2"],
                     comparisons=[check.Equals(value=2)],
                 ),
@@ -302,54 +305,54 @@ def mock_signal_cache() -> check._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
     ],
 )
 def test_pv_config(
-    mock_signal_cache: check._SignalCache[ophyd.sim.FakeEpicsSignalRO],
-    checklist: List[check.IdentifierAndComparison],
+    mock_signal_cache: cache._SignalCache[ophyd.sim.FakeEpicsSignalRO],
+    checklist: List[IdentifierAndComparison],
     expected_severity: check.Severity
 ):
-    overall, _ = check.check_pvs(checklist, cache=mock_signal_cache)
+    overall, _ = check_pvs(checklist, cache=mock_signal_cache)
     assert overall == expected_severity
 
 
 @pytest.fixture
-def get_by_config_file() -> check.ConfigurationFile:
-    return check.ConfigurationFile(
+def get_by_config_file() -> ConfigurationFile:
+    return ConfigurationFile(
         configs=[
-            check.DeviceConfiguration(
+            DeviceConfiguration(
                 tags=["a"],
                 devices=["dev_a", "dev_b"],
                 checklist=[
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         name="dev_ab_checks",
                         ids=["attr3", "attr2"],
                         comparisons=[check.Equals(value=1)],
                     ),
                 ],
             ),
-            check.DeviceConfiguration(
+            DeviceConfiguration(
                 tags=["a"],
                 devices=["dev_b", "dev_c"],
                 checklist=[
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         name="dev_bc_checks",
                         ids=["attr1", "attr2"],
                         comparisons=[check.Equals(value=1)],
                     ),
                 ],
             ),
-            check.PVConfiguration(
+            PVConfiguration(
                 tags=["a"],
                 checklist=[
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         name="pv_checks",
                         ids=["pv1", "pv2"],
                         comparisons=[check.Equals(value=1)],
                     ),
                 ],
             ),
-            check.PVConfiguration(
+            PVConfiguration(
                 tags=["a", "c"],
                 checklist=[
-                    check.IdentifierAndComparison(
+                    IdentifierAndComparison(
                         name="pv_checks2",
                         ids=["pv3"],
                         comparisons=[check.Equals(value=1)],
@@ -360,19 +363,19 @@ def get_by_config_file() -> check.ConfigurationFile:
     )
 
 
-def test_get_by_device(get_by_config_file: check.ConfigurationFile):
+def test_get_by_device(get_by_config_file: ConfigurationFile):
     a_checks = list(get_by_config_file.get_by_device("dev_a"))
     b_checks = list(get_by_config_file.get_by_device("dev_b"))
     c_checks = list(get_by_config_file.get_by_device("dev_c"))
     assert (a_checks + c_checks) == b_checks
 
 
-def test_get_by_pv(get_by_config_file: check.ConfigurationFile):
-    ((config, (ids,)),) = list(get_by_config_file.get_by_pv("pv1"))
-    assert isinstance(config, check.PVConfiguration)
+def test_get_by_pv(get_by_config_file: ConfigurationFile):
+    ((conf, (ids,)),) = list(get_by_config_file.get_by_pv("pv1"))
+    assert isinstance(conf, PVConfiguration)
     assert "pv1" in ids.ids
 
 
-def test_get_by_tag(get_by_config_file: check.ConfigurationFile):
+def test_get_by_tag(get_by_config_file: ConfigurationFile):
     assert len(list(get_by_config_file.get_by_tag("a"))) == 4
     assert len(list(get_by_config_file.get_by_tag("c"))) == 1
