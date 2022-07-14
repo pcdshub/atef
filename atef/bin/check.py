@@ -256,7 +256,7 @@ def log_results_rich(
     console.print(root)
 
 
-def check_and_log(
+async def check_and_log(
     config: AnyConfiguration,
     console: rich.console.Console,
     verbose: int = 0,
@@ -285,7 +285,7 @@ def check_and_log(
                     )
                     continue
 
-            prepared.result = prepared.compare()
+            prepared.result = await prepared.compare()
             if prepared.result is not None:
                 items.append(prepared)
                 severities.append(prepared.result.severity)
@@ -312,7 +312,7 @@ def check_and_log(
     )
 
 
-def main(
+async def main(
     filename: str,
     name_filter: Optional[Sequence[str]] = None,
     verbose: int = 0,
@@ -336,7 +336,7 @@ def main(
     try:
         with console.status("[bold green] Performing checks..."):
             for config in config_file.configs:
-                check_and_log(
+                await check_and_log(
                     config,
                     console=console,
                     verbose=verbose,

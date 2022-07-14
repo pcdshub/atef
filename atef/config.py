@@ -69,8 +69,8 @@ class PVConfiguration(Configuration):
 AnyConfiguration = Union[PVConfiguration, DeviceConfiguration]
 PathItem = Union[
     AnyConfiguration,
-    "IdentifierAndComparison",
-    "Comparison",
+    IdentifierAndComparison,
+    Comparison,
     str,
 ]
 
@@ -155,7 +155,7 @@ class PreparedComparison:
     #: The last result of the comparison, if run.
     result: Optional[Result] = None
 
-    def compare(self) -> Result:
+    async def compare(self) -> Result:
         """
         Run the prepared comparison.
 
