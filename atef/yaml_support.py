@@ -21,7 +21,8 @@ def init_yaml_support():
         return dumper.represent_str(data.value)
 
     # The ugliness of this makes me think we should use a different library
-    from . import enums, reduce
+    from . import enums, reduce, tools
 
     yaml.add_representer(enums.Severity, int_enum_representer)
     yaml.add_representer(reduce.ReduceMethod, str_enum_representer)
+    yaml.add_representer(tools.SupportedTool, str_enum_representer)

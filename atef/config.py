@@ -10,7 +10,7 @@ import happi
 import ophyd
 import yaml
 
-from . import serialization, util
+from . import serialization, tools, util
 from .cache import get_signal_cache
 from .check import Comparison, Result
 from .enums import Severity
@@ -57,16 +57,46 @@ class Configuration:
 
 @dataclass
 class DeviceConfiguration(Configuration):
+    """
+    A configuration that is built to check one or more devices.
+
+    Identifiers are by default assumed to be attribute (component) names of the
+    devices.  Identifiers may refer to components on the device
+    (``"component"`` would mean to access each device's ``.component``) or may
+    refer to any level of sub-device components (``"sub_device.component"``
+    would mean to access each device's ``.sub_device`` and that sub-device's
+    ``.a`` component).
+    """
     #: Happi device names which give meaning to self.checklist[].ids.
     devices: List[str] = field(default_factory=list)
 
 
 @dataclass
 class PVConfiguration(Configuration):
+    """
+    A configuration that is built to check live EPICS PVs.
+
+    Identifiers are by default assumed to be PV names.
+    """
     ...
 
 
-AnyConfiguration = Union[PVConfiguration, DeviceConfiguration]
+@dataclass
+class ToolConfiguration(Configuration):
+    """
+    A configuration unrelated to PVs or Devices which verifies status via some
+    tool.
+
+    Comparisons can optionally be run on the tool's results.
+    """
+    tool: tools.Tool = field(default_factory=tools.Ping)
+
+
+AnyConfiguration = Union[
+    PVConfiguration,
+    DeviceConfiguration,
+    ToolConfiguration,
+]
 PathItem = Union[
     AnyConfiguration,
     IdentifierAndComparison,
@@ -81,7 +111,7 @@ class ConfigurationFile:
     A configuration file comprised of a number of devices/PV configurations.
     """
 
-    #: configs: either PVConfiguration or DeviceConfiguration.
+    #: configs: PVConfiguration, DeviceConfiguration, or ToolConfiguration.
     configs: List[Configuration]
 
     def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
@@ -144,16 +174,86 @@ class PreparedComparison:
     identifier: str = ""
     #: The comparison itself.
     comparison: Comparison = field(default_factory=Comparison)
-    #: The device the comparison applies to, if applicable.
-    device: Optional[ophyd.Device] = None
-    #: The signal the comparison is to be run on.
-    signal: Optional[ophyd.Signal] = None
     #: The name of the associated configuration.
     name: Optional[str] = None
     #: The hierarhical path that led to this prepared comparison.
     path: List[PathItem] = field(default_factory=list)
     #: The last result of the comparison, if run.
     result: Optional[Result] = None
+
+    @classmethod
+    def from_config(
+        cls,
+        config: AnyConfiguration,
+        *,
+        client: Optional[happi.Client] = None,
+        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+    ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
+        """
+        Create one or more PreparedComparison instances from a PVConfiguration
+        or a DeviceConfiguration.
+
+        If available, provide an instantiated happi Client and PV-to-Signal
+        cache.  If unspecified, a configuration-derived happi Client will
+        be instantiated and a global PV-to-Signal cache will be utilized.
+
+        Parameters
+        ----------
+        config : PVConfiguration or DeviceConfiguration
+            The configuration.
+
+        client : happi.Client
+            A happi Client instance.
+
+        cache : dict of str to type[Signal]
+            The PV to signal cache.
+
+        Yields
+        ------
+        item : PreparedComparisonException or PreparedComparison
+            If an error occurs during preparation, a
+            PreparedComparisonException will be yielded in place of the
+            PreparedComparison.
+        """
+        if isinstance(config, PVConfiguration):
+            yield from PreparedSignalComparison._from_pv_config(config, cache=cache)
+        elif isinstance(config, DeviceConfiguration):
+            if client is None:
+                client = happi.Client.from_config()
+            for dev_name in config.devices:
+                try:
+                    device = util.get_happi_device_by_name(dev_name, client=client)
+                except Exception as ex:
+                    yield PreparedComparisonException(
+                        exception=ex,
+                        comparison=None,  # TODO
+                        name=config.name or config.description,
+                        identifier=dev_name,
+                        path=[
+                            config,
+                            dev_name,
+                        ],
+                    )
+                else:
+                    yield from PreparedSignalComparison._from_device_config(
+                        config=config,
+                        device=device,
+                    )
+        elif isinstance(config, ToolConfiguration):
+            yield from PreparedToolComparison._from_tool_config(config)
+        else:
+            raise NotImplementedError(f"Configuration type unsupported: {type(config)}")
+
+
+@dataclass
+class PreparedSignalComparison(PreparedComparison):
+    """
+    A unified representation of comparisons for device signals and standalone PVs.
+    """
+    #: The device the comparison applies to, if applicable.
+    device: Optional[ophyd.Device] = None
+    #: The signal the comparison is to be run on.
+    signal: Optional[ophyd.Signal] = None
 
     async def compare(self) -> Result:
         """
@@ -336,32 +436,92 @@ class PreparedComparison:
                             path=path,
                         )
 
-    @classmethod
-    def from_config(
-        cls,
-        config: AnyConfiguration,
-        *,
-        client: Optional[happi.Client] = None,
-        cache: Optional[Mapping[str, ophyd.Signal]] = None,
-    ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
-        """
-        Create one or more PreparedComparison instances from a PVConfiguration
-        or a DeviceConfiguration.
 
-        If available, provide an instantiated happi Client and PV-to-Signal
-        cache.  If unspecified, a configuration-derived happi Client will
-        be instantiated and a global PV-to-Signal cache will be utilized.
+@dataclass
+class PreparedToolComparison(PreparedComparison):
+    """
+    A unified representation of comparisons for device signals and standalone PVs.
+    """
+    #: The device the comparison applies to, if applicable.
+    tool: tools.Tool = field(default_factory=lambda: tools.Ping(hosts=[]))
+
+    async def compare(self) -> Result:
+        """
+        Run the prepared comparison.
+
+        Returns
+        -------
+        Result
+            The result of the comparison.  This is also set in ``self.result``.
+        """
+        try:
+            value = await self.tool.run()
+        except TimeoutError:
+            return Result(
+                severity=self.comparison.if_disconnected,
+                reason=(
+                    f"Tool {self.tool} timed out {self.identifier!r} ({self.name}) "
+                    f"for comparison {self.comparison}"
+                ),
+            )
+        self.result = self.comparison.compare(
+            value[self.identifier],
+            identifier=self.identifier
+        )
+        return self.result
+
+    @classmethod
+    def from_tool(
+        cls,
+        tool: tools.Tool,
+        result_key: str,
+        comparison: Comparison,
+        name: Optional[str] = None,
+        path: Optional[List[PathItem]] = None,
+    ) -> PreparedToolComparison:
+        """
+        Prepare a tool-based comparison for execution.
 
         Parameters
         ----------
-        config : PVConfiguration or DeviceConfiguration
+        tool : Tool
+            The tool to run.
+        result_key : str
+            The key from the result dictionary to check after running the tool.
+        comparison : Comparison
+            The comparison to perform on the tool's results (looking at the
+            specific result_key).
+        name : Optional[str], optional
+            The name of the comparison.
+        path : Optional[List[PathItem]], optional
+            The path that led us to this single comparison.
+
+        Returns
+        -------
+        PreparedToolComparison
+        """
+        tool.check_result_key(result_key)
+        return cls(
+            tool=tool,
+            comparison=comparison,
+            name=name,
+            identifier=result_key,
+            path=path or [],
+        )
+
+    @classmethod
+    def _from_tool_config(
+        cls,
+        config: ToolConfiguration,
+    ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
+        """
+        Create one or more PreparedComparison instances from a
+        ToolConfiguration.
+
+        Parameters
+        ----------
+        config : ToolConfiguration
             The configuration.
-
-        client : happi.Client
-            A happi Client instance.
-
-        cache : dict of str to type[Signal]
-            The PV to signal cache.
 
         Yields
         ------
@@ -370,30 +530,31 @@ class PreparedComparison:
             PreparedComparisonException will be yielded in place of the
             PreparedComparison.
         """
-        if isinstance(config, PVConfiguration):
-            yield from cls._from_pv_config(config, cache=cache)
-        elif isinstance(config, DeviceConfiguration):
-            if client is None:
-                client = happi.Client.from_config()
-            for dev_name in config.devices:
-                try:
-                    device = util.get_happi_device_by_name(dev_name, client=client)
-                except Exception as ex:
-                    yield PreparedComparisonException(
-                        exception=ex,
-                        comparison=None,  # TODO
-                        name=config.name or config.description,
-                        identifier=dev_name,
-                        path=[
-                            config,
-                            dev_name,
-                        ],
-                    )
-                else:
-                    yield from cls._from_device_config(
-                        config=config,
-                        device=device,
-                    )
+        for checklist_item in config.checklist:
+            for comparison in checklist_item.comparisons:
+                for result_key in checklist_item.ids:
+                    path = [
+                        config,
+                        checklist_item,
+                        comparison,
+                        result_key,
+                    ]
+                    try:
+                        yield cls.from_tool(
+                            tool=config.tool,
+                            result_key=result_key,
+                            comparison=comparison,
+                            name=config.name or config.description,
+                            path=path,
+                        )
+                    except Exception as ex:
+                        yield PreparedComparisonException(
+                            exception=ex,
+                            comparison=comparison,
+                            name=config.name or config.description,
+                            identifier=result_key,
+                            path=path,
+                        )
 
 
 def check_device(
