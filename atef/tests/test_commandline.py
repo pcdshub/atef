@@ -5,7 +5,7 @@ import pytest
 
 import atef.bin.main as atef_main
 
-from .. import check, util
+from .. import config, util
 from .conftest import CONFIG_PATH
 from .test_comparison_device import at2l0, mock_signal_cache  # noqa: F401
 
@@ -24,7 +24,7 @@ def test_help_module(monkeypatch, subcommand):
 
 def test_check_pv_smoke(monkeypatch, mock_signal_cache):  # noqa: F811
     from atef.bin.check import main as check_main
-    monkeypatch.setattr(check, "get_signal_cache", lambda: mock_signal_cache)
+    monkeypatch.setattr(config, "get_signal_cache", lambda: mock_signal_cache)
     check_main(filename=str(CONFIG_PATH / "pv_based.yml"))
 
 

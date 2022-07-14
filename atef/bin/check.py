@@ -14,9 +14,9 @@ import rich
 import rich.console
 import rich.tree
 
-from ..check import (AnyConfiguration, Comparison, Configuration,
-                     ConfigurationFile, PathItem, PreparedComparison, Result,
-                     Severity)
+from ..check import Comparison, Result, Severity
+from ..config import (AnyConfiguration, Configuration, ConfigurationFile,
+                      PathItem, PreparedComparison)
 from ..util import get_maximum_severity, ophyd_cleanup
 
 logger = logging.getLogger(__name__)
