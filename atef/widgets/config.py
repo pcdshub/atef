@@ -905,7 +905,7 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
             color = self.palette().color(QPalette.ColorRole.Base)
             self.setStyleSheet(
                 f"QLineEdit, QPlainTextEdit {{ background: rgba({color.red()},"
-                f"{color.green()}, {color.blue()}) }}"
+                f"{color.green()}, {color.blue()}, {color.alpha()}) }}"
             )
             if not self.name_edit.text():
                 self.delete_button.setEnabled(True)
