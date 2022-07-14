@@ -15,7 +15,6 @@ from .cache import get_signal_cache
 from .check import Comparison, Result
 from .enums import Severity
 from .exceptions import PreparedComparisonException
-# from .tools import ToolArguments, SupportedTool
 from .type_hints import AnyPath
 from .yaml_support import init_yaml_support
 
@@ -65,12 +64,6 @@ class DeviceConfiguration(Configuration):
 @dataclass
 class PVConfiguration(Configuration):
     ...
-
-
-# @dataclass
-# class ToolConfiguration(Configuration):
-#     tool: SupportedTool = SupportedTool.ping
-#     arguments: ToolArguments = field(default_factory=dict)
 
 
 AnyConfiguration = Union[PVConfiguration, DeviceConfiguration]
