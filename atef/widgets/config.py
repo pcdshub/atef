@@ -27,10 +27,10 @@ from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QVBoxLayout, QWidget)
 
 from .. import util
-from ..check import (Comparison, Configuration, ConfigurationFile,
-                     DeviceConfiguration, Equals, Greater, GreaterOrEqual,
-                     IdentifierAndComparison, Less, LessOrEqual, NotEquals,
-                     PVConfiguration, Range)
+from ..check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
+                     LessOrEqual, NotEquals, Range)
+from ..config import (Configuration, ConfigurationFile, DeviceConfiguration,
+                      IdentifierAndComparison, PVConfiguration)
 from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod

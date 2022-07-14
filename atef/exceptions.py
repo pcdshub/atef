@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import typing
+from typing import Optional
 
 from .enums import Severity
 
 if typing.TYPE_CHECKING:
-    from .check import AnyConfiguration
+    from .check import Comparison
+    from .config import AnyConfiguration
 
 
 class ConfigFileLoadError(Exception):
@@ -42,3 +44,24 @@ class ComparisonError(ComparisonException):
 class ComparisonWarning(ComparisonException):
     """Raise this exception to warn in a comparator."""
     severity = Severity.warning
+
+
+class PreparedComparisonException(Exception):
+    """Exception caught during preparation of comparisons."""
+    exception: Exception
+    identifier: str
+    comparison: Comparison
+    name: Optional[str] = None
+
+    def __init__(
+        self,
+        exception: Exception,
+        identifier: str,
+        comparison: Comparison,
+        name: Optional[str] = None,
+    ):
+        super().__init__(str(exception))
+        self.exception = exception
+        self.identifier = identifier
+        self.comparison = comparison
+        self.name = name

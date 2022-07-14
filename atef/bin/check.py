@@ -13,8 +13,8 @@ import rich
 import rich.console
 import rich.tree
 
-from ..check import (AnyConfiguration, ConfigurationFile, PreparedComparison,
-                     Result, Severity)
+from ..check import Result, Severity
+from ..config import AnyConfiguration, ConfigurationFile, PreparedComparison
 from ..util import get_maximum_severity, ophyd_cleanup
 
 logger = logging.getLogger(__name__)
