@@ -74,6 +74,12 @@ class PVConfiguration(Configuration):
 
 
 AnyConfiguration = Union[PVConfiguration, DeviceConfiguration]
+PathItem = Union[
+    AnyConfiguration,
+    "IdentifierAndComparison",
+    "Comparison",
+    str,
+]
 
 
 @dataclass
@@ -151,6 +157,8 @@ class PreparedComparison:
     signal: Optional[ophyd.Signal] = None
     #: The name of the associated configuration.
     name: Optional[str] = None
+    #: The hierarhical path that led to this prepared comparison.
+    path: List[PathItem] = field(default_factory=list)
     #: The last result of the comparison, if run.
     result: Optional[Result] = None
 
@@ -191,6 +199,7 @@ class PreparedComparison:
         attr: str,
         comparison: Comparison,
         name: Optional[str] = None,
+        path: Optional[List[PathItem]] = None,
     ) -> PreparedComparison:
         """Create a PreparedComparison from a device and comparison."""
         full_attr = f"{device.name}.{attr}"
@@ -208,6 +217,7 @@ class PreparedComparison:
             identifier=full_attr,
             comparison=comparison,
             signal=signal,
+            path=path or [],
         )
 
     @classmethod
@@ -216,6 +226,7 @@ class PreparedComparison:
         pvname: str,
         comparison: Comparison,
         name: Optional[str] = None,
+        path: Optional[List[PathItem]] = None,
         *,
         cache: Optional[Mapping[str, ophyd.Signal]] = None,
     ) -> PreparedComparison:
@@ -229,6 +240,7 @@ class PreparedComparison:
             signal=cache[pvname],
             comparison=comparison,
             name=name,
+            path=path or [],
         )
 
     @classmethod
@@ -258,9 +270,16 @@ class PreparedComparison:
         for checklist_item in config.checklist:
             for comparison in checklist_item.comparisons:
                 for pvname in checklist_item.ids:
+                    path = [
+                        config,
+                        checklist_item,
+                        comparison,
+                        pvname,
+                    ]
                     try:
                         yield cls.from_pvname(
                             pvname=pvname,
+                            path=path,
                             comparison=comparison,
                             name=config.name or config.description,
                             cache=cache,
@@ -271,6 +290,7 @@ class PreparedComparison:
                             comparison=comparison,
                             name=config.name or config.description,
                             identifier=pvname,
+                            path=path,
                         )
 
     @classmethod
@@ -300,12 +320,19 @@ class PreparedComparison:
         for checklist_item in config.checklist:
             for comparison in checklist_item.comparisons:
                 for attr in checklist_item.ids:
+                    path = [
+                        config,
+                        checklist_item,
+                        comparison,
+                        attr,
+                    ]
                     try:
                         yield cls.from_device(
                             device=device,
                             attr=attr,
                             comparison=comparison,
                             name=config.name or config.description,
+                            path=path,
                         )
                     except Exception as ex:
                         yield PreparedComparisonException(
@@ -313,6 +340,7 @@ class PreparedComparison:
                             comparison=comparison,
                             name=config.name or config.description,
                             identifier=attr,
+                            path=path,
                         )
 
     @classmethod
@@ -363,6 +391,10 @@ class PreparedComparison:
                         comparison=None,  # TODO
                         name=config.name or config.description,
                         identifier=dev_name,
+                        path=[
+                            config,
+                            dev_name,
+                        ],
                     )
                 else:
                     yield from cls._from_device_config(

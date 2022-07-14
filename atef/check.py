@@ -261,12 +261,7 @@ class Comparison:
         if passed:
             return success
 
-        desc = self.describe()
-        if self.description:
-            desc = f"{identifier_prefix}{self.description} ({desc})"
-        else:
-            desc = f"{identifier_prefix}{desc}"
-
+        desc = f"{identifier_prefix}{self.describe()}"
         return Result(
             severity=self.severity_on_failure,
             reason=(
