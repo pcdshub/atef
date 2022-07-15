@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import re
 import shutil
+import sys
 import typing
 from dataclasses import field
 from typing import Any, ClassVar, Dict, List, Type, TypedDict, TypeVar, Union
@@ -72,7 +73,7 @@ class Ping(Tool):
     encoding: str = "utf-8"
 
     result_type: ClassVar[Type[ToolResult]] = PingResult
-    _time_re: ClassVar[re.Pattern] = re.compile("time=(.*) ms")
+    _time_re: ClassVar[re.Pattern] = re.compile(r"time=(.*)\s?ms")
     _unresponsive_time: ClassVar[float] = 100.0
 
     @staticmethod
@@ -127,8 +128,15 @@ class Ping(Tool):
         -------
         PingResult
         """
+
+        if sys.platform == "win32":
+            args = ("/n", str(self.count))
+        else:
+            args = ("-c", str(self.count))
+
         proc = await asyncio.create_subprocess_exec(
-            str(shutil.which("ping")), "-c", str(self.count),
+            str(shutil.which("ping")),
+            *args,
             host,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
