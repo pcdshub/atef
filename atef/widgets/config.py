@@ -1448,9 +1448,9 @@ class StringListWithDialog(DesignerDisplay, QWidget):
 
         def copy_selected():
             items = self.list_strings.selectedItems()
-            if len(items) > 0:
-                QGuiApplication.clipboard().setText(items[0].text(),
-                                                    QClipboard.Mode.Clipboard)
+            text = '\n'.join([x.text() for x in items])
+            if len(text) > 0:
+                QGuiApplication.clipboard().setText(text, QClipboard.Mode.Clipboard)
 
         copy = menu.addAction('&Copy')
         copy.triggered.connect(copy_selected)
