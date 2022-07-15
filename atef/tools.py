@@ -6,7 +6,7 @@ import re
 import shutil
 import typing
 from dataclasses import field
-from typing import Any, ClassVar, Dict, List, Type, TypedDict, TypeVar
+from typing import Any, ClassVar, Dict, List, Type, TypedDict, TypeVar, Union
 
 from . import serialization
 from .check import Result, Severity
@@ -154,8 +154,34 @@ class Ping(Tool):
             min_time=0.0,
             max_time=0.0,
         )
-        for host in self.hosts:
-            host_result = await self.ping(host)
+
+        if not self.hosts:
+            return result
+
+        ping_by_host: Dict[str, Union[Exception, PingResult]] = {}
+
+        async def _ping(host: str) -> None:
+            try:
+                ping_by_host[host] = await self.ping(host)
+            except Exception as ex:
+                ping_by_host[host] = ex
+
+        tasks = [asyncio.create_task(_ping(host)) for host in self.hosts]
+
+        try:
+            await asyncio.wait(tasks)
+        except KeyboardInterrupt:
+            for task in tasks:
+                task.cancel()
+            raise
+
+        for host, host_result in ping_by_host.items():
+            if isinstance(host_result, Exception):
+                result["unresponsive"].append(host)
+                result["times"][host] = self._unresponsive_time
+                result["max_time"] = self._unresponsive_time
+                continue
+
             result["unresponsive"].extend(host_result["unresponsive"])
             result["alive"].extend(host_result["alive"])
             result["times"].update(host_result["times"])

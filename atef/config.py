@@ -464,6 +464,17 @@ class PreparedToolComparison(PreparedComparison):
                     f"for comparison {self.comparison}"
                 ),
             )
+        except Exception as ex:
+            logger.debug("Internal error with tool %s", self, exc_info=True)
+            # TODO: include some traceback information for debugging?
+            # Could 'Result' have optional verbose error information?
+            return Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Tool {self.tool} failed to run {self.identifier!r} ({self.name}) "
+                    f"for comparison {self.comparison}: {ex.__class__.__name__} {ex}"
+                ),
+            )
         self.result = self.comparison.compare(
             value[self.identifier],
             identifier=self.identifier
