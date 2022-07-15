@@ -16,15 +16,15 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
 from apischema import deserialize, serialize
 from pydm.widgets.drawing import PyDMDrawingLine
 from qtpy import QtWidgets
-from qtpy.QtCore import QEvent, QObject, QTimer
+from qtpy.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtGui import QColor, QPalette
+from qtpy.QtGui import QClipboard, QColor, QGuiApplication, QPalette
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QInputDialog, QLabel,
-                            QLayout, QLineEdit, QMainWindow, QMessageBox,
-                            QPlainTextEdit, QPushButton, QStyle, QTabWidget,
-                            QToolButton, QTreeWidget, QTreeWidgetItem,
-                            QVBoxLayout, QWidget)
+                            QLayout, QLineEdit, QMainWindow, QMenu,
+                            QMessageBox, QPlainTextEdit, QPushButton, QStyle,
+                            QTabWidget, QToolButton, QTreeWidget,
+                            QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from .. import util
 from ..check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
@@ -1278,6 +1278,9 @@ class StringListWithDialog(DesignerDisplay, QWidget):
         for starting_value in starting_list or []:
             self._add_item(starting_value, init=True)
 
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
+
         # def test():
         #     text, success = QtWidgets.QInputDialog.getText(
         #         self, "Device name", "Device name?"
@@ -1427,6 +1430,35 @@ class StringListWithDialog(DesignerDisplay, QWidget):
                 self._remove_item(old)
             else:
                 self._edit_item(old, new)
+
+    def _show_context_menu(self, pos: QPoint):
+        """
+        Displays a context menu that provides copy & remove actions
+        to the user
+
+        Parameters
+        ----------
+        pos : QPoint
+            Position to display the menu at
+        """
+        if len(self.list_strings.selectedItems()) <= 0:
+            return
+
+        menu = QMenu(self)
+
+        def copy_selected():
+            items = self.list_strings.selectedItems()
+            text = '\n'.join([x.text() for x in items])
+            if len(text) > 0:
+                QGuiApplication.clipboard().setText(text, QClipboard.Mode.Clipboard)
+
+        copy = menu.addAction('&Copy')
+        copy.triggered.connect(copy_selected)
+
+        remove = menu.addAction('&Remove')
+        remove.triggered.connect(self._remove_item_request)
+
+        menu.exec(self.mapToGlobal(pos))
 
 
 class DeviceListWidget(StringListWithDialog):

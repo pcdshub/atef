@@ -201,7 +201,17 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         """Context menu for the happi list view."""
         self.menu = QtWidgets.QMenu(self)
         index: QtCore.QModelIndex = self.happi_list_view.indexAt(pos)
-        if index is not None:
+
+        if index is not None and index.data() is not None:
+            # Add action to add the selected device
+            add_action = self.menu.addAction(f'&Add Device: {index.data()}')
+
+            def items_added():
+                self.happi_items_chosen.emit([index.data()])
+
+            add_action.triggered.connect(items_added)
+
+            # Add action to copy the text
             def copy(*_):
                 copy_to_clipboard(index.data())
 
