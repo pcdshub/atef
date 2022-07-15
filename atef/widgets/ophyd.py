@@ -551,6 +551,7 @@ class OphydDeviceTableView(QtWidgets.QTableView):
     attributes_selected: ClassVar[QtCore.Signal] = QtCore.Signal(
         list  # List[OphydAttributeData]
     )
+    context_menu_helper: Callable[[], QtWidgets.QMenu]
 
     def __init__(
         self,
@@ -602,7 +603,10 @@ class OphydDeviceTableView(QtWidgets.QTableView):
 
     def _table_context_menu(self, pos: QtCore.QPoint) -> None:
         """Context menu for the table."""
-        self.menu = QtWidgets.QMenu(self)
+        if self.context_menu_helper:
+            self.menu = self.context_menu_helper()
+        else:
+            self.menu = QtWidgets.QMenu(self)
         index: QtCore.QModelIndex = self.indexAt(pos)
         if index is not None:
             def copy(*_):
@@ -611,16 +615,23 @@ class OphydDeviceTableView(QtWidgets.QTableView):
             def select_attr(*_):
                 self.attributes_selected.emit([row_data])
 
+            standard_actions = []
+
             if index.data() is not None:
-                copy_action = self.menu.addAction(f"&Copy: {index.data()}")
+                copy_action = QtWidgets.QAction(f'&Copy: {index.data()}')
+                standard_actions.append(copy_action)
                 copy_action.triggered.connect(copy)
 
             row_data = self.get_data_from_proxy_index(index)
             if row_data is not None:
-                select_action = self.menu.addAction(
+                select_action = QtWidgets.QAction(
                     f"&Select attribute: {row_data.attr}"
                 )
+                standard_actions.append(select_action)
                 select_action.triggered.connect(select_attr)
+
+            # Insert the standard actions above the custom ones
+            self.menu.insertActions(self.menu.actions()[0], standard_actions)
 
         self.menu.exec_(self.mapToGlobal(pos))
 
@@ -745,6 +756,8 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
             if model is not None:
                 model.start()
 
+        self.device_table_view.context_menu_helper = self._create_context_menu
+
         self.edit_filter.textEdited.connect(set_filter)
         self.button_update_data.clicked.connect(update_data)
         # For now, we are disabling polling for device tables.  Update at the
@@ -777,6 +790,15 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
         self.device_table_view.attributes_selected.connect(
             self.attributes_selected.emit
         )
+
+    def _create_context_menu(self):
+        """Handler for when the device table view is right clicked."""
+        attrs = self.device_table_view.selected_attribute_data
+        if not attrs or not self.custom_menu_helper:
+            return QtWidgets.QMenu()
+
+        self._custom_menu = self.custom_menu_helper(attrs)
+        return self._custom_menu
 
     def _select_attrs_clicked(self):
         """Handler for when attributes are selected."""
