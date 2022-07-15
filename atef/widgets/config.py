@@ -17,7 +17,7 @@ from apischema import deserialize, serialize
 from pydm.widgets.drawing import PyDMDrawingLine
 from qtpy import QtWidgets
 from qtpy.QtCore import QEvent, QObject, Qt, QTimer
-from qtpy.QtCore import Signal as QSignal
+from qtpy.QtCore import Signal as QSignal, QPoint
 from qtpy.QtGui import QClipboard, QColor, QGuiApplication, QPalette
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QInputDialog, QLabel,
@@ -1431,7 +1431,7 @@ class StringListWithDialog(DesignerDisplay, QWidget):
             else:
                 self._edit_item(old, new)
 
-    def _show_context_menu(self, pos):
+    def _show_context_menu(self, pos: QPoint):
         """
         Displays a context menu that provides copy & remove actions
         to the user
@@ -1441,6 +1441,9 @@ class StringListWithDialog(DesignerDisplay, QWidget):
         pos : QPoint
             Position to display the menu at
         """
+        if len(self.list_strings.selectedItems()) <= 0:
+            return
+
         menu = QMenu(self)
 
         def copy_selected():

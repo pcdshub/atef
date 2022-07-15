@@ -202,7 +202,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.menu = QtWidgets.QMenu(self)
         index: QtCore.QModelIndex = self.happi_list_view.indexAt(pos)
 
-        if index is not None:
+        if index is not None and index.data() is not None:
             # Add action to add the selected device
             add_action = self.menu.addAction(f'&Add Device: {index.data()}')
 
