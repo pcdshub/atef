@@ -12,7 +12,7 @@ import ophyd
 from happi.qt.model import (HappiDeviceListView, HappiDeviceTreeView,
                             HappiViewMixin)
 from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtWidgets import QWidget, QTableView
+from qtpy.QtWidgets import QTableView, QWidget
 
 from ..qt_helpers import ThreadWorker, copy_to_clipboard
 from .core import DesignerDisplay
