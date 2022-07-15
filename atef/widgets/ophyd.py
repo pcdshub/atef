@@ -571,6 +571,8 @@ class OphydDeviceTableView(QtWidgets.QTableView):
 
         self.sortByColumn(0, Qt.AscendingOrder)
 
+        self.setSelectionBehavior(self.SelectionBehavior.SelectRows)
+
         # Set the property last
         self.device = device
 

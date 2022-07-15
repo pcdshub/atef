@@ -12,7 +12,7 @@ import ophyd
 from happi.qt.model import (HappiDeviceListView, HappiDeviceTreeView,
                             HappiViewMixin)
 from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtWidgets import QWidget
+from qtpy.QtWidgets import QTableView, QWidget
 
 from ..qt_helpers import ThreadWorker, copy_to_clipboard
 from .core import DesignerDisplay
@@ -360,6 +360,8 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
 
         self.table_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self._table_context_menu)
+
+        self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
 
     def _table_context_menu(self, pos: QtCore.QPoint) -> None:
         """Context menu when the key/value table is right-clicked."""
