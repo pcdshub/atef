@@ -16,15 +16,15 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
 from apischema import deserialize, serialize
 from pydm.widgets.drawing import PyDMDrawingLine
 from qtpy import QtWidgets
-from qtpy.QtCore import QEvent, QObject, QTimer, Qt
+from qtpy.QtCore import QEvent, QObject, Qt, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtGui import QColor, QPalette, QClipboard, QGuiApplication
+from qtpy.QtGui import QClipboard, QColor, QGuiApplication, QPalette
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QInputDialog, QLabel,
-                            QLayout, QLineEdit, QMainWindow, QMessageBox,
-                            QPlainTextEdit, QPushButton, QStyle, QTabWidget,
-                            QToolButton, QTreeWidget, QTreeWidgetItem,
-                            QVBoxLayout, QWidget, QMenu)
+                            QLayout, QLineEdit, QMainWindow, QMenu,
+                            QMessageBox, QPlainTextEdit, QPushButton, QStyle,
+                            QTabWidget, QToolButton, QTreeWidget,
+                            QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from .. import util
 from ..check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
