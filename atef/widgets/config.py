@@ -16,8 +16,8 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
 from apischema import deserialize, serialize
 from pydm.widgets.drawing import PyDMDrawingLine
 from qtpy import QtWidgets
-from qtpy.QtCore import QEvent, QObject, Qt, QTimer
-from qtpy.QtCore import Signal as QSignal, QPoint
+from qtpy.QtCore import QEvent, QObject, QPoint, Qt, QTimer
+from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import QClipboard, QColor, QGuiApplication, QPalette
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QInputDialog, QLabel,
