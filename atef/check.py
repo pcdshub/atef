@@ -7,7 +7,7 @@ from typing import Any, Generator, Iterator, List, Optional, Sequence, Union
 import numpy as np
 import ophyd
 
-from . import exceptions, reduce, serialization, util
+from . import cache, exceptions, reduce, serialization, util
 from .enums import Severity
 from .exceptions import (ComparisonError, ComparisonException,
                          ComparisonWarning, DynamicValueError,
@@ -164,9 +164,9 @@ class EpicsValue(DynamicValue):
     pvname: str
 
     def _get(self) -> PrimitiveType:
-        if not hasattr(self, "_signal"):
-            self._signal = ophyd.EpicsSignalRO(self.pvname)
-        return self._signal.get()
+        pv_cache = cache.get_signal_cache()
+        signal = pv_cache[self.pvname]
+        return signal.get()
 
 
 @dataclass
@@ -183,10 +183,9 @@ class HappiValue(DynamicValue):
     signal_attr: str
 
     def _get(self) -> PrimitiveType:
-        if not hasattr(self, "_signal"):
-            device = util.get_happi_device_by_name(self.device_name)
-            self._signal = getattr(device, self.signal_attr)
-        return self._signal.get()
+        device = util.get_happi_device_by_name(self.device_name)
+        signal = getattr(device, self.signal_attr)
+        return signal.get()
 
 
 @dataclass
