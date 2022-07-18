@@ -10,7 +10,8 @@ import dataclasses
 import functools
 import logging
 import platform
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
+                    Union)
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QObject
@@ -71,6 +72,7 @@ class QDataclassBridge(QObject):
             )
 
 
+# qt signal type or placeholder per type annotation piece
 normalize_map = {
     'Optional': Optional,
     'List': List,
@@ -86,6 +88,8 @@ normalize_map = {
     'PrimitiveType': object,
     'Sequence': List,
     'Value': object,
+    'Union': Union,
+    'DynamicValue': object,
 }
 
 
@@ -107,7 +111,12 @@ def normalize_annotation(annotation: str) -> Tuple[type]:
     """
     elems = []
     for text in annotation.strip(']').split('['):
-        elems.append(normalize_map[text])
+        # Special case: more than one thing
+        if ',' in text:
+            elems.append(object)
+        # Normal case: one single type
+        else:
+            elems.append(normalize_map[text])
     return tuple(elems)
 
 
