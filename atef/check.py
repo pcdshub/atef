@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field, asdict
-from typing import Any, Generator, List, Optional, Sequence, Union, Iterator
+from dataclasses import asdict, dataclass, field
+from typing import Any, Generator, Iterator, List, Optional, Sequence, Union
 
 import numpy as np
 import ophyd
@@ -10,8 +10,8 @@ import ophyd
 from . import exceptions, reduce, serialization, util
 from .enums import Severity
 from .exceptions import (ComparisonError, ComparisonException,
-                         ComparisonWarning, PreparedComparisonException,
-                         DynamicValueError)
+                         ComparisonWarning, DynamicValueError,
+                         PreparedComparisonException)
 from .type_hints import Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
