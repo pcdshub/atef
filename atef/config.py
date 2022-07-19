@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Generator, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import (Any, Generator, List, Mapping, Optional, Sequence, Tuple,
+                    Union)
 
 import apischema
 import happi
@@ -254,6 +255,29 @@ class PreparedSignalComparison(PreparedComparison):
     device: Optional[ophyd.Device] = None
     #: The signal the comparison is to be run on.
     signal: Optional[ophyd.Signal] = None
+    #: The signal the comparison is to be run on.
+    data: Optional[Any] = None
+
+    async def get_data(self) -> Any:
+        """
+        Get the provided signal's data according to the comparison's reduction
+        configuration.
+
+        Returns
+        -------
+        data : Any
+            The acquired data.
+
+        Raises
+        ------
+        TimeoutError
+            If unable to connect or retrieve data from the signal.
+        """
+        if self.signal is None:
+            raise ValueError("Signal instance unset")
+        # TODO: async?
+        self.data = self.comparison.get_data_for_signal(self.signal)
+        return self.data
 
     async def compare(self) -> Result:
         """
@@ -269,6 +293,7 @@ class PreparedSignalComparison(PreparedComparison):
                 severity=Severity.internal_error,
                 reason="Signal not set"
             )
+
         try:
             self.signal.wait_for_connection()
         except TimeoutError:
@@ -279,8 +304,37 @@ class PreparedSignalComparison(PreparedComparison):
                     f"for comparison {self.comparison}"
                 ),
             )
-        self.result = self.comparison.compare_signal(
-            self.signal,
+
+        try:
+            self.data = await self.get_data()
+        except TimeoutError:
+            return Result(
+                severity=self.comparison.if_disconnected,
+                reason=f"Signal disconnected when reading: {self.signal}"
+            )
+        except Exception as ex:
+            return Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Getting data for signal {self.identifier!r} comparison "
+                    f"{self.comparison} raised {ex.__class__.__name__}: {ex}"
+                ),
+            )
+
+        if self.data is None:
+            # 'None' is likely incompatible with our comparisons and should
+            # be raised for separately
+            # TODO reviewers: Is this a sensible assumption?
+            return Result(
+                severity=self.comparison.if_disconnected,
+                reason=(
+                    f"No data available for signal {self.identifier!r} in "
+                    f"comparison {self.comparison}"
+                ),
+            )
+
+        self.result = self.comparison.compare(
+            self.data,
             identifier=self.identifier
         )
         return self.result
@@ -293,7 +347,7 @@ class PreparedSignalComparison(PreparedComparison):
         comparison: Comparison,
         name: Optional[str] = None,
         path: Optional[List[PathItem]] = None,
-    ) -> PreparedComparison:
+    ) -> PreparedSignalComparison:
         """Create a PreparedComparison from a device and comparison."""
         full_attr = f"{device.name}.{attr}"
         logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
@@ -322,7 +376,7 @@ class PreparedSignalComparison(PreparedComparison):
         path: Optional[List[PathItem]] = None,
         *,
         cache: Optional[Mapping[str, ophyd.Signal]] = None,
-    ) -> PreparedComparison:
+    ) -> PreparedSignalComparison:
         """Create a PreparedComparison from a PV name and comparison."""
         if cache is None:
             cache = get_signal_cache()
@@ -341,7 +395,9 @@ class PreparedSignalComparison(PreparedComparison):
         cls,
         config: PVConfiguration,
         cache: Optional[Mapping[str, ophyd.Signal]] = None,
-    ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
+    ) -> Generator[
+        Union[PreparedComparisonException, PreparedSignalComparison], None, None
+    ]:
         """
         Create one or more PreparedComparison instances from a PVConfiguration.
 
@@ -391,7 +447,9 @@ class PreparedSignalComparison(PreparedComparison):
         cls,
         device: ophyd.Device,
         config: DeviceConfiguration,
-    ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
+    ) -> Generator[
+        Union[PreparedComparisonException, PreparedSignalComparison], None, None
+    ]:
         """
         Create one or more PreparedComparison instances from a DeviceConfiguration.
 
@@ -568,7 +626,7 @@ class PreparedToolComparison(PreparedComparison):
                         )
 
 
-def check_device(
+async def check_device(
     device: ophyd.Device, checklist: Sequence[IdentifierAndComparison]
 ) -> Tuple[Severity, List[Result]]:
     """
@@ -599,7 +657,7 @@ def check_device(
                 full_attr = f"{device.name}.{attr}"
                 logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
                 try:
-                    prepared = PreparedComparison.from_device(
+                    prepared = PreparedSignalComparison.from_device(
                         device=device, attr=attr, comparison=comparison
                     )
                 except AttributeError:
@@ -611,7 +669,7 @@ def check_device(
                         ),
                     )
                 else:
-                    result = prepared.compare()
+                    result = await prepared.compare()
 
                 if result.severity > overall:
                     overall = result.severity
@@ -620,7 +678,7 @@ def check_device(
     return overall, results
 
 
-def check_pvs(
+async def check_pvs(
     checklist: Sequence[IdentifierAndComparison],
     *,
     cache: Optional[Mapping[str, ophyd.Signal]] = None,
@@ -659,10 +717,10 @@ def check_pvs(
     for comparison, pvname in get_comparison_and_pvname():
         logger.debug("Checking %s.%s with comparison %s", pvname, comparison)
 
-        prepared = PreparedComparison.from_pvname(
+        prepared = PreparedSignalComparison.from_pvname(
             pvname=pvname, comparison=comparison, cache=cache
         )
-        result = prepared.compare()
+        result = await prepared.compare()
 
         if result.severity > overall:
             overall = result.severity

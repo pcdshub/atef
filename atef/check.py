@@ -216,7 +216,6 @@ class Comparison:
                 f"{self.__class__.__name__}.describe() failure "
                 f"({ex.__class__.__name__}: {ex})"
             )
-        # return f"{self.__class__.__name__}({desc})"
 
     def compare(self, value: Any, identifier: Optional[str] = None) -> Result:
         """
@@ -283,41 +282,6 @@ class Comparison:
             return signal.get(as_string=True)
 
         return signal.get()
-
-    def compare_signal(
-        self, signal: ophyd.Signal, *, identifier: Optional[str] = None
-    ) -> Result:
-        """
-        Compare the provided signal's value using the comparator's settings.
-
-        Parameters
-        ----------
-        signal : ophyd.Signal
-            The signal to get data from and run a comparison on.
-
-        identifier : str, optional
-            An identifier that goes along with the provided signal.  Used for
-            severity result descriptions.  Defaults to the signal's dotted
-            name.
-        """
-        try:
-            identifier = identifier or signal.dotted_name
-            try:
-                value = self.get_data_for_signal(signal)
-            except TimeoutError:
-                return Result(
-                    severity=self.if_disconnected,
-                    reason=f"Signal disconnected when reading: {signal}"
-                )
-            return self.compare(value, identifier=identifier)
-        except Exception as ex:
-            return Result(
-                severity=Severity.internal_error,
-                reason=(
-                    f"Checking if {identifier!r} {self} "
-                    f"raised {ex.__class__.__name__}: {ex}"
-                ),
-            )
 
 
 @dataclass
