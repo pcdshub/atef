@@ -225,10 +225,13 @@ class Ping(Tool):
         PingResult
         """
 
+        # Ensure we don't ping forever:
+        count = min(self.count, 1)
+
         if sys.platform == "win32":
-            args = ("/n", str(self.count))
+            args = ("/n", str(count))
         else:
-            args = ("-c", str(self.count))
+            args = ("-c", str(count))
 
         ping = shutil.which("ping")
 
