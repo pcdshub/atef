@@ -37,3 +37,8 @@ async def test_check_device_smoke(monkeypatch, at2l0):  # noqa: F811
     monkeypatch.setattr(util, "get_happi_device_by_name", get_happi_device_by_name)
     monkeypatch.setattr(happi.Client, "from_config", lambda: None)
     await bin_check.main(filename=str(CONFIG_PATH / "device_based.yml"))
+
+
+@pytest.mark.asyncio
+async def test_check_ping_localhost_smoke():  # noqa: F811
+    await bin_check.main(filename=str(CONFIG_PATH / "ping_localhost.json"), verbose=2)
