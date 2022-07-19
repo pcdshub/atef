@@ -78,7 +78,7 @@ def get_result_value_by_key(result: ToolResult, key: str) -> Any:
         try:
             if isinstance(item, Mapping):
                 item = item[key]
-            elif isinstance(item, Sequence) and not isinstance(item, str):
+            elif isinstance(item, Sequence):
                 item = item[int(key)]
             else:
                 item = getattr(item, key)

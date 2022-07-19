@@ -1,3 +1,5 @@
+from typing import Any
+
 import apischema
 import pytest
 
@@ -77,3 +79,30 @@ def test_result_keys(
         print("Failed check, as expected:\n", ex)
     else:
         tool.check_result_key(key)
+
+
+class _TestItem:
+    a = {
+        "b": [1, 2, 3]
+    }
+
+
+@pytest.mark.parametrize(
+    "value, key, expected",
+    [
+        # abc[1] = "b"
+        ("abc", "1", "b"),
+        # [1, 2, 3][1] = 2
+        ([1, 2, 3], "1", 2),
+        # dict(a=dict(b="c"))["a"]["b"] = "c"
+        ({"a": {"b": "c"}}, "a.b", "c"),
+        # dict(a=dict(b="c"))["a"]["b"][1] = 2
+        ({"a": {"b": [1, 2, 3]}}, "a.b.1", 2),
+        # _TestItem.a.b[1]
+        (_TestItem, "a.b.1", 2),
+    ]
+)
+def test_get_result_value_by_key(
+    value: Any, key: str, expected: Any
+):
+    assert tools.get_result_value_by_key(value, key) == expected
