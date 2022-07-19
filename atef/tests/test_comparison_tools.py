@@ -106,3 +106,36 @@ def test_get_result_value_by_key(
     value: Any, key: str, expected: Any
 ):
     assert tools.get_result_value_by_key(value, key) == expected
+
+
+@pytest.mark.parametrize(
+    "output, expected",
+    [
+        pytest.param(
+            "Reply from 127.0.0.1: bytes=32 time<1ms TTL=128",
+            1.0e-3,
+            id="win32_less",
+        ),
+        pytest.param(
+            "Reply from 127.0.0.1: bytes=32 time=10ms TTL=128",
+            10e-3,
+            id="win32_equal",
+        ),
+        pytest.param(
+            "64 bytes from 1.1.1.1: icmp_seq=0 ttl=55 time=11.000 ms",
+            11e-3,
+            id="macos",
+        ),
+        pytest.param(
+            "64 bytes from 1.1.1.1: icmp_seq=1 ttl=50 time=3.00 ms",
+            3e-3,
+            id="linux",
+        ),
+    ],
+)
+def test_ping_regex(
+    output: str,
+    expected: float,
+):
+    result = tools.PingResult.from_output("", output)
+    assert abs(result.max_time - expected) < 1e-6

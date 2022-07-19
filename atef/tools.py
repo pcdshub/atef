@@ -33,15 +33,97 @@ class PingResult(ToolResult):
     The result dictionary of the 'ping' tool.
     """
     #: Host(s) that are alive
-    alive: List[str]
+    alive: List[str] = field(default_factory=list)
+    #: Number of hosts that are alive.
+    num_alive: int = 0
+
     #: Host(s) that are unresponsvie
-    unresponsive: List[str]
+    unresponsive: List[str] = field(default_factory=list)
+    #: Number of hosts that are unresponsive.
+    num_unresponsive: int = 0
+
     #: Host name to time taken.
-    times: Dict[str, float]
-    #: Minimum time in milliseconds from ``times``.
-    min_time: float
-    #: Maximum time in milliseconds from ``times``.
-    max_time: float
+    times: Dict[str, float] = field(default_factory=dict)
+    #: Minimum time in seconds from ``times``.
+    min_time: float = 0.0
+    #: Maximum time in seconds from ``times``.
+    max_time: float = 0.0
+
+    def add_host_result(
+        self,
+        host: str,
+        result: Union[PingResult, Exception],
+        *,
+        failure_time: float = 100.0
+    ) -> None:
+        """
+        Add a new per-host result to this aggregate one.
+
+        Parameters
+        ----------
+        host : str
+            The hostname or IP address.
+        result : Union[PingResult, Exception]
+            The result to add.  Caught exceptions will be interpreted as a ping
+            failure for the given host.
+        failure_time : float, optional
+            The time to use when failures happen.
+        """
+        if isinstance(result, Exception):
+            self.result = Result(
+                severity=Severity.error,
+            )
+            self.unresponsive.append(host)
+            self.times[host] = failure_time
+            self.max_time = failure_time
+            return
+
+        self.unresponsive.extend(result.unresponsive)
+        self.alive.extend(result.alive)
+        self.times.update(result.times)
+
+        times = self.times.values()
+        self.min_time = min(times) if times else 0.0
+        self.max_time = max(times) if times else failure_time
+
+    @classmethod
+    def from_output(cls, host: str, output: str) -> PingResult:
+        """
+        Fill a PingResult from the results of the ping program.
+
+        Parameters
+        ----------
+        host : str
+            The hostname that ``ping`` was called with.
+        output : str
+            The decoded output of the subprocess call.
+
+        Returns
+        -------
+        PingResult
+        """
+        # NOTE: lazily ignoring non-millisecond-level results here; 1 second+
+        # is the same as non-responsive if you ask me...
+        times = [float(ms) / 1000.0 for ms in Ping._time_re.findall(output)]
+
+        if not times:
+            return cls(
+                result=Result(severity=Severity.error),
+                alive=[],
+                unresponsive=[host],
+                min_time=Ping._unresponsive_time,
+                max_time=Ping._unresponsive_time,
+                times={host: Ping._unresponsive_time},
+            )
+
+        return cls(
+            result=Result(severity=Severity.success),
+            alive=[host],
+            unresponsive=[],
+            min_time=min(times),
+            max_time=max(times),
+            times={host: sum(times) / len(times)},
+        )
 
 
 def get_result_value_by_key(result: ToolResult, key: str) -> Any:
@@ -168,48 +250,9 @@ class Ping(Tool):
     encoding: str = "utf-8"
 
     #: Time pattern for matching the ping output.
-    _time_re: ClassVar[re.Pattern] = re.compile(r"time=(.*)\s?ms")
-    #: Time to report when unresponsive [ms]
+    _time_re: ClassVar[re.Pattern] = re.compile(r"time[=<](.*)\s?ms")
+    #: Time to report when unresponsive [sec]
     _unresponsive_time: ClassVar[float] = 100.0
-
-    @staticmethod
-    def _result_from_output(host: str, output: str) -> PingResult:
-        """
-        Fill a PingResult from the results of the ping program.
-
-        Parameters
-        ----------
-        host : str
-            The hostname that ``ping`` was called with.
-        output : str
-            The decoded output of the subprocess call.
-
-        Returns
-        -------
-        PingResult
-        """
-        # NOTE: lazily ignoring non-millisecond-level results here; 1 second+
-        # is the same as non-responsive if you ask me...
-        times = [float(ms) for ms in Ping._time_re.findall(output)]
-
-        if not times:
-            return PingResult(
-                result=Result(severity=Severity.error),
-                alive=[],
-                unresponsive=[host],
-                min_time=Ping._unresponsive_time,
-                max_time=Ping._unresponsive_time,
-                times={host: Ping._unresponsive_time},
-            )
-
-        return PingResult(
-            result=Result(severity=Severity.success),
-            alive=[host],
-            unresponsive=[],
-            min_time=min(times),
-            max_time=max(times),
-            times={host: sum(times) / len(times)},
-        )
 
     async def ping(self, host: str) -> PingResult:
         """
@@ -251,7 +294,7 @@ class Ping(Tool):
         assert proc.stdout is not None
         output = await proc.stdout.read()
         await proc.wait()
-        return self._result_from_output(host, output.decode(self.encoding))
+        return PingResult.from_output(host, output.decode(self.encoding))
 
     async def run(self) -> PingResult:
         """
@@ -261,15 +304,8 @@ class Ping(Tool):
         -------
         PingResult
         """
-        result = PingResult(
-            result=Result(),
-            unresponsive=[],
-            alive=[],
-            times={},
-            min_time=0.0,
-            max_time=0.0,
-        )
-        self.result = result
+        self.result = PingResult(result=Result())
+        result = self.result
 
         if not self.hosts:
             return result
@@ -292,18 +328,8 @@ class Ping(Tool):
             raise
 
         for host, host_result in ping_by_host.items():
-            if isinstance(host_result, Exception):
-                result.unresponsive.append(host)
-                result.times[host] = self._unresponsive_time
-                result.max_time = self._unresponsive_time
-                continue
-
-            result.unresponsive.extend(host_result.unresponsive)
-            result.alive.extend(host_result.alive)
-            result.times.update(host_result.times)
-
-            times = result.times.values()
-            result.min_time = min(times) if times else 0.0
-            result.max_time = max(times) if times else self._unresponsive_time
+            result.add_host_result(
+                host, host_result, failure_time=self._unresponsive_time
+            )
 
         return result
