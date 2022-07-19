@@ -323,7 +323,6 @@ class PreparedSignalComparison(PreparedComparison):
         if self.data is None:
             # 'None' is likely incompatible with our comparisons and should
             # be raised for separately
-            # TODO reviewers: Is this a sensible assumption?
             return Result(
                 severity=self.comparison.if_disconnected,
                 reason=(
