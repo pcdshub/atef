@@ -4,6 +4,7 @@ import happi
 import pytest
 
 import atef.bin.main as atef_main
+from atef.bin import check as bin_check
 
 from .. import config, util
 from .conftest import CONFIG_PATH
@@ -22,18 +23,17 @@ def test_help_module(monkeypatch, subcommand):
         atef_main.main()
 
 
-def test_check_pv_smoke(monkeypatch, mock_signal_cache):  # noqa: F811
-    from atef.bin.check import main as check_main
+@pytest.mark.asyncio
+async def test_check_pv_smoke(monkeypatch, mock_signal_cache):  # noqa: F811
     monkeypatch.setattr(config, "get_signal_cache", lambda: mock_signal_cache)
-    check_main(filename=str(CONFIG_PATH / "pv_based.yml"))
+    await bin_check.main(filename=str(CONFIG_PATH / "pv_based.yml"))
 
 
-def test_check_device_smoke(monkeypatch, at2l0):  # noqa: F811
-    from atef.bin import check as bin_check
-
+@pytest.mark.asyncio
+async def test_check_device_smoke(monkeypatch, at2l0):  # noqa: F811
     def get_happi_device_by_name(name, client=None):
         return at2l0
 
     monkeypatch.setattr(util, "get_happi_device_by_name", get_happi_device_by_name)
     monkeypatch.setattr(happi.Client, "from_config", lambda: None)
-    bin_check.main(filename=str(CONFIG_PATH / "device_based.yml"))
+    await bin_check.main(filename=str(CONFIG_PATH / "device_based.yml"))

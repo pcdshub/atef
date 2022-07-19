@@ -12,5 +12,7 @@ sphinx_rtd_theme
 doctr
 docs-versions-menu
 recommonmark
+# test suite-specific
+pytest-asyncio
 # for happi loading at lcls
 pcdsdevices
