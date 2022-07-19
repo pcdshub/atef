@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Generator, List, Optional, Sequence
@@ -272,6 +274,21 @@ class Comparison:
         """
         Get data for the given signal, according to the string and data
         reduction settings.
+
+        Parameters
+        ----------
+        signal : ophyd.Signal
+            The signal.
+
+        Returns
+        -------
+        Any
+            The acquired data.
+
+        Raises
+        ------
+        TimeoutError
+            If the get operation times out.
         """
         if self.reduce_period and self.reduce_period > 0:
             return self.reduce_method.subscribe_and_reduce(
@@ -282,6 +299,48 @@ class Comparison:
             return signal.get(as_string=True)
 
         return signal.get()
+
+    async def get_data_for_signal_async(
+        self,
+        signal: ophyd.Signal,
+        *,
+        executor: Optional[concurrent.futures.Executor] = None
+    ) -> Any:
+        """
+        Get data for the given signal, according to the string and data
+        reduction settings.
+
+        Parameters
+        ----------
+        signal : ophyd.Signal
+            The signal.
+        executor : concurrent.futures.Executor, optional
+            The executor to run the synchronous call in.  Defaults to
+            the loop-defined default executor.
+
+        Returns
+        -------
+        Any
+            The acquired data.
+
+        Raises
+        ------
+        TimeoutError
+            If the get operation times out.
+        """
+        if self.reduce_period and self.reduce_period > 0:
+            return await self.reduce_method.subscribe_and_reduce_async(
+                signal, self.reduce_period
+            )
+
+        def inner_sync_get():
+            if self.string:
+                return signal.get(as_string=True)
+
+            return signal.get()
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(executor, inner_sync_get)
 
 
 @dataclass

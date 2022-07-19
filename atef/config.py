@@ -275,8 +275,7 @@ class PreparedSignalComparison(PreparedComparison):
         """
         if self.signal is None:
             raise ValueError("Signal instance unset")
-        # TODO: async?
-        self.data = self.comparison.get_data_for_signal(self.signal)
+        self.data = await self.comparison.get_data_for_signal_async(self.signal)
         return self.data
 
     async def compare(self) -> Result:
