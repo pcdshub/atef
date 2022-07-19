@@ -12,6 +12,7 @@ from typing import (Any, ClassVar, Dict, List, Mapping, Optional, Sequence,
 
 from . import serialization
 from .check import Result, Severity
+from .exceptions import ToolDependencyMissingException
 
 #: Arguments that can be passed to tools.
 ToolArguments = Dict[str, Any]
@@ -229,8 +230,16 @@ class Ping(Tool):
         else:
             args = ("-c", str(self.count))
 
+        ping = shutil.which("ping")
+
+        if ping is None:
+            raise ToolDependencyMissingException(
+                "The 'ping' binary is unavailable on the currently-defined "
+                "PATH"
+            )
+
         proc = await asyncio.create_subprocess_exec(
-            str(shutil.which("ping")),
+            ping,
             *args,
             host,
             stdout=asyncio.subprocess.PIPE,

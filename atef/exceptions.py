@@ -73,3 +73,11 @@ class PreparedComparisonException(Exception):
         self.comparison = comparison
         self.name = name
         self.path = path or []
+
+
+class ToolException(Exception):
+    """Base exception for tool-related errors."""
+
+
+class ToolDependencyMissingException(Exception):
+    """Required dependency for a tool to work is unavailable."""
