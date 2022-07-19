@@ -513,7 +513,7 @@ class PreparedToolComparison(PreparedComparison):
             The result of the comparison.  This is also set in ``self.result``.
         """
         try:
-            value = await self.tool.run()
+            result = await self.tool.run()
         except TimeoutError:
             return Result(
                 severity=self.comparison.if_disconnected,
@@ -533,8 +533,21 @@ class PreparedToolComparison(PreparedComparison):
                     f"for comparison {self.comparison}: {ex.__class__.__name__} {ex}"
                 ),
             )
+
+        try:
+            value = tools.get_result_value_by_key(result, self.identifier)
+        except KeyError as ex:
+            return Result(
+                severity=self.comparison.severity_on_failure,
+                reason=(
+                    f"Provided key is invalid for tool result {self.tool} "
+                    f"{self.identifier!r} ({self.name}): {ex} "
+                    f"(in comparison {self.comparison})"
+                ),
+            )
+
         self.result = self.comparison.compare(
-            value[self.identifier],
+            value,
             identifier=self.identifier
         )
         return self.result
@@ -715,10 +728,57 @@ async def check_pvs(
         _ = cache[pvname]
 
     for comparison, pvname in get_comparison_and_pvname():
-        logger.debug("Checking %s.%s with comparison %s", pvname, comparison)
+        logger.debug("Checking %r with comparison %s", pvname, comparison)
 
         prepared = PreparedSignalComparison.from_pvname(
             pvname=pvname, comparison=comparison, cache=cache
+        )
+        result = await prepared.compare()
+
+        if result.severity > overall:
+            overall = result.severity
+        results.append(result)
+
+    return overall, results
+
+
+async def check_tool(
+    tool: tools.Tool,
+    checklist: Sequence[IdentifierAndComparison],
+) -> Tuple[Severity, List[Result]]:
+    """
+    Check a PVConfiguration.
+
+    Parameters
+    ----------
+    tool : Tool
+        The tool instance defining which tool to run and with what arguments.
+    checklist : sequence of IdentifierAndComparison
+        Comparisons to run on the given device.  Multiple PVs may share the
+        same checks.
+
+    Returns
+    -------
+    overall_severity : Severity
+        Maximum severity found when running comparisons.
+
+    results : list of Result
+        Individual comparison results.
+    """
+    overall = Severity.success
+    results = []
+
+    def get_comparison_and_key():
+        for checklist_item in checklist:
+            for comparison in checklist_item.comparisons:
+                for key in checklist_item.ids:
+                    yield comparison, key
+
+    for comparison, key in get_comparison_and_key():
+        logger.debug("Checking %r with comparison %s", key, comparison)
+
+        prepared = PreparedToolComparison.from_tool(
+            tool, result_key=key, comparison=comparison
         )
         result = await prepared.compare()
 
