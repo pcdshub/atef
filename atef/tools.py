@@ -8,7 +8,7 @@ import sys
 import typing
 from dataclasses import field
 from typing import (Any, ClassVar, Dict, List, Mapping, Optional, Sequence,
-                    TypedDict, TypeVar, Union)
+                    TypeVar, Union)
 
 from . import serialization
 from .check import Result, Severity
@@ -18,13 +18,15 @@ ToolArguments = Dict[str, Any]
 T = TypeVar("T", bound="Tool")
 
 
-class ToolResult(TypedDict):
+@dataclasses.dataclass
+class ToolResult:
     """
     The base result dictionary of any tool.
     """
     result: Result
 
 
+@dataclasses.dataclass
 class PingResult(ToolResult):
     """
     The result dictionary of the 'ping' tool.
@@ -279,17 +281,17 @@ class Ping(Tool):
 
         for host, host_result in ping_by_host.items():
             if isinstance(host_result, Exception):
-                result["unresponsive"].append(host)
-                result["times"][host] = self._unresponsive_time
-                result["max_time"] = self._unresponsive_time
+                result.unresponsive.append(host)
+                result.times[host] = self._unresponsive_time
+                result.max_time = self._unresponsive_time
                 continue
 
-            result["unresponsive"].extend(host_result["unresponsive"])
-            result["alive"].extend(host_result["alive"])
-            result["times"].update(host_result["times"])
+            result.unresponsive.extend(host_result.unresponsive)
+            result.alive.extend(host_result.alive)
+            result.times.update(host_result.times)
 
-            times = result["times"].values()
-            result["min_time"] = min(times) if times else 0.0
-            result["max_time"] = max(times) if times else self._unresponsive_time
+            times = result.times.values()
+            result.min_time = min(times) if times else 0.0
+            result.max_time = max(times) if times else self._unresponsive_time
 
         return result
