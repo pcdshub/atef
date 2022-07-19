@@ -52,8 +52,8 @@ def get_result_value_by_key(result: ToolResult, key: str) -> Any:
 
     Parameters
     ----------
-    result : dict
-        The result (typed) dictionary.
+    result : object
+        The result dataclass instance.
     key : str
         The (optionally) dotted key name.
 
@@ -132,7 +132,7 @@ class Tool:
         # Use the return type of the tool's run() method to tell us the
         # ToolResult type:
         run_type: ToolResult = typing.get_type_hints(self.run)["return"]
-        # And then the keys that are defined in its TypedDict definition:
+        # And then the keys that are defined in its definition:
         result_type_hints = typing.get_type_hints(run_type)
         valid_keys = list(result_type_hints)
         if top_level_key not in valid_keys:
