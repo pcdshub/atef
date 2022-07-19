@@ -255,7 +255,7 @@ class PreparedSignalComparison(PreparedComparison):
     device: Optional[ophyd.Device] = None
     #: The signal the comparison is to be run on.
     signal: Optional[ophyd.Signal] = None
-    #: The signal the comparison is to be run on.
+    #: The value from the signal the comparison is to be run on.
     data: Optional[Any] = None
 
     async def get_data(self) -> Any:
