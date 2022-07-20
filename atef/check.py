@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass, field
-from typing import Any, Generator, Iterator, List, Optional, Sequence, Union
+from itertools import zip_longest
+from typing import Any, Generator, List, Optional, Sequence
 
 import numpy as np
 import ophyd
@@ -11,7 +12,8 @@ from . import cache, exceptions, reduce, serialization, util
 from .enums import Severity
 from .exceptions import (ComparisonError, ComparisonException,
                          ComparisonWarning, DynamicValueError,
-                         PreparedComparisonException)
+                         PreparedComparisonException,
+                         UnpreparedComparisonException)
 from .type_hints import Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
@@ -68,7 +70,7 @@ success = Result()
 class Value:
     """A primitive value with optional metadata."""
     #: The value for comparison.
-    value: Union[PrimitiveType, DynamicValue]
+    value: PrimitiveType
     #: A description of what the value represents.
     description: str = ""
     #: Relative tolerance value.
@@ -103,17 +105,13 @@ class Value:
 
     def compare(self, value: PrimitiveType) -> bool:
         """Compare the provided value with this one, using tolerance settings."""
-        if isinstance(self.value, DynamicValue):
-            our_value = self.value.get()
-        else:
-            our_value = self.value
         if self.rtol is not None or self.atol is not None:
             return np.isclose(
-                value, our_value,
+                value, self.value,
                 rtol=(self.rtol or 0.0),
                 atol=(self.atol or 0.0)
             )
-        return value == our_value
+        return value == self.value
 
 
 class DynamicValue:
@@ -192,9 +190,9 @@ class HappiValue(DynamicValue):
 class ValueRange:
     """A range of primitive values with optional metadata."""
     #: The low value for comparison.
-    low: Union[Number, DynamicValue]
+    low: Number
     #: The high value for comparison.
-    high: Union[Number, DynamicValue]
+    high: Number
     #: Should the low and high values be included in the range?
     inclusive: bool = True
     #: Check if inside the range.
@@ -215,16 +213,8 @@ class ValueRange:
 
     def compare(self, value: Number) -> bool:
         """Compare the provided value with this range."""
-        if isinstance(self.low, DynamicValue):
-            our_low = self.low.get()
-        else:
-            our_low = self.low
-        if isinstance(self.high, DynamicValue):
-            our_high = self.high.get()
-        else:
-            our_high = self.high
         in_range = _is_in_range(
-            value, low=our_low, high=our_high, inclusive=self.inclusive
+            value, low=self.low, high=self.high, inclusive=self.inclusive
         )
         if self.in_range:
             # Normal functionality - is value in the range?
@@ -404,12 +394,20 @@ class Comparison:
                 ),
             )
 
+    def prepare(self) -> None:
+        """Implement in subclass to grab and cache dynamic values."""
+        raise NotImplementedError()
+
 
 @dataclass
 class Equals(Comparison):
-    value: Union[PrimitiveType, DynamicValue] = 0.0
+    value: PrimitiveType = 0.0
+    value_dynamic: Optional[DynamicValue] = None
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
+
+    def __post_init__(self):
+        self.is_prepared = False
 
     @property
     def _value(self) -> Value:
@@ -423,18 +421,36 @@ class Equals(Comparison):
     def describe(self) -> str:
         """Describe the equality comparison in words."""
         comparison = "equal to" if not self.invert else "not equal to"
-        return f"{comparison} {self._value}"
+        if self.value_dynamic is None:
+            dynamic = " "
+        else:
+            dynamic = f" {self.value_dynamic} "
+        return f"{comparison}{dynamic}{self._value}"
 
     def _compare(self, value: PrimitiveType) -> bool:
+        if not self.is_prepared and self.value_dynamic is not None:
+            raise UnpreparedComparisonException(
+                f"Dynamic equals comparison to {self.value_dynamic} "
+                "was not prepared."
+            )
         return self._value.compare(value)
+
+    def prepare(self) -> None:
+        if self.value_dynamic is not None:
+            self.value = self.value_dynamic.get()
+        self.is_prepared = True
 
 
 @dataclass
 class NotEquals(Comparison):
     # Less confusing shortcut for `Equals(..., invert=True)`
-    value: Union[PrimitiveType, DynamicValue] = 0
+    value: PrimitiveType = 0
+    value_dynamic: Optional[DynamicValue] = None
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
+
+    def __post_init__(self):
+        self.is_prepared = False
 
     @property
     def _value(self) -> Value:
@@ -448,10 +464,24 @@ class NotEquals(Comparison):
     def describe(self) -> str:
         """Describe the equality comparison in words."""
         comparison = "equal to" if self.invert else "not equal to"
-        return f"{comparison} {self._value}"
+        if self.value_dynamic is None:
+            dynamic = " "
+        else:
+            dynamic = f" {self.value_dynamic} "
+        return f"{comparison}{dynamic}{self._value}"
 
     def _compare(self, value: PrimitiveType) -> bool:
+        if not self.is_prepared and self.value_dynamic is not None:
+            raise UnpreparedComparisonException(
+                f"Dynamic not equals comparison to {self.value_dynamic} "
+                "was not prepared."
+            )
         return not self._value.compare(value)
+
+    def prepare(self) -> None:
+        if self.value_dynamic is not None:
+            self.value = self.value_dynamic.get()
+        self.is_prepared = True
 
 
 @dataclass
@@ -460,16 +490,35 @@ class ValueSet(Comparison):
     # Review: really a "value sequence"/list as the first ones have priority,
     # but that sounds like a vector version of "Value" above; better ideas?
     values: Sequence[Value] = field(default_factory=list)
+    values_dynamic: Sequence[Optional[DynamicValue]] = field(
+        default_factory=list
+    )
+
+    def __post_init__(self):
+        self.is_prepared = False
 
     def describe(self) -> str:
         """Describe the equality comparison in words."""
+        accumulated_values = []
+        for value, dynamic in zip_longest(self.values, self.values_dynamic):
+            if dynamic is None:
+                accumulated_values.append(value)
+            else:
+                accumulated_values.append(dynamic)
         values = "\n".join(
             str(value)
-            for value in self.values
+            for value in accumulated_values
         )
         return f"Any of:\n{values}"
 
     def _compare(self, value: PrimitiveType) -> bool:
+        if not self.is_prepared and any(
+            dyn is not None for dyn in self.values_dynamic
+        ):
+            raise UnpreparedComparisonException(
+                f"Dynamic value set comparison with {self.values_dynamic} "
+                "was not prepared."
+            )
         for compare_value in self.values:
             if compare_value.compare(value):
                 _raise_for_severity(
@@ -478,29 +527,55 @@ class ValueSet(Comparison):
                 return True
         return False
 
+    def prepare(self) -> None:
+        for value, dynamic in zip(self.values, self.values_dynamic):
+            if dynamic is not None:
+                value.value = dynamic.get()
+        self.is_prepared = True
+
 
 @dataclass
 class AnyValue(Comparison):
     """Comparison passes if the value is in the ``values`` list."""
-    values: List[Union[PrimitiveType, DynamicValue]] = field(default_factory=list)
+    values: List[PrimitiveType] = field(default_factory=list)
+    values_dynamic: List[Optional[DynamicValue]] = field(
+        default_factory=list
+    )
+
+    def __post_init__(self):
+        self.is_prepared = False
 
     def describe(self) -> str:
         """Describe the comparison in words."""
-        values = ", ".join(str(value) for value in self.values)
+        accumulated_values = []
+        for value, dynamic in zip_longest(self.values, self.values_dynamic):
+            if dynamic is None:
+                accumulated_values.append(value)
+            else:
+                accumulated_values.append(dynamic)
+        values = ", ".join(str(value) for value in accumulated_values)
         return f"one of {values}"
 
     def _compare(self, value: PrimitiveType) -> bool:
-        return value in self.values or value in self.dynamic_values()
+        if not self.is_prepared and any(
+            dyn is not None for dyn in self.values_dynamic
+        ):
+            raise UnpreparedComparisonException(
+                f"Dynamic any value comparison with {self.values_dynamic} "
+                "was not prepared."
+            )
+        return value in self.values
 
-    def dynamic_values(self) -> Iterator[PrimitiveType]:
-        for value in self.values:
-            if isinstance(value, DynamicValue):
-                yield value.get()
+    def prepare(self) -> None:
+        for index, dynamic in enumerate(self.values_dynamic):
+            if dynamic is not None:
+                self.values[index] = dynamic.get()
+        self.is_prepared = True
 
 
 @dataclass
 class AnyComparison(Comparison):
-    """Comparison passes if the value matches *any* comparison."""
+    """Comparison passes *any* contained comparison passes."""
     comparisons: List[Comparison] = field(default_factory=list)
 
     def describe(self) -> str:
@@ -517,69 +592,113 @@ class AnyComparison(Comparison):
             for comparison in self.comparisons
         )
 
+    def prepare(self) -> None:
+        for comp in self.comparisons:
+            comp.prepare()
+
 
 @dataclass
 class Greater(Comparison):
     """Comparison: value > self.value."""
-    value: Union[Number, DynamicValue] = 0
+    value: Number = 0
+    value_dynamic: Optional[DynamicValue] = None
+
+    def __post_init__(self):
+        self.is_prepared = False
 
     def describe(self) -> str:
-        return f"> {self.value}"
+        return f"> {self.value_dynamic or self.value}"
 
     def _compare(self, value: Number) -> bool:
-        if isinstance(self.value, DynamicValue):
-            our_value = self.value.get()
-        else:
-            our_value = self.value
-        return value > our_value
+        if not self.is_prepared and self.value_dynamic is not None:
+            raise UnpreparedComparisonException(
+                f"Dynamic greater comparison to {self.value_dynamic} "
+                "was not prepared."
+            )
+        return value > self.value
+
+    def prepare(self) -> None:
+        if self.value_dynamic is not None:
+            self.value = self.value_dynamic.get()
+        self.is_prepared = True
 
 
 @dataclass
 class GreaterOrEqual(Comparison):
     """Comparison: value >= self.value."""
-    value: Union[Number, DynamicValue] = 0
+    value: Number = 0
+    value_dynamic: Optional[DynamicValue] = None
+
+    def __post_init__(self):
+        self.is_prepared = False
 
     def describe(self) -> str:
-        return f">= {self.value}"
+        return f">= {self.value_dynamic or self.value}"
 
     def _compare(self, value: Number) -> bool:
-        if isinstance(self.value, DynamicValue):
-            our_value = self.value.get()
-        else:
-            our_value = self.value
-        return value >= our_value
+        if not self.is_prepared and self.value_dynamic is not None:
+            raise UnpreparedComparisonException(
+                f"Dynamic greater or equal comparison to {self.value_dynamic}"
+                " was not prepared."
+            )
+        return value >= self.value
+
+    def prepare(self) -> None:
+        if self.value_dynamic is not None:
+            self.value = self.value_dynamic.get()
+        self.is_prepared = True
 
 
 @dataclass
 class Less(Comparison):
     """Comparison: value < self.value."""
-    value: Union[Number, DynamicValue] = 0
+    value: Number = 0
+    value_dynamic: Optional[DynamicValue] = None
+
+    def __post_init__(self):
+        self.is_prepared = False
 
     def describe(self) -> str:
-        return f"< {self.value}"
+        return f"< {self.value_dynamic or self.value}"
 
     def _compare(self, value: Number) -> bool:
-        if isinstance(self.value, DynamicValue):
-            our_value = self.value.get()
-        else:
-            our_value = self.value
-        return value < our_value
+        if not self.is_prepared and self.value_dynamic is not None:
+            raise UnpreparedComparisonException(
+                f"Dynamic less than comparison to {self.value_dynamic} "
+                "was not prepared."
+            )
+        return value < self.value
+
+    def prepare(self) -> None:
+        if self.value_dynamic is not None:
+            self.value = self.value_dynamic.get()
+        self.is_prepared = True
 
 
 @dataclass
 class LessOrEqual(Comparison):
     """Comparison: value <= self.value."""
-    value: Union[Number, DynamicValue] = 0
+    value: Number = 0
+    value_dynamic: Optional[DynamicValue] = None
+
+    def __post_init__(self):
+        self.is_prepared = False
 
     def describe(self) -> str:
-        return f"<= {self.value}"
+        return f"<= {self.value_dynamic or self.value}"
 
     def _compare(self, value: Number) -> bool:
-        if isinstance(self.value, DynamicValue):
-            our_value = self.value.get()
-        else:
-            our_value = self.value
-        return value <= our_value
+        if not self.is_prepared and self.value_dynamic is not None:
+            raise UnpreparedComparisonException(
+                f"Dynamic less or equal comparison to {self.value_dynamic} "
+                "was not prepared."
+            )
+        return value <= self.value
+
+    def prepare(self) -> None:
+        if self.value_dynamic is not None:
+            self.value = self.value_dynamic.get()
+        self.is_prepared = True
 
 
 @dataclass
@@ -611,15 +730,22 @@ class Range(Comparison):
         warn_high <= value <= high
     """
     #: The low end of the range, which must be <= high.
-    low: Union[Number, DynamicValue] = 0
+    low: Number = 0
+    low_dynamic: Optional[DynamicValue] = None
     #: The high end of the range, which must be >= low.
-    high: Union[Number, DynamicValue] = 0
+    high: Number = 0
+    high_dynamic: Optional[DynamicValue] = None
     #: The low end of the warning range, which must be <= warn_high.
-    warn_low: Optional[Union[Number, DynamicValue]] = None
+    warn_low: Optional[Number] = None
+    warn_low_dynamic: Optional[DynamicValue] = None
     #: The high end of the warning range, which must be >= warn_low.
-    warn_high: Optional[Union[Number, DynamicValue]] = None
+    warn_high: Optional[Number] = None
+    warn_high_dynamic: Optional[DynamicValue] = None
     #: Should the low and high values be included in the range?
     inclusive: bool = True
+
+    def __post_init__(self):
+        self.is_prepared = False
 
     @property
     def ranges(self) -> Generator[ValueRange, None, None]:
@@ -651,11 +777,45 @@ class Range(Comparison):
             )
 
     def describe(self) -> str:
-        return "\n".join(str(range_) for range_ in self.ranges)
+        text = "\n".join(str(range_) for range_ in self.ranges)
+        if self.low_dynamic is not None:
+            text.append(f"\n Dynamic low value: {self.low_dynamic}")
+        if self.high_dynamic is not None:
+            text.append(f"\n Dynamic high value: {self.high_dynamic}")
+        if self.warn_low_dynamic is not None:
+            text.append(f"\n Dynamic warn_low value: {self.warn_low_dynamic}")
+        if self.warn_high_dynamic is not None:
+            text.append(
+                f"\n Dynamic warn_high value: {self.warn_high_dynamic}"
+            )
+        return text
 
     def _compare(self, value: Number) -> bool:
+        if not self.is_prepared and any(
+            dyn is not None for dyn in (
+                self.low_dynamic,
+                self.high_dynamic,
+                self.warn_low_dynamic,
+                self.warn_high_dynamic,
+            )
+        ):
+            raise UnpreparedComparisonException(
+                f"Dynamic less or range comparison {self} "
+                "was not prepared."
+            )
         for range_ in self.ranges:
             if range_.compare(value):
                 _raise_for_severity(range_.severity, str(range_))
 
         return True
+
+    def prepare(self) -> None:
+        if self.low_dynamic is not None:
+            self.low = self.low_dynamic.get()
+        if self.high_dynamic is not None:
+            self.high = self.high_dynamic.get()
+        if self.warn_low_dynamic is not None:
+            self.warn_low = self.warn_low_dynamic.get()
+        if self.warn_high_dynamic is not None:
+            self.warn_high = self.warn_high_dynamic.get()
+        self.is_prepared = True
