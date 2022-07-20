@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import concurrent.futures
 import enum
+from dataclasses import dataclass
 from typing import Any, Optional, Protocol, Sequence
 
 import numpy as np
@@ -10,6 +10,7 @@ import ophyd
 
 from .ophyd_helpers import acquire_async, acquire_blocking
 from .type_hints import Number, PrimitiveType
+from .util import run_in_executor
 
 
 class _ReduceMethodType(Protocol):
@@ -65,6 +66,76 @@ class ReduceMethod(str, enum.Enum):
         """
         data = await acquire_async(signal, duration)
         return self.reduce_values(data)
+
+
+@dataclass(frozen=True, eq=True)
+class ReductionKey:
+    period: Optional[Number]
+    method: ReduceMethod
+
+    def get_data_for_signal(self, signal: ophyd.Signal, string: bool = False) -> Any:
+        """
+        Get data for the given signal, according to the string and data
+        reduction settings.
+
+        Parameters
+        ----------
+        signal : ophyd.Signal
+            The signal.
+
+        Returns
+        -------
+        Any
+            The acquired data.
+
+        Raises
+        ------
+        TimeoutError
+            If the get operation times out.
+        """
+        return get_data_for_signal(
+            signal,
+            reduce_period=self.period,
+            reduce_method=self.method,
+            string=string or False,
+        )
+
+    async def get_data_for_signal_async(
+        self,
+        signal: ophyd.Signal,
+        string: bool = False,
+        *,
+        executor: Optional[concurrent.futures.Executor] = None
+    ) -> Any:
+        """
+        Get data for the given signal, according to the string and data
+        reduction settings.
+
+        Parameters
+        ----------
+        signal : ophyd.Signal
+            The signal.
+        executor : concurrent.futures.Executor, optional
+            The executor to run the synchronous call in.  Defaults to
+            the loop-defined default executor.
+
+        Returns
+        -------
+        Any
+            The acquired data.
+
+        Raises
+        ------
+        TimeoutError
+            If the get operation times out.
+        """
+        return await get_data_for_signal_async(
+            signal,
+            reduce_period=self.period,
+            reduce_method=self.method,
+            string=string or False,
+            executor=executor,
+        )
 
 
 def get_data_for_signal(
@@ -162,5 +233,4 @@ async def get_data_for_signal_async(
 
         return signal.get()
 
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(executor, inner_sync_get)
+    return await run_in_executor(executor, inner_sync_get)
