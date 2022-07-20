@@ -27,9 +27,11 @@
 
 configs:
 - PVConfiguration:
+    name: PV Config 1
     checklist:
     - comparisons:
       - Equals:
+          name: Equality check 1
           value: 1
       ids:
       - simple:A
@@ -38,9 +40,11 @@ configs:
     tags:
     - a
 - PVConfiguration:
+    name: PV Config 2
     checklist:
     - comparisons:
       - Equals:
+          name: Equality check 2
           value: 1
       ids:
       - simple:C
