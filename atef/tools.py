@@ -49,6 +49,9 @@ class PingResult(ToolResult):
     #: Maximum time in seconds from ``times``.
     max_time: float = 0.0
 
+    #: Time pattern for matching the ping output.
+    _time_re: ClassVar[re.Pattern] = re.compile(r"time[=<](.*)\s?ms")
+
     def add_host_result(
         self,
         host: str,
@@ -75,19 +78,22 @@ class PingResult(ToolResult):
             )
             self.unresponsive.append(host)
             self.times[host] = failure_time
-            self.max_time = failure_time
-            return
-
-        self.unresponsive.extend(result.unresponsive)
-        self.alive.extend(result.alive)
-        self.times.update(result.times)
+        else:
+            self.unresponsive.extend(result.unresponsive)
+            self.alive.extend(result.alive)
+            self.times.update(result.times)
 
         times = self.times.values()
         self.min_time = min(times) if times else 0.0
         self.max_time = max(times) if times else failure_time
 
+        self.num_unresponsive = len(self.unresponsive)
+        self.num_alive = len(self.alive)
+
     @classmethod
-    def from_output(cls, host: str, output: str) -> PingResult:
+    def from_output(
+        cls, host: str, output: str, unresponsive_time: float = 100.0
+    ) -> PingResult:
         """
         Fill a PingResult from the results of the ping program.
 
@@ -97,6 +103,8 @@ class PingResult(ToolResult):
             The hostname that ``ping`` was called with.
         output : str
             The decoded output of the subprocess call.
+        unresponsive_time : float, optional
+            Time to use for unresponsive or errored hosts.
 
         Returns
         -------
@@ -104,16 +112,16 @@ class PingResult(ToolResult):
         """
         # NOTE: lazily ignoring non-millisecond-level results here; 1 second+
         # is the same as non-responsive if you ask me...
-        times = [float(ms) / 1000.0 for ms in Ping._time_re.findall(output)]
+        times = [float(ms) / 1000.0 for ms in PingResult._time_re.findall(output)]
 
         if not times:
             return cls(
                 result=Result(severity=Severity.error),
                 alive=[],
                 unresponsive=[host],
-                min_time=Ping._unresponsive_time,
-                max_time=Ping._unresponsive_time,
-                times={host: Ping._unresponsive_time},
+                min_time=unresponsive_time,
+                max_time=unresponsive_time,
+                times={host: unresponsive_time},
             )
 
         return cls(
@@ -249,8 +257,6 @@ class Ping(Tool):
     #: The assumed output encoding of the 'ping' command.
     encoding: str = "utf-8"
 
-    #: Time pattern for matching the ping output.
-    _time_re: ClassVar[re.Pattern] = re.compile(r"time[=<](.*)\s?ms")
     #: Time to report when unresponsive [sec]
     _unresponsive_time: ClassVar[float] = 100.0
 
