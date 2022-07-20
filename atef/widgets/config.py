@@ -7,6 +7,8 @@ import dataclasses
 import json
 import logging
 import os.path
+import time
+from enum import Enum
 from functools import partial
 from itertools import zip_longest
 from pprint import pprint
@@ -14,6 +16,7 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union, cast)
 
 from apischema import deserialize, serialize
+from ophyd import EpicsSignal, EpicsSignalRO
 from pydm.widgets.drawing import PyDMDrawingLine
 from qtpy import QtWidgets
 from qtpy.QtCore import QEvent, QObject, QPoint, Qt, QTimer
@@ -22,13 +25,14 @@ from qtpy.QtGui import QClipboard, QColor, QGuiApplication, QPalette
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QInputDialog, QLabel,
                             QLayout, QLineEdit, QMainWindow, QMenu,
-                            QMessageBox, QPlainTextEdit, QPushButton, QStyle,
-                            QTabWidget, QToolButton, QTreeWidget,
+                            QMessageBox, QPlainTextEdit, QPushButton, QSpinBox,
+                            QStyle, QTabWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from .. import util
-from ..check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
-                     LessOrEqual, NotEquals, Range)
+from ..cache import get_signal_cache
+from ..check import (Comparison, EpicsValue, Equals, Greater, GreaterOrEqual,
+                     HappiValue, Less, LessOrEqual, NotEquals, Range)
 from ..config import (Configuration, ConfigurationFile, DeviceConfiguration,
                       IdentifierAndComparison, PVConfiguration)
 from ..enums import Severity
@@ -2177,6 +2181,220 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         self.tree_item.removeChild(item)
         del self.bridge_item_map[bridge]
         bridge.deleteLater()
+
+
+class EditMode(Enum):
+    BOOL = 0
+    ENUM = 1
+    FLOAT = 2
+    INT = 3
+    STR = 4
+    EPICS = 5
+    HAPPI = 6
+
+
+class MultiModeValueEdit(DesignerDisplay):
+    """
+    Widget to edit a single value/dynamic value pair.
+
+    This widget contains a set of various edit
+    widgets that will be connected to the corresponding
+    QDataclassValue instances as appropriate. On first load
+    we will match the data type of the saved value (or of
+    the default value). The user will be able to pick a
+    different input method via right-click context menu
+    and the appropriate input widget will be shown.
+
+    This is intended to be used to edit the "value" and
+    "dynamic_value" attributes of "Comparison" classes and of
+    similar constructs. Some of the modes will edit the
+    "dynamic_value" and others will edit the plain normal
+    "value".
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        The bridge to the "Comparison" data class.
+    value_name : str, optional
+        The attribute name of the static value to edit.
+        Defaults to "value".
+    dynamic_name : str, optional
+        The attribute name of the dynamic value to edit.
+        Defaults = "value_dynamic".
+    ids : QDataclassValue, optional
+        The value object that will give us the list of ids
+        (pvnames, devices) that are active for this comparison.
+        This is needed to establish enum options.
+    devices : QDataclassValue, optional
+        The value object that will contain the list of device
+        names if this is part of a device config. This is needed
+        to establish enum options. If omitted, we'll treat
+        ids as a list of PVs.
+    """
+    filename = 'config_value_edit.ui'
+
+    bool_input: QComboBox
+    enum_input: QComboBox
+    epics_widget: QWidget
+    epics_input: QLineEdit
+    epics_value_preview: QLabel
+    epics_refresh: QToolButton
+    happi_widget: QWidget
+    happi_select_device: QPushButton
+    happi_select_component: QPushButton
+    happi_value_preview: QLabel
+    happi_refresh: QToolButton
+    float_input: QLineEdit
+    int_input: QSpinBox
+    str_input: QLineEdit
+
+    bridge: QDataclassBridge
+    value: QDataclassValue
+    dynamic_value: QDataclassValue
+    dynamic_bridge: Optional[QDataclassBridge]
+    ids: Optional[QDataclassValue]
+    devices: Optional[QDataclassValue]
+
+    def __init__(
+        self,
+        bridge: QDataclassBridge,
+        value_name: str = 'value',
+        dynamic_name: str = 'value_dynamic',
+        ids: Optional[QDataclassValue] = None,
+        devices: Optional[QDataclassValue] = None,
+    ):
+        self.bridge = bridge
+        self.value = getattr(bridge, value_name)
+        self.dynamic_value = getattr(bridge, dynamic_name)
+        self.dynamic_bridge = None
+        self.ids = ids
+        self.devices = devices
+        self.setup_widgets()
+        self.set_mode(self.get_mode_from_data())
+
+    def setup_widgets(self):
+        """
+        Connect widgets to edit data classes as appropriate.
+        """
+        # TODO
+        ...
+
+    def get_mode_from_data(self) -> EditMode:
+        """
+        Return the expected mode from the current data.
+        """
+        dynamic = self.dynamic_value.get()
+        if dynamic is not None:
+            if isinstance(dynamic, EpicsValue):
+                return EditMode.EPICS
+            if isinstance(dynamic, HappiValue):
+                return EditMode.HAPPI
+            raise TypeError(
+                f"Unexpected dynamic value {dynamic}."
+            )
+        static = self.value.get()
+        if isinstance(static, bool):
+            return EditMode.BOOL
+        if isinstance(static, float):
+            return EditMode.FLOAT
+        if isinstance(static, int):
+            return EditMode.INT
+        if isinstance(static, str):
+            if static in self.get_enum_strs():
+                return EditMode.ENUM
+            return EditMode.STR
+        raise TypeError(
+            f"Unexpected static value {static}"
+        )
+
+    def get_enum_strs(self) -> List[str]:
+        """
+        For all configured data sources, get the enum strings.
+
+        If multiple data sources have conflicting enum strings
+        this will include all of them.
+
+        If no data sources include enum strings this will be
+        an empty list.
+        """
+        if self.ids is None:
+            return []
+        ids = self.ids.get()
+        if self.devices is None:
+            # Collect signals from ids as pv names
+            signal_cache = get_signal_cache()
+            sigs: List[EpicsSignalRO] = []
+            for id in ids:
+                sigs.append(signal_cache[id])
+
+        else:
+            # Collect signals from ids as device attrs
+            device_names = self.devices.get()
+            devices = []
+            for device_name in device_names:
+                devices.append(util.get_happi_device_by_name(device_name))
+            sigs: List[EpicsSignal] = []
+            for id in ids:
+                for device in devices:
+                    try:
+                        sig = getattr(device, id)
+                    except AttributeError:
+                        continue
+                    else:
+                        sigs.append(sig)
+        start = time.monotonic()
+        for sig in sigs:
+            try:
+                sig.wait_for_connection(timeout=1)
+            except TimeoutError:
+                pass
+            if time.monotonic() - start >= 1:
+                break
+        enums_in_order = []
+        enum_set = set()
+        for sig in sigs:
+            if sig.enum_strs is not None:
+                for enum_str in sig.enum_strs:
+                    if enum_str not in enum_set:
+                        enum_set.add(enum_str)
+                        enums_in_order.append(enum_str)
+        return enums_in_order
+
+    def set_mode(self, mode: EditMode) -> None:
+        """
+        Change the mode of the edit widget.
+
+        This adjusts the dynamic data classes as needed and
+        shows only the correct edit widget.
+        """
+        # Hide all the widgets
+        self.epics_widget.hide()
+        self.happi_widget.hide()
+        self.bool_input.hide()
+        self.enum_input.hide()
+        self.float_input.hide()
+        self.int_input.hide()
+        self.str_input.hide()
+        if mode == EditMode.EPICS:
+            # TODO Create and assign EPICS data class if needed
+            self.epics_widget.show()
+        elif mode == EditMode.HAPPI:
+            # TODO Create and assign the happi data class if needed
+            self.happi_widget.show()
+        else:
+            # TODO Delete the dynamic data class if needed
+            pass
+        if mode == EditMode.BOOL:
+            self.bool_input.show()
+        elif mode == EditMode.ENUM:
+            # TODO fill the enum combo box options
+            self.enum_input.show()
+        elif mode == EditMode.FLOAT:
+            self.float_input.show()
+        elif mode == EditMode.INT:
+            self.int_input.show()
+        elif mode == EditMode.STR:
+            self.str_input.show()
 
 
 class CompView(ConfigTextMixin, PageWidget):
