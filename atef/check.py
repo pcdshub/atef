@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import concurrent.futures
 import logging
 from dataclasses import dataclass, field
@@ -290,15 +289,12 @@ class Comparison:
         TimeoutError
             If the get operation times out.
         """
-        if self.reduce_period and self.reduce_period > 0:
-            return self.reduce_method.subscribe_and_reduce(
-                signal, self.reduce_period
-            )
-
-        if self.string:
-            return signal.get(as_string=True)
-
-        return signal.get()
+        return reduce.get_data_for_signal(
+            signal,
+            reduce_period=self.reduce_period,
+            reduce_method=self.reduce_method,
+            string=self.string or False,
+        )
 
     async def get_data_for_signal_async(
         self,
@@ -328,19 +324,13 @@ class Comparison:
         TimeoutError
             If the get operation times out.
         """
-        if self.reduce_period and self.reduce_period > 0:
-            return await self.reduce_method.subscribe_and_reduce_async(
-                signal, self.reduce_period
-            )
-
-        def inner_sync_get():
-            if self.string:
-                return signal.get(as_string=True)
-
-            return signal.get()
-
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(executor, inner_sync_get)
+        return await reduce.get_data_for_signal_async(
+            signal,
+            reduce_period=self.reduce_period,
+            reduce_method=self.reduce_method,
+            string=self.string or False,
+            executor=executor,
+        )
 
 
 @dataclass
