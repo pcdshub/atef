@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>182</width>
-    <height>190</height>
+    <width>186</width>
+    <height>192</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -140,7 +140,14 @@
     <widget class="QLineEdit" name="float_input"/>
    </item>
    <item>
-    <widget class="QSpinBox" name="int_input"/>
+    <widget class="QSpinBox" name="int_input">
+     <property name="minimum">
+      <number>-2147483647</number>
+     </property>
+     <property name="maximum">
+      <number>2147483647</number>
+     </property>
+    </widget>
    </item>
    <item>
     <widget class="QLineEdit" name="str_input"/>
