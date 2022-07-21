@@ -2183,6 +2183,12 @@ class IdAndCompWidget(ConfigTextMixin, PageWidget):
         bridge.deleteLater()
 
 
+def set_widget_font_size(widget: QWidget, size: int):
+    font = widget.font()
+    font.setPointSize(size)
+    widget.setFont(font)
+
+
 class EditMode(Enum):
     BOOL = 0
     ENUM = 1
@@ -2290,26 +2296,22 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         """
         # Data connections and style
         self.bool_input.activated.connect(self.update_from_bool)
-        self.bool_input.font().setPointSize(self.font_pt_size)
         self.enum_input.activated.connect(self.update_from_enum)
-        self.enum_input.font().setPointSize(self.font_pt_size)
         self.epics_input.textEdited.connect(self.update_from_epics)
-        self.epics_input.font().setPointSize(self.font_pt_size)
         setup_line_edit_sizing(self.epics_input, 30, 10)
         self.epics_refresh.clicked.connect(self.update_epics_preview)
         self.setup_refresh_icon(self.epics_refresh)
         self.happi_select_component.clicked.connect(self.select_happi_cpt)
-        self.happi_select_component.font().setPointSize(self.font_pt_size)
         self.happi_refresh.clicked.connect(self.update_happi_preview)
         self.setup_refresh_icon(self.happi_refresh)
         self.float_input.textEdited.connect(self.update_from_float)
-        self.float_input.font().setPointSize(self.font_pt_size)
         setup_line_edit_sizing(self.float_input, 30, 10)
         self.int_input.valueChanged.connect(self.update_normal)
-        self.int_input.font().setPointSize(self.font_pt_size)
         self.str_input.textEdited.connect(self.update_normal)
-        self.str_input.font().setPointSize(self.font_pt_size)
         setup_line_edit_sizing(self.str_input, 30, 10)
+        for widget in self.children():
+            if hasattr(widget, "font"):
+                set_widget_font_size(widget, self.font_pt_size)
 
         # Right click -> select mode
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
