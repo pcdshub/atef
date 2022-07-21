@@ -2240,7 +2240,6 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     epics_value_preview: QLabel
     epics_refresh: QToolButton
     happi_widget: QWidget
-    happi_select_device: QPushButton
     happi_select_component: QPushButton
     happi_value_preview: QLabel
     happi_refresh: QToolButton
@@ -2254,6 +2253,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     dynamic_bridge: Optional[QDataclassBridge]
     ids: Optional[QDataclassValue]
     devices: Optional[QDataclassValue]
+    happi_select_widget: Optional[HappiDeviceComponentWidget]
 
     def __init__(
         self,
@@ -2270,6 +2270,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.dynamic_bridge = None
         self.ids = ids
         self.devices = devices
+        self.happi_select_widget = None
         self.setup_widgets()
         self.set_mode(self.get_mode_from_data())
         super().__init__(**kwargs)
@@ -2281,15 +2282,46 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.bool_input.activated.connect(self.update_from_bool)
         self.enum_input.activated.connect(self.update_from_enum)
         self.epics_input.textEdited.connect(self.update_from_epics)
+        setup_line_edit_sizing(self.epics_input)
         self.epics_refresh.clicked.connect(self.update_epics_preview)
         self.setup_refresh_icon(self.epics_refresh)
-        # self.happi_select_device.clicked.connect(self.select_happi_device)
-        # self.happi_select_component.clicked.connect(self.select_happi_cpt)
+        self.happi_select_component.clicked.connect(self.select_happi_cpt)
         self.happi_refresh.clicked.connect(self.update_happi_preview)
         self.setup_refresh_icon(self.happi_refresh)
         self.float_input.textEdited.connect(self.update_from_float)
+        setup_line_edit_sizing(self.float_input)
         self.int_input.valueChanged.connect(self.update_normal)
         self.str_input.textEdited.connect(self.update_normal)
+        setup_line_edit_sizing(self.str_input)
+
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
+
+    def _show_context_menu(self, pos: QPoint):
+        """
+        Display a context menu that allows us to change the mode.
+
+        Parameters
+        ----------
+        pos : QPoint
+            Position to display the menu at.
+        """
+        menu = QMenu(self)
+        use_bool = menu.addAction("&Bool")
+        use_bool.triggered.connect(partial(self.set_mode, EditMode.BOOL))
+        use_enum = menu.addAction("&Enum")
+        use_enum.triggered.connect(partial(self.set_mode, EditMode.ENUM))
+        use_float = menu.addAction("&Float")
+        use_float.triggered.connect(partial(self.set_mode, EditMode.FLOAT))
+        use_int = menu.addAction("&Int")
+        use_int.triggered.connect(partial(self.set_mode, EditMode.INT))
+        use_str = menu.addAction("&String")
+        use_str.triggered.connect(partial(self.set_mode, EditMode.STR))
+        use_epics = menu.addAction("EPICS")
+        use_epics.triggered.connect(partial(self.set_mode, EditMode.EPICS))
+        use_happi = menu.addAction("Happi")
+        use_happi.triggered.connect(partial(self.set_mode, EditMode.HAPPI))
+        menu.exec(self.mapToGlobal(pos))
 
     def setup_refresh_icon(self, button: QToolButton):
         """
@@ -2342,6 +2374,71 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         """
         value = self.dynamic_value.get().get()
         self.epics_value_preview.setText(str(value))
+
+    def select_happi_cpt(self) -> None:
+        """
+        When the user clicks on the happi device name, open the cpt chooser.
+
+        Unlike other uses of this GUI, this one is used to select both the
+        device and component all at once, since we can only have one
+        target for the dynamic value.
+        """
+        if self.happi_select_widget is None:
+            widget = HappiDeviceComponentWidget(
+                client=util.get_happi_client()
+            )
+            widget.item_search_widget.happi_items_chosen.connect(
+                self.new_happi_devices
+            )
+            widget.device_widget.attributes_selected.connect(
+                self.new_happi_attrs
+            )
+            self.happi_select_widget = widget
+        self.happi_select_widget.show()
+        self.happi_select_widget.activateWindow()
+
+        try:
+            current_device = self.dynamic_value.get().device_name
+        except AttributeError:
+            return
+        if current_device:
+            self.happi_select_widget.item_search_widget.edit_filter.setText(
+                current_device
+            )
+
+    def new_happi_devices(self, device_names: List[str]) -> None:
+        """
+        Set the new happi name on the dataclass and on the display.
+
+        The selection widget gives us a list, but we can only accept
+        one item, so the first element is selected.
+        """
+        if device_names:
+            self.dynamic_bridge.device_name.put(device_names[0])
+            self.update_happi_text()
+
+    def new_happi_attrs(self, attr_names: List[str]) -> None:
+        """
+        Set the new happi attr on the dataclass and on the display.
+
+        The selection widget gives us a list, but we can only accept
+        one item, so the first element is selected.
+        """
+        if attr_names:
+            self.dynamic_bridge.signal_attr.put(attr_names[0])
+            self.update_happi_text()
+
+    def update_happi_text(self) -> None:
+        """
+        Update the text on the happi selection button as appropriate.
+        """
+        happi_value = self.dynamic_value.get()
+        if happi_value is not None:
+            if not happi_value.device_name or not happi_value.signal_attr:
+                text = "Click to select"
+            else:
+                text = f"{happi_value.device_name}.{happi_value.signal_attr}"
+            self.happi_select_component.setText(text)
 
     def update_happi_preview(self) -> None:
         """
@@ -2458,12 +2555,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
                     HappiValue(device_name="", signal_attr="")
                 )
             self.dynamic_bridge = QDataclassBridge(self.dynamic_value.get())
-            self.happi_select_device.setText(
-                self.dynamic_bridge.device_name.get()
-            )
-            self.happi_select_component.setText(
-                self.dynamic_bridge.signal_attr.get()
-            )
+            self.update_happi_text()
             self.happi_widget.show()
         else:
             self.dynamic_value.put(None)

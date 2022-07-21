@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>313</width>
+    <width>186</width>
     <height>201</height>
    </rect>
   </property>
@@ -101,28 +101,14 @@
       <item>
        <widget class="QLabel" name="happi_indicator">
         <property name="text">
-         <string>Happi Device:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="happi_select_device">
-        <property name="text">
-         <string>Device</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="happi_dot">
-        <property name="text">
-         <string>.</string>
+         <string>Happi:</string>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QPushButton" name="happi_select_component">
         <property name="text">
-         <string>Component</string>
+         <string>click to select</string>
         </property>
        </widget>
       </item>
