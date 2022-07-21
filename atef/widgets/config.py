@@ -3242,12 +3242,14 @@ class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
             from_str=float,
             to_str=str,
         )
-        starting_value = self.bridge.value.get()
-        self.update_range_label(starting_value)
         self.bridge.value.changed_value.connect(self.update_range_label)
         self.bridge.atol.changed_value.connect(self.update_range_label)
         self.bridge.rtol.changed_value.connect(self.update_range_label)
-        # TODO new signal to know when we have a new preview value
+        self.value_widget.refreshed.connect(self.update_range_label)
+        self.value_widget.mode_changed.connect(self.on_mode_change)
+        self.on_mode_change(
+            self.value_widget.get_mode_from_data()
+        )
 
     def update_range_label(self, *args, **kwargs) -> None:
         """
@@ -3276,6 +3278,23 @@ class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
             diff = atol + abs(rtol * value)
             text = f'± {diff:.3g}'
         self.range_label.setText(text)
+
+    def on_mode_change(self, mode: EditMode) -> None:
+        """
+        We need to recalculate the ranges and show/hide tolerance per mode.
+        """
+        self.update_range_label()
+        needs_tol = mode in (
+            EditMode.FLOAT,
+            EditMode.INT,
+            EditMode.EPICS,
+            EditMode.HAPPI,
+        )
+        self.range_label.setVisible(needs_tol)
+        self.atol_label.setVisible(needs_tol)
+        self.atol_edit.setVisible(needs_tol)
+        self.rtol_label.setVisible(needs_tol)
+        self.rtol_edit.setVisible(needs_tol)
 
 
 class NotEqualsWidget(EqualsWidget):
