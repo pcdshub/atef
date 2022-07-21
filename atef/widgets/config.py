@@ -2240,6 +2240,8 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         The size of the font to use for the widget.
     """
     filename = 'config_value_edit.ui'
+    mode_changed: ClassVar[QSignal] = QSignal(int)
+    refreshed: ClassVar[QSignal] = QSignal()
 
     bool_input: QComboBox
     enum_input: QComboBox
@@ -2410,6 +2412,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         """
         value = self.dynamic_value.get().get()
         self.epics_value_preview.setText(str(value))
+        self.refreshed.emit()
 
     def select_happi_cpt(self) -> None:
         """
@@ -2485,6 +2488,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         """
         value = self.dynamic_value.get().get()
         self.happi_value_preview.setText(str(value))
+        self.refreshed.emit()
 
     def get_mode_from_data(self) -> EditMode:
         """
@@ -2628,6 +2632,11 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         elif mode == EditMode.STR:
             self.str_input.setText(str(self.value.get()))
             self.str_input.show()
+        else:
+            raise ValueError(
+                f"Unexpected edit mode {mode}"
+            )
+        self.mode_changed.emit(mode)
 
 
 class CompView(ConfigTextMixin, PageWidget):
