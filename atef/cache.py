@@ -234,15 +234,19 @@ class DataCache:
             The acquired data.
         """
         signal_data = self.signal_data[signal]
-        acquired = await asyncio.shield(
-            get_data_for_signal_async(
-                signal,
-                reduce_period=key.period,
-                reduce_method=key.method,
-                string=key.string,
-                executor=executor,
+        try:
+            acquired = await asyncio.shield(
+                get_data_for_signal_async(
+                    signal,
+                    reduce_period=key.period,
+                    reduce_method=key.method,
+                    string=key.string,
+                    executor=executor,
+                )
             )
-        )
+        except TimeoutError:
+            acquired = None
+
         signal_data[key] = acquired
         return acquired
 
@@ -282,9 +286,42 @@ class DataCache:
         try:
             data = self.tool_data[key]
         except KeyError:
-            data = asyncio.create_task(tool.run())
+            data = asyncio.create_task(self._update_tool_by_key(tool, key))
             self.tool_data[key] = data
 
         if isinstance(data, asyncio.Future):
             return await data
+
         return data
+
+    async def _update_tool_by_key(
+        self,
+        tool: tools.Tool,
+        key: ToolKey,
+        executor: Optional[concurrent.futures.Executor] = None,
+    ) -> Any:
+        """
+        Update the tool cache given the signal and the reduction key.
+
+        Parameters
+        ----------
+        tool : tools.Tool
+            The tool to run.
+        key : ToolKey
+            The hashable key according to the tool's configuration.
+        executor : concurrent.futures.Executor, optional
+            The executor to run the synchronous call in.  Defaults to
+            the loop-defined default executor.
+
+        Returns
+        -------
+        Any
+            The acquired data.
+        """
+        try:
+            acquired = await tool.run()
+        except Exception:
+            acquired = None
+
+        self.tool_data[key] = acquired
+        return acquired

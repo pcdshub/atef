@@ -185,6 +185,19 @@ class PreparedComparison:
     #: The last result of the comparison, if run.
     result: Optional[Result] = None
 
+    async def get_data_async(self) -> Any:
+        """
+        Get the data according to the comparison's configuration.
+
+        To be immplemented in subclass.
+
+        Returns
+        -------
+        data : Any
+            The acquired data.
+        """
+        raise NotImplementedError()
+
     async def compare(self) -> Result:
         """
         Run the comparison.
@@ -257,7 +270,7 @@ class PreparedComparison:
                         cache=cache,
                     )
         elif isinstance(config, ToolConfiguration):
-            yield from PreparedToolComparison._from_tool_config(config)
+            yield from PreparedToolComparison._from_tool_config(config, cache=cache)
         else:
             raise NotImplementedError(f"Configuration type unsupported: {type(config)}")
 
@@ -289,8 +302,6 @@ class PreparedSignalComparison(PreparedComparison):
         """
         Get the provided signal's data from the cache according to the
         reduction configuration.
-
-        Caller must prepare the cache prior to calling this method.
 
         Returns
         -------
@@ -563,6 +574,17 @@ class PreparedToolComparison(PreparedComparison):
     #: The device the comparison applies to, if applicable.
     tool: tools.Tool = field(default_factory=lambda: tools.Ping(hosts=[]))
 
+    async def get_data_async(self) -> Any:
+        """
+        Get the provided tool's result data from the cache.
+
+        Returns
+        -------
+        data : Any
+            The acquired data.
+        """
+        return await self.cache.get_tool_data(self.tool)
+
     async def compare(self) -> Result:
         """
         Run the prepared comparison.
@@ -573,7 +595,7 @@ class PreparedToolComparison(PreparedComparison):
             The result of the comparison.  This is also set in ``self.result``.
         """
         try:
-            result = await self.tool.run()
+            result = await self.get_data_async()
         except (asyncio.TimeoutError, TimeoutError):
             return Result(
                 severity=self.comparison.if_disconnected,
@@ -661,6 +683,7 @@ class PreparedToolComparison(PreparedComparison):
     def _from_tool_config(
         cls,
         config: ToolConfiguration,
+        cache: DataCache,
     ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
         """
         Create one or more PreparedComparison instances from a
@@ -694,6 +717,7 @@ class PreparedToolComparison(PreparedComparison):
                             comparison=comparison,
                             name=config.name or config.description,
                             path=path,
+                            cache=cache,
                         )
                     except Exception as ex:
                         yield PreparedComparisonException(
