@@ -2270,6 +2270,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         font_pt_size: int = 8,
         **kwargs,
     ):
+        super().__init__(**kwargs)
         self.bridge = bridge
         self.value_name = value_name
         self.value = getattr(bridge, value_name)
@@ -2282,7 +2283,6 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.happi_select_widget = None
         self.setup_widgets()
         self.set_mode(self.get_mode_from_data())
-        super().__init__(**kwargs)
 
     def setup_widgets(self):
         """
@@ -2295,7 +2295,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.enum_input.font().setPointSize(self.font_pt_size)
         self.epics_input.textEdited.connect(self.update_from_epics)
         self.epics_input.font().setPointSize(self.font_pt_size)
-        setup_line_edit_sizing(self.epics_input)
+        setup_line_edit_sizing(self.epics_input, 30, 10)
         self.epics_refresh.clicked.connect(self.update_epics_preview)
         self.setup_refresh_icon(self.epics_refresh)
         self.happi_select_component.clicked.connect(self.select_happi_cpt)
@@ -2304,12 +2304,12 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.setup_refresh_icon(self.happi_refresh)
         self.float_input.textEdited.connect(self.update_from_float)
         self.float_input.font().setPointSize(self.font_pt_size)
-        setup_line_edit_sizing(self.float_input)
+        setup_line_edit_sizing(self.float_input, 30, 10)
         self.int_input.valueChanged.connect(self.update_normal)
         self.int_input.font().setPointSize(self.font_pt_size)
         self.str_input.textEdited.connect(self.update_normal)
         self.str_input.font().setPointSize(self.font_pt_size)
-        setup_line_edit_sizing(self.str_input)
+        setup_line_edit_sizing(self.str_input, 30, 10)
 
         # Right click -> select mode
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -2789,6 +2789,7 @@ class CompView(ConfigTextMixin, PageWidget):
             )
         self.specific_widget = widget_class(self.bridge)
         self.specific_content.addWidget(self.specific_widget)
+        self.specific_widget.setup_edit_widget()
 
         if not self.comparison_setup_done:
             # Fill the generic combobox options
@@ -3105,7 +3106,7 @@ def setup_multi_mode_edit_comparison_widget(
             node = curr_parent.tree_item
             break
         except AttributeError:
-            curr_parent = curr_parent.parent
+            curr_parent = curr_parent.parent()
     if node is None:
         raise RuntimeError(
             "Could not find link to file tree nodes."
@@ -3113,13 +3114,11 @@ def setup_multi_mode_edit_comparison_widget(
     # Travel up the node tree to find the id and devices
     ids = None
     devices = None
-    while not isinstance(node.widget, Overview):
-        if isinstance(node.widget, IdAndCompWidget):
-            ids = node.widget.bridge.ids.get()
-        elif isinstance(node.widget, Group):
-            if isinstance(node.widget.bridge.data, DeviceConfiguration):
-                devices = node.widget.bridge.devices.get()
-            break
+    id_and_comp = node.find_ancestor_by_widget(IdAndCompWidget)
+    group = node.find_ancestor_by_widget(Group)
+    ids = id_and_comp.widget.bridge.ids
+    if isinstance(group.widget.bridge.data, DeviceConfiguration):
+        devices = group.widget.bridge.devices
 
     page.value_widget = MultiModeValueEdit(
         bridge=page.bridge,
@@ -3165,6 +3164,8 @@ class BasicSymbolMixin:
           and be linked to the dataclass's value.
         """
         self.comp_symbol_label.setText(self.symbol)
+
+    def setup_edit_widget(self):
         setup_multi_mode_edit_comparison_widget(
             page=self,
             target_layout=self.value_layout,
