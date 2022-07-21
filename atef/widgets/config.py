@@ -2948,18 +2948,19 @@ def cast_dataclass(data: Any, new_type: Type) -> Any:
     data : Any dataclass instance
         The dataclass instance that we'd like to convert.
     new_type : Any dataclass
-        The dataclass type that we'd like to convert.
+        The dataclass type that we'd like to convert to.
 
     Returns
     -------
     casted_data : instance of new_type
         The new dataclass instance.
     """
+    old_fields = dataclasses.fields(data)
     new_fields = dataclasses.fields(new_type)
-    field_names = set(field.name for field in new_fields)
+    new_field_names = set(field.name for field in new_fields)
     new_kwargs = {
-        key: value for key, value in dataclasses.asdict(data).items()
-        if key in field_names
+        field.name: getattr(data, field.name) for field in old_fields
+        if field.name in new_field_names
     }
     return new_type(**new_kwargs)
 

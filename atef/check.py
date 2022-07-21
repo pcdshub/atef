@@ -125,8 +125,8 @@ class DynamicValue:
     _last_value: Optional[PrimitiveType] = None
 
     def __str__(self) -> str:
-        kwds = (f"{key}={value}" for key, value in asdict(self))
-        return f"{type(self)}({', '.join(kwds)}) [{self._last_value}]"
+        kwds = (f"{key}={value}" for key, value in asdict(self).items())
+        return f"{type(self).__name__}({', '.join(kwds)}) [{self._last_value}]"
 
     def get(self) -> PrimitiveType:
         """
