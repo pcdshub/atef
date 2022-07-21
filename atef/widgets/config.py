@@ -8,7 +8,7 @@ import json
 import logging
 import os.path
 import time
-from enum import Enum
+from enum import IntEnum
 from functools import partial
 from itertools import zip_longest
 from pprint import pprint
@@ -2189,7 +2189,7 @@ def set_widget_font_size(widget: QWidget, size: int):
     widget.setFont(font)
 
 
-class EditMode(Enum):
+class EditMode(IntEnum):
     BOOL = 0
     ENUM = 1
     FLOAT = 2
@@ -2632,10 +2632,6 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         elif mode == EditMode.STR:
             self.str_input.setText(str(self.value.get()))
             self.str_input.show()
-        else:
-            raise ValueError(
-                f"Unexpected edit mode {mode}"
-            )
         self.mode_changed.emit(mode)
 
 
@@ -3245,6 +3241,9 @@ class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
         self.bridge.value.changed_value.connect(self.update_range_label)
         self.bridge.atol.changed_value.connect(self.update_range_label)
         self.bridge.rtol.changed_value.connect(self.update_range_label)
+
+    def setup_edit_widget(self):
+        super().setup_edit_widget()
         self.value_widget.refreshed.connect(self.update_range_label)
         self.value_widget.mode_changed.connect(self.on_mode_change)
         self.on_mode_change(
