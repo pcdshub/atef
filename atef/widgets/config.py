@@ -2193,7 +2193,7 @@ class EditMode(Enum):
     HAPPI = 6
 
 
-class MultiModeValueEdit(DesignerDisplay):
+class MultiModeValueEdit(DesignerDisplay, QWidget):
     """
     Widget to edit a single value/dynamic value pair.
 
@@ -2262,6 +2262,7 @@ class MultiModeValueEdit(DesignerDisplay):
         dynamic_name: str = 'value_dynamic',
         ids: Optional[QDataclassValue] = None,
         devices: Optional[QDataclassValue] = None,
+        **kwargs,
     ):
         self.bridge = bridge
         self.value = getattr(bridge, value_name)
@@ -2271,13 +2272,83 @@ class MultiModeValueEdit(DesignerDisplay):
         self.devices = devices
         self.setup_widgets()
         self.set_mode(self.get_mode_from_data())
+        super().__init__(**kwargs)
 
     def setup_widgets(self):
         """
         Connect widgets to edit data classes as appropriate.
         """
-        # TODO
-        ...
+        self.bool_input.activated.connect(self.update_from_bool)
+        self.enum_input.activated.connect(self.update_from_enum)
+        self.epics_input.textEdited.connect(self.update_from_epics)
+        self.epics_refresh.clicked.connect(self.update_epics_preview)
+        self.setup_refresh_icon(self.epics_refresh)
+        # self.happi_select_device.clicked.connect(self.select_happi_device)
+        # self.happi_select_component.clicked.connect(self.select_happi_cpt)
+        self.happi_refresh.clicked.connect(self.update_happi_preview)
+        self.setup_refresh_icon(self.happi_refresh)
+        self.float_input.textEdited.connect(self.update_from_float)
+        self.int_input.valueChanged.connect(self.update_normal)
+        self.str_input.textEdited.connect(self.update_normal)
+
+    def setup_refresh_icon(self, button: QToolButton):
+        """
+        Assign the refresh icon to a QToolButton.
+        """
+        icon = self.style().standardIcon(QStyle.SP_BrowserReload)
+        button.setIcon(icon)
+
+    def update_from_bool(self, index: int) -> None:
+        """
+        When the bool widget is updated by the user, save a boolean.
+        """
+        self.value.put(bool(index))
+
+    def update_from_enum(self, index: int) -> None:
+        """
+        When the enum widget is updated by the user, save a string.
+        """
+        text = self.enum_input.itemText(index)
+        self.value.put(text)
+
+    def update_from_float(self, text: str) -> None:
+        """
+        When the float widget is updated by the user, save a float.
+        """
+        try:
+            value = float(text)
+        except ValueError:
+            pass
+        else:
+            self.value.put(value)
+
+    def update_normal(self, value: Any) -> None:
+        """
+        Catch-all for updates that are already correct.
+
+        These are cases where no preprocessing of value is needed.
+        """
+        self.value.put(value)
+
+    def update_from_epics(self, text: str) -> None:
+        """
+        When the EPICS widget is updated by the user, save the PV name.
+        """
+        self.dynamic_bridge.pvname.put(text)
+
+    def update_epics_preview(self) -> None:
+        """
+        When the user asks for a new value, get a value from EPICS.
+        """
+        value = self.dynamic_value.get().get()
+        self.epics_value_preview.setText(str(value))
+
+    def update_happi_preview(self) -> None:
+        """
+        When the user asks for a new value, query happi and make a device.
+        """
+        value = self.dynamic_value.get().get()
+        self.happi_value_preview.setText(str(value))
 
     def get_mode_from_data(self) -> EditMode:
         """
@@ -2376,24 +2447,55 @@ class MultiModeValueEdit(DesignerDisplay):
         self.int_input.hide()
         self.str_input.hide()
         if mode == EditMode.EPICS:
-            # TODO Create and assign EPICS data class if needed
+            if not isinstance(self.dynamic_value.get(), EpicsValue):
+                self.dynamic_value.put(EpicsValue(pvname=""))
+            self.dynamic_bridge = QDataclassBridge(self.dynamic_value.get())
+            self.epics_input.setText(self.dynamic_bridge.pvname.get())
             self.epics_widget.show()
         elif mode == EditMode.HAPPI:
-            # TODO Create and assign the happi data class if needed
+            if not isinstance(self.dynamic_value.get(), HappiValue):
+                self.dynamic_value.put(
+                    HappiValue(device_name="", signal_attr="")
+                )
+            self.dynamic_bridge = QDataclassBridge(self.dynamic_value.get())
+            self.happi_select_device.setText(
+                self.dynamic_bridge.device_name.get()
+            )
+            self.happi_select_component.setText(
+                self.dynamic_bridge.signal_attr.get()
+            )
             self.happi_widget.show()
         else:
-            # TODO Delete the dynamic data class if needed
-            pass
+            self.dynamic_value.put(None)
+            self.dynamic_bridge = None
         if mode == EditMode.BOOL:
+            self.bool_input.setCurrentIndex(int(bool(self.value.get())))
             self.bool_input.show()
         elif mode == EditMode.ENUM:
-            # TODO fill the enum combo box options
+            self.enum_input.clear()
+            enum_strs = self.get_enum_strs()
+            for text in enum_strs:
+                self.enum_input.addItem(text)
+            value = str(self.value.get())
+            if value in enum_strs:
+                self.enum_input.setCurrentText(value)
             self.enum_input.show()
         elif mode == EditMode.FLOAT:
+            try:
+                value = float(self.value.get())
+            except (ValueError, TypeError):
+                value = 0.0
+            self.float_input.setText(str(value))
             self.float_input.show()
         elif mode == EditMode.INT:
+            try:
+                value = int(self.value.get())
+            except (ValueError, TypeError):
+                value = 0
+            self.int_input.setValue(value)
             self.int_input.show()
         elif mode == EditMode.STR:
+            self.str_input.setText(str(self.value.get()))
             self.str_input.show()
 
 
