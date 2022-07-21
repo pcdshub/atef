@@ -38,7 +38,7 @@ from ..config import (Configuration, ConfigurationFile, DeviceConfiguration,
 from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod
-from ..type_hints import PrimitiveType
+from ..type_hints import Number, PrimitiveType
 from .core import DesignerDisplay
 from .happi import HappiDeviceComponentWidget
 from .ophyd import OphydAttributeData, OphydAttributeDataSummary
@@ -2248,12 +2248,15 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     str_input: QLineEdit
 
     bridge: QDataclassBridge
+    value_name: str
     value: QDataclassValue
+    dynamic_name: str
     dynamic_value: QDataclassValue
     dynamic_bridge: Optional[QDataclassBridge]
     ids: Optional[QDataclassValue]
     devices: Optional[QDataclassValue]
     happi_select_widget: Optional[HappiDeviceComponentWidget]
+    include_boolean: bool
 
     def __init__(
         self,
@@ -2265,7 +2268,9 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         **kwargs,
     ):
         self.bridge = bridge
+        self.value_name = value_name
         self.value = getattr(bridge, value_name)
+        self.dynamic_name = dynamic_name
         self.dynamic_value = getattr(bridge, dynamic_name)
         self.dynamic_bridge = None
         self.ids = ids
@@ -2279,6 +2284,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         """
         Connect widgets to edit data classes as appropriate.
         """
+        # Data connections and style
         self.bool_input.activated.connect(self.update_from_bool)
         self.enum_input.activated.connect(self.update_from_enum)
         self.epics_input.textEdited.connect(self.update_from_epics)
@@ -2294,8 +2300,22 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.str_input.textEdited.connect(self.update_normal)
         setup_line_edit_sizing(self.str_input)
 
+        # Right click -> select mode
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
+
+        # Hide boolean if the value can't be a bool, e.g. "Number" annotation.
+        self.include_boolean = True
+        for field in dataclasses.fields(self.bridge.data):
+            if field.name == self.value_name:
+                if field.type in (
+                    Number,
+                    "Number",
+                    Optional[Number],
+                    "Optional[Number]",
+                ):
+                    self.include_boolean = False
+                break
 
     def _show_context_menu(self, pos: QPoint):
         """
@@ -2307,8 +2327,9 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             Position to display the menu at.
         """
         menu = QMenu(self)
-        use_bool = menu.addAction("&Bool")
-        use_bool.triggered.connect(partial(self.set_mode, EditMode.BOOL))
+        if self.include_boolean:
+            use_bool = menu.addAction("&Bool")
+            use_bool.triggered.connect(partial(self.set_mode, EditMode.BOOL))
         use_enum = menu.addAction("&Enum")
         use_enum.triggered.connect(partial(self.set_mode, EditMode.ENUM))
         use_float = menu.addAction("&Float")
@@ -2317,9 +2338,9 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         use_int.triggered.connect(partial(self.set_mode, EditMode.INT))
         use_str = menu.addAction("&String")
         use_str.triggered.connect(partial(self.set_mode, EditMode.STR))
-        use_epics = menu.addAction("EPICS")
+        use_epics = menu.addAction("EPI&CS")
         use_epics.triggered.connect(partial(self.set_mode, EditMode.EPICS))
-        use_happi = menu.addAction("Happi")
+        use_happi = menu.addAction("&Happi")
         use_happi.triggered.connect(partial(self.set_mode, EditMode.HAPPI))
         menu.exec(self.mapToGlobal(pos))
 
