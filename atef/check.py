@@ -122,11 +122,11 @@ class DynamicValue:
     the value is not guaranteed to be successful. If unsuccessful,
     This will raise a DynamicValueError from the original exception.
     """
-    _last_value: Optional[PrimitiveType] = None
+    last_value: Optional[PrimitiveType] = None
 
     def __str__(self) -> str:
         kwds = (f"{key}={value}" for key, value in asdict(self).items())
-        return f"{type(self).__name__}({', '.join(kwds)}) [{self._last_value}]"
+        return f"{type(self).__name__}({', '.join(kwds)}) [{self.last_value}]"
 
     def get(self) -> PrimitiveType:
         """
@@ -135,13 +135,13 @@ class DynamicValue:
         This also sets up a cached last value to use in the repr.
         """
         try:
-            self._last_value = self._get()
+            self.last_value = self._get()
         except Exception as exc:
             raise DynamicValueError(
                 'Error loading dynamic value'
             ) from exc
         else:
-            return self._last_value
+            return self.last_value
 
     def _get(self) -> PrimitiveType:
         """

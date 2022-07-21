@@ -3238,6 +3238,7 @@ class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
         self.bridge.value.changed_value.connect(self.update_range_label)
         self.bridge.atol.changed_value.connect(self.update_range_label)
         self.bridge.rtol.changed_value.connect(self.update_range_label)
+        # TODO new signal to know when we have a new preview value
 
     def update_range_label(self, *args, **kwargs) -> None:
         """
@@ -3250,7 +3251,11 @@ class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
         If our value is a bool, this will summarize whether our
         value is being interpretted as True or False.
         """
-        value = self.bridge.value.get()
+        dynamic = self.bridge.value_dynamic.get()
+        if dynamic is None:
+            value = self.bridge.value.get()
+        else:
+            value = self.bridge.value_dynamic.get().last_value
         if not isinstance(value, (int, float, bool)):
             return
         if isinstance(value, bool):
