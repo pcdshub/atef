@@ -2265,6 +2265,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     devices: Optional[QDataclassValue]
     happi_select_widget: Optional[HappiDeviceComponentWidget]
     include_boolean: bool
+    _last_device_name: str
 
     def __init__(
         self,
@@ -2287,6 +2288,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.devices = devices
         self.font_pt_size = font_pt_size
         self.happi_select_widget = None
+        self._last_device_name = ""
         self.setup_widgets()
         self.set_mode(self.get_mode_from_data())
 
@@ -2421,7 +2423,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             widget = HappiDeviceComponentWidget(
                 client=util.get_happi_client()
             )
-            widget.item_search_widget.happi_items_chosen.connect(
+            widget.item_search_widget.happi_items_selected.connect(
                 self.new_happi_devices
             )
             widget.device_widget.attributes_selected.connect(
@@ -2442,24 +2444,27 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
 
     def new_happi_devices(self, device_names: List[str]) -> None:
         """
-        Set the new happi name on the dataclass and on the display.
+        Cache the name of the last device that was selected.
 
         The selection widget gives us a list, but we can only accept
         one item, so the first element is selected.
         """
         if device_names:
-            self.dynamic_bridge.device_name.put(device_names[0])
-            self.update_happi_text()
+            self._last_device_name = device_names[0]
 
-    def new_happi_attrs(self, attr_names: List[str]) -> None:
+    def new_happi_attrs(self, attr_names: List[OphydAttributeData]) -> None:
         """
-        Set the new happi attr on the dataclass and on the display.
+        Set the new happi device/attr on the dataclass and on the display.
+
+        This takes the selection we just chose in the UI and also the
+        cached device name.
 
         The selection widget gives us a list, but we can only accept
         one item, so the first element is selected.
         """
         if attr_names:
-            self.dynamic_bridge.signal_attr.put(attr_names[0])
+            self.dynamic_bridge.device_name.put(self._last_device_name)
+            self.dynamic_bridge.signal_attr.put(attr_names[0].attr)
             self.update_happi_text()
 
     def update_happi_text(self) -> None:
