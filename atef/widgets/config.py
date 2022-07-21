@@ -2230,6 +2230,8 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         names if this is part of a device config. This is needed
         to establish enum options. If omitted, we'll treat
         ids as a list of PVs.
+    font_pt_size : int, optional
+        The size of the font to use for the widget.
     """
     filename = 'config_value_edit.ui'
 
@@ -2265,6 +2267,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         dynamic_name: str = 'value_dynamic',
         ids: Optional[QDataclassValue] = None,
         devices: Optional[QDataclassValue] = None,
+        font_pt_size: int = 8,
         **kwargs,
     ):
         self.bridge = bridge
@@ -2275,6 +2278,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.dynamic_bridge = None
         self.ids = ids
         self.devices = devices
+        self.font_pt_size = font_pt_size
         self.happi_select_widget = None
         self.setup_widgets()
         self.set_mode(self.get_mode_from_data())
@@ -2286,18 +2290,25 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         """
         # Data connections and style
         self.bool_input.activated.connect(self.update_from_bool)
+        self.bool_input.font().setPointSize(self.font_pt_size)
         self.enum_input.activated.connect(self.update_from_enum)
+        self.enum_input.font().setPointSize(self.font_pt_size)
         self.epics_input.textEdited.connect(self.update_from_epics)
+        self.epics_input.font().setPointSize(self.font_pt_size)
         setup_line_edit_sizing(self.epics_input)
         self.epics_refresh.clicked.connect(self.update_epics_preview)
         self.setup_refresh_icon(self.epics_refresh)
         self.happi_select_component.clicked.connect(self.select_happi_cpt)
+        self.happi_select_component.font().setPointSize(self.font_pt_size)
         self.happi_refresh.clicked.connect(self.update_happi_preview)
         self.setup_refresh_icon(self.happi_refresh)
         self.float_input.textEdited.connect(self.update_from_float)
+        self.float_input.font().setPointSize(self.font_pt_size)
         setup_line_edit_sizing(self.float_input)
         self.int_input.valueChanged.connect(self.update_normal)
+        self.int_input.font().setPointSize(self.font_pt_size)
         self.str_input.textEdited.connect(self.update_normal)
+        self.str_input.font().setPointSize(self.font_pt_size)
         setup_line_edit_sizing(self.str_input)
 
         # Right click -> select mode
@@ -2456,7 +2467,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         happi_value = self.dynamic_value.get()
         if happi_value is not None:
             if not happi_value.device_name or not happi_value.signal_attr:
-                text = "Click to select"
+                text = "click to select"
             else:
                 text = f"{happi_value.device_name}.{happi_value.signal_attr}"
             self.happi_select_component.setText(text)
