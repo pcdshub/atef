@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>238</width>
-    <height>113</height>
+    <height>80</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -59,16 +59,11 @@
       </widget>
      </item>
      <item>
-      <widget class="QLineEdit" name="value_edit">
-       <property name="font">
-        <font>
-         <pointsize>16</pointsize>
-        </font>
+      <layout class="QVBoxLayout" name="value_layout">
+       <property name="spacing">
+        <number>0</number>
        </property>
-       <property name="placeholderText">
-        <string>0</string>
-       </property>
-      </widget>
+      </layout>
      </item>
      <item>
       <widget class="QLabel" name="range_label">
@@ -106,24 +101,17 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="rtol_label">
-       <property name="text">
-        <string>Relative Tolerance:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="data_type_label">
-       <property name="text">
-        <string>Data Type:</string>
-       </property>
-      </widget>
-     </item>
      <item row="0" column="1">
       <widget class="QLineEdit" name="atol_edit">
        <property name="placeholderText">
         <string>0</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="rtol_label">
+       <property name="text">
+        <string>Relative Tolerance:</string>
        </property>
       </widget>
      </item>
@@ -133,9 +121,6 @@
         <string>0</string>
        </property>
       </widget>
-     </item>
-     <item row="2" column="1">
-      <widget class="QComboBox" name="data_type_combo"/>
      </item>
     </layout>
    </item>

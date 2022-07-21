@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>186</width>
-    <height>201</height>
+    <width>182</width>
+    <height>190</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -52,7 +52,7 @@
       <item>
        <widget class="QLabel" name="epics_indicator">
         <property name="text">
-         <string>EPICS PV:</string>
+         <string>EPICS:</string>
         </property>
        </widget>
       </item>

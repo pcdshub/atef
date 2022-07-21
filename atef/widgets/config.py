@@ -38,7 +38,7 @@ from ..config import (Configuration, ConfigurationFile, DeviceConfiguration,
 from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod
-from ..type_hints import Number, PrimitiveType
+from ..type_hints import Number
 from .core import DesignerDisplay
 from .happi import HappiDeviceComponentWidget
 from .ophyd import OphydAttributeData, OphydAttributeDataSummary
@@ -3091,6 +3091,47 @@ def setup_line_edit_all(
     )
 
 
+def setup_multi_mode_edit_comparison_widget(
+    page: PageWidget,
+    target_layout: QLayout,
+    value_name: str = "value",
+    dynamic_name: str = "value_dynamic",
+):
+    # Find the current node
+    curr_parent = page
+    node = None
+    while curr_parent is not None:
+        try:
+            node = curr_parent.tree_item
+            break
+        except AttributeError:
+            curr_parent = curr_parent.parent
+    if node is None:
+        raise RuntimeError(
+            "Could not find link to file tree nodes."
+        )
+    # Travel up the node tree to find the id and devices
+    ids = None
+    devices = None
+    while not isinstance(node.widget, Overview):
+        if isinstance(node.widget, IdAndCompWidget):
+            ids = node.widget.bridge.ids.get()
+        elif isinstance(node.widget, Group):
+            if isinstance(node.widget.bridge.data, DeviceConfiguration):
+                devices = node.widget.bridge.devices.get()
+            break
+
+    page.value_widget = MultiModeValueEdit(
+        bridge=page.bridge,
+        value_name=value_name,
+        dynamic_name=dynamic_name,
+        ids=ids,
+        devices=devices,
+        font_pt_size=16,
+    )
+    target_layout.addWidget(page.value_widget)
+
+
 class BasicSymbolMixin:
     """
     Mix-in class for very basic comparisons.
@@ -3107,7 +3148,8 @@ class BasicSymbolMixin:
         the dataclass.
     """
     symbol: str
-    value_edit: QLineEdit
+    value_widget: MultiModeValueEdit
+    value_layout: QVBoxLayout
     comp_symbol_label: QLabel
 
     def __init__(self, *args, **kwargs):
@@ -3123,13 +3165,9 @@ class BasicSymbolMixin:
           and be linked to the dataclass's value.
         """
         self.comp_symbol_label.setText(self.symbol)
-        setup_line_edit_all(
-            line_edit=self.value_edit,
-            value_obj=self.bridge.value,
-            from_str=float,
-            to_str=str,
-            minimum=30,
-            buffer=15,
+        setup_multi_mode_edit_comparison_widget(
+            page=self,
+            target_layout=self.value_layout,
         )
 
 
@@ -3149,27 +3187,12 @@ class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
     filename = 'comp_equals.ui'
     data_type = Equals
     symbol = '='
-    label_to_type: Dict[str, type] = {
-        'float': float,
-        'integer': int,
-        'bool': bool,
-        'string': str,
-    }
-    type_to_label: Dict[type, str] = {
-        value: key for key, value in label_to_type.items()
-    }
-    cast_from_user_str: Dict[type, Callable[[str], bool]] = {
-        tp: tp for tp in type_to_label
-    }
-    cast_from_user_str[bool] = user_string_to_bool
 
     range_label: QLabel
     atol_label: QLabel
     atol_edit: QLineEdit
     rtol_label: QLabel
     rtol_edit: QLineEdit
-    data_type_label: QLabel
-    data_type_combo: QComboBox
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -3189,8 +3212,6 @@ class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
           data fields
         - Set up the range_label for a summary of the allowed range
         """
-        for option in self.label_to_type:
-            self.data_type_combo.addItem(option)
         setup_line_edit_data(
             line_edit=self.atol_edit,
             value_obj=self.bridge.atol,
@@ -3204,11 +3225,7 @@ class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
             to_str=str,
         )
         starting_value = self.bridge.value.get()
-        self.data_type_combo.setCurrentText(
-            self.type_to_label[type(starting_value)]
-        )
         self.update_range_label(starting_value)
-        self.data_type_combo.currentTextChanged.connect(self.new_gui_type)
         self.bridge.value.changed_value.connect(self.update_range_label)
         self.bridge.atol.changed_value.connect(self.update_range_label)
         self.bridge.rtol.changed_value.connect(self.update_range_label)
@@ -3236,67 +3253,6 @@ class EqualsWidget(CompMixin, BasicSymbolMixin, PageWidget):
             diff = atol + abs(rtol * value)
             text = f'± {diff:.3g}'
         self.range_label.setText(text)
-
-    def value_from_str(
-        self,
-        value: Optional[str] = None,
-        gui_type_str: Optional[str] = None,
-    ) -> PrimitiveType:
-        """
-        Convert our line edit value into a string based on the combobox.
-
-        Parameters
-        ----------
-        value : str, optional
-            The text contents of our line edit.
-        gui_type_str : str, optional
-            The text contents of our combobox.
-
-        Returns
-        -------
-        converted : Any
-            The casted datatype.
-        """
-        if value is None:
-            value = self.value_edit.text()
-        if gui_type_str is None:
-            gui_type_str = self.data_type_combo.currentText()
-        type_cast = self.cast_from_user_str[self.label_to_type[gui_type_str]]
-        return type_cast(value)
-
-    def new_gui_type(self, gui_type_str: str) -> None:
-        """
-        Slot for when the user changes the GUI data type.
-
-        Re-interprets our value as the selected type. This will
-        update the current value in the bridge as appropriate.
-
-        If we have a numeric type, we'll enable the range and
-        tolerance widgets. Otherwise, we'll disable them.
-
-        Parameters
-        ----------
-        gui_type_str : str
-            The user's text input from the data type combobox.
-        """
-        gui_type = self.label_to_type[gui_type_str]
-        # Try the gui value first
-        try:
-            new_value = self.value_from_str(gui_type_str=gui_type_str)
-        except ValueError:
-            # Try the bridge value second, or give up
-            try:
-                new_value = gui_type(self.bridge.value.get())
-            except ValueError:
-                new_value = None
-        if new_value is not None:
-            self.bridge.value.put(new_value)
-        self.range_label.setVisible(gui_type in (int, float, bool))
-        tol_vis = gui_type in (int, float)
-        self.atol_label.setVisible(tol_vis)
-        self.atol_edit.setVisible(tol_vis)
-        self.rtol_label.setVisible(tol_vis)
-        self.rtol_edit.setVisible(tol_vis)
 
 
 class NotEqualsWidget(EqualsWidget):
