@@ -47,6 +47,7 @@ configs:
           name: Equality check 2
           value: 1
       ids:
+      - simple:A
       - simple:C
       name: pv_checks2
     tags:

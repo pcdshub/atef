@@ -1,25 +1,21 @@
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 import re
 import shutil
 import sys
 import typing
-from dataclasses import field
-from typing import (Any, ClassVar, Dict, List, Mapping, Optional, Sequence,
-                    TypeVar, Union)
+from dataclasses import dataclass, field
+from typing import Any, ClassVar, Dict, List, Mapping, Sequence, TypeVar, Union
 
 from . import serialization
 from .check import Result, Severity
 from .exceptions import ToolDependencyMissingException
 
-#: Arguments that can be passed to tools.
-ToolArguments = Dict[str, Any]
 T = TypeVar("T", bound="Tool")
 
 
-@dataclasses.dataclass
+@dataclass
 class ToolResult:
     """
     The base result dictionary of any tool.
@@ -27,7 +23,7 @@ class ToolResult:
     result: Result
 
 
-@dataclasses.dataclass
+@dataclass
 class PingResult(ToolResult):
     """
     The result dictionary of the 'ping' tool.
@@ -194,13 +190,12 @@ def get_result_value_by_key(result: ToolResult, key: str) -> Any:
     return item
 
 
-@dataclasses.dataclass
+@dataclass
 @serialization.as_tagged_union
 class Tool:
     """
     Base class for atef tool checks.
     """
-    result: Optional[ToolResult] = None
 
     def check_result_key(self, key: str) -> None:
         """
@@ -245,7 +240,7 @@ class Tool:
         raise NotImplementedError("To be implemented by subclass")
 
 
-@dataclasses.dataclass
+@dataclass
 class Ping(Tool):
     """
     Tool for pinging one or more hosts and summarizing the results.
@@ -310,8 +305,7 @@ class Ping(Tool):
         -------
         PingResult
         """
-        self.result = PingResult(result=Result())
-        result = self.result
+        result = PingResult(result=Result())
 
         if not self.hosts:
             return result

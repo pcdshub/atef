@@ -3,7 +3,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Generator, List, Optional, Sequence
+from typing import Any, Generator, Iterable, List, Optional, Sequence
 
 import numpy as np
 import ophyd
@@ -104,11 +104,12 @@ class Value:
     def compare(self, value: PrimitiveType) -> bool:
         """Compare the provided value with this one, using tolerance settings."""
         if self.rtol is not None or self.atol is not None:
-            return np.isclose(
+            close = np.isclose(
                 value, self.value,
                 rtol=(self.rtol or 0.0),
                 atol=(self.atol or 0.0)
             )
+            return close
         return value == self.value
 
 
@@ -257,6 +258,11 @@ class Comparison:
 
         if self.invert:
             passed = not passed
+
+        # Some comparisons may be done with array values; require that
+        # all match for a success here:
+        if isinstance(passed, Iterable):
+            passed = all(passed)
 
         if passed:
             return success

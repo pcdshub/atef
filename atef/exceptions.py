@@ -52,8 +52,8 @@ class PreparedComparisonException(Exception):
     exception: Exception
     #: The identifier used for the comparison.
     identifier: str
-    #: The comparison itself.
-    comparison: Comparison
+    #: The comparison related to the exception, if applicable.
+    comparison: Optional[Comparison]
     #: The hierarhical path that led to this prepared comparison.
     path: List[PathItem]
     #: The name of the associated configuration.
@@ -63,7 +63,7 @@ class PreparedComparisonException(Exception):
         self,
         exception: Exception,
         identifier: str,
-        comparison: Comparison,
+        comparison: Optional[Comparison] = None,
         name: Optional[str] = None,
         path: Optional[List[PathItem]] = None,
     ):

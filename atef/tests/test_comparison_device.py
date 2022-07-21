@@ -279,6 +279,15 @@ def mock_signal_cache() -> cache._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
     return mock_cache
 
 
+@pytest.fixture
+def data_cache(
+    mock_signal_cache: cache._SignalCache[ophyd.sim.FakeEpicsSignalRO],
+) -> cache.DataCache:
+    return cache.DataCache(
+        signals=mock_signal_cache,
+    )
+
+
 @pytest.mark.parametrize(
     "checklist, expected_severity",
     [
@@ -310,11 +319,11 @@ def mock_signal_cache() -> cache._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
 )
 @pytest.mark.asyncio
 async def test_pv_config(
-    mock_signal_cache: cache._SignalCache[ophyd.sim.FakeEpicsSignalRO],
+    data_cache: cache.DataCache,
     checklist: List[IdentifierAndComparison],
     expected_severity: check.Severity
 ):
-    overall, _ = await check_pvs(checklist, cache=mock_signal_cache)
+    overall, _ = await check_pvs(checklist, cache=data_cache)
     assert overall == expected_severity
 
 

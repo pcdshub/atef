@@ -6,7 +6,7 @@ import pytest
 import atef.bin.main as atef_main
 from atef.bin import check as bin_check
 
-from .. import config, util
+from .. import util
 from .conftest import CONFIG_PATH
 from .test_comparison_device import at2l0, mock_signal_cache  # noqa: F401
 
@@ -24,9 +24,10 @@ def test_help_module(monkeypatch, subcommand):
 
 
 @pytest.mark.asyncio
-async def test_check_pv_smoke(monkeypatch, mock_signal_cache):  # noqa: F811
-    monkeypatch.setattr(config, "get_signal_cache", lambda: mock_signal_cache)
-    await bin_check.main(filename=str(CONFIG_PATH / "pv_based.yml"))
+async def test_check_pv_smoke(mock_signal_cache):  # noqa: F811
+    await bin_check.main(
+        filename=str(CONFIG_PATH / "pv_based.yml"), signal_cache=mock_signal_cache
+    )
 
 
 @pytest.mark.asyncio

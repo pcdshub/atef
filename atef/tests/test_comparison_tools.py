@@ -1,10 +1,12 @@
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, ClassVar, Optional
 
 import apischema
 import pytest
 
 from .. import check, config, tools
-from ..check import Severity
+from ..cache import DataCache
+from ..check import Result, Severity
 from ..config import IdentifierAndComparison, ToolConfiguration
 
 config_and_severity = pytest.mark.parametrize(
@@ -79,6 +81,38 @@ def test_result_keys(
         print("Failed check, as expected:\n", ex)
     else:
         tool.check_result_key(key)
+
+
+@dataclass
+class CustomToolResult(tools.ToolResult):
+    run_count: int
+
+
+@dataclass
+class CustomTool(tools.Tool):
+    result: ClassVar[Optional[CustomToolResult]] = None
+
+    async def run(self) -> CustomToolResult:
+        print("Running custom tool...")
+        if CustomTool.result is None:
+            CustomTool.result = CustomToolResult(result=Result(), run_count=0)
+
+        CustomTool.result.run_count += 1
+        return CustomTool.result
+
+
+@pytest.mark.asyncio
+async def test_tool_cache():
+    cache = DataCache()
+    tool = CustomTool()
+    first_data = await cache.get_tool_data(tool)
+    assert isinstance(first_data, CustomToolResult)
+    assert first_data.run_count == 1
+
+    second_data = await cache.get_tool_data(tool)
+    assert first_data is second_data
+    assert isinstance(second_data, CustomToolResult)
+    assert second_data.run_count == 1
 
 
 class _TestItem:

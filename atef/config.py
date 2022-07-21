@@ -1,18 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import (Any, Generator, List, Mapping, Optional, Sequence, Tuple,
-                    Union)
+from typing import Any, Generator, List, Optional, Sequence, Tuple, Union
 
 import apischema
 import happi
 import ophyd
 import yaml
+from ophyd.signal import ConnectionTimeoutError
 
 from . import serialization, tools, util
-from .cache import get_signal_cache
+from .cache import DataCache
 from .check import Comparison, Result
 from .enums import Severity
 from .exceptions import PreparedComparisonException
@@ -171,6 +172,8 @@ class PreparedComparison:
     """
     A unified representation of comparisons for device signals and standalone PVs.
     """
+    #: The data cache to use for the preparation step.
+    cache: DataCache
     #: The identifier used for the comparison.
     identifier: str = ""
     #: The comparison itself.
@@ -182,32 +185,41 @@ class PreparedComparison:
     #: The last result of the comparison, if run.
     result: Optional[Result] = None
 
+    async def compare(self) -> Result:
+        """
+        Run the comparison.
+
+        To be immplemented in subclass.
+        """
+        raise NotImplementedError()
+
     @classmethod
     def from_config(
         cls,
         config: AnyConfiguration,
         *,
         client: Optional[happi.Client] = None,
-        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+        cache: Optional[DataCache] = None,
     ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
         """
         Create one or more PreparedComparison instances from a PVConfiguration
         or a DeviceConfiguration.
 
-        If available, provide an instantiated happi Client and PV-to-Signal
+        If available, provide an instantiated happi Client and a data
         cache.  If unspecified, a configuration-derived happi Client will
-        be instantiated and a global PV-to-Signal cache will be utilized.
+        be instantiated and a global data cache will be utilized.
+
+        It is recommended - but not required - to manage a data cache on a
+        per-configuration basis.  Managing the global cache is up to the user.
 
         Parameters
         ----------
         config : PVConfiguration or DeviceConfiguration
             The configuration.
-
-        client : happi.Client
+        client : happi.Client, optional
             A happi Client instance.
-
-        cache : dict of str to type[Signal]
-            The PV to signal cache.
+        cache : DataCache, optional
+            The data cache to use for this and other similar comparisons.
 
         Yields
         ------
@@ -216,6 +228,9 @@ class PreparedComparison:
             PreparedComparisonException will be yielded in place of the
             PreparedComparison.
         """
+        if cache is None:
+            cache = DataCache()
+
         if isinstance(config, PVConfiguration):
             yield from PreparedSignalComparison._from_pv_config(config, cache=cache)
         elif isinstance(config, DeviceConfiguration):
@@ -239,6 +254,7 @@ class PreparedComparison:
                     yield from PreparedSignalComparison._from_device_config(
                         config=config,
                         device=device,
+                        cache=cache,
                     )
         elif isinstance(config, ToolConfiguration):
             yield from PreparedToolComparison._from_tool_config(config)
@@ -249,7 +265,18 @@ class PreparedComparison:
 @dataclass
 class PreparedSignalComparison(PreparedComparison):
     """
-    A unified representation of comparisons for device signals and standalone PVs.
+    A unified representation of comparisons for device signals and standalone
+    PVs.
+
+    Each PreparedSignalComparison has a single leaf in the configuration tree,
+    comprised of:
+    * A configuration
+    * The signal specification.  This is comprised of the configuration and
+        "IdentifierAndComparison"
+        - DeviceConfiguration: Device and attribute (the "identifier")
+        - PVConfiguration: PV name (the "identifier")
+    * A comparison to run
+        - Including data reduction settings
     """
     #: The device the comparison applies to, if applicable.
     device: Optional[ophyd.Device] = None
@@ -258,10 +285,12 @@ class PreparedSignalComparison(PreparedComparison):
     #: The value from the signal the comparison is to be run on.
     data: Optional[Any] = None
 
-    async def get_data(self) -> Any:
+    async def get_data_async(self) -> Any:
         """
-        Get the provided signal's data according to the comparison's reduction
-        configuration.
+        Get the provided signal's data from the cache according to the
+        reduction configuration.
+
+        Caller must prepare the cache prior to calling this method.
 
         Returns
         -------
@@ -273,10 +302,19 @@ class PreparedSignalComparison(PreparedComparison):
         TimeoutError
             If unable to connect or retrieve data from the signal.
         """
-        if self.signal is None:
+        signal = self.signal
+        if signal is None:
             raise ValueError("Signal instance unset")
-        self.data = await self.comparison.get_data_for_signal_async(self.signal)
-        return self.data
+
+        data = await self.cache.get_signal_data(
+            signal,
+            reduce_period=self.comparison.reduce_period,
+            reduce_method=self.comparison.reduce_method,
+            string=self.comparison.string or False,
+        )
+
+        self.data = data
+        return data
 
     async def compare(self) -> Result:
         """
@@ -287,32 +325,15 @@ class PreparedSignalComparison(PreparedComparison):
         Result
             The result of the comparison.  This is also set in ``self.result``.
         """
-        if self.signal is None:
-            return Result(
-                severity=Severity.internal_error,
-                reason="Signal not set"
-            )
-
         try:
-            self.signal.wait_for_connection()
-        except TimeoutError:
-            return Result(
+            self.data = await self.get_data_async()
+        except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
+            result = Result(
                 severity=self.comparison.if_disconnected,
-                reason=(
-                    f"Unable to connect to {self.identifier!r} ({self.name}) "
-                    f"for comparison {self.comparison}"
-                ),
-            )
-
-        try:
-            self.data = await self.get_data()
-        except TimeoutError:
-            return Result(
-                severity=self.comparison.if_disconnected,
-                reason=f"Signal disconnected when reading: {self.signal}"
+                reason=f"Signal not able to connect or read: {self.identifier}"
             )
         except Exception as ex:
-            return Result(
+            result = Result(
                 severity=Severity.internal_error,
                 reason=(
                     f"Getting data for signal {self.identifier!r} comparison "
@@ -320,7 +341,33 @@ class PreparedSignalComparison(PreparedComparison):
                 ),
             )
 
-        if self.data is None:
+        try:
+            result = self._compare()
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Failed to run {self.identifier!r} comparison "
+                    f"{self.comparison} raised {ex.__class__.__name__}: {ex} "
+                    f"with value {self.data}"
+                ),
+            )
+
+        self.result = result
+        return result
+
+    def _compare(self) -> Result:
+        """
+        Run the comparison with the already-acquired data in ``self.data``.
+        """
+        if self.signal is None:
+            return Result(
+                severity=Severity.internal_error,
+                reason="Signal not set"
+            )
+
+        data = self.data
+        if data is None:
             # 'None' is likely incompatible with our comparisons and should
             # be raised for separately
             return Result(
@@ -331,11 +378,10 @@ class PreparedSignalComparison(PreparedComparison):
                 ),
             )
 
-        self.result = self.comparison.compare(
-            self.data,
+        return self.comparison.compare(
+            data,
             identifier=self.identifier
         )
-        return self.result
 
     @classmethod
     def from_device(
@@ -345,10 +391,14 @@ class PreparedSignalComparison(PreparedComparison):
         comparison: Comparison,
         name: Optional[str] = None,
         path: Optional[List[PathItem]] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedSignalComparison:
         """Create a PreparedComparison from a device and comparison."""
         full_attr = f"{device.name}.{attr}"
         logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
+        if cache is None:
+            cache = DataCache()
+
         signal = getattr(device, attr, None)
         if signal is None:
             raise AttributeError(
@@ -363,6 +413,7 @@ class PreparedSignalComparison(PreparedComparison):
             comparison=comparison,
             signal=signal,
             path=path or [],
+            cache=cache,
         )
 
     @classmethod
@@ -372,27 +423,27 @@ class PreparedSignalComparison(PreparedComparison):
         comparison: Comparison,
         name: Optional[str] = None,
         path: Optional[List[PathItem]] = None,
-        *,
-        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedSignalComparison:
         """Create a PreparedComparison from a PV name and comparison."""
         if cache is None:
-            cache = get_signal_cache()
+            cache = DataCache()
 
         return cls(
             identifier=pvname,
             device=None,
-            signal=cache[pvname],
+            signal=cache.signals[pvname],
             comparison=comparison,
             name=name,
             path=path or [],
+            cache=cache,
         )
 
     @classmethod
     def _from_pv_config(
         cls,
         config: PVConfiguration,
-        cache: Optional[Mapping[str, ophyd.Signal]] = None,
+        cache: DataCache,
     ) -> Generator[
         Union[PreparedComparisonException, PreparedSignalComparison], None, None
     ]:
@@ -445,6 +496,7 @@ class PreparedSignalComparison(PreparedComparison):
         cls,
         device: ophyd.Device,
         config: DeviceConfiguration,
+        cache: DataCache,
     ) -> Generator[
         Union[PreparedComparisonException, PreparedSignalComparison], None, None
     ]:
@@ -482,6 +534,7 @@ class PreparedSignalComparison(PreparedComparison):
                             comparison=comparison,
                             name=config.name or config.description,
                             path=path,
+                            cache=cache,
                         )
                     except Exception as ex:
                         yield PreparedComparisonException(
@@ -497,6 +550,15 @@ class PreparedSignalComparison(PreparedComparison):
 class PreparedToolComparison(PreparedComparison):
     """
     A unified representation of comparisons for device signals and standalone PVs.
+
+    Each PreparedToolComparison has a single leaf in the configuration tree,
+    comprised of:
+    * A configuration
+    * The tool configuration (i.e., a :class:`tools.Tool` instance)
+    * Identifiers to compare are dependent on the tool type
+    * A comparison to run
+        - For example, a :class:`tools.Ping` has keys described in
+          :class:`tools.PingResult`.
     """
     #: The device the comparison applies to, if applicable.
     tool: tools.Tool = field(default_factory=lambda: tools.Ping(hosts=[]))
@@ -512,7 +574,7 @@ class PreparedToolComparison(PreparedComparison):
         """
         try:
             result = await self.tool.run()
-        except TimeoutError:
+        except (asyncio.TimeoutError, TimeoutError):
             return Result(
                 severity=self.comparison.if_disconnected,
                 reason=(
@@ -558,6 +620,7 @@ class PreparedToolComparison(PreparedComparison):
         comparison: Comparison,
         name: Optional[str] = None,
         path: Optional[List[PathItem]] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedToolComparison:
         """
         Prepare a tool-based comparison for execution.
@@ -575,11 +638,15 @@ class PreparedToolComparison(PreparedComparison):
             The name of the comparison.
         path : Optional[List[PathItem]], optional
             The path that led us to this single comparison.
+        cache : DataCache, optional
+            The data cache to use for this and other similar comparisons.
 
         Returns
         -------
         PreparedToolComparison
         """
+        if cache is None:
+            cache = DataCache()
         tool.check_result_key(result_key)
         return cls(
             tool=tool,
@@ -587,6 +654,7 @@ class PreparedToolComparison(PreparedComparison):
             name=name,
             identifier=result_key,
             path=path or [],
+            cache=cache,
         )
 
     @classmethod
@@ -691,8 +759,7 @@ async def check_device(
 
 async def check_pvs(
     checklist: Sequence[IdentifierAndComparison],
-    *,
-    cache: Optional[Mapping[str, ophyd.Signal]] = None,
+    cache: Optional[DataCache] = None,
 ) -> Tuple[Severity, List[Result]]:
     """
     Check a PVConfiguration.
@@ -702,6 +769,8 @@ async def check_pvs(
     checklist : sequence of IdentifierAndComparison
         Comparisons to run on the given device.  Multiple PVs may share the
         same checks.
+    cache : DataCache, optional
+        The data cache to use for this and other similar comparisons.
 
     Returns
     -------
@@ -713,7 +782,8 @@ async def check_pvs(
     """
     overall = Severity.success
     results = []
-    cache = cache or get_signal_cache()
+    if cache is None:
+        cache = DataCache()
 
     def get_comparison_and_pvname():
         for checklist_item in checklist:
@@ -721,16 +791,27 @@ async def check_pvs(
                 for pvname in checklist_item.ids:
                     yield comparison, pvname
 
-    for comparison, pvname in get_comparison_and_pvname():
-        # Pre-fill the cache with PVs, connecting in the background
-        _ = cache[pvname]
-
-    for comparison, pvname in get_comparison_and_pvname():
-        logger.debug("Checking %r with comparison %s", pvname, comparison)
-
-        prepared = PreparedSignalComparison.from_pvname(
+    prepared_comparisons = [
+        PreparedSignalComparison.from_pvname(
             pvname=pvname, comparison=comparison, cache=cache
         )
+        for comparison, pvname in get_comparison_and_pvname()
+    ]
+
+    cache_fill_tasks = []
+    for prepared in prepared_comparisons:
+        # Pre-fill the cache with PVs, connecting in the background
+        cache_fill_tasks.append(
+            asyncio.create_task(
+                prepared.get_data_async()
+            )
+        )
+
+    for prepared in prepared_comparisons:
+        logger.debug(
+            "Checking %r with comparison %s", prepared.identifier, prepared.comparison
+        )
+
         result = await prepared.compare()
 
         if result.severity > overall:
@@ -743,6 +824,7 @@ async def check_pvs(
 async def check_tool(
     tool: tools.Tool,
     checklist: Sequence[IdentifierAndComparison],
+    cache: Optional[DataCache] = None,
 ) -> Tuple[Severity, List[Result]]:
     """
     Check a PVConfiguration.
@@ -754,6 +836,8 @@ async def check_tool(
     checklist : sequence of IdentifierAndComparison
         Comparisons to run on the given device.  Multiple PVs may share the
         same checks.
+    cache : DataCache, optional
+        The data cache to use for this tool and other similar comparisons.
 
     Returns
     -------
@@ -766,6 +850,9 @@ async def check_tool(
     overall = Severity.success
     results = []
 
+    if cache is None:
+        cache = DataCache()
+
     def get_comparison_and_key():
         for checklist_item in checklist:
             for comparison in checklist_item.comparisons:
@@ -776,7 +863,7 @@ async def check_tool(
         logger.debug("Checking %r with comparison %s", key, comparison)
 
         prepared = PreparedToolComparison.from_tool(
-            tool, result_key=key, comparison=comparison
+            tool, result_key=key, comparison=comparison, cache=cache,
         )
         result = await prepared.compare()
 
