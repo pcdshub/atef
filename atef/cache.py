@@ -6,7 +6,7 @@ import dataclasses
 import logging
 import typing
 from dataclasses import dataclass, field
-from typing import (Any, Dict, Hashable, Mapping, Optional, Sequence, Type,
+from typing import (Any, Dict, Hashable, Iterable, Mapping, Optional, Type,
                     TypeVar, cast)
 
 import ophyd
@@ -87,14 +87,27 @@ class ToolKey:
 
 
 def _freeze(data):
-    if isinstance(data, (int, float, str)):
+    """
+    Freeze ``data`` such that it can be used as a hashable key.
+
+    Parameters
+    ----------
+    data : Any
+        The data to be frozen.
+
+    Returns
+    -------
+    Any
+        Hopefully hashable version of ``data``.
+    """
+    if isinstance(data, str):
         return data
     if isinstance(data, Mapping):
         return frozenset(
             (_freeze(key), _freeze(value))
             for key, value in data.items()
         )
-    if isinstance(data, Sequence):
+    if isinstance(data, Iterable):
         return tuple(_freeze(part) for part in data)
     return data
 
