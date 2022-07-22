@@ -25,9 +25,10 @@ from qtpy.QtGui import QClipboard, QColor, QGuiApplication, QPalette
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QInputDialog, QLabel,
                             QLayout, QLineEdit, QMainWindow, QMenu,
-                            QMessageBox, QPlainTextEdit, QPushButton, QSpinBox,
-                            QStyle, QTabWidget, QToolButton, QTreeWidget,
-                            QTreeWidgetItem, QVBoxLayout, QWidget)
+                            QMessageBox, QPlainTextEdit, QPushButton,
+                            QSizePolicy, QSpinBox, QStyle, QTabWidget,
+                            QToolButton, QTreeWidget, QTreeWidgetItem,
+                            QVBoxLayout, QWidget)
 
 from .. import util
 from ..cache import get_signal_cache
@@ -2208,7 +2209,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     QDataclassValue instances as appropriate. On first load
     we will match the data type of the saved value (or of
     the default value). The user will be able to pick a
-    different input method via right-click context menu
+    different input method via the mode select button
     and the appropriate input widget will be shown.
 
     This is intended to be used to edit the "value" and
@@ -2243,6 +2244,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     mode_changed: ClassVar[QSignal] = QSignal(int)
     refreshed: ClassVar[QSignal] = QSignal()
 
+    select_mode_button: QToolButton
     bool_input: QComboBox
     enum_input: QComboBox
     epics_widget: QWidget
@@ -2266,7 +2268,6 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     ids: Optional[QDataclassValue]
     devices: Optional[QDataclassValue]
     happi_select_widget: Optional[HappiDeviceComponentWidget]
-    include_boolean: bool
     _last_device_name: str
 
     def __init__(
@@ -2293,6 +2294,12 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self._last_device_name = ""
         self.setup_widgets()
         self.set_mode(self.get_mode_from_data())
+        self.setSizePolicy(
+            QSizePolicy(
+                QSizePolicy.Maximum,
+                QSizePolicy.Maximum,
+            )
+        )
 
     def setup_widgets(self):
         """
@@ -2317,12 +2324,8 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             if hasattr(widget, "font"):
                 set_widget_font_size(widget, self.font_pt_size)
 
-        # Right click -> select mode
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self._show_context_menu)
-
-        # Hide boolean if the value can't be a bool, e.g. "Number" annotation.
-        self.include_boolean = True
+        # Hide bool/str if "Number" annotation.
+        number_anno = False
         for field in dataclasses.fields(self.bridge.data):
             if field.name == self.value_name:
                 if field.type in (
@@ -2331,35 +2334,31 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
                     Optional[Number],
                     "Optional[Number]",
                 ):
-                    self.include_boolean = False
+                    number_anno = True
                 break
 
-    def _show_context_menu(self, pos: QPoint):
-        """
-        Display a context menu that allows us to change the mode.
-
-        Parameters
-        ----------
-        pos : QPoint
-            Position to display the menu at.
-        """
-        menu = QMenu(self)
-        if self.include_boolean:
+        # Select mode
+        menu = QMenu()
+        if not number_anno:
             use_bool = menu.addAction("&Bool")
             use_bool.triggered.connect(partial(self.set_mode, EditMode.BOOL))
-        use_enum = menu.addAction("&Enum")
-        use_enum.triggered.connect(partial(self.set_mode, EditMode.ENUM))
+            use_enum = menu.addAction("&Enum")
+            use_enum.triggered.connect(partial(self.set_mode, EditMode.ENUM))
         use_float = menu.addAction("&Float")
         use_float.triggered.connect(partial(self.set_mode, EditMode.FLOAT))
         use_int = menu.addAction("&Int")
         use_int.triggered.connect(partial(self.set_mode, EditMode.INT))
-        use_str = menu.addAction("&String")
-        use_str.triggered.connect(partial(self.set_mode, EditMode.STR))
+        if not number_anno:
+            use_str = menu.addAction("&String")
+            use_str.triggered.connect(partial(self.set_mode, EditMode.STR))
         use_epics = menu.addAction("EPI&CS")
         use_epics.triggered.connect(partial(self.set_mode, EditMode.EPICS))
         use_happi = menu.addAction("&Happi")
         use_happi.triggered.connect(partial(self.set_mode, EditMode.HAPPI))
-        menu.exec(self.mapToGlobal(pos))
+        self.select_mode_button.setMenu(menu)
+        self.select_mode_button.setPopupMode(
+            self.select_mode_button.InstantPopup
+        )
 
     def setup_refresh_icon(self, button: QToolButton):
         """
@@ -2632,6 +2631,9 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         elif mode == EditMode.STR:
             self.str_input.setText(str(self.value.get()))
             self.str_input.show()
+        self.select_mode_button.setToolTip(
+            f"Current mode: {mode.name}"
+        )
         self.mode_changed.emit(mode)
 
 
