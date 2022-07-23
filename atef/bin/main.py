@@ -6,8 +6,10 @@ Try:
 """
 
 import argparse
+import asyncio
 import importlib
 import logging
+from inspect import iscoroutinefunction
 
 import atef
 
@@ -91,7 +93,10 @@ def main():
     if hasattr(args, 'func'):
         func = kwargs.pop('func')
         logger.debug('%s(**%r)', func.__name__, kwargs)
-        func(**kwargs)
+        if iscoroutinefunction(func):
+            asyncio.run(func(**kwargs))
+        else:
+            func(**kwargs)
     else:
         top_parser.print_help()
 

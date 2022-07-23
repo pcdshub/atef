@@ -120,10 +120,11 @@ def test_serializable(config: DeviceConfiguration, severity: Severity):
 
 
 @config_and_severity
-def test_result_severity(
+@pytest.mark.asyncio
+async def test_result_severity(
     device, config: DeviceConfiguration, severity: Severity
 ):
-    overall, _ = check_device(device=device, checklist=config.checklist)
+    overall, _ = await check_device(device=device, checklist=config.checklist)
     assert overall == severity
 
 
@@ -159,7 +160,8 @@ def at2l0(request):
     return FakeAT2L0()
 
 
-def test_at2l0_standin(at2l0):
+@pytest.mark.asyncio
+async def test_at2l0_standin(at2l0):
     state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
     severity = {
         0: Severity.error,
@@ -196,12 +198,13 @@ def test_at2l0_standin(at2l0):
         ),
     ]
 
-    overall, results = check_device(at2l0, checklist=checklist)
+    overall, results = await check_device(at2l0, checklist=checklist)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == severity
 
 
-def test_at2l0_standin_reduce(at2l0):
+@pytest.mark.asyncio
+async def test_at2l0_standin_reduce(at2l0):
     state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
     state1.put(1.0)
     checklist = [
@@ -219,12 +222,13 @@ def test_at2l0_standin_reduce(at2l0):
         ),
     ]
 
-    overall, results = check_device(at2l0, checklist=checklist)
+    overall, results = await check_device(at2l0, checklist=checklist)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == Severity.success
 
 
-def test_at2l0_standin_value_map(at2l0):
+@pytest.mark.asyncio
+async def test_at2l0_standin_value_map(at2l0):
     state1: ophyd.Signal = getattr(at2l0, "blade_01.state.state")
     value_to_severity = {
         0: Severity.error,
@@ -261,7 +265,7 @@ def test_at2l0_standin_value_map(at2l0):
         )
     ]
 
-    overall, results = check_device(at2l0, checklist=checklist)
+    overall, results = await check_device(at2l0, checklist=checklist)
     print("\n".join(res.reason or "n/a" for res in results))
     assert overall == severity
 
@@ -273,6 +277,15 @@ def mock_signal_cache() -> cache._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
     mock_cache["pv2"].sim_put(1)
     mock_cache["pv3"].sim_put(2)
     return mock_cache
+
+
+@pytest.fixture
+def data_cache(
+    mock_signal_cache: cache._SignalCache[ophyd.sim.FakeEpicsSignalRO],
+) -> cache.DataCache:
+    return cache.DataCache(
+        signals=mock_signal_cache,
+    )
 
 
 @pytest.mark.parametrize(
@@ -304,12 +317,13 @@ def mock_signal_cache() -> cache._SignalCache[ophyd.sim.FakeEpicsSignalRO]:
         ),
     ],
 )
-def test_pv_config(
-    mock_signal_cache: cache._SignalCache[ophyd.sim.FakeEpicsSignalRO],
+@pytest.mark.asyncio
+async def test_pv_config(
+    data_cache: cache.DataCache,
     checklist: List[IdentifierAndComparison],
     expected_severity: check.Severity
 ):
-    overall, _ = check_pvs(checklist, cache=mock_signal_cache)
+    overall, _ = await check_pvs(checklist, cache=data_cache)
     assert overall == expected_severity
 
 

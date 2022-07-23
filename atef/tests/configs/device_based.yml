@@ -61,6 +61,7 @@ configs:
           description: Filter status unknown
           invert: true
           value: 3
+      name: Checklist
       ids:
       - blade_01.state.state
       - blade_02.state.state

@@ -3,6 +3,7 @@
 """
 
 import argparse
+import asyncio
 import dataclasses
 import logging
 import pathlib
@@ -14,6 +15,7 @@ import rich
 import rich.console
 import rich.tree
 
+from ..cache import DataCache, _SignalCache, get_signal_cache
 from ..check import Comparison, Result, Severity
 from ..config import (AnyConfiguration, Configuration, ConfigurationFile,
                       PathItem, PreparedComparison)
@@ -50,6 +52,12 @@ def build_arg_parser(argparser=None):
         nargs="*",
         dest="name_filter",
         help="Limit checkout to the named device(s) or identifiers",
+    )
+
+    argparser.add_argument(
+        "-p", "--parallel",
+        action="store_true",
+        help="Acquire data for comparisons in parallel",
     )
 
     return argparser
@@ -256,18 +264,55 @@ def log_results_rich(
     console.print(root)
 
 
-def check_and_log(
+async def check_and_log(
     config: AnyConfiguration,
     console: rich.console.Console,
     verbose: int = 0,
     client: Optional[happi.Client] = None,
     name_filter: Optional[Sequence[str]] = None,
+    parallel: bool = True,
+    cache: Optional[DataCache] = None,
 ):
-    """Check a configuration and log the results."""
+    """
+    Check a configuration and log the results.
+
+    Parameters
+    ----------
+    config : AnyConfiguration
+        The configuration to check.
+    console : rich.console.Console
+        The rich console to write output to.
+    verbose : int, optional
+        The verbosity level for the output.
+    client : happi.Client, optional
+        The happi client, if available.
+    name_filter : Sequence[str], optional
+        A filter for names.
+    parallel : bool, optional
+        Pre-fill cache in parallel when possible.
+    cache : DataCache
+        The data cache instance.
+    """
     items = []
     name_filter = list(name_filter or [])
     severities = []
-    for prepared in PreparedComparison.from_config(config, client=client):
+
+    if cache is None:
+        cache = DataCache()
+
+    all_prepared = list(
+        PreparedComparison.from_config(config, client=client, cache=cache)
+    )
+
+    cache_fill_tasks = []
+    if parallel:
+        for prepared in all_prepared:
+            if isinstance(prepared, PreparedComparison):
+                cache_fill_tasks.append(
+                    asyncio.create_task(prepared.get_data_async())
+                )
+
+    for prepared in all_prepared:
         if isinstance(prepared, PreparedComparison):
             if name_filter:
                 device_name = getattr(prepared.device, "name", None)
@@ -285,7 +330,7 @@ def check_and_log(
                     )
                     continue
 
-            prepared.result = prepared.compare()
+            prepared.result = await prepared.compare()
             if prepared.result is not None:
                 items.append(prepared)
                 severities.append(prepared.result.severity)
@@ -312,12 +357,14 @@ def check_and_log(
     )
 
 
-def main(
+async def main(
     filename: str,
     name_filter: Optional[Sequence[str]] = None,
     verbose: int = 0,
+    parallel: bool = False,
     *,
-    cleanup: bool = True
+    cleanup: bool = True,
+    signal_cache: Optional[_SignalCache] = None,
 ):
     path = pathlib.Path(filename)
     if path.suffix.lower() == ".json":
@@ -333,15 +380,18 @@ def main(
         client = None
 
     console = rich.console.Console()
+    cache = DataCache(signals=signal_cache or get_signal_cache())
     try:
         with console.status("[bold green] Performing checks..."):
             for config in config_file.configs:
-                check_and_log(
+                await check_and_log(
                     config,
                     console=console,
                     verbose=verbose,
                     client=client,
                     name_filter=name_filter,
+                    parallel=parallel,
+                    cache=cache,
                 )
     finally:
         if cleanup:

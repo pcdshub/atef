@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Generator, List, Optional, Sequence
+from typing import Any, Generator, Iterable, List, Optional, Sequence
 
 import numpy as np
 import ophyd
@@ -216,7 +217,6 @@ class Comparison:
                 f"{self.__class__.__name__}.describe() failure "
                 f"({ex.__class__.__name__}: {ex})"
             )
-        # return f"{self.__class__.__name__}({desc})"
 
     def compare(self, value: Any, identifier: Optional[str] = None) -> Result:
         """
@@ -258,6 +258,11 @@ class Comparison:
         if self.invert:
             passed = not passed
 
+        # Some comparisons may be done with array values; require that
+        # all match for a success here:
+        if isinstance(passed, Iterable):
+            passed = all(passed)
+
         if passed:
             return success
 
@@ -273,51 +278,64 @@ class Comparison:
         """
         Get data for the given signal, according to the string and data
         reduction settings.
-        """
-        if self.reduce_period and self.reduce_period > 0:
-            return self.reduce_method.subscribe_and_reduce(
-                signal, self.reduce_period
-            )
-
-        if self.string:
-            return signal.get(as_string=True)
-
-        return signal.get()
-
-    def compare_signal(
-        self, signal: ophyd.Signal, *, identifier: Optional[str] = None
-    ) -> Result:
-        """
-        Compare the provided signal's value using the comparator's settings.
 
         Parameters
         ----------
         signal : ophyd.Signal
-            The signal to get data from and run a comparison on.
+            The signal.
 
-        identifier : str, optional
-            An identifier that goes along with the provided signal.  Used for
-            severity result descriptions.  Defaults to the signal's dotted
-            name.
+        Returns
+        -------
+        Any
+            The acquired data.
+
+        Raises
+        ------
+        TimeoutError
+            If the get operation times out.
         """
-        try:
-            identifier = identifier or signal.dotted_name
-            try:
-                value = self.get_data_for_signal(signal)
-            except TimeoutError:
-                return Result(
-                    severity=self.if_disconnected,
-                    reason=f"Signal disconnected when reading: {signal}"
-                )
-            return self.compare(value, identifier=identifier)
-        except Exception as ex:
-            return Result(
-                severity=Severity.internal_error,
-                reason=(
-                    f"Checking if {identifier!r} {self} "
-                    f"raised {ex.__class__.__name__}: {ex}"
-                ),
-            )
+        return reduce.get_data_for_signal(
+            signal,
+            reduce_period=self.reduce_period,
+            reduce_method=self.reduce_method,
+            string=self.string or False,
+        )
+
+    async def get_data_for_signal_async(
+        self,
+        signal: ophyd.Signal,
+        *,
+        executor: Optional[concurrent.futures.Executor] = None
+    ) -> Any:
+        """
+        Get data for the given signal, according to the string and data
+        reduction settings.
+
+        Parameters
+        ----------
+        signal : ophyd.Signal
+            The signal.
+        executor : concurrent.futures.Executor, optional
+            The executor to run the synchronous call in.  Defaults to
+            the loop-defined default executor.
+
+        Returns
+        -------
+        Any
+            The acquired data.
+
+        Raises
+        ------
+        TimeoutError
+            If the get operation times out.
+        """
+        return await reduce.get_data_for_signal_async(
+            signal,
+            reduce_period=self.reduce_period,
+            reduce_method=self.reduce_method,
+            string=self.string or False,
+            executor=executor,
+        )
 
 
 @dataclass

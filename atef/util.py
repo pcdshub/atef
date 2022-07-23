@@ -1,7 +1,9 @@
+import asyncio
+import concurrent.futures
 import functools
 import logging
 import pathlib
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 import happi
 import ophyd
@@ -85,3 +87,35 @@ def regex_for_devices(names: Optional[Sequence[str]]) -> str:
     """Get a regular expression that matches all the given device names."""
     names = list(names or [])
     return "|".join(f"^{name}$" for name in names)
+
+
+async def run_in_executor(
+    executor: Optional[concurrent.futures.Executor],
+    func: Callable,
+    *args, **kwargs
+):
+    """
+    Using the provided executor, run the function and return its value.
+
+    Parameters
+    ----------
+    executor : concurrent.futures.Executor or None
+        The executor to use.  Defaults to the one from the running loop.
+    func : Callable
+        The function to run.
+    *args :
+        Arguments to pass.
+    **kwargs :
+        Keyword arguments to pass.
+
+    Returns
+    -------
+    Any
+        The value returned from func().
+    """
+    @functools.wraps(func)
+    def wrapped():
+        return func(*args, **kwargs)
+
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, wrapped)
