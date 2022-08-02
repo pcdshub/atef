@@ -3,12 +3,11 @@ from __future__ import annotations
 import typing
 from typing import Optional
 
-from .config import PreparedConfiguration
 from .enums import Severity
 
 if typing.TYPE_CHECKING:
     from .check import Comparison
-    from .config import AnyConfiguration
+    from .config import AnyConfiguration, PreparedConfiguration
 
 
 class ConfigFileLoadError(Exception):
@@ -74,7 +73,7 @@ class PreparedComparisonException(Exception):
     ):
         if message is None:
             message = str(exception)
-        super().__init__(str(exception))
+        super().__init__(message)
         self.exception = exception
         self.identifier = identifier
         self.comparison = comparison

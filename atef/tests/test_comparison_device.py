@@ -5,12 +5,13 @@ import ophyd
 import ophyd.sim
 import pytest
 
-from .. import cache, check, reduce
+from .. import cache, check, reduce, util
 from ..check import Comparison, Result, Severity
 from ..config import (ConfigurationFile, ConfigurationGroup,
                       DeviceConfiguration, PreparedDeviceConfiguration,
-                      PreparedPVConfiguration, PVConfiguration,
+                      PreparedFile, PreparedPVConfiguration, PVConfiguration,
                       get_result_from_comparison)
+from ..exceptions import PreparedComparisonException
 
 
 async def check_device(
@@ -428,3 +429,54 @@ def test_get_by_pv(get_by_config_file: ConfigurationFile):
 def test_get_by_tag(get_by_config_file: ConfigurationFile):
     assert len(list(get_by_config_file.get_by_tag("a"))) == 4
     assert len(list(get_by_config_file.get_by_tag("c"))) == 1
+
+
+def test_bad_device_raises(monkeypatch):
+    def get_by_name(name: str, *, client=None):
+        from ..exceptions import HappiLoadError
+
+        raise HappiLoadError("Load error")
+
+    monkeypatch.setattr(util, "get_happi_device_by_name", get_by_name)
+
+    config = DeviceConfiguration(
+        devices=["abc"],
+    )
+
+    with pytest.raises(PreparedComparisonException) as exc_info:
+        PreparedDeviceConfiguration.from_config(config)
+
+    ex = exc_info.value
+    assert isinstance(ex, PreparedComparisonException)
+    assert "abc" in str(ex)
+    assert ex.identifier == "abc"
+
+
+def test_bad_device_in_file(monkeypatch):
+    my_device = object()
+
+    def get_by_name(name: str, *, client=None):
+        from ..exceptions import HappiLoadError
+
+        if name == "abc":
+            raise HappiLoadError("Load error")
+        return my_device
+
+    monkeypatch.setattr(util, "get_happi_device_by_name", get_by_name)
+
+    file = ConfigurationFile()
+    file.root.configs = [
+        DeviceConfiguration(
+            devices=["abc"],
+        ),
+        DeviceConfiguration(
+            devices=["def"],
+        ),
+    ]
+
+    prepared = PreparedFile.from_config(file)
+    assert len(prepared.root.prepare_failures) == 1
+    assert "abc" in str(prepared.root.prepare_failures[0])
+    assert len(prepared.root.configs) == 1
+    assert isinstance(prepared.root.configs[0], PreparedDeviceConfiguration)
+    assert prepared.root.configs[0].devices == [my_device]
