@@ -4,8 +4,8 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import (Any, Dict, Generator, List, Optional, Sequence, Tuple,
-                    Union, cast)
+from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
+                    Tuple, Union, cast)
 
 import apischema
 import happi
@@ -130,7 +130,7 @@ class ConfigurationFile:
     A configuration file comprised of a number of devices/PV configurations.
     """
     #: atef configuration file version information.
-    version: int = 0
+    version: Literal[0] = field(default=0, metadata=apischema.metadata.required)
     #: Top-level configuration group.
     root: ConfigurationGroup = field(default_factory=ConfigurationGroup)
 

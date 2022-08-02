@@ -41,6 +41,7 @@ async def check_tool(
         shared=shared,
         cache=cache,
     )
+
     overall = await prepared.compare()
     results = [
         config.get_result_from_comparison(comparison)[1]

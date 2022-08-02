@@ -1,40 +1,43 @@
 {
-  "configs": [
-    {
-      "ToolConfiguration": {
-        "name": "Host alive check",
-        "description": "Tool",
-        "tags": null,
-        "tool": {
-          "Ping": {
-            "hosts": ["127.0.0.1", "localhost"],
-            "count": 1
-          }
-        },
-        "checklist": [
-          {
-            "name": "Check that the ping time is good",
-            "ids": [
-              "max_time",
-              "times.localhost"
-            ],
-            "comparisons": [
-              {
-                "Less": {
-                  "name": "Ping time OK",
-                  "description": "Is the ping less than x ms?",
-                  "invert": false,
-                  "reduce_period": null,
-                  "reduce_method": "average",
-                  "string": null,
-                  "severity_on_failure": 2,
-                  "if_disconnected": 2,
-                  "value": 1000
-                }
+  "version": 0,
+  "root": {
+    "name": "Root",
+    "configs": [
+      {
+        "ToolConfiguration": {
+          "name": "Host alive check",
+          "description": "Tool",
+          "tags": null,
+          "tool": {
+            "Ping": {
+              "hosts": [
+                "127.0.0.1",
+                "localhost"
+              ],
+              "count": 1
+            }
+          },
+          "by_attr": {
+            "max_time": [],
+            "times.localhost": []
+          },
+          "shared": [
+            {
+              "Less": {
+                "name": "Ping time OK",
+                "description": "Is the ping less than x ms?",
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "value": 1000
               }
-            ]
-          }
-        ]
+            }
+          ]
+        }
       }
-    }]
+    ]
+  }
 }
