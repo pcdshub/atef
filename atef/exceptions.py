@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 from typing import Optional
 
+from .config import PreparedConfiguration
 from .enums import Severity
 
 if typing.TYPE_CHECKING:
@@ -54,6 +55,8 @@ class PreparedComparisonException(Exception):
     identifier: str
     #: The relevant configuration
     config: Optional[AnyConfiguration]
+    #: The parent container of the comparison that failed to prepare.
+    prepared: Optional[PreparedConfiguration] = None
     #: The comparison related to the exception, if applicable.
     comparison: Optional[Comparison]
     #: The name of the associated configuration.
@@ -63,15 +66,20 @@ class PreparedComparisonException(Exception):
         self,
         exception: Exception,
         identifier: str,
+        message: Optional[str] = None,
         config: Optional[AnyConfiguration] = None,
+        prepared: Optional[PreparedConfiguration] = None,
         comparison: Optional[Comparison] = None,
         name: Optional[str] = None,
     ):
+        if message is None:
+            message = str(exception)
         super().__init__(str(exception))
         self.exception = exception
         self.identifier = identifier
         self.comparison = comparison
         self.config = config
+        self.prepared = prepared
         self.name = name
 
 

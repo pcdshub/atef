@@ -90,12 +90,10 @@ class DeviceConfiguration(Configuration):
 class PVConfiguration(Configuration):
     """
     A configuration that is built to check live EPICS PVs.
-
-    Identifiers are by default assumed to be PV names.
     """
     #: PV name to comparison list.
     by_pv: Dict[str, List[Comparison]] = field(default_factory=dict)
-    #: Comparisons to be run on *all* identifiers in the `by_pv` dictionary.
+    #: Comparisons to be run on *all* PVs in the `by_pv` dictionary.
     shared: List[Comparison] = field(default_factory=list)
 
 
@@ -659,7 +657,7 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
             A shared data cahce, if available.
         client : happi.Client, optional
             A happi Client, if available.
-        additional_devices : Optional[List[ophyd.Device]], optional
+        additional_devices : List[ophyd.Device], optional
             Additional devices (aside from those in the DeviceConfiguration)
             to add to the PreparedDeviceConfiguration list.
 
@@ -684,13 +682,10 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
                 devices.append(util.get_happi_device_by_name(dev_name, client=client))
             except Exception as ex:
                 raise PreparedComparisonException(
-                    parent=parent,
+                    message=f"Failed to load happi device: {dev_name}",
+                    prepared=parent,
                     config=config,
                     identifier=dev_name,
-                    reason=Result(
-                        reason=f"Failed to load happi device: {dev_name}",
-                        severity=Severity.error,
-                    ),
                     exception=ex,
                 )
 
@@ -743,6 +738,26 @@ class PreparedPVConfiguration(PreparedConfiguration):
         parent: Optional[PreparedGroup] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedPVConfiguration:
+        """
+        Ready a set of PV checks without requiring an existing PVConfiguration.
+
+        Parameters
+        ----------
+        by_pv : Dict[str, List[Comparison]]
+            PV name to comparison list.
+        shared : list of Comparison, optional
+            Comparisons to be run on *all* PVs in the `by_pv` dictionary.
+        parent : PreparedGroup, optional
+            The parent group.
+        cache : DataCache, optional
+            The data cache to use for this and other similar comparisons.
+
+
+        Returns
+        -------
+        PreparedPVConfiguration
+
+        """
         config = cls.from_config(
             PVConfiguration(
                 by_pv=by_pv,
@@ -759,7 +774,23 @@ class PreparedPVConfiguration(PreparedConfiguration):
         config: PVConfiguration,
         parent: Optional[PreparedGroup] = None,
         cache: Optional[DataCache] = None,
-    ) -> Union[FailedConfiguration, PreparedPVConfiguration]:
+    ) -> PreparedPVConfiguration:
+        """
+        Prepare a PVConfiguration for running.
+
+        Parameters
+        ----------
+        config : PVConfiguration
+            The configuration settings.
+        parent : PreparedGroup, optional
+            The parent group.
+        cache : DataCache, optional
+            The data cache to use for this and other similar comparisons.
+
+        Returns
+        -------
+        PreparedPVConfiguration
+        """
         if not isinstance(config, PVConfiguration):
             raise ValueError(f"Unexpected configuration type: {type(config).__name__}")
 
@@ -1160,7 +1191,7 @@ class PreparedToolComparison(PreparedComparison):
         comparison : Comparison
             The comparison to perform on the tool's results (looking at the
             specific result_key).
-        name : Optional[str], optional
+        name : str, optional
             The name of the comparison.
         cache : DataCache, optional
             The data cache to use for this and other similar comparisons.
