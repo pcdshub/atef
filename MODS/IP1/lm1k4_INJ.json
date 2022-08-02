@@ -1,0 +1,326 @@
+{
+  "configs": [
+    {
+      "DeviceConfiguration": {
+        "name": "camera - ff1",
+        "description": null,
+        "tags": null,
+        "checklist": [
+          {
+            "name": "centroid",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "image counter",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "ping",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "status plug",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "binning",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "image size",
+            "ids": [],
+            "comparisons": []
+          }
+        ],
+        "devices": [
+          "lm1k4_inj_dp1_tf1_ff1"
+        ]
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "camera- nf1",
+        "description": null,
+        "tags": null,
+        "checklist": [
+          {
+            "name": "centroid",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "image counter",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "ping",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "status plug",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "binning",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "image size",
+            "ids": [],
+            "comparisons": []
+          }
+        ],
+        "devices": [
+          "lm1k4_inj_dp1_tf1_nf1"
+        ]
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "elliptec - dp1",
+        "description": null,
+        "tags": null,
+        "checklist": [
+          {
+            "name": "status",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "curpos",
+            "ids": [],
+            "comparisons": []
+          }
+        ],
+        "devices": [
+          "lm1k4_inj_dp1_tf1_sl1"
+        ]
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "elliptec - dp2",
+        "description": null,
+        "tags": null,
+        "checklist": [
+          {
+            "name": "status",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "curpos",
+            "ids": [],
+            "comparisons": []
+          }
+        ],
+        "devices": [
+          "lm1k4_inj_dp2_tf1_sl1"
+        ]
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "environmental sensor",
+        "description": null,
+        "tags": null,
+        "checklist": [
+          {
+            "name": "humidity",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "pressure",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "temperature",
+            "ids": [],
+            "comparisons": []
+          }
+        ],
+        "devices": [
+          "lm1k4_inj_env_sens"
+        ]
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "smaract - dp2 mr1",
+        "description": null,
+        "tags": null,
+        "checklist": [
+          {
+            "name": "RBV vs VAL",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "MOVN",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "HLS",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "LLS",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "TDIR",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "STOP",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "DRBV",
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": "STEP_COUNT",
+            "ids": [],
+            "comparisons": []
+          }
+        ],
+        "devices": [
+          "lm1k4_inj_dp2_mr1"
+        ]
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "smaract - mp1 att1 wp1",
+        "description": null,
+        "tags": null,
+        "checklist": [],
+        "devices": [
+          "lm1k4_inj_mp1_att1_wp1"
+        ]
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "smaract - mp1 att1 wp2",
+        "description": null,
+        "tags": null,
+        "checklist": [],
+        "devices": []
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "smaract - mp1 mr1",
+        "description": null,
+        "tags": null,
+        "checklist": [],
+        "devices": []
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "smaract - mp1 zoo1 ls2",
+        "description": null,
+        "tags": null,
+        "checklist": [],
+        "devices": []
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "smaract - mp1 zoo1 ls3",
+        "description": null,
+        "tags": null,
+        "checklist": [],
+        "devices": []
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "spectrometer",
+        "description": null,
+        "tags": null,
+        "checklist": [
+          {
+            "name": "STATUS",
+            "ids": [],
+            "comparisons": []
+          }
+        ],
+        "devices": [
+          "lm1k4_inj_dp2_tf1_sp1"
+        ]
+      }
+    },
+    {
+      "DeviceConfiguration": {
+        "name": "power meter",
+        "description": null,
+        "tags": null,
+        "checklist": [
+          {
+            "name": "measured value",
+            "ids": [],
+            "comparisons": []
+          }
+        ],
+        "devices": [
+          "lm1k4_inj_dp2_tf1_pm1"
+        ]
+      }
+    },
+    {
+      "PVConfiguration": {
+        "name": null,
+        "description": null,
+        "tags": null,
+        "checklist": [
+          {
+            "name": null,
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": null,
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": null,
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": null,
+            "ids": [],
+            "comparisons": []
+          },
+          {
+            "name": null,
+            "ids": [],
+            "comparisons": []
+          }
+        ]
+      }
+    }
+  ]
+}
