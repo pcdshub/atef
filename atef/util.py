@@ -83,6 +83,14 @@ def get_maximum_severity(severities: Sequence[Severity]) -> Severity:
     )
 
 
+def get_minimum_severity(severities: Sequence[Severity]) -> Severity:
+    """Get the minimum severity defined from the sequence of severities."""
+    severities = tuple(severities)
+    if not severities:
+        return Severity.success
+    return Severity(min(severity.value for severity in severities))
+
+
 def regex_for_devices(names: Optional[Sequence[str]]) -> str:
     """Get a regular expression that matches all the given device names."""
     names = list(names or [])

@@ -1,27 +1,27 @@
 """
 `atef check` runs passive checkouts of devices given a configuration file.
 """
+from __future__ import annotations
 
 import argparse
 import asyncio
-import dataclasses
 import enum
+import itertools
 import logging
 import pathlib
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
+from typing import Dict, Optional, Sequence, Tuple, Union
 
 import happi
-import ophyd
 import rich
 import rich.console
 import rich.tree
 
 from ..cache import DataCache, _SignalCache, get_signal_cache
 from ..check import Comparison, Result, Severity
-from ..config import (AnyConfiguration, Configuration, ConfigurationFile,
-                      ConfigurationGroup, PreparedComparison, PreparedFile,
+from ..config import (AnyConfiguration, AnyPreparedConfiguration,
+                      ConfigurationFile, PreparedComparison, PreparedFile,
                       PreparedGroup)
-from ..util import get_maximum_severity, ophyd_cleanup
+from ..util import ophyd_cleanup
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +29,53 @@ DESCRIPTION = __doc__
 
 
 class VerbositySetting(enum.Flag):
-    default = enum.auto()
-    show_description = enum.auto()
+    show_severity_emoji = enum.auto()
+    show_severity_description = enum.auto()
+    show_config_description = enum.auto()
     show_tags = enum.auto()
     show_passed_tests = enum.auto()
+    default = show_severity_emoji | show_severity_description
+
+    @classmethod
+    def from_kwargs(
+        cls, start: Optional[VerbositySetting] = None, **kwargs
+    ) -> VerbositySetting:
+        """
+        Get a VerbositySetting from the provided kwargs.
+
+        Parameters
+        ----------
+        start : VerbositySetting, optional
+             The starting VerbositySetting.
+
+        **kwargs : str to bool
+            Keyword arguments that match VerbositySetting flags, with the
+            value set to False (clear) or True (set).
+
+        Returns
+        -------
+        VerbositySetting
+            The adjusted VerbositySetting.
+        """
+        def set_or_clear(verbosity: cls, name: str, value: bool) -> cls:
+            flag = getattr(cls, name)
+            if value:
+                return verbosity | flag
+            return verbosity & ~flag
+
+        if start is None:
+            verbosity = cls.default
+        else:
+            verbosity = start
+
+        for setting in cls:
+            if setting.name is None:
+                continue
+
+            setting_value = kwargs.get(setting.name, None)
+            if setting_value is not None:
+                verbosity = set_or_clear(verbosity, setting.name, setting_value)
+        return verbosity
 
 
 def build_arg_parser(argparser=None):
@@ -48,20 +91,37 @@ def build_arg_parser(argparser=None):
         help="Configuration filename",
     )
 
-    argparser.add_argument(
-        "-v", "--verbose",
-        action="count",
-        help="Increase output verbosity",
-        default=0,
-    )
+    for setting in VerbositySetting:
+        flag_name = setting.name.replace("_", "-")
+        if setting == VerbositySetting.default:
+            continue
 
-    argparser.add_argument(
-        "--filter",
-        type=str,
-        nargs="*",
-        dest="name_filter",
-        help="Limit checkout to the named device(s) or identifiers",
-    )
+        help_text = setting.name.replace("_", " ").capitalize()
+
+        argparser.add_argument(
+            f"--{flag_name}",
+            dest=setting.name,
+            help=help_text,
+            action="store_true",
+        )
+
+        if flag_name.startswith("show-"):
+            hide_flag_name = flag_name.replace("show-", "hide-")
+            help_text = help_text.replace("Show ", "Hide ")
+            argparser.add_argument(
+                f"--{hide_flag_name}",
+                dest=setting.name,
+                help=help_text,
+                action="store_false",
+            )
+
+    # argparser.add_argument(
+    #     "--filter",
+    #     type=str,
+    #     nargs="*",
+    #     dest="name_filter",
+    #     help="Limit checkout to the named device(s) or identifiers",
+    # )
 
     argparser.add_argument(
         "-p", "--parallel",
@@ -73,10 +133,10 @@ def build_arg_parser(argparser=None):
 
 
 default_severity_to_rich = {
-    Severity.success: "[bold green]:heavy_check_mark: Success",
-    Severity.warning: "[bold yellow]:heavy_check_mark: Warning",
-    Severity.error: "[bold red]:x: Error",
-    Severity.internal_error: "[bold red]:x: Internal error",
+    Severity.success: "[bold green]:heavy_check_mark:",
+    Severity.warning: "[bold yellow]:heavy_check_mark:",
+    Severity.error: "[bold red]:x:",
+    Severity.internal_error: "[bold red]:x:",
 }
 
 default_severity_to_log_level = {
@@ -87,12 +147,50 @@ default_severity_to_log_level = {
 }
 
 
+def get_result_from_comparison(
+    item: Union[PreparedComparison, Exception, None]
+) -> Tuple[Optional[PreparedComparison], Result]:
+    """
+    Get a Result, if available, from the provided arguments.
+
+    In the case of an exception (or None/internal error), create one.
+
+    Parameters
+    ----------
+    item : Union[PreparedComparison, Exception, None]
+        The item to grab a result from.
+
+    Returns
+    -------
+    PreparedComparison or None :
+        The prepared comparison, if available
+    Result :
+        The result instance.
+    """
+    if item is None:
+        return None, Result(
+            severity=Severity.internal_error,
+            reason="no result available (comparison not run?)"
+        )
+    if isinstance(item, Exception):
+        # An error that was transformed into a Result with a severity
+        return None, Result.from_exception(item)
+
+    if item.result is None:
+        return item, Result(
+            severity=Severity.internal_error,
+            reason="no result available (comparison not run?)"
+        )
+
+    return item, item.result
+
+
 def get_comparison_text_for_tree(
     item: Union[PreparedComparison, Exception],
     *,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
     verbosity: VerbositySetting = VerbositySetting.default,
-) -> Optional[str]:
+) -> str:
     """
     Get a description for the rich Tree, given a comparison or a failed result.
 
@@ -108,28 +206,11 @@ def get_comparison_text_for_tree(
     Returns
     -------
     str or None
-        Returns a description to add to the tree if applicable for the given
-        verbosity level, or ``None`` if no message should be displayed.
+        Returns a description to add to the tree.
     """
     severity_to_rich = severity_to_rich or default_severity_to_rich
 
-    if isinstance(item, PreparedComparison):
-        # A successfully prepared comparison
-        result = item.result
-        prepared = item
-    elif isinstance(item, Exception):
-        # An error that was transformed into a Result with a severity
-        result = Result.from_exception(item)
-        prepared = None
-    else:
-        raise ValueError(f"Unexpected item type: {item}")
-
-    if result is None:
-        return (
-            f"{severity_to_rich[Severity.internal_error]}[default]: "
-            f"comparison not run"
-        )
-
+    prepared, result = get_result_from_comparison(item)
     if result.severity > Severity.success:
         return (
             f"{severity_to_rich[result.severity]}[default]: {result.reason}"
@@ -168,7 +249,7 @@ def get_name_for_tree(
     str
         The displayable name.
     """
-    if VerbositySetting.show_description in verbosity:
+    if VerbositySetting.show_config_description in verbosity:
         if obj.description:
             if obj.name:
                 return f"{obj.name}: {obj.description}"
@@ -179,19 +260,96 @@ def get_name_for_tree(
     return ""
 
 
+def get_tree_heading(
+    obj: AnyPreparedConfiguration,
+    verbosity: VerbositySetting,
+    severity_to_rich: Dict[Severity, str],
+) -> str:
+    """
+    Get severity, name, and description (per verbosity settings) for a tree.
+
+    Parameters
+    ----------
+    obj : Comparison or AnyConfiguration
+        The comparison or configuration.
+
+    Returns
+    -------
+    str
+        The displayable name.
+    """
+    severity: Severity = getattr(obj.result, "severity", Severity.error)
+
+    severity_text = []
+    if VerbositySetting.show_severity_emoji in verbosity:
+        severity_text.append(severity_to_rich[severity])
+    if VerbositySetting.show_severity_description in verbosity:
+        severity_text.append(severity.name.replace("_", " ").capitalize())
+        severity_text.append(": ")
+
+    severity_text = "".join(severity_text)
+    name_and_desc = get_name_for_tree(obj.config, verbosity)
+    return f"{severity_text}{name_and_desc}"
+
+
+def should_show_in_tree(
+    item: Union[PreparedComparison, Exception, None],
+    verbosity: VerbositySetting = VerbositySetting.default
+) -> bool:
+    """
+    Should ``item`` be shown in the tree, based on the verbosity settings?
+
+    Parameters
+    ----------
+    item : Union[PreparedComparison, Exception, None]
+        The item to check.
+    verbosity : VerbositySetting, optional
+        The verbosity settings.
+
+    Returns
+    -------
+    bool
+        True to show it in the tree, False to not show it.
+    """
+    _, result = get_result_from_comparison(item)
+    if result is None:
+        # Error - always show it
+        return True
+
+    if result.severity == Severity.success:
+        return VerbositySetting.show_passed_tests in verbosity
+    return True
+
+
 def group_to_rich_tree(
     group: PreparedGroup,
     verbosity: VerbositySetting = VerbositySetting.default,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
-):
+) -> rich.tree.Tree:
+    """
+    Convert a `PreparedGroup` into a `rich.tree.Tree`.
+
+    Parameters
+    ----------
+    group : PreparedGroup
+        The group to convert.  Comparisons must be complete to generate the
+        tree effectively.
+    verbosity : VerbositySetting, optional
+
+    severity_to_rich : Optional[Dict[Severity, str]], optional
+
+
+    Returns
+    -------
+
+
+    """
     severity_to_rich = severity_to_rich or default_severity_to_rich
 
-    severity_marker = severity_to_rich[group.result.severity]
-    tree_name = get_name_for_tree(group.group, verbosity=verbosity)
-    tree = rich.tree.Tree(f"{severity_marker} {tree_name}")
-    print("tree", tree_name)
+    tree = rich.tree.Tree(
+        get_tree_heading(group, severity_to_rich=severity_to_rich, verbosity=verbosity)
+    )
     for config in group.configs:
-        print(type(config))
         if isinstance(config, PreparedGroup):
             tree.add(
                 group_to_rich_tree(
@@ -201,27 +359,25 @@ def group_to_rich_tree(
                 )
             )
         else:
-            result = config.result
-            severity = getattr(result, "severity", Severity.error)
-            severity_marker = severity_to_rich[group.result.severity]
-
-            subtree_name = get_name_for_tree(config.config, verbosity=verbosity)
-            subtree = rich.tree.Tree(f"{severity_marker} {subtree_name}")
-            if result is not None and severity == Severity.success:
+            subtree = rich.tree.Tree(
+                get_tree_heading(
+                    config, severity_to_rich=severity_to_rich, verbosity=verbosity
+                )
+            )
+            severity = getattr(config.result, "severity", Severity.error)
+            if config.result is not None and severity == Severity.success:
                 if VerbositySetting.show_passed_tests in verbosity:
                     tree.add(subtree)
             else:
                 tree.add(subtree)
 
-            for comparison in config.comparisons:
-                subtree.add(
-                    get_comparison_text_for_tree(comparison, verbosity=verbosity)
-                )
-
-            for comparison in config.prepare_failures:
-                subtree.add(
-                    get_comparison_text_for_tree(comparison, verbosity=verbosity)
-                )
+            for comparison in itertools.chain(
+                config.comparisons, config.prepare_failures
+            ):
+                if should_show_in_tree(comparison, verbosity):
+                    subtree.add(
+                        get_comparison_text_for_tree(comparison, verbosity=verbosity)
+                    )
 
     return tree
 
@@ -256,9 +412,7 @@ async def check_and_log(
     cache : DataCache
         The data cache instance.
     """
-    items = []
     name_filter = list(name_filter or [])
-    severities = []
 
     if cache is None:
         cache = DataCache()
@@ -267,9 +421,18 @@ async def check_and_log(
 
     cache_fill_tasks = []
     if parallel:
-        cache_fill_tasks = await prepared_file.fill_cache()
+        try:
+            cache_fill_tasks = await prepared_file.fill_cache()
+        except asyncio.CancelledError:
+            console.print("Tests interrupted; no results available.")
+            return
 
-    await prepared_file.compare()
+    try:
+        await prepared_file.compare()
+    except asyncio.CancelledError:
+        console.print("Tests interrupted; showing partial results.")
+        for task in cache_fill_tasks or []:
+            task.cancel()
 
     root_tree = rich.tree.Tree(str(filename))
     tree = group_to_rich_tree(prepared_file.root, verbosity=verbosity)
@@ -312,18 +475,6 @@ async def check_and_log(
     #             type(prepared)
     #         )
 
-    if not items:
-        # Nothing to report; all filtered out
-        return
-
-    log_results_rich(
-        console,
-        config=config,
-        severity=get_maximum_severity(severities),
-        items=items,
-        verbose=verbose,
-    )
-
 
 async def main(
     filename: str,
@@ -333,7 +484,21 @@ async def main(
     *,
     cleanup: bool = True,
     signal_cache: Optional[_SignalCache] = None,
+    show_severity_emoji: bool = True,
+    show_severity_description: bool = True,
+    show_config_description: bool = False,
+    show_tags: bool = False,
+    show_passed_tests: bool = False,
 ):
+
+    verbosity = VerbositySetting.from_kwargs(
+        show_severity_emoji=show_severity_emoji,
+        show_severity_description=show_severity_description,
+        show_config_description=show_config_description,
+        show_tags=show_tags,
+        show_passed_tests=show_passed_tests,
+    )
+
     path = pathlib.Path(filename)
     if path.suffix.lower() == ".json":
         config_file = ConfigurationFile.from_json(filename)
@@ -360,6 +525,7 @@ async def main(
                 parallel=parallel,
                 cache=cache,
                 filename=filename,
+                verbosity=verbosity,
             )
     finally:
         if cleanup:

@@ -24,7 +24,6 @@ from .yaml_support import init_yaml_support
 logger = logging.getLogger(__name__)
 
 
-
 @dataclass
 @serialization.as_tagged_union
 class Configuration:
@@ -267,9 +266,25 @@ class FailedConfiguration:
     exception: Optional[Exception] = None
 
 
-def _summarize_results(
-    mode: GroupResultMode, results: List[Union[Result, Exception, None]]
+def _summarize_result_severity(
+    mode: GroupResultMode,
+    results: List[Union[Result, Exception, None]]
 ) -> Severity:
+    """
+    Summarize all results based on the configured mode.
+
+    Parameters
+    ----------
+    mode : GroupResultMode
+        The mode to apply to the results.
+    results : list of (Result, Exception, or None)
+        The list of results.
+
+    Returns
+    -------
+    Severity
+        The calculated severity.
+    """
     if any(result is None or isinstance(result, Exception) for result in results):
         return Severity.error
 
@@ -277,14 +292,11 @@ def _summarize_results(
         result.severity for result in results if isinstance(result, Result)
     ]
 
-    if not severities:
-        return Severity.success
-
     if mode == GroupResultMode.all_:
-        return max(severities)
+        return util.get_maximum_severity(severities)
 
     if mode == GroupResultMode.any_:
-        return min(severities)
+        return util.get_minimum_severity(severities)
 
     return Severity.internal_error
 
@@ -328,7 +340,7 @@ class PreparedConfiguration:
 
         Parameters
         ----------
-        config : PVConfiguration, DeviceConfiguration, ToolConfiguration, ConfigurationGroup
+        config : {PV,Device,Tool}Configuration or ConfigurationGroup
             The configuration.
         client : happi.Client, optional
             A happi Client instance.
@@ -387,7 +399,7 @@ class PreparedConfiguration:
                 reason="At least one configuration failed to initialize",
             )
         else:
-            severity = _summarize_results(GroupResultMode.all_, results)
+            severity = _summarize_result_severity(GroupResultMode.all_, results)
             result = Result(severity=severity)
 
         self.result = result
@@ -397,12 +409,12 @@ class PreparedConfiguration:
 @dataclass
 class PreparedGroup(PreparedConfiguration):
     #: The corresponding group from the configuration file.
-    group: ConfigurationGroup = field(default_factory=ConfigurationGroup)
+    config: ConfigurationGroup = field(default_factory=ConfigurationGroup)
     #: The hierarhical parent of this group.  If this is the root group,
     #: 'parent' may be a PreparedFile.
     parent: Optional[Union[PreparedGroup, PreparedFile]] = field(default=None, repr=False)
     #: The configs defined in the group.
-    configs: List[PreparedConfiguration] = field(default_factory=list)
+    configs: List[AnyPreparedConfiguration] = field(default_factory=list)
     #: The configs that failed to prepare.
     prepare_failures: List[FailedConfiguration] = field(default_factory=list)
     #: Result of all comparisons.
@@ -426,7 +438,7 @@ class PreparedGroup(PreparedConfiguration):
 
         prepared = cls(
             cache=cache,
-            group=group,
+            config=group,
             parent=parent,
             configs=[],
         )
@@ -492,7 +504,7 @@ class PreparedGroup(PreparedConfiguration):
                 reason="At least one configuration failed to initialize",
             )
         else:
-            severity = _summarize_results(self.group.mode, results)
+            severity = _summarize_result_severity(self.config.mode, results)
             result = Result(
                 severity=severity
             )
@@ -668,7 +680,7 @@ class PreparedComparison:
         """
         raise NotImplementedError()
 
-    async def _compare(self) -> Result:
+    async def _compare(self, data: Any) -> Result:
         """
         Run the comparison.
 
@@ -686,7 +698,7 @@ class PreparedComparison:
             The result of the comparison.
         """
         try:
-            self.data = await self.get_data_async()
+            data = await self.get_data_async()
         except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
             result = Result(
                 severity=self.comparison.if_disconnected,
@@ -705,8 +717,10 @@ class PreparedComparison:
             self.result = result
             return result
 
+        self.data = data
+
         try:
-            result = await self._compare()
+            result = await self._compare(data)
         except Exception as ex:
             result = Result(
                 severity=Severity.internal_error,
@@ -737,7 +751,9 @@ class PreparedSignalComparison(PreparedComparison):
         - Including data reduction settings
     """
     #: The hierarhical parent of this comparison.
-    parent: Optional[Union[PreparedDeviceConfiguration, PreparedPVConfiguration]] = field(default=None, repr=False)
+    parent: Optional[
+        Union[PreparedDeviceConfiguration, PreparedPVConfiguration]
+    ] = field(default=None, repr=False)
     #: The device the comparison applies to, if applicable.
     device: Optional[ophyd.Device] = None
     #: The signal the comparison is to be run on.
@@ -774,17 +790,10 @@ class PreparedSignalComparison(PreparedComparison):
         self.data = data
         return data
 
-    async def _compare(self) -> Result:
+    async def _compare(self, data: Any) -> Result:
         """
         Run the comparison with the already-acquired data in ``self.data``.
         """
-        if self.signal is None:
-            return Result(
-                severity=Severity.internal_error,
-                reason="Signal not set"
-            )
-
-        data = self.data
         if data is None:
             # 'None' is likely incompatible with our comparisons and should
             # be raised for separately
@@ -886,7 +895,7 @@ class PreparedToolComparison(PreparedComparison):
         """
         return await self.cache.get_tool_data(self.tool)
 
-    async def _compare(self) -> Result:
+    async def _compare(self, data: Any) -> Result:
         """
         Run the prepared comparison.
 
@@ -896,7 +905,7 @@ class PreparedToolComparison(PreparedComparison):
             The result of the comparison.  This is also set in ``self.result``.
         """
         try:
-            value = tools.get_result_value_by_key(result, self.identifier)
+            value = tools.get_result_value_by_key(data, self.identifier)
         except KeyError as ex:
             return Result(
                 severity=self.comparison.severity_on_failure,
@@ -910,7 +919,6 @@ class PreparedToolComparison(PreparedComparison):
             value,
             identifier=self.identifier
         )
-
 
     @classmethod
     def from_tool(
@@ -956,6 +964,13 @@ class PreparedToolComparison(PreparedComparison):
             cache=cache,
         )
 
+
+AnyPreparedConfiguration = Union[
+    PreparedDeviceConfiguration,
+    PreparedGroup,
+    PreparedPVConfiguration,
+    PreparedToolConfiguration
+]
 
 _class_to_prepared: Dict[type, type] = {
     ConfigurationFile: PreparedFile,

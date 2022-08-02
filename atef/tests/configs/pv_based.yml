@@ -18,10 +18,18 @@
 #             atef.config.PVConfiguration(
 #                 name="PV Config 2",
 #                 by_pv={
-#                     "simple:A": [atef.check.Equals(value=1, name="Single equality check 1")],
+#                     "simple:A": [
+#                         atef.check.Equals(value=1, name="Single equality check 1")
+#                     ],
 #                     "simple:C": [],
 #                 },
-#                 shared=[atef.check.Equals(value=1, name="Shared equality check 3")],
+#                 shared=[
+#                     atef.check.Equals(
+#                         value=1,
+#                         name="Shared equality check 3",
+#                         severity_on_failure=atef.check.Severity.warning,
+#                     )
+#                 ],
 #                 tags=["pv_config_tag_2"],
 #             ),
 #         ],
@@ -60,6 +68,7 @@ root:
       shared:
       - Equals:
           name: Shared equality check 3
+          severity_on_failure: 1
           value: 1
       tags:
       - pv_config_tag_2
