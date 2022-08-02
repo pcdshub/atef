@@ -185,8 +185,10 @@ class Window(DesignerDisplay, QMainWindow):
                 caption='Save as',
                 filter='Json Files (*.json)',
             )
+        if filename.endswith('.json') is False:   # json_extension_bug_fix location
+            filename += '.json'
         try:
-            with open(filename+'.json', 'w') as fd: ## json_extension_bug_fix location
+            with open(filename, 'w') as fd:
                 json.dump(serialized, fd, indent=2)
         except OSError:
             logger.exception(f'Error saving file {filename}')
