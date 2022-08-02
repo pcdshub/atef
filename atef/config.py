@@ -80,7 +80,7 @@ class DeviceConfiguration(Configuration):
     """
     #: The device names.
     devices: List[str] = field(default_factory=list)
-    #: Identifier name to comparison list.
+    #: Device attribute name to comparison list.
     by_attr: Dict[str, List[Comparison]] = field(default_factory=dict)
     #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
     shared: List[Comparison] = field(default_factory=list)
@@ -243,25 +243,24 @@ class PreparedFile:
         """
         if not parallel:
             for prepared in self.walk_comparisons():
-                if isinstance(prepared, PreparedComparison):
-                    await prepared.get_data_async()
+                await prepared.get_data_async()
             return None
 
         tasks = []
         for prepared in self.walk_comparisons():
-            if isinstance(prepared, PreparedComparison):
-                task = asyncio.create_task(prepared.get_data_async())
-                tasks.append(task)
+            task = asyncio.create_task(prepared.get_data_async())
+            tasks.append(task)
 
         return tasks
 
     def walk_comparisons(
         self,
+        include_failures: bool = False,
     ) -> Generator[Union[PreparedComparison, FailedConfiguration], None, None]:
         """
         Walk through the prepared comparisons.
         """
-        yield from self.root.walk_comparisons()
+        yield from self.root.walk_comparisons(include_failures=include_failures)
 
     def walk_groups(
         self,
@@ -281,9 +280,9 @@ class FailedConfiguration:
     parent: Optional[PreparedGroup]
     #: Configuration instance.
     config: AnyConfiguration
-    #: Reason
-    reason: Result
-    #: Reason
+    #: The result with a severity.
+    result: Result
+    #: Exception that was caught, if available.
     exception: Optional[Exception] = None
 
 
@@ -328,6 +327,10 @@ class PreparedConfiguration:
     cache: DataCache = field(repr=False)
     #: The data cache to use for the preparation step.
     parent: Optional[PreparedGroup] = None
+    #: The comparisons to be run on the given devices.
+    comparisons: List[Union[PreparedSignalComparison, PreparedToolComparison]] = field(
+        default_factory=list
+    )
     #: The comparisons that failed to be prepared.
     prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
     #: The result of all comparisons.
@@ -371,40 +374,68 @@ class PreparedConfiguration:
         if cache is None:
             cache = DataCache()
 
-        if isinstance(config, PVConfiguration):
-            return PreparedPVConfiguration.from_config(
+        try:
+            if isinstance(config, PVConfiguration):
+                return PreparedPVConfiguration.from_config(
+                    config=config,
+                    cache=cache,
+                    parent=parent,
+                )
+            if isinstance(config, ToolConfiguration):
+                return PreparedToolConfiguration.from_config(
+                    cache=cache,
+                    config=config,
+                    parent=parent,
+                )
+            if isinstance(config, DeviceConfiguration):
+                return PreparedDeviceConfiguration.from_config(
+                    cache=cache,
+                    config=config,
+                    client=client,
+                    parent=parent,
+                )
+            if isinstance(config, ConfigurationGroup):
+                return PreparedGroup.from_config(
+                    config,
+                    cache=cache,
+                    client=client,
+                    parent=parent,
+                )
+            raise NotImplementedError(f"Configuration type unsupported: {type(config)}")
+        except PreparedComparisonException as ex:
+            return FailedConfiguration(
                 config=config,
-                cache=cache,
                 parent=parent,
+                exception=ex,
+                result=Result(
+                    severity=Severity.internal_error,
+                    reason=(
+                        f"Failed to instantiate configuration: {ex}."
+                        f"Configuration is: {config}"
+                    ),
+                ),
             )
-        if isinstance(config, ToolConfiguration):
-            return PreparedToolConfiguration.from_config(
-                cache=cache,
+        except Exception as ex:
+            return FailedConfiguration(
                 config=config,
                 parent=parent,
+                exception=ex,
+                result=Result(
+                    severity=Severity.internal_error,
+                    reason=(
+                        f"Failed to instantiate configuration: {ex}."
+                        f"Configuration is: {config}"
+                    ),
+                ),
             )
-        if isinstance(config, DeviceConfiguration):
-            return PreparedDeviceConfiguration.from_config(
-                cache=cache,
-                config=config,
-                client=client,
-                parent=parent,
-            )
-        if isinstance(config, ConfigurationGroup):
-            return PreparedGroup.from_group(
-                config,
-                cache=cache,
-                client=client,
-                parent=parent,
-            )
-
-        raise NotImplementedError(f"Configuration type unsupported: {type(config)}")
 
     def walk_comparisons(
         self,
+        include_failures: bool = False,
     ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
         """Walk through the prepared comparisons and failures."""
-        yield from self.prepare_failures
+        if include_failures:
+            yield from self.prepare_failures
         yield from self.comparisons
 
     async def compare(self) -> Result:
@@ -441,8 +472,34 @@ class PreparedGroup(PreparedConfiguration):
     #: Result of all comparisons.
     result: Result = field(default_factory=Result)
 
+    def get_value_by_name(self, name: str) -> Any:
+        """
+        Get a value defined in this group or in any ancestor.  The first found
+        is returned.
+
+        Parameters
+        ----------
+        name : str
+            The key name for the ``variables`` dictionary.
+
+        Returns
+        -------
+        Any
+            Value defined for the given key.
+
+        Raises
+        ------
+        KeyError
+            If the key is not defined on this group or any ancestor group.
+        """
+        if name in self.config.values:
+            return self.config.values[name]
+        if self.parent is not None and isinstance(self.parent, PreparedGroup):
+            return self.parent.get_value_by_name(name)
+        raise KeyError("No value defined for key: {key}")
+
     @classmethod
-    def from_group(
+    def from_config(
         cls,
         group: ConfigurationGroup,
         parent: Optional[Union[PreparedGroup, PreparedFile]] = None,
@@ -495,7 +552,7 @@ class PreparedGroup(PreparedConfiguration):
 
     def walk_groups(
         self,
-    ) -> Generator[Union[PreparedGroup], None, None]:
+    ) -> Generator[PreparedGroup, None, None]:
         """Walk through the prepared groups."""
         for config in self.configs:
             if isinstance(config, PreparedGroup):
@@ -504,13 +561,15 @@ class PreparedGroup(PreparedConfiguration):
 
     def walk_comparisons(
         self,
+        include_failures: bool = False,
     ) -> Generator[Union[PreparedComparison, FailedConfiguration], None, None]:
         """
         Walk through the prepared comparisons.
         """
-        yield from self.prepare_failures
+        if include_failures:
+            yield from self.prepare_failures
         for config in self.configs:
-            yield from config.walk_comparisons()
+            yield from config.walk_comparisons(include_failures=include_failures)
 
     async def compare(self) -> Result:
         """Run all comparisons and return a combined result."""
@@ -555,6 +614,29 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
         cache: Optional[DataCache] = None,
         client: Optional[happi.Client] = None,
     ) -> PreparedDeviceConfiguration:
+        """
+        Create a PreparedDeviceConfiguration given a device and some checks.
+
+        Parameters
+        ----------
+        device : Union[ophyd.Device, Sequence[ophyd.Device]]
+            The device or devices to check.
+        by_attr : Dict[str, List[Comparison]]
+            Device attribute name to comparison list.
+        shared : List[Comparison], optional
+            Comparisons to be run on *all* signals identified in the `by_attr`
+            dictionary.
+        parent : PreparedGroup, optional
+            The parent group, if applicable.
+        cache : DataCache, optional
+            A shared data cahce, if available.
+        client : happi.Client, optional
+            A happi Client, if available.
+
+        Returns
+        -------
+        PreparedDeviceConfiguration
+        """
         if isinstance(device, Sequence):
             devices = list(device)
         else:
@@ -581,7 +663,30 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
         parent: Optional[PreparedGroup] = None,
         cache: Optional[DataCache] = None,
         additional_devices: Optional[List[ophyd.Device]] = None,
-    ) -> Union[FailedConfiguration, PreparedDeviceConfiguration]:
+    ) -> PreparedDeviceConfiguration:
+        """
+        Prepare a DeviceConfiguration for running comparisons.
+
+        Parameters
+        ----------
+        config : DeviceConfiguration
+            The configuration to prepare.
+        parent : PreparedGroup, optional
+            The parent group, if applicable.
+        cache : DataCache, optional
+            A shared data cahce, if available.
+        client : happi.Client, optional
+            A happi Client, if available.
+        additional_devices : Optional[List[ophyd.Device]], optional
+            Additional devices (aside from those in the DeviceConfiguration)
+            to add to the PreparedDeviceConfiguration list.
+
+        Returns
+        -------
+        FailedConfiguration or PreparedDeviceConfiguration
+            If one or more devices is unavailable, a FailedConfiguration
+            instance will be returned.
+        """
         if not isinstance(config, DeviceConfiguration):
             raise ValueError(f"Unexpected configuration type: {type(config).__name__}")
 
@@ -596,9 +701,10 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
             try:
                 devices.append(util.get_happi_device_by_name(dev_name, client=client))
             except Exception as ex:
-                return FailedConfiguration(
+                raise PreparedComparisonException(
                     parent=parent,
                     config=config,
+                    identifier=dev_name,
                     reason=Result(
                         reason=f"Failed to load happi device: {dev_name}",
                         severity=Severity.error,
@@ -1074,8 +1180,6 @@ class PreparedToolComparison(PreparedComparison):
             specific result_key).
         name : Optional[str], optional
             The name of the comparison.
-        path : Optional[List[PathItem]], optional
-            The path that led us to this single comparison.
         cache : DataCache, optional
             The data cache to use for this and other similar comparisons.
 

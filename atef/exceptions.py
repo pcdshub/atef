@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import typing
-from typing import List, Optional
+from typing import Optional
 
 from .enums import Severity
 
 if typing.TYPE_CHECKING:
     from .check import Comparison
-    from .config import AnyConfiguration, PathItem
+    from .config import AnyConfiguration
 
 
 class ConfigFileLoadError(Exception):
@@ -52,10 +52,10 @@ class PreparedComparisonException(Exception):
     exception: Exception
     #: The identifier used for the comparison.
     identifier: str
+    #: The relevant configuration
+    config: Optional[AnyConfiguration]
     #: The comparison related to the exception, if applicable.
     comparison: Optional[Comparison]
-    #: The hierarhical path that led to this prepared comparison.
-    path: List[PathItem]
     #: The name of the associated configuration.
     name: Optional[str] = None
 
@@ -63,16 +63,16 @@ class PreparedComparisonException(Exception):
         self,
         exception: Exception,
         identifier: str,
+        config: Optional[AnyConfiguration] = None,
         comparison: Optional[Comparison] = None,
         name: Optional[str] = None,
-        path: Optional[List[PathItem]] = None,
     ):
         super().__init__(str(exception))
         self.exception = exception
         self.identifier = identifier
         self.comparison = comparison
+        self.config = config
         self.name = name
-        self.path = path or []
 
 
 class ToolException(Exception):
