@@ -5,6 +5,7 @@
 import argparse
 import asyncio
 import dataclasses
+import enum
 import logging
 import pathlib
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
@@ -18,12 +19,20 @@ import rich.tree
 from ..cache import DataCache, _SignalCache, get_signal_cache
 from ..check import Comparison, Result, Severity
 from ..config import (AnyConfiguration, Configuration, ConfigurationFile,
-                      PathItem, PreparedComparison)
+                      ConfigurationGroup, PreparedComparison, PreparedFile,
+                      PreparedGroup)
 from ..util import get_maximum_severity, ophyd_cleanup
 
 logger = logging.getLogger(__name__)
 
 DESCRIPTION = __doc__
+
+
+class VerbositySetting(enum.Flag):
+    default = enum.auto()
+    show_description = enum.auto()
+    show_tags = enum.auto()
+    show_passed_tests = enum.auto()
 
 
 def build_arg_parser(argparser=None):
@@ -78,11 +87,11 @@ default_severity_to_log_level = {
 }
 
 
-def description_for_tree(
+def get_comparison_text_for_tree(
     item: Union[PreparedComparison, Exception],
     *,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
-    verbose: int = 0,
+    verbosity: VerbositySetting = VerbositySetting.default,
 ) -> Optional[str]:
     """
     Get a description for the rich Tree, given a comparison or a failed result.
@@ -126,7 +135,7 @@ def description_for_tree(
             f"{severity_to_rich[result.severity]}[default]: {result.reason}"
         )
 
-    if verbose > 0 and prepared is not None:
+    if VerbositySetting.show_passed_tests and prepared is not None:
         if prepared.comparison is not None:
             description = prepared.comparison.describe()
         else:
@@ -142,7 +151,10 @@ def description_for_tree(
     return None
 
 
-def _get_name_and_description(obj: Union[Comparison, AnyConfiguration]) -> str:
+def get_name_for_tree(
+    obj: Union[Comparison, AnyConfiguration],
+    verbosity: VerbositySetting
+) -> str:
     """
     Get a combined name and description for a given item.
 
@@ -156,129 +168,80 @@ def _get_name_and_description(obj: Union[Comparison, AnyConfiguration]) -> str:
     str
         The displayable name.
     """
-    if obj.name and obj.description:
-        return f"{obj.name}: {obj.description}"
+    if VerbositySetting.show_description in verbosity:
+        if obj.description:
+            if obj.name:
+                return f"{obj.name}: {obj.description}"
+            return obj.description
+
     if obj.name:
         return obj.name
-    return obj.description or ""
+    return ""
 
 
-def _get_display_name_for_item(item: PathItem) -> str:
-    """
-    Get the text to show in the rich Tree for the given item.
-
-    Parameters
-    ----------
-    item : PathItem
-        The item to get the display text for.
-
-    Returns
-    -------
-    str
-        Text to display.
-    """
-    if isinstance(item, (Comparison, Configuration)):
-        return _get_name_and_description(item)
-    return getattr(item, "name", str(item)) or ""
-
-
-@dataclasses.dataclass
-class _RichTreeHelper:
-    """A helper for mapping to subtrees of a root ``rich.Tree``."""
-    root: rich.tree.Tree
-    path_to_tree: Dict[Tuple[str, ...], rich.tree.Tree] = dataclasses.field(
-        default_factory=dict
-    )
-    path: List[str] = dataclasses.field(default_factory=list)
-
-    def get_subtree(self, path: Iterable[PathItem]) -> rich.tree.Tree:
-        """
-        Get a subtree based on the traversed node names along the path.
-
-        Parameters
-        ----------
-        path : Iterable[str]
-            The path of names to the subtree.
-
-        Returns
-        -------
-        rich.tree.Tree
-            The subtree depending on the provided path.
-        """
-        displayed_path = [_get_display_name_for_item(item) for item in path]
-        partial_path = ()
-        node = self.root
-        for part in displayed_path:
-            partial_path = partial_path + (part, )
-            if partial_path not in self.path_to_tree:
-                subtree = rich.tree.Tree(partial_path[-1])
-                self.path_to_tree[partial_path] = subtree
-                node.add(subtree)
-
-            node = self.path_to_tree[partial_path]
-
-        return node
-
-
-def log_results_rich(
-    console: rich.console.Console,
-    severity: Severity,
-    config: AnyConfiguration,
-    items: List[Union[Exception, PreparedComparison]],
-    *,
-    device: Optional[ophyd.Device] = None,
+def group_to_rich_tree(
+    group: PreparedGroup,
+    verbosity: VerbositySetting = VerbositySetting.default,
     severity_to_rich: Optional[Dict[Severity, str]] = None,
-    verbose: int = 0,
 ):
-    """Log check results to the module logger."""
     severity_to_rich = severity_to_rich or default_severity_to_rich
 
-    desc = f" ({config.description}) " if config.description else ""
+    severity_marker = severity_to_rich[group.result.severity]
+    tree_name = get_name_for_tree(group.group, verbosity=verbosity)
+    tree = rich.tree.Tree(f"{severity_marker} {tree_name}")
+    print("tree", tree_name)
+    for config in group.configs:
+        print(type(config))
+        if isinstance(config, PreparedGroup):
+            tree.add(
+                group_to_rich_tree(
+                    config,
+                    verbosity=verbosity,
+                    severity_to_rich=severity_to_rich
+                )
+            )
+        else:
+            result = config.result
+            severity = getattr(result, "severity", Severity.error)
+            severity_marker = severity_to_rich[group.result.severity]
 
-    # Not sure about this just yet:
-    label_prefix = f"{severity_to_rich[severity]} [default]"
-    label_suffix = desc
-    if config.name:
-        label_middle = config.name
-    elif device is not None:
-        label_middle = device.name
-    else:
-        label_middle = ""
+            subtree_name = get_name_for_tree(config.config, verbosity=verbosity)
+            subtree = rich.tree.Tree(f"{severity_marker} {subtree_name}")
+            if result is not None and severity == Severity.success:
+                if VerbositySetting.show_passed_tests in verbosity:
+                    tree.add(subtree)
+            else:
+                tree.add(subtree)
 
-    root = rich.tree.Tree(f"{label_prefix}{label_middle}{label_suffix}")
-    tree_helper = _RichTreeHelper(root=root)
-    for item in items:
-        path = getattr(item, "path", [])
+            for comparison in config.comparisons:
+                subtree.add(
+                    get_comparison_text_for_tree(comparison, verbosity=verbosity)
+                )
 
-        # Remove the configuration name ``path[0]`` and the final attribute
-        # in the tree ``path[-1]``
-        path = path[1:-1]
+            for comparison in config.prepare_failures:
+                subtree.add(
+                    get_comparison_text_for_tree(comparison, verbosity=verbosity)
+                )
 
-        desc = description_for_tree(
-            item, severity_to_rich=severity_to_rich, verbose=verbose
-        )
-        if desc:
-            node = tree_helper.get_subtree(path)
-            node.add(desc)
-
-    console.print(root)
+    return tree
 
 
 async def check_and_log(
-    config: AnyConfiguration,
+    config: ConfigurationFile,
     console: rich.console.Console,
-    verbose: int = 0,
+    verbosity: VerbositySetting = VerbositySetting.default,
     client: Optional[happi.Client] = None,
     name_filter: Optional[Sequence[str]] = None,
     parallel: bool = True,
     cache: Optional[DataCache] = None,
+    filename: Optional[str] = None,
 ):
     """
     Check a configuration and log the results.
 
     Parameters
     ----------
-    config : AnyConfiguration
+    config : ConfigurationFile
         The configuration to check.
     console : rich.console.Console
         The rich console to write output to.
@@ -300,49 +263,54 @@ async def check_and_log(
     if cache is None:
         cache = DataCache()
 
-    all_prepared = list(
-        PreparedComparison.from_config(config, client=client, cache=cache)
-    )
+    prepared_file = PreparedFile.from_config(config, cache=cache, client=client)
 
     cache_fill_tasks = []
     if parallel:
-        for prepared in all_prepared:
-            if isinstance(prepared, PreparedComparison):
-                cache_fill_tasks.append(
-                    asyncio.create_task(prepared.get_data_async())
-                )
+        cache_fill_tasks = await prepared_file.fill_cache()
 
-    for prepared in all_prepared:
-        if isinstance(prepared, PreparedComparison):
-            if name_filter:
-                device_name = getattr(prepared.device, "name", None)
-                if device_name is not None:
-                    if device_name not in name_filter:
-                        logger.debug(
-                            "Skipping device check at user's request: %s",
-                            device_name,
-                        )
-                        continue
-                elif prepared.identifier not in name_filter:
-                    logger.debug(
-                        "Skipping identifier at user's request: %s",
-                        prepared.identifier
-                    )
-                    continue
+    await prepared_file.compare()
 
-            prepared.result = await prepared.compare()
-            if prepared.result is not None:
-                items.append(prepared)
-                severities.append(prepared.result.severity)
-        elif isinstance(prepared, Exception):
-            ex = cast(Exception, prepared)
-            items.append(ex)
-            severities.append(Result.from_exception(ex).severity)
-        else:
-            logger.error(
-                "Internal error: unexpected result from PreparedComparison: %s",
-                type(prepared)
-            )
+    root_tree = rich.tree.Tree(str(filename))
+    tree = group_to_rich_tree(prepared_file.root, verbosity=verbosity)
+    root_tree.add(tree)
+
+    if filename is not None:
+        console.print(root_tree)
+    else:
+        console.print(tree)
+
+    # for prepared in all_prepared:
+    #     if isinstance(prepared, PreparedComparison):
+    #         if name_filter:
+    #             device_name = getattr(prepared.device, "name", None)
+    #             if device_name is not None:
+    #                 if device_name not in name_filter:
+    #                     logger.debug(
+    #                         "Skipping device check at user's request: %s",
+    #                         device_name,
+    #                     )
+    #                     continue
+    #             elif prepared.identifier not in name_filter:
+    #                 logger.debug(
+    #                     "Skipping identifier at user's request: %s",
+    #                     prepared.identifier
+    #                 )
+    #                 continue
+
+    #         prepared.result = await prepared.compare()
+    #         if prepared.result is not None:
+    #             items.append(prepared)
+    #             severities.append(prepared.result.severity)
+    #     elif isinstance(prepared, Exception):
+    #         ex = cast(Exception, prepared)
+    #         items.append(ex)
+    #         severities.append(Result.from_exception(ex).severity)
+    #     else:
+    #         logger.error(
+    #             "Internal error: unexpected result from PreparedComparison: %s",
+    #             type(prepared)
+    #         )
 
     if not items:
         # Nothing to report; all filtered out
@@ -383,16 +351,16 @@ async def main(
     cache = DataCache(signals=signal_cache or get_signal_cache())
     try:
         with console.status("[bold green] Performing checks..."):
-            for config in config_file.configs:
-                await check_and_log(
-                    config,
-                    console=console,
-                    verbose=verbose,
-                    client=client,
-                    name_filter=name_filter,
-                    parallel=parallel,
-                    cache=cache,
-                )
+            await check_and_log(
+                config_file,
+                console=console,
+                # verbose=verbose,
+                client=client,
+                name_filter=name_filter,
+                parallel=parallel,
+                cache=cache,
+                filename=filename,
+            )
     finally:
         if cleanup:
             ophyd_cleanup()

@@ -4,7 +4,8 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Generator, List, Optional, Sequence, Tuple, Union
+from typing import (Any, Dict, Generator, List, Optional, Sequence, Tuple,
+                    Union, cast)
 
 import apischema
 import happi
@@ -15,25 +16,13 @@ from ophyd.signal import ConnectionTimeoutError
 from . import serialization, tools, util
 from .cache import DataCache
 from .check import Comparison, Result
-from .enums import Severity
+from .enums import GroupResultMode, Severity
 from .exceptions import PreparedComparisonException
 from .type_hints import AnyPath
 from .yaml_support import init_yaml_support
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class IdentifierAndComparison:
-    """
-    Set of identifiers (IDs) and comparisons to perform on those identifiers.
-    """
-    #: An optional identifier for this set.
-    name: Optional[str] = None
-    #: PV name, attribute name, or test-specific identifier.
-    ids: List[str] = field(default_factory=list)
-    #: The comparisons to perform for *each* of the ids.
-    comparisons: List[Comparison] = field(default_factory=list)
 
 
 @dataclass
@@ -53,8 +42,19 @@ class Configuration:
     description: Optional[str] = None
     #: Tags tied to this configuration.
     tags: Optional[List[str]] = None
-    #: Comparison checklist for this configuration.
-    checklist: List[IdentifierAndComparison] = field(default_factory=list)
+
+
+@dataclass
+class ConfigurationGroup(Configuration):
+    """
+    Configuration group.
+    """
+    #: Configurations underneath this group.
+    configs: List[Configuration] = field(default_factory=list)
+    #: Values that can be reused in comparisons underneath this group.
+    values: Dict[str, Any] = field(default_factory=dict)
+    #: Result mode.
+    mode: GroupResultMode = GroupResultMode.all_
 
 
 @dataclass
@@ -69,8 +69,12 @@ class DeviceConfiguration(Configuration):
     would mean to access each device's ``.sub_device`` and that sub-device's
     ``.a`` component).
     """
-    #: Happi device names which give meaning to self.checklist[].ids.
+    #: The device names.
     devices: List[str] = field(default_factory=list)
+    #: Identifier name to comparison list.
+    by_attr: Dict[str, List[Comparison]] = field(default_factory=dict)
+    #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
+    shared: List[Comparison] = field(default_factory=list)
 
 
 @dataclass
@@ -80,7 +84,10 @@ class PVConfiguration(Configuration):
 
     Identifiers are by default assumed to be PV names.
     """
-    ...
+    #: PV name to comparison list.
+    by_pv: Dict[str, List[Comparison]] = field(default_factory=dict)
+    #: Comparisons to be run on *all* identifiers in the `by_pv` dictionary.
+    shared: List[Comparison] = field(default_factory=list)
 
 
 @dataclass
@@ -91,19 +98,20 @@ class ToolConfiguration(Configuration):
 
     Comparisons can optionally be run on the tool's results.
     """
+    #: The tool and its settings.  Subclasses such as "Ping" are expected
+    #: here.
     tool: tools.Tool = field(default_factory=tools.Ping)
+    #: Result attribute name to comparison list.
+    by_attr: Dict[str, List[Comparison]] = field(default_factory=dict)
+    #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
+    shared: List[Comparison] = field(default_factory=list)
 
 
 AnyConfiguration = Union[
     PVConfiguration,
     DeviceConfiguration,
     ToolConfiguration,
-]
-PathItem = Union[
-    AnyConfiguration,
-    IdentifierAndComparison,
-    Comparison,
-    str,
+    ConfigurationGroup,
 ]
 
 
@@ -112,36 +120,37 @@ class ConfigurationFile:
     """
     A configuration file comprised of a number of devices/PV configurations.
     """
+    #: atef configuration file version information.
+    version: int = 0
+    #: Top-level configuration group.
+    root: ConfigurationGroup = field(default_factory=ConfigurationGroup)
 
-    #: configs: PVConfiguration, DeviceConfiguration, or ToolConfiguration.
-    configs: List[Configuration]
+    # def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
+    #     """Get all configurations that match the device name."""
+    #     for config in self.configs:
+    #         if isinstance(config, DeviceConfiguration):
+    #             if name in config.devices:
+    #                 yield config
 
-    def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
-        """Get all configurations that match the device name."""
-        for config in self.configs:
-            if isinstance(config, DeviceConfiguration):
-                if name in config.devices:
-                    yield config
+    # def get_by_pv(
+    #     self, pvname: str
+    # ) -> Generator[Tuple[PVConfiguration, List[IdentifierAndComparison]], None, None]:
+    #     """Get all configurations + IdentifierAndComparison that match the PV name."""
+    #     for config in self.configs:
+    #         if isinstance(config, PVConfiguration):
+    #             checks = [check for check in config.checklist if pvname in check.ids]
+    #             if checks:
+    #                 yield config, checks
 
-    def get_by_pv(
-        self, pvname: str
-    ) -> Generator[Tuple[PVConfiguration, List[IdentifierAndComparison]], None, None]:
-        """Get all configurations + IdentifierAndComparison that match the PV name."""
-        for config in self.configs:
-            if isinstance(config, PVConfiguration):
-                checks = [check for check in config.checklist if pvname in check.ids]
-                if checks:
-                    yield config, checks
+    # def get_by_tag(self, *tags: str) -> Generator[Configuration, None, None]:
+    #     """Get all configurations that match the tag name."""
+    #     if not tags:
+    #         return
 
-    def get_by_tag(self, *tags: str) -> Generator[Configuration, None, None]:
-        """Get all configurations that match the tag name."""
-        if not tags:
-            return
-
-        tag_set = set(tags)
-        for config in self.configs:
-            if tag_set.intersection(set(config.tags or [])):
-                yield config
+    #     tag_set = set(tags)
+    #     for config in self.configs:
+    #         if tag_set.intersection(set(config.tags or [])):
+    #             yield config
 
     @classmethod
     def from_json(cls, filename: AnyPath) -> ConfigurationFile:
@@ -168,20 +177,481 @@ class ConfigurationFile:
 
 
 @dataclass
+class PreparedFile:
+    #: The data cache to use for the preparation step.
+    cache: DataCache = field(repr=False)
+    #: The corresponding configuration file information.
+    file: ConfigurationFile
+    #: The happi client instance.
+    client: happi.Client
+    #: The comparisons defined in the top-level file.
+    root: PreparedGroup
+
+    @classmethod
+    def from_config(
+        cls,
+        file: ConfigurationFile,
+        *,
+        client: Optional[happi.Client] = None,
+        cache: Optional[DataCache] = None,
+    ) -> PreparedFile:
+        if client is None:
+            client = happi.Client.from_config()
+
+        if cache is None:
+            cache = DataCache()
+
+        prepared_file = PreparedFile(
+            file=file,
+            cache=cache,
+            client=client,
+            root=None,
+        )
+        prepared_root = PreparedGroup.from_group(
+            file.root,
+            client=client,
+            cache=cache,
+            parent=prepared_file,
+        )
+        prepared_root.parent = prepared_root
+        prepared_file.root = prepared_root
+        return prepared_file
+
+    async def fill_cache(self, parallel: bool = True) -> Optional[List[asyncio.Task]]:
+        """
+        Fill the DataCache.
+        """
+        if not parallel:
+            for prepared in self.walk_comparisons():
+                if isinstance(prepared, PreparedComparison):
+                    await prepared.get_data_async()
+            return None
+
+        tasks = []
+        for prepared in self.walk_comparisons():
+            if isinstance(prepared, PreparedComparison):
+                task = asyncio.create_task(prepared.get_data_async())
+                tasks.append(task)
+
+        return tasks
+
+    def walk_comparisons(
+        self,
+    ) -> Generator[Union[PreparedComparison, FailedConfiguration], None, None]:
+        """
+        Walk through the prepared comparisons.
+        """
+        yield from self.root.walk_comparisons()
+
+    def walk_groups(
+        self,
+    ) -> Generator[Union[PreparedGroup], None, None]:
+        """Walk through the prepared groups."""
+        yield self.root
+        yield from self.root.walk_groups()
+
+    async def compare(self) -> Result:
+        """Run all comparisons and return a combined result."""
+        return await self.root.compare()
+
+
+@dataclass
+class FailedConfiguration:
+    #: The data cache to use for the preparation step.
+    parent: Optional[PreparedGroup]
+    #: Configuration instance.
+    config: AnyConfiguration
+    #: Reason
+    reason: Result
+    #: Reason
+    exception: Optional[Exception] = None
+
+
+def _summarize_results(
+    mode: GroupResultMode, results: List[Union[Result, Exception, None]]
+) -> Severity:
+    if any(result is None or isinstance(result, Exception) for result in results):
+        return Severity.error
+
+    severities = [
+        result.severity for result in results if isinstance(result, Result)
+    ]
+
+    if not severities:
+        return Severity.success
+
+    if mode == GroupResultMode.all_:
+        return max(severities)
+
+    if mode == GroupResultMode.any_:
+        return min(severities)
+
+    return Severity.internal_error
+
+
+@dataclass
+class PreparedConfiguration:
+    #: The data cache to use for the preparation step.
+    cache: DataCache = field(repr=False)
+    #: The data cache to use for the preparation step.
+    parent: Optional[PreparedGroup] = None
+    #: The comparisons that failed to be prepared.
+    prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
+    #: The result of all comparisons.
+    result: Result = field(default_factory=Result)
+
+    @classmethod
+    def from_config(
+        cls,
+        config: AnyConfiguration,
+        parent: Optional[PreparedGroup] = None,
+        *,
+        client: Optional[happi.Client] = None,
+        cache: Optional[DataCache] = None,
+    ) -> Union[
+        PreparedPVConfiguration,
+        PreparedDeviceConfiguration,
+        PreparedToolConfiguration,
+        PreparedGroup,
+        FailedConfiguration,
+    ]:
+        """
+        Create one or more PreparedConfiguration instances from a
+        given Configuration instance.
+
+        If available, provide an instantiated happi Client and a data
+        cache.  If unspecified, a configuration-derived happi Client will
+        be instantiated and a global data cache will be utilized.
+
+        It is recommended - but not required - to manage a data cache on a
+        per-configuration basis.  Managing the global cache is up to the user.
+
+        Parameters
+        ----------
+        config : PVConfiguration, DeviceConfiguration, ToolConfiguration, ConfigurationGroup
+            The configuration.
+        client : happi.Client, optional
+            A happi Client instance.
+        cache : DataCache, optional
+            The data cache to use for this and other similar comparisons.
+        """
+        if cache is None:
+            cache = DataCache()
+
+        if isinstance(config, PVConfiguration):
+            return PreparedPVConfiguration.from_config(
+                config=config,
+                cache=cache,
+                parent=parent,
+            )
+        if isinstance(config, ToolConfiguration):
+            return PreparedToolConfiguration.from_config(
+                cache=cache,
+                config=config,
+                parent=parent,
+            )
+        if isinstance(config, DeviceConfiguration):
+            return PreparedDeviceConfiguration.from_config(
+                cache=cache,
+                config=config,
+                client=client,
+                parent=parent,
+            )
+        if isinstance(config, ConfigurationGroup):
+            return PreparedGroup.from_group(
+                config,
+                cache=cache,
+                client=client,
+                parent=parent,
+            )
+
+        raise NotImplementedError(f"Configuration type unsupported: {type(config)}")
+
+    def walk_comparisons(
+        self,
+    ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
+        """Walk through the prepared comparisons and failures."""
+        yield from self.prepare_failures
+        yield from self.comparisons
+
+    async def compare(self) -> Result:
+        """Run all comparisons and return a combined result."""
+        results = []
+        for config in self.comparisons:
+            if isinstance(config, PreparedComparison):
+                results.append(await config.compare())
+
+        if self.prepare_failures:
+            result = Result(
+                severity=Severity.error,
+                reason="At least one configuration failed to initialize",
+            )
+        else:
+            severity = _summarize_results(GroupResultMode.all_, results)
+            result = Result(severity=severity)
+
+        self.result = result
+        return result
+
+
+@dataclass
+class PreparedGroup(PreparedConfiguration):
+    #: The corresponding group from the configuration file.
+    group: ConfigurationGroup = field(default_factory=ConfigurationGroup)
+    #: The hierarhical parent of this group.  If this is the root group,
+    #: 'parent' may be a PreparedFile.
+    parent: Optional[Union[PreparedGroup, PreparedFile]] = field(default=None, repr=False)
+    #: The configs defined in the group.
+    configs: List[PreparedConfiguration] = field(default_factory=list)
+    #: The configs that failed to prepare.
+    prepare_failures: List[FailedConfiguration] = field(default_factory=list)
+    #: Result of all comparisons.
+    result: Result = field(default_factory=Result)
+
+    @classmethod
+    def from_group(
+        cls,
+        group: ConfigurationGroup,
+        parent: Optional[Union[PreparedGroup, PreparedFile]] = None,
+        *,
+        client: Optional[happi.Client] = None,
+        cache: Optional[DataCache] = None,
+    ) -> PreparedGroup:
+
+        if client is None:
+            client = happi.Client.from_config()
+
+        if cache is None:
+            cache = DataCache()
+
+        prepared = cls(
+            cache=cache,
+            group=group,
+            parent=parent,
+            configs=[],
+        )
+
+        for config in group.configs:
+            prepared_conf = PreparedConfiguration.from_config(
+                config=cast(AnyConfiguration, config),
+                parent=prepared,
+                client=client,
+                cache=cache,
+            )
+            if isinstance(prepared_conf, FailedConfiguration):
+                prepared.prepare_failures.append(prepared_conf)
+            else:
+                prepared.configs.append(prepared_conf)
+
+        return prepared
+
+    @property
+    def subgroups(self) -> List[PreparedGroup]:
+        """
+        Direct descendent subgroups in this group.
+
+        Returns
+        -------
+        List[PreparedGroup]
+        """
+        return [
+            config
+            for config in self.configs
+            if isinstance(config, PreparedGroup)
+        ]
+
+    def walk_groups(
+        self,
+    ) -> Generator[Union[PreparedGroup], None, None]:
+        """Walk through the prepared groups."""
+        for config in self.configs:
+            if isinstance(config, PreparedGroup):
+                yield config
+                yield from config.walk_groups()
+
+    def walk_comparisons(
+        self,
+    ) -> Generator[Union[PreparedComparison, FailedConfiguration], None, None]:
+        """
+        Walk through the prepared comparisons.
+        """
+        yield from self.prepare_failures
+        for config in self.configs:
+            yield from config.walk_comparisons()
+
+    async def compare(self) -> Result:
+        """Run all comparisons and return a combined result."""
+        results = []
+        for config in self.configs:
+            if isinstance(config, PreparedConfiguration):
+                results.append(await config.compare())
+
+        if self.prepare_failures:
+            result = Result(
+                severity=Severity.error,
+                reason="At least one configuration failed to initialize",
+            )
+        else:
+            severity = _summarize_results(self.group.mode, results)
+            result = Result(
+                severity=severity
+            )
+
+        self.result = result
+        return result
+
+
+@dataclass
+class PreparedDeviceConfiguration(PreparedConfiguration):
+    #: The configuration settings.
+    config: DeviceConfiguration = field(default_factory=DeviceConfiguration)
+    #: The device the comparisons apply to.
+    devices: List[ophyd.Device] = field(default_factory=list)
+    #: The comparisons to be run on the given devices.
+    comparisons: List[PreparedSignalComparison] = field(default_factory=list)
+    #: The comparisons that failed to be prepared.
+    prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
+
+    @classmethod
+    def from_config(
+        cls,
+        config: DeviceConfiguration,
+        client: Optional[happi.Client] = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
+    ) -> Union[FailedConfiguration, PreparedDeviceConfiguration]:
+        if not isinstance(config, DeviceConfiguration):
+            raise ValueError(f"Unexpected configuration type: {type(config).__name__}")
+
+        if client is None:
+            client = happi.Client.from_config()
+
+        if cache is None:
+            cache = DataCache()
+
+        devices = []
+        for dev_name in config.devices:
+            try:
+                devices.append(util.get_happi_device_by_name(dev_name, client=client))
+            except Exception as ex:
+                return FailedConfiguration(
+                    parent=parent,
+                    config=config,
+                    reason=Result(
+                        reason=f"Failed to load happi device: {dev_name}",
+                        severity=Severity.error,
+                    ),
+                    exception=ex,
+                )
+
+        comparisons = []
+        prepare_failures = []
+        shared = config.shared or []
+
+        prepared = PreparedDeviceConfiguration(
+            config=config,
+            devices=devices,
+            cache=cache,
+            parent=parent,
+            comparisons=comparisons,
+            prepare_failures=prepare_failures,
+        )
+
+        for device in devices:
+            for attr, comparisons in config.by_attr.items():
+                for comparison in comparisons + shared:
+                    try:
+                        comparisons.append(
+                            PreparedSignalComparison.from_device(
+                                device=device,
+                                attr=attr,
+                                comparison=comparison,
+                                parent=prepared,
+                                cache=cache,
+                            )
+                        )
+                    except Exception as ex:
+                        prepare_failures.append(ex)
+
+        return prepared
+
+
+@dataclass
+class PreparedPVConfiguration(PreparedConfiguration):
+    #: The configuration settings.
+    config: PVConfiguration = field(default_factory=PVConfiguration)
+    #: The comparisons to be run on the given devices.
+    comparisons: List[PreparedSignalComparison] = field(default_factory=list)
+    #: The comparisons to be run on the given devices.
+    prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
+
+    @classmethod
+    def from_config(
+        cls,
+        config: PVConfiguration,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
+    ) -> Union[FailedConfiguration, PreparedPVConfiguration]:
+        if not isinstance(config, PVConfiguration):
+            raise ValueError(f"Unexpected configuration type: {type(config).__name__}")
+
+        if cache is None:
+            cache = DataCache()
+
+        prepared_comparisons = []
+        prepare_failures = []
+        shared = config.shared or []
+
+        prepared = PreparedPVConfiguration(
+            config=config,
+            cache=cache,
+            parent=parent,
+            comparisons=prepared_comparisons,
+            prepare_failures=prepare_failures,
+        )
+
+        for pvname, comparisons in config.by_pv.items():
+            for comparison in comparisons + shared:
+                try:
+                    prepared_comparisons.append(
+                        PreparedSignalComparison.from_pvname(
+                            pvname=pvname,
+                            comparison=comparison,
+                            parent=prepared,
+                            cache=cache,
+                        )
+                    )
+                except Exception as ex:
+                    prepare_failures.append(ex)
+
+        return prepared
+
+
+@dataclass
+class PreparedToolConfiguration(PreparedConfiguration):
+    #: The configuration settings.
+    config: ToolConfiguration = field(default_factory=ToolConfiguration)
+    #: The comparisons to be run on the given devices.
+    comparisons: List[PreparedSignalComparison] = field(default_factory=list)
+    #: The comparisons that failed to be prepared.
+    prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
+
+
+@dataclass
 class PreparedComparison:
     """
     A unified representation of comparisons for device signals and standalone PVs.
     """
     #: The data cache to use for the preparation step.
-    cache: DataCache
+    cache: DataCache = field(repr=False)
     #: The identifier used for the comparison.
     identifier: str = ""
     #: The comparison itself.
     comparison: Comparison = field(default_factory=Comparison)
     #: The name of the associated configuration.
     name: Optional[str] = None
-    #: The hierarhical path that led to this prepared comparison.
-    path: List[PathItem] = field(default_factory=list)
+    #: The hierarhical parent of this comparison.
+    parent: Optional[PreparedGroup] = field(default=None, repr=False)
     #: The last result of the comparison, if run.
     result: Optional[Result] = None
 
@@ -198,7 +668,7 @@ class PreparedComparison:
         """
         raise NotImplementedError()
 
-    async def compare(self) -> Result:
+    async def _compare(self) -> Result:
         """
         Run the comparison.
 
@@ -206,73 +676,48 @@ class PreparedComparison:
         """
         raise NotImplementedError()
 
-    @classmethod
-    def from_config(
-        cls,
-        config: AnyConfiguration,
-        *,
-        client: Optional[happi.Client] = None,
-        cache: Optional[DataCache] = None,
-    ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
+    async def compare(self) -> Result:
         """
-        Create one or more PreparedComparison instances from a PVConfiguration
-        or a DeviceConfiguration.
+        Run the comparison and return the Result.
 
-        If available, provide an instantiated happi Client and a data
-        cache.  If unspecified, a configuration-derived happi Client will
-        be instantiated and a global data cache will be utilized.
-
-        It is recommended - but not required - to manage a data cache on a
-        per-configuration basis.  Managing the global cache is up to the user.
-
-        Parameters
-        ----------
-        config : PVConfiguration or DeviceConfiguration
-            The configuration.
-        client : happi.Client, optional
-            A happi Client instance.
-        cache : DataCache, optional
-            The data cache to use for this and other similar comparisons.
-
-        Yields
-        ------
-        item : PreparedComparisonException or PreparedComparison
-            If an error occurs during preparation, a
-            PreparedComparisonException will be yielded in place of the
-            PreparedComparison.
+        Returns
+        -------
+        Result
+            The result of the comparison.
         """
-        if cache is None:
-            cache = DataCache()
+        try:
+            self.data = await self.get_data_async()
+        except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
+            result = Result(
+                severity=self.comparison.if_disconnected,
+                reason=f"Unable to retrieve data for comparison: {self.identifier}"
+            )
+            self.result = result
+            return result
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Getting data for {self.identifier!r} comparison "
+                    f"{self.comparison} raised {ex.__class__.__name__}: {ex}"
+                ),
+            )
+            self.result = result
+            return result
 
-        if isinstance(config, PVConfiguration):
-            yield from PreparedSignalComparison._from_pv_config(config, cache=cache)
-        elif isinstance(config, DeviceConfiguration):
-            if client is None:
-                client = happi.Client.from_config()
-            for dev_name in config.devices:
-                try:
-                    device = util.get_happi_device_by_name(dev_name, client=client)
-                except Exception as ex:
-                    yield PreparedComparisonException(
-                        exception=ex,
-                        comparison=None,  # TODO
-                        name=config.name or config.description,
-                        identifier=dev_name,
-                        path=[
-                            config,
-                            dev_name,
-                        ],
-                    )
-                else:
-                    yield from PreparedSignalComparison._from_device_config(
-                        config=config,
-                        device=device,
-                        cache=cache,
-                    )
-        elif isinstance(config, ToolConfiguration):
-            yield from PreparedToolComparison._from_tool_config(config, cache=cache)
-        else:
-            raise NotImplementedError(f"Configuration type unsupported: {type(config)}")
+        try:
+            result = await self._compare()
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Failed to run {self.identifier!r} comparison "
+                    f"{self.comparison} raised {ex.__class__.__name__}: {ex} "
+                ),
+            )
+
+        self.result = result
+        return result
 
 
 @dataclass
@@ -291,6 +736,8 @@ class PreparedSignalComparison(PreparedComparison):
     * A comparison to run
         - Including data reduction settings
     """
+    #: The hierarhical parent of this comparison.
+    parent: Optional[Union[PreparedDeviceConfiguration, PreparedPVConfiguration]] = field(default=None, repr=False)
     #: The device the comparison applies to, if applicable.
     device: Optional[ophyd.Device] = None
     #: The signal the comparison is to be run on.
@@ -327,47 +774,7 @@ class PreparedSignalComparison(PreparedComparison):
         self.data = data
         return data
 
-    async def compare(self) -> Result:
-        """
-        Run the prepared comparison.
-
-        Returns
-        -------
-        Result
-            The result of the comparison.  This is also set in ``self.result``.
-        """
-        try:
-            self.data = await self.get_data_async()
-        except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
-            result = Result(
-                severity=self.comparison.if_disconnected,
-                reason=f"Signal not able to connect or read: {self.identifier}"
-            )
-        except Exception as ex:
-            result = Result(
-                severity=Severity.internal_error,
-                reason=(
-                    f"Getting data for signal {self.identifier!r} comparison "
-                    f"{self.comparison} raised {ex.__class__.__name__}: {ex}"
-                ),
-            )
-
-        try:
-            result = self._compare()
-        except Exception as ex:
-            result = Result(
-                severity=Severity.internal_error,
-                reason=(
-                    f"Failed to run {self.identifier!r} comparison "
-                    f"{self.comparison} raised {ex.__class__.__name__}: {ex} "
-                    f"with value {self.data}"
-                ),
-            )
-
-        self.result = result
-        return result
-
-    def _compare(self) -> Result:
+    async def _compare(self) -> Result:
         """
         Run the comparison with the already-acquired data in ``self.data``.
         """
@@ -401,7 +808,7 @@ class PreparedSignalComparison(PreparedComparison):
         attr: str,
         comparison: Comparison,
         name: Optional[str] = None,
-        path: Optional[List[PathItem]] = None,
+        parent: Optional[PreparedDeviceConfiguration] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedSignalComparison:
         """Create a PreparedComparison from a device and comparison."""
@@ -423,7 +830,7 @@ class PreparedSignalComparison(PreparedComparison):
             identifier=full_attr,
             comparison=comparison,
             signal=signal,
-            path=path or [],
+            parent=parent,
             cache=cache,
         )
 
@@ -433,7 +840,7 @@ class PreparedSignalComparison(PreparedComparison):
         pvname: str,
         comparison: Comparison,
         name: Optional[str] = None,
-        path: Optional[List[PathItem]] = None,
+        parent: Optional[PreparedPVConfiguration] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedSignalComparison:
         """Create a PreparedComparison from a PV name and comparison."""
@@ -446,115 +853,9 @@ class PreparedSignalComparison(PreparedComparison):
             signal=cache.signals[pvname],
             comparison=comparison,
             name=name,
-            path=path or [],
             cache=cache,
+            parent=parent,
         )
-
-    @classmethod
-    def _from_pv_config(
-        cls,
-        config: PVConfiguration,
-        cache: DataCache,
-    ) -> Generator[
-        Union[PreparedComparisonException, PreparedSignalComparison], None, None
-    ]:
-        """
-        Create one or more PreparedComparison instances from a PVConfiguration.
-
-        Parameters
-        ----------
-        config : PVConfiguration or DeviceConfiguration
-            The configuration.
-
-        cache : dict of str to type[Signal]
-            The PV to signal cache.
-
-        Yields
-        ------
-        item : PreparedComparisonException or PreparedComparison
-            If an error occurs during preparation, a
-            PreparedComparisonException will be yielded in place of the
-            PreparedComparison.
-        """
-        for checklist_item in config.checklist:
-            for comparison in checklist_item.comparisons:
-                for pvname in checklist_item.ids:
-                    path = [
-                        config,
-                        checklist_item,
-                        comparison,
-                        pvname,
-                    ]
-                    try:
-                        yield cls.from_pvname(
-                            pvname=pvname,
-                            path=path,
-                            comparison=comparison,
-                            name=config.name or config.description,
-                            cache=cache,
-                        )
-                    except Exception as ex:
-                        yield PreparedComparisonException(
-                            exception=ex,
-                            comparison=comparison,
-                            name=config.name or config.description,
-                            identifier=pvname,
-                            path=path,
-                        )
-
-    @classmethod
-    def _from_device_config(
-        cls,
-        device: ophyd.Device,
-        config: DeviceConfiguration,
-        cache: DataCache,
-    ) -> Generator[
-        Union[PreparedComparisonException, PreparedSignalComparison], None, None
-    ]:
-        """
-        Create one or more PreparedComparison instances from a DeviceConfiguration.
-
-        Parameters
-        ----------
-        config : PVConfiguration or DeviceConfiguration
-            The configuration.
-
-        client : happi.Client
-            A happi Client instance.
-
-        Yields
-        ------
-        item : PreparedComparisonException or PreparedComparison
-            If an error occurs during preparation, a
-            PreparedComparisonException will be yielded in place of the
-            PreparedComparison.
-        """
-        for checklist_item in config.checklist:
-            for comparison in checklist_item.comparisons:
-                for attr in checklist_item.ids:
-                    path = [
-                        config,
-                        checklist_item,
-                        comparison,
-                        attr,
-                    ]
-                    try:
-                        yield cls.from_device(
-                            device=device,
-                            attr=attr,
-                            comparison=comparison,
-                            name=config.name or config.description,
-                            path=path,
-                            cache=cache,
-                        )
-                    except Exception as ex:
-                        yield PreparedComparisonException(
-                            exception=ex,
-                            comparison=comparison,
-                            name=config.name or config.description,
-                            identifier=attr,
-                            path=path,
-                        )
 
 
 @dataclass
@@ -585,7 +886,7 @@ class PreparedToolComparison(PreparedComparison):
         """
         return await self.cache.get_tool_data(self.tool)
 
-    async def compare(self) -> Result:
+    async def _compare(self) -> Result:
         """
         Run the prepared comparison.
 
@@ -594,28 +895,6 @@ class PreparedToolComparison(PreparedComparison):
         Result
             The result of the comparison.  This is also set in ``self.result``.
         """
-        try:
-            result = await self.get_data_async()
-        except (asyncio.TimeoutError, TimeoutError):
-            return Result(
-                severity=self.comparison.if_disconnected,
-                reason=(
-                    f"Tool {self.tool} timed out {self.identifier!r} ({self.name}) "
-                    f"for comparison {self.comparison}"
-                ),
-            )
-        except Exception as ex:
-            logger.debug("Internal error with tool %s", self, exc_info=True)
-            # TODO: include some traceback information for debugging?
-            # Could 'Result' have optional verbose error information?
-            return Result(
-                severity=Severity.internal_error,
-                reason=(
-                    f"Tool {self.tool} failed to run {self.identifier!r} ({self.name}) "
-                    f"for comparison {self.comparison}: {ex.__class__.__name__} {ex}"
-                ),
-            )
-
         try:
             value = tools.get_result_value_by_key(result, self.identifier)
         except KeyError as ex:
@@ -627,12 +906,11 @@ class PreparedToolComparison(PreparedComparison):
                     f"(in comparison {self.comparison})"
                 ),
             )
-
-        self.result = self.comparison.compare(
+        return self.comparison.compare(
             value,
             identifier=self.identifier
         )
-        return self.result
+
 
     @classmethod
     def from_tool(
@@ -641,7 +919,7 @@ class PreparedToolComparison(PreparedComparison):
         result_key: str,
         comparison: Comparison,
         name: Optional[str] = None,
-        path: Optional[List[PathItem]] = None,
+        parent: Optional[PreparedFile] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedToolComparison:
         """
@@ -675,62 +953,23 @@ class PreparedToolComparison(PreparedComparison):
             comparison=comparison,
             name=name,
             identifier=result_key,
-            path=path or [],
             cache=cache,
         )
 
-    @classmethod
-    def _from_tool_config(
-        cls,
-        config: ToolConfiguration,
-        cache: DataCache,
-    ) -> Generator[Union[PreparedComparisonException, PreparedComparison], None, None]:
-        """
-        Create one or more PreparedComparison instances from a
-        ToolConfiguration.
 
-        Parameters
-        ----------
-        config : ToolConfiguration
-            The configuration.
-
-        Yields
-        ------
-        item : PreparedComparisonException or PreparedComparison
-            If an error occurs during preparation, a
-            PreparedComparisonException will be yielded in place of the
-            PreparedComparison.
-        """
-        for checklist_item in config.checklist:
-            for comparison in checklist_item.comparisons:
-                for result_key in checklist_item.ids:
-                    path = [
-                        config,
-                        checklist_item,
-                        comparison,
-                        result_key,
-                    ]
-                    try:
-                        yield cls.from_tool(
-                            tool=config.tool,
-                            result_key=result_key,
-                            comparison=comparison,
-                            name=config.name or config.description,
-                            path=path,
-                            cache=cache,
-                        )
-                    except Exception as ex:
-                        yield PreparedComparisonException(
-                            exception=ex,
-                            comparison=comparison,
-                            name=config.name or config.description,
-                            identifier=result_key,
-                            path=path,
-                        )
+_class_to_prepared: Dict[type, type] = {
+    ConfigurationFile: PreparedFile,
+    ConfigurationGroup: PreparedGroup,
+    ToolConfiguration: PreparedToolConfiguration,
+    DeviceConfiguration: PreparedDeviceConfiguration,
+    PVConfiguration: PreparedPVConfiguration,
+}
 
 
 async def check_device(
-    device: ophyd.Device, checklist: Sequence[IdentifierAndComparison]
+    device: ophyd.Device,
+    by_attr: Dict[str, List[Comparison]],
+    shared: Optional[List[Comparison]] = None,
 ) -> Tuple[Severity, List[Result]]:
     """
     Check a given device using the list of comparisons.
@@ -739,10 +978,11 @@ async def check_device(
     ----------
     device : ophyd.Device
         The device to check.
-
-    checklist : sequence of IdentifierAndComparison
-        Comparisons to run on the given device.  Multiple attributes may
-        share the same checks.
+    by_attr : dict of attribute to comparison list
+        Comparisons to run on the given device by dotted attribute (component)
+        name.
+    shared : list of Comparison, optional
+        Comparisons to be run on every identifier.
 
     Returns
     -------
@@ -754,35 +994,37 @@ async def check_device(
     """
     overall = Severity.success
     results = []
-    for checklist_item in checklist:
-        for comparison in checklist_item.comparisons:
-            for attr in checklist_item.ids:
-                full_attr = f"{device.name}.{attr}"
-                logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
-                try:
-                    prepared = PreparedSignalComparison.from_device(
-                        device=device, attr=attr, comparison=comparison
-                    )
-                except AttributeError:
-                    result = Result(
-                        severity=Severity.internal_error,
-                        reason=(
-                            f"Attribute {full_attr} does not exist on class "
-                            f"{type(device).__name__}"
-                        ),
-                    )
-                else:
-                    result = await prepared.compare()
+    shared = shared or []
+    for attr, comparisons in by_attr.items():
+        full_attr = f"{device.name}.{attr}"
+        all_comparisons = list(shared) + comparisons
+        for comparison in all_comparisons:
+            logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
+            try:
+                prepared = PreparedSignalComparison.from_device(
+                    device=device, attr=attr, comparison=comparison
+                )
+            except AttributeError:
+                result = Result(
+                    severity=Severity.internal_error,
+                    reason=(
+                        f"Attribute {full_attr} does not exist on class "
+                        f"{type(device).__name__}"
+                    ),
+                )
+            else:
+                result = await prepared.compare()
 
-                if result.severity > overall:
-                    overall = result.severity
-                results.append(result)
+            if result.severity > overall:
+                overall = result.severity
+            results.append(result)
 
     return overall, results
 
 
 async def check_pvs(
-    checklist: Sequence[IdentifierAndComparison],
+    by_pv: Dict[str, List[Comparison]],
+    shared: Optional[List[Comparison]] = None,
     cache: Optional[DataCache] = None,
 ) -> Tuple[Severity, List[Result]]:
     """
@@ -793,6 +1035,8 @@ async def check_pvs(
     checklist : sequence of IdentifierAndComparison
         Comparisons to run on the given device.  Multiple PVs may share the
         same checks.
+    shared : list of Comparison, optional
+        Comparisons to be run on every identifier.
     cache : DataCache, optional
         The data cache to use for this and other similar comparisons.
 
@@ -810,10 +1054,11 @@ async def check_pvs(
         cache = DataCache()
 
     def get_comparison_and_pvname():
-        for checklist_item in checklist:
-            for comparison in checklist_item.comparisons:
-                for pvname in checklist_item.ids:
-                    yield comparison, pvname
+        for pvname, per_pv_checks in by_pv.items():
+            for comparison in per_pv_checks:
+                yield comparison, pvname
+            for comparison in shared or []:
+                yield comparison, pvname
 
     prepared_comparisons = [
         PreparedSignalComparison.from_pvname(
