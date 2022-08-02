@@ -185,7 +185,7 @@ class Window(DesignerDisplay, QMainWindow):
                 caption='Save as',
                 filter='Json Files (*.json)',
             )
-        if filename.endswith('.json') is False:   # json_extension_bug_fix location
+        if not filename.endswith('.json'):
             filename += '.json'
         try:
             with open(filename, 'w') as fd:
