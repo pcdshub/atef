@@ -221,20 +221,19 @@ class PreparedFile:
         if cache is None:
             cache = DataCache()
 
+        prepared_root = PreparedGroup.from_config(
+            file.root,
+            client=client,
+            cache=cache,
+            parent=None,
+        )
         prepared_file = PreparedFile(
             file=file,
             cache=cache,
             client=client,
-            root=None,
-        )
-        prepared_root = PreparedGroup.from_group(
-            file.root,
-            client=client,
-            cache=cache,
-            parent=prepared_file,
+            root=prepared_root,
         )
         prepared_root.parent = prepared_root
-        prepared_file.root = prepared_root
         return prepared_file
 
     async def fill_cache(self, parallel: bool = True) -> Optional[List[asyncio.Task]]:
@@ -253,18 +252,13 @@ class PreparedFile:
 
         return tasks
 
-    def walk_comparisons(
-        self,
-        include_failures: bool = False,
-    ) -> Generator[Union[PreparedComparison, FailedConfiguration], None, None]:
-        """
-        Walk through the prepared comparisons.
-        """
-        yield from self.root.walk_comparisons(include_failures=include_failures)
+    def walk_comparisons(self) -> Generator[PreparedComparison, None, None]:
+        """Walk through the prepared comparisons."""
+        yield from self.root.walk_comparisons()
 
     def walk_groups(
         self,
-    ) -> Generator[Union[PreparedGroup], None, None]:
+    ) -> Generator[PreparedGroup, None, None]:
         """Walk through the prepared groups."""
         yield self.root
         yield from self.root.walk_groups()
@@ -429,13 +423,8 @@ class PreparedConfiguration:
                 ),
             )
 
-    def walk_comparisons(
-        self,
-        include_failures: bool = False,
-    ) -> Generator[Union[PreparedComparison, PreparedComparisonException], None, None]:
-        """Walk through the prepared comparisons and failures."""
-        if include_failures:
-            yield from self.prepare_failures
+    def walk_comparisons(self) -> Generator[PreparedComparison, None, None]:
+        """Walk through the prepared comparisons."""
         yield from self.comparisons
 
     async def compare(self) -> Result:
@@ -559,17 +548,10 @@ class PreparedGroup(PreparedConfiguration):
                 yield config
                 yield from config.walk_groups()
 
-    def walk_comparisons(
-        self,
-        include_failures: bool = False,
-    ) -> Generator[Union[PreparedComparison, FailedConfiguration], None, None]:
-        """
-        Walk through the prepared comparisons.
-        """
-        if include_failures:
-            yield from self.prepare_failures
+    def walk_comparisons(self) -> Generator[PreparedComparison, None, None]:
+        """Walk through the prepared comparisons."""
         for config in self.configs:
-            yield from config.walk_comparisons(include_failures=include_failures)
+            yield from config.walk_comparisons()
 
     async def compare(self) -> Result:
         """Run all comparisons and return a combined result."""
