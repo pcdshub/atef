@@ -1,3 +1,0 @@
-#!/bin/bash
-
-python -m atef check Laser_Lockers/FS11.json
