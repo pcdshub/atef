@@ -55,6 +55,16 @@ class ConfigurationGroup(Configuration):
     #: Result mode.
     mode: GroupResultMode = GroupResultMode.all_
 
+    def walk_configs(self) -> Generator[AnyConfiguration, None, None]:
+        for config in self.configs:
+            # `config` is stored as Configuration due to the tagged union;
+            # however we never yield Configuration instances, just subclasses
+            # thereof:
+            config = cast(AnyConfiguration, config)
+            yield config
+            if isinstance(config, ConfigurationGroup):
+                yield from config.walk_configs()
+
 
 @dataclass
 class DeviceConfiguration(Configuration):
@@ -124,32 +134,43 @@ class ConfigurationFile:
     #: Top-level configuration group.
     root: ConfigurationGroup = field(default_factory=ConfigurationGroup)
 
-    # def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
-    #     """Get all configurations that match the device name."""
-    #     for config in self.configs:
-    #         if isinstance(config, DeviceConfiguration):
-    #             if name in config.devices:
-    #                 yield config
+    def walk_configs(self) -> Generator[AnyConfiguration, None, None]:
+        """
+        Walk configurations defined in this file.  This includes the "root"
+        node.
 
-    # def get_by_pv(
-    #     self, pvname: str
-    # ) -> Generator[Tuple[PVConfiguration, List[IdentifierAndComparison]], None, None]:
-    #     """Get all configurations + IdentifierAndComparison that match the PV name."""
-    #     for config in self.configs:
-    #         if isinstance(config, PVConfiguration):
-    #             checks = [check for check in config.checklist if pvname in check.ids]
-    #             if checks:
-    #                 yield config, checks
+        Yields
+        ------
+        AnyConfiguration
+        """
+        yield self.root
+        yield from self.root.walk_configs()
 
-    # def get_by_tag(self, *tags: str) -> Generator[Configuration, None, None]:
-    #     """Get all configurations that match the tag name."""
-    #     if not tags:
-    #         return
+    def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
+        """Get all configurations that match the device name."""
+        for config in self.walk_configs():
+            if isinstance(config, DeviceConfiguration):
+                if name in config.devices:
+                    yield config
 
-    #     tag_set = set(tags)
-    #     for config in self.configs:
-    #         if tag_set.intersection(set(config.tags or [])):
-    #             yield config
+    def get_by_pv(
+        self, pvname: str
+    ) -> Generator[PVConfiguration, None, None]:
+        """Get all configurations + IdentifierAndComparison that match the PV name."""
+        for config in self.walk_configs():
+            if isinstance(config, PVConfiguration):
+                if pvname in config.by_pv:
+                    yield config
+
+    def get_by_tag(self, *tags: str) -> Generator[Configuration, None, None]:
+        """Get all configurations that match the tag name."""
+        if not tags:
+            return
+
+        tag_set = set(tags)
+        for config in self.walk_configs():
+            if tag_set.intersection(set(config.tags or [])):
+                yield config
 
     @classmethod
     def from_json(cls, filename: AnyPath) -> ConfigurationFile:
@@ -525,12 +546,41 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
     prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
 
     @classmethod
+    def from_device(
+        cls,
+        device: Union[ophyd.Device, Sequence[ophyd.Device]],
+        by_attr: Dict[str, List[Comparison]],
+        shared: Optional[List[Comparison]] = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
+        client: Optional[happi.Client] = None,
+    ) -> PreparedDeviceConfiguration:
+        if isinstance(device, Sequence):
+            devices = list(device)
+        else:
+            devices = [device]
+
+        config = cls.from_config(
+            DeviceConfiguration(
+                devices=[],
+                by_attr=by_attr,
+                shared=shared or [],
+            ),
+            additional_devices=devices,
+            cache=cache,
+            client=client,
+            parent=parent,
+        )
+        return cast(PreparedDeviceConfiguration, config)
+
+    @classmethod
     def from_config(
         cls,
         config: DeviceConfiguration,
         client: Optional[happi.Client] = None,
         parent: Optional[PreparedGroup] = None,
         cache: Optional[DataCache] = None,
+        additional_devices: Optional[List[ophyd.Device]] = None,
     ) -> Union[FailedConfiguration, PreparedDeviceConfiguration]:
         if not isinstance(config, DeviceConfiguration):
             raise ValueError(f"Unexpected configuration type: {type(config).__name__}")
@@ -541,7 +591,7 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
         if cache is None:
             cache = DataCache()
 
-        devices = []
+        devices = list(additional_devices or [])
         for dev_name in config.devices:
             try:
                 devices.append(util.get_happi_device_by_name(dev_name, client=client))
@@ -556,7 +606,7 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
                     exception=ex,
                 )
 
-        comparisons = []
+        prepared_comparisons = []
         prepare_failures = []
         shared = config.shared or []
 
@@ -565,7 +615,7 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
             devices=devices,
             cache=cache,
             parent=parent,
-            comparisons=comparisons,
+            comparisons=prepared_comparisons,
             prepare_failures=prepare_failures,
         )
 
@@ -573,7 +623,7 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
             for attr, comparisons in config.by_attr.items():
                 for comparison in comparisons + shared:
                     try:
-                        comparisons.append(
+                        prepared_comparisons.append(
                             PreparedSignalComparison.from_device(
                                 device=device,
                                 attr=attr,
@@ -596,6 +646,24 @@ class PreparedPVConfiguration(PreparedConfiguration):
     comparisons: List[PreparedSignalComparison] = field(default_factory=list)
     #: The comparisons to be run on the given devices.
     prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
+
+    @classmethod
+    def from_pvs(
+        cls,
+        by_pv: Dict[str, List[Comparison]],
+        shared: Optional[List[Comparison]] = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
+    ) -> PreparedPVConfiguration:
+        config = cls.from_config(
+            PVConfiguration(
+                by_pv=by_pv,
+                shared=shared or [],
+            ),
+            cache=cache,
+            parent=parent,
+        )
+        return cast(PreparedPVConfiguration, config)
 
     @classmethod
     def from_config(
@@ -647,6 +715,68 @@ class PreparedToolConfiguration(PreparedConfiguration):
     comparisons: List[PreparedSignalComparison] = field(default_factory=list)
     #: The comparisons that failed to be prepared.
     prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
+
+    @classmethod
+    def from_tool(
+        cls,
+        tool: tools.Tool,
+        by_attr: Dict[str, List[Comparison]],
+        shared: Optional[List[Comparison]] = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
+    ) -> PreparedToolConfiguration:
+        config = cls.from_config(
+            ToolConfiguration(
+                tool=tool,
+                by_attr=by_attr,
+                shared=shared or [],
+            ),
+            cache=cache,
+            parent=parent,
+        )
+        return cast(PreparedToolConfiguration, config)
+
+    @classmethod
+    def from_config(
+        cls,
+        config: ToolConfiguration,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
+    ) -> PreparedToolConfiguration:
+        if not isinstance(config, ToolConfiguration):
+            raise ValueError(f"Unexpected configuration type: {type(config).__name__}")
+
+        if cache is None:
+            cache = DataCache()
+
+        prepared_comparisons = []
+        prepare_failures = []
+        shared = config.shared or []
+
+        prepared = PreparedToolConfiguration(
+            config=config,
+            cache=cache,
+            parent=parent,
+            comparisons=prepared_comparisons,
+            prepare_failures=prepare_failures,
+        )
+
+        for result_key, comparisons in config.by_attr.items():
+            for comparison in comparisons + shared:
+                try:
+                    prepared_comparisons.append(
+                        PreparedToolComparison.from_tool(
+                            tool=config.tool,
+                            result_key=result_key,
+                            comparison=comparison,
+                            parent=prepared,
+                            cache=cache,
+                        )
+                    )
+                except Exception as ex:
+                    prepare_failures.append(ex)
+
+        return prepared
 
 
 @dataclass
@@ -927,7 +1057,7 @@ class PreparedToolComparison(PreparedComparison):
         result_key: str,
         comparison: Comparison,
         name: Optional[str] = None,
-        parent: Optional[PreparedFile] = None,
+        parent: Optional[PreparedToolConfiguration] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedToolComparison:
         """
@@ -962,6 +1092,7 @@ class PreparedToolComparison(PreparedComparison):
             name=name,
             identifier=result_key,
             cache=cache,
+            parent=parent,
         )
 
 
@@ -981,178 +1112,39 @@ _class_to_prepared: Dict[type, type] = {
 }
 
 
-async def check_device(
-    device: ophyd.Device,
-    by_attr: Dict[str, List[Comparison]],
-    shared: Optional[List[Comparison]] = None,
-) -> Tuple[Severity, List[Result]]:
+def get_result_from_comparison(
+    item: Union[PreparedComparison, Exception, None]
+) -> Tuple[Optional[PreparedComparison], Result]:
     """
-    Check a given device using the list of comparisons.
+    Get a Result, if available, from the provided arguments.
+
+    In the case of an exception (or None/internal error), create one.
 
     Parameters
     ----------
-    device : ophyd.Device
-        The device to check.
-    by_attr : dict of attribute to comparison list
-        Comparisons to run on the given device by dotted attribute (component)
-        name.
-    shared : list of Comparison, optional
-        Comparisons to be run on every identifier.
+    item : Union[PreparedComparison, Exception, None]
+        The item to grab a result from.
 
     Returns
     -------
-    overall_severity : Severity
-        Maximum severity found when running comparisons.
-
-    results : list of Result
-        Individual comparison results.
+    PreparedComparison or None :
+        The prepared comparison, if available
+    Result :
+        The result instance.
     """
-    overall = Severity.success
-    results = []
-    shared = shared or []
-    for attr, comparisons in by_attr.items():
-        full_attr = f"{device.name}.{attr}"
-        all_comparisons = list(shared) + comparisons
-        for comparison in all_comparisons:
-            logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
-            try:
-                prepared = PreparedSignalComparison.from_device(
-                    device=device, attr=attr, comparison=comparison
-                )
-            except AttributeError:
-                result = Result(
-                    severity=Severity.internal_error,
-                    reason=(
-                        f"Attribute {full_attr} does not exist on class "
-                        f"{type(device).__name__}"
-                    ),
-                )
-            else:
-                result = await prepared.compare()
-
-            if result.severity > overall:
-                overall = result.severity
-            results.append(result)
-
-    return overall, results
-
-
-async def check_pvs(
-    by_pv: Dict[str, List[Comparison]],
-    shared: Optional[List[Comparison]] = None,
-    cache: Optional[DataCache] = None,
-) -> Tuple[Severity, List[Result]]:
-    """
-    Check a PVConfiguration.
-
-    Parameters
-    ----------
-    checklist : sequence of IdentifierAndComparison
-        Comparisons to run on the given device.  Multiple PVs may share the
-        same checks.
-    shared : list of Comparison, optional
-        Comparisons to be run on every identifier.
-    cache : DataCache, optional
-        The data cache to use for this and other similar comparisons.
-
-    Returns
-    -------
-    overall_severity : Severity
-        Maximum severity found when running comparisons.
-
-    results : list of Result
-        Individual comparison results.
-    """
-    overall = Severity.success
-    results = []
-    if cache is None:
-        cache = DataCache()
-
-    def get_comparison_and_pvname():
-        for pvname, per_pv_checks in by_pv.items():
-            for comparison in per_pv_checks:
-                yield comparison, pvname
-            for comparison in shared or []:
-                yield comparison, pvname
-
-    prepared_comparisons = [
-        PreparedSignalComparison.from_pvname(
-            pvname=pvname, comparison=comparison, cache=cache
+    if item is None:
+        return None, Result(
+            severity=Severity.internal_error,
+            reason="no result available (comparison not run?)"
         )
-        for comparison, pvname in get_comparison_and_pvname()
-    ]
+    if isinstance(item, Exception):
+        # An error that was transformed into a Result with a severity
+        return None, Result.from_exception(item)
 
-    cache_fill_tasks = []
-    for prepared in prepared_comparisons:
-        # Pre-fill the cache with PVs, connecting in the background
-        cache_fill_tasks.append(
-            asyncio.create_task(
-                prepared.get_data_async()
-            )
+    if item.result is None:
+        return item, Result(
+            severity=Severity.internal_error,
+            reason="no result available (comparison not run?)"
         )
 
-    for prepared in prepared_comparisons:
-        logger.debug(
-            "Checking %r with comparison %s", prepared.identifier, prepared.comparison
-        )
-
-        result = await prepared.compare()
-
-        if result.severity > overall:
-            overall = result.severity
-        results.append(result)
-
-    return overall, results
-
-
-async def check_tool(
-    tool: tools.Tool,
-    checklist: Sequence[IdentifierAndComparison],
-    cache: Optional[DataCache] = None,
-) -> Tuple[Severity, List[Result]]:
-    """
-    Check a PVConfiguration.
-
-    Parameters
-    ----------
-    tool : Tool
-        The tool instance defining which tool to run and with what arguments.
-    checklist : sequence of IdentifierAndComparison
-        Comparisons to run on the given device.  Multiple PVs may share the
-        same checks.
-    cache : DataCache, optional
-        The data cache to use for this tool and other similar comparisons.
-
-    Returns
-    -------
-    overall_severity : Severity
-        Maximum severity found when running comparisons.
-
-    results : list of Result
-        Individual comparison results.
-    """
-    overall = Severity.success
-    results = []
-
-    if cache is None:
-        cache = DataCache()
-
-    def get_comparison_and_key():
-        for checklist_item in checklist:
-            for comparison in checklist_item.comparisons:
-                for key in checklist_item.ids:
-                    yield comparison, key
-
-    for comparison, key in get_comparison_and_key():
-        logger.debug("Checking %r with comparison %s", key, comparison)
-
-        prepared = PreparedToolComparison.from_tool(
-            tool, result_key=key, comparison=comparison, cache=cache,
-        )
-        result = await prepared.compare()
-
-        if result.severity > overall:
-            overall = result.severity
-        results.append(result)
-
-    return overall, results
+    return item, item.result

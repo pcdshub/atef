@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import apischema
 import ophyd
@@ -6,9 +6,94 @@ import ophyd.sim
 import pytest
 
 from .. import cache, check, reduce
-from ..check import Comparison, Severity
-from ..config import (ConfigurationFile, DeviceConfiguration, PVConfiguration,
-                      check_device, check_pvs)
+from ..check import Comparison, Result, Severity
+from ..config import (ConfigurationFile, ConfigurationGroup,
+                      DeviceConfiguration, PreparedDeviceConfiguration,
+                      PreparedPVConfiguration, PVConfiguration,
+                      get_result_from_comparison)
+
+
+async def check_device(
+    device: ophyd.Device,
+    by_attr: Dict[str, List[Comparison]],
+    shared: Optional[List[Comparison]] = None,
+    cache: Optional[cache.DataCache] = None,
+) -> Tuple[Severity, List[Result]]:
+    """
+    Convenience function for checking an ophyd Device without creating any
+    configuration instances.
+
+    Parameters
+    ----------
+    device : ophyd.Device
+        The device or devices to check.
+    by_attr : dict of attribute to comparison list
+        Comparisons to run on the given device by dotted attribute (component)
+        name.
+    shared : list of Comparison, optional
+        Comparisons to be run on every identifier.
+    cache : DataCache, optional
+        The data cache to use for this and other similar comparisons.
+
+    Returns
+    -------
+    overall_severity : Severity
+        Maximum severity found when running comparisons.
+
+    results : list of Result
+        Individual comparison results.
+    """
+
+    prepared = PreparedDeviceConfiguration.from_device(
+        device=device,
+        by_attr=by_attr,
+        shared=shared,
+        cache=cache,
+    )
+    overall = await prepared.compare()
+    results = [
+        get_result_from_comparison(comparison)[1] for comparison in prepared.comparisons
+    ]
+    return overall.severity, results
+
+
+async def check_pvs(
+    by_pv: Dict[str, List[Comparison]],
+    shared: Optional[List[Comparison]] = None,
+    cache: Optional[cache.DataCache] = None,
+) -> Tuple[Severity, List[Result]]:
+    """
+    Convenience function for checking a set of PVs without creating any
+    configuration instances.
+
+    Parameters
+    ----------
+    by_pv : dict of PV name to comparison list
+        Run the provided checks on each of the given PVs.
+    shared : list of Comparison, optional
+        Additionally run these checks on all PVs in the ``by_pv`` dictionary.
+    cache : DataCache, optional
+        The data cache to use for this and other similar comparisons.
+
+    Returns
+    -------
+    overall_severity : Severity
+        Maximum severity found when running comparisons.
+
+    results : list of Result
+        Individual comparison results.
+    """
+    prepared = PreparedPVConfiguration.from_pvs(
+        by_pv=by_pv,
+        shared=shared,
+        cache=cache,
+    )
+    overall = await prepared.compare()
+    results = [
+        get_result_from_comparison(comparison)[1]
+        for comparison in prepared.comparisons
+    ]
+    return overall.severity, results
 
 
 @pytest.fixture(scope="function")
@@ -174,7 +259,6 @@ async def test_at2l0_standin(at2l0):
         ),
     ]
 
-
     by_attr = {attr: [] for attr in at2l0.state_attrs}
 
     overall, results = await check_device(
@@ -299,30 +383,32 @@ async def test_pv_config(
 @pytest.fixture
 def get_by_config_file() -> ConfigurationFile:
     return ConfigurationFile(
-        configs=[
-            DeviceConfiguration(
-                tags=["a"],
-                devices=["dev_a", "dev_b"],
-                by_attr={"attr3": [], "attr2": []},
-                shared=[check.Equals(value=1)],
-            ),
-            DeviceConfiguration(
-                tags=["a"],
-                devices=["dev_b", "dev_c"],
-                by_attr={"attr1": [], "attr2": []},
-                shared=[check.Equals(value=1)],
-            ),
-            PVConfiguration(
-                tags=["a"],
-                by_pv={"pv1": [], "pv2": []},
-                shared=[check.Equals(value=1)],
-            ),
-            PVConfiguration(
-                tags=["a", "c"],
-                by_pv={"pv3": []},
-                shared=[check.Equals(value=1)],
-            ),
-        ]
+        root=ConfigurationGroup(
+            configs=[
+                DeviceConfiguration(
+                    tags=["a"],
+                    devices=["dev_a", "dev_b"],
+                    by_attr={"attr3": [], "attr2": []},
+                    shared=[check.Equals(value=1)],
+                ),
+                DeviceConfiguration(
+                    tags=["a"],
+                    devices=["dev_b", "dev_c"],
+                    by_attr={"attr1": [], "attr2": []},
+                    shared=[check.Equals(value=1)],
+                ),
+                PVConfiguration(
+                    tags=["a"],
+                    by_pv={"pv1": [], "pv2": []},
+                    shared=[check.Equals(value=1)],
+                ),
+                PVConfiguration(
+                    tags=["a", "c"],
+                    by_pv={"pv3": []},
+                    shared=[check.Equals(value=1)],
+                ),
+            ]
+        )
     )
 
 
@@ -334,9 +420,9 @@ def test_get_by_device(get_by_config_file: ConfigurationFile):
 
 
 def test_get_by_pv(get_by_config_file: ConfigurationFile):
-    ((conf, (ids,)),) = list(get_by_config_file.get_by_pv("pv1"))
+    conf, = list(get_by_config_file.get_by_pv("pv1"))
     assert isinstance(conf, PVConfiguration)
-    assert "pv1" in ids.ids
+    assert "pv1" in conf.by_pv
 
 
 def test_get_by_tag(get_by_config_file: ConfigurationFile):
