@@ -213,6 +213,26 @@ class PreparedFile:
         client: Optional[happi.Client] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedFile:
+        """
+        Prepare a ConfigurationFile for running.
+
+        If available, provide an instantiated happi Client and a data
+        cache.  If unspecified, a configuration-derived happi Client will
+        be instantiated and a new data cache will be utilized.
+
+        The provided cache (or a new one) will be utilized for every
+        configuration/comparison in the file.
+
+        Parameters
+        ----------
+        file : ConfigurationFile
+            The configuration file instance.
+        client : happi.Client, optional
+            A happi Client instance.
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+        """
         if client is None:
             client = happi.Client.from_config()
 
@@ -237,6 +257,17 @@ class PreparedFile:
     async def fill_cache(self, parallel: bool = True) -> Optional[List[asyncio.Task]]:
         """
         Fill the DataCache.
+
+        Parameters
+        ----------
+        parallel : bool, optional
+            By default, fill the cache in parallel with multiple asyncio tasks.
+            If False, fill the cache sequentially.
+
+        Returns
+        -------
+        List[asyncio.Task] or None
+            The tasks created when in parallel mode.
         """
         if not parallel:
             for prepared in self.walk_comparisons():
@@ -268,6 +299,9 @@ class PreparedFile:
 
 @dataclass
 class FailedConfiguration:
+    """
+    A Configuration that failed to be prepared for running.
+    """
     #: The data cache to use for the preparation step.
     parent: Optional[PreparedGroup]
     #: Configuration instance.
@@ -315,6 +349,9 @@ def _summarize_result_severity(
 
 @dataclass
 class PreparedConfiguration:
+    """
+    Base class for a Configuration that has been prepared to run.
+    """
     #: The data cache to use for the preparation step.
     cache: DataCache = field(repr=False)
     #: The data cache to use for the preparation step.
@@ -344,15 +381,14 @@ class PreparedConfiguration:
         FailedConfiguration,
     ]:
         """
-        Create one or more PreparedConfiguration instances from a
-        given Configuration instance.
+        Prepare a Configuration for running.
 
         If available, provide an instantiated happi Client and a data
         cache.  If unspecified, a configuration-derived happi Client will
-        be instantiated and a global data cache will be utilized.
+        be instantiated and a new data cache will be utilized.
 
-        It is recommended - but not required - to manage a data cache on a
-        per-configuration basis.  Managing the global cache is up to the user.
+        It is recommended to share a data cache on a per-configuration file
+        basis.
 
         Parameters
         ----------
@@ -361,7 +397,8 @@ class PreparedConfiguration:
         client : happi.Client, optional
             A happi Client instance.
         cache : DataCache, optional
-            The data cache to use for this and other similar comparisons.
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
         """
         if cache is None:
             cache = DataCache()
@@ -494,6 +531,29 @@ class PreparedGroup(PreparedConfiguration):
         client: Optional[happi.Client] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedGroup:
+        """
+        Prepare a ConfigurationGroup for running.
+
+        If available, provide an instantiated happi Client and a data
+        cache.  If unspecified, a configuration-derived happi Client will
+        be instantiated and a new data cache will be utilized.
+
+        The provided cache (or a new one) will be utilized for every
+        configuration/comparison in the file.
+
+        Parameters
+        ----------
+        group : ConfigurationGroup
+            The configuration group instance.
+        parent : PreparedGroup or PreparedFile, optional
+            The parent instance of the group.  If this is the root
+            configuration, the parent may be a PreparedFile.
+        client : happi.Client, optional
+            A happi Client instance.
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+        """
 
         if client is None:
             client = happi.Client.from_config()
@@ -609,7 +669,8 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
         parent : PreparedGroup, optional
             The parent group, if applicable.
         cache : DataCache, optional
-            A shared data cahce, if available.
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
         client : happi.Client, optional
             A happi Client, if available.
 
@@ -654,7 +715,8 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
         parent : PreparedGroup, optional
             The parent group, if applicable.
         cache : DataCache, optional
-            A shared data cahce, if available.
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
         client : happi.Client, optional
             A happi Client, if available.
         additional_devices : List[ophyd.Device], optional
@@ -750,8 +812,8 @@ class PreparedPVConfiguration(PreparedConfiguration):
         parent : PreparedGroup, optional
             The parent group.
         cache : DataCache, optional
-            The data cache to use for this and other similar comparisons.
-
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
 
         Returns
         -------
@@ -785,7 +847,8 @@ class PreparedPVConfiguration(PreparedConfiguration):
         parent : PreparedGroup, optional
             The parent group.
         cache : DataCache, optional
-            The data cache to use for this and other similar comparisons.
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
 
         Returns
         -------
@@ -844,6 +907,28 @@ class PreparedToolConfiguration(PreparedConfiguration):
         parent: Optional[PreparedGroup] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedToolConfiguration:
+        """
+        Prepare a Tool for running tests without an associated configuration.
+
+        Parameters
+        ----------
+        tool : tools.Tool
+            The tool instance.
+        by_attr : Dict[str, List[Comparison]]
+            A dictionary of tool result attributes to comparisons.
+        shared : List[Comparison], optional
+            A list of comparisons to run on every key of the ``by_attr``
+            dictionary.
+        parent : PreparedGroup, optional
+            The parent group, if available.
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Returns
+        -------
+        PreparedToolConfiguration
+        """
         config = cls.from_config(
             ToolConfiguration(
                 tool=tool,
@@ -862,6 +947,23 @@ class PreparedToolConfiguration(PreparedConfiguration):
         parent: Optional[PreparedGroup] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedToolConfiguration:
+        """
+        Prepare a ToolConfiguration for running.
+
+        Parameters
+        ----------
+        config : ToolConfiguration
+            The tool configuration instance.
+        parent : PreparedGroup, optional
+            The parent group, if available.
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Returns
+        -------
+        PreparedToolConfiguration
+        """
         if not isinstance(config, ToolConfiguration):
             raise ValueError(f"Unexpected configuration type: {type(config).__name__}")
 
@@ -1069,7 +1171,29 @@ class PreparedSignalComparison(PreparedComparison):
         parent: Optional[PreparedDeviceConfiguration] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedSignalComparison:
-        """Create a PreparedComparison from a device and comparison."""
+        """
+        Create one PreparedComparison from a device, attribute, and comparison.
+
+        Parameters
+        ----------
+        device : ophyd.Device
+            The ophyd Device.
+        attr : str
+            The attribute name of the component.  May be in dotted notation.
+        comparison : Comparison
+            The comparison instance to run on the PV.
+        name : str, optional
+            The name of this comparison.
+        parent : PreparedPVConfiguration, optional
+            The parent configuration, if available.
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Returns
+        -------
+        PreparedSignalComparison
+        """
         full_attr = f"{device.name}.{attr}"
         logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
         if cache is None:
@@ -1101,7 +1225,27 @@ class PreparedSignalComparison(PreparedComparison):
         parent: Optional[PreparedPVConfiguration] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedSignalComparison:
-        """Create a PreparedComparison from a PV name and comparison."""
+        """
+        Create one PreparedComparison from a PV name and comparison.
+
+        Parameters
+        ----------
+        pvname : str
+            The PV name.
+        comparison : Comparison
+            The comparison instance to run on the PV.
+        name : str, optional
+            The name of this comparison.
+        parent : PreparedPVConfiguration, optional
+            The parent configuration, if available.
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Returns
+        -------
+        PreparedSignalComparison
+        """
         if cache is None:
             cache = DataCache()
 
@@ -1194,7 +1338,8 @@ class PreparedToolComparison(PreparedComparison):
         name : str, optional
             The name of the comparison.
         cache : DataCache, optional
-            The data cache to use for this and other similar comparisons.
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
 
         Returns
         -------
