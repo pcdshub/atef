@@ -185,6 +185,8 @@ class Window(DesignerDisplay, QMainWindow):
                 caption='Save as',
                 filter='Json Files (*.json)',
             )
+        if not filename.endswith('.json'):
+            filename += '.json'
         try:
             with open(filename, 'w') as fd:
                 json.dump(serialized, fd, indent=2)
