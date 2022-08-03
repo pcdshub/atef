@@ -443,38 +443,6 @@ async def check_and_log(
     else:
         console.print(tree)
 
-    # for prepared in all_prepared:
-    #     if isinstance(prepared, PreparedComparison):
-    #         if name_filter:
-    #             device_name = getattr(prepared.device, "name", None)
-    #             if device_name is not None:
-    #                 if device_name not in name_filter:
-    #                     logger.debug(
-    #                         "Skipping device check at user's request: %s",
-    #                         device_name,
-    #                     )
-    #                     continue
-    #             elif prepared.identifier not in name_filter:
-    #                 logger.debug(
-    #                     "Skipping identifier at user's request: %s",
-    #                     prepared.identifier
-    #                 )
-    #                 continue
-
-    #         prepared.result = await prepared.compare()
-    #         if prepared.result is not None:
-    #             items.append(prepared)
-    #             severities.append(prepared.result.severity)
-    #     elif isinstance(prepared, Exception):
-    #         ex = cast(Exception, prepared)
-    #         items.append(ex)
-    #         severities.append(Result.from_exception(ex).severity)
-    #     else:
-    #         logger.error(
-    #             "Internal error: unexpected result from PreparedComparison: %s",
-    #             type(prepared)
-    #         )
-
 
 async def main(
     filename: str,
