@@ -8,7 +8,6 @@ import yaml
 from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
                          ProcedureStep, PydmDisplayStep, TyphosDisplayStep)
 from ..widgets import procedure_step_to_widget
-from ..widgets.config import Window
 from . import qt_utils
 
 logger = logging.getLogger(__name__)
@@ -170,5 +169,7 @@ def test_create_widget(request: pytest.FixtureRequest, group: ProcedureStep):
     widget.deleteLater()
 
 
+@pytest.mark.xfail(reason="Configuration GUI rework in progress")
 def test_config_window_basic():
+    from ..widgets.config import Window
     Window()
