@@ -251,7 +251,7 @@ class PreparedFile:
             client=client,
             root=prepared_root,
         )
-        prepared_root.parent = prepared_root
+        prepared_root.parent = prepared_file
         return prepared_file
 
     async def fill_cache(self, parallel: bool = True) -> Optional[List[asyncio.Task]]:
