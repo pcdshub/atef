@@ -216,7 +216,7 @@ def get_comparison_text_for_tree(
             f"{severity_to_rich[result.severity]}[default]: {result.reason}"
         )
 
-    if VerbositySetting.show_passed_tests and prepared is not None:
+    if VerbositySetting.show_passed_tests in verbosity and prepared is not None:
         if prepared.comparison is not None:
             description = prepared.comparison.describe()
         else:
