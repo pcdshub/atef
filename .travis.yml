@@ -27,4 +27,4 @@ jobs:
     - name: "Python - PIP"
 
 import:
-  - klauer/pcds-ci-helpers:travis/shared_configs/standard-python-conda-latest.yml@ref_pytest-cov
+  - pcdshub/pcds-ci-helpers:travis/shared_configs/standard-python-conda-latest.yml
