@@ -31,6 +31,11 @@ class HappiLoadError(ConfigFileHappiError):
     ...
 
 
+class HappiUnavailableError(ConfigFileHappiError):
+    """Config file load error: happi is unavailable."""
+    ...
+
+
 class ComparisonException(Exception):
     """Raise this exception to exit a comparator and set severity."""
     severity = Severity.success

@@ -234,7 +234,7 @@ class PreparedFile:
             cache will be instantiated.
         """
         if client is None:
-            client = happi.Client.from_config()
+            client = util.get_happi_client()
 
         if cache is None:
             cache = DataCache()
@@ -556,7 +556,7 @@ class PreparedGroup(PreparedConfiguration):
         """
 
         if client is None:
-            client = happi.Client.from_config()
+            client = util.get_happi_client()
 
         if cache is None:
             cache = DataCache()
@@ -733,7 +733,7 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
             raise ValueError(f"Unexpected configuration type: {type(config).__name__}")
 
         if client is None:
-            client = happi.Client.from_config()
+            client = util.get_happi_client()
 
         if cache is None:
             cache = DataCache()

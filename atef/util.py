@@ -9,7 +9,8 @@ import happi
 import ophyd
 
 from .enums import Severity
-from .exceptions import HappiLoadError, MissingHappiDeviceError
+from .exceptions import (HappiLoadError, HappiUnavailableError,
+                         MissingHappiDeviceError)
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +25,22 @@ def ophyd_cleanup():
 
 
 @functools.lru_cache(None)
-def get_happi_client() -> happi.Client:
-    """Get the atef-configured happi client or the one as-configured by happi."""
-    return happi.Client.from_config()
+def get_happi_client() -> Optional[happi.Client]:
+    """
+    Get the atef-configured happi client or the one as-configured by happi,
+    if available.
+
+    If misconfigured, this will warn once and return ``None`` for future calls.
+    """
+    try:
+        return happi.Client.from_config()
+    except Exception as ex:
+        logger.warning(
+            "Unable to load happi Client from configuration (%s): %s",
+            ex.__class__.__name__,
+            ex,
+        )
+        return None
 
 
 def get_happi_device_by_name(
@@ -47,7 +61,16 @@ def get_happi_device_by_name(
         a temporary client with the environment configuration.
     """
     if client is None:
-        client = happi.Client.from_config()
+        client = get_happi_client()
+
+    if client is None:
+        ex = HappiUnavailableError(
+            f"The happi database is misconfigured or otherwise unavailable; "
+            f"unable to load device {name!r}"
+        )
+        ex.dev_name = name
+        ex.dev_config = None
+        raise ex
 
     try:
         search_result = client[name]

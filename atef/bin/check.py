@@ -473,13 +473,6 @@ async def main(
     else:
         config_file = ConfigurationFile.from_yaml(filename)
 
-    try:
-        client = happi.Client.from_config()
-    except Exception:
-        # happi isn't necessarily required; fail later if we try to use it.
-        # Without a proper config, it may raise OSError or something strange.
-        client = None
-
     console = rich.console.Console()
     cache = DataCache(signals=signal_cache or get_signal_cache())
     try:
@@ -488,7 +481,6 @@ async def main(
                 config_file,
                 console=console,
                 # verbose=verbose,
-                client=client,
                 name_filter=name_filter,
                 parallel=parallel,
                 cache=cache,
