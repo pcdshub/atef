@@ -19,8 +19,8 @@ import rich.tree
 from ..cache import DataCache, _SignalCache, get_signal_cache
 from ..check import Comparison, Result, Severity
 from ..config import (AnyConfiguration, AnyPreparedConfiguration,
-                      ConfigurationFile, PreparedComparison, PreparedFile,
-                      PreparedGroup)
+                      ConfigurationFile, FailedConfiguration,
+                      PreparedComparison, PreparedFile, PreparedGroup)
 from ..util import ophyd_cleanup
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ default_severity_to_log_level = {
 
 
 def get_result_from_comparison(
-    item: Union[PreparedComparison, Exception, None]
+    item: Union[PreparedComparison, Exception, FailedConfiguration, None]
 ) -> Tuple[Optional[PreparedComparison], Result]:
     """
     Get a Result, if available, from the provided arguments.
@@ -163,9 +163,9 @@ def get_result_from_comparison(
 
     Returns
     -------
-    PreparedComparison or None :
+    PreparedComparison or None
         The prepared comparison, if available
-    Result :
+    Result
         The result instance.
     """
     if item is None:
@@ -176,6 +176,9 @@ def get_result_from_comparison(
     if isinstance(item, Exception):
         # An error that was transformed into a Result with a severity
         return None, Result.from_exception(item)
+    if isinstance(item, FailedConfiguration):
+        # An error that was transformed into a Result with a severity
+        return None, item.result
 
     if item.result is None:
         return item, Result(
@@ -294,7 +297,7 @@ def get_tree_heading(
 
 
 def should_show_in_tree(
-    item: Union[PreparedComparison, Exception, None],
+    item: Union[PreparedComparison, Exception, FailedConfiguration, None],
     verbosity: VerbositySetting = VerbositySetting.default
 ) -> bool:
     """
@@ -302,7 +305,7 @@ def should_show_in_tree(
 
     Parameters
     ----------
-    item : Union[PreparedComparison, Exception, None]
+    item : Union[PreparedComparison, Exception, FailedConfiguration, None]
         The item to check.
     verbosity : VerbositySetting, optional
         The verbosity settings.
@@ -336,20 +339,25 @@ def group_to_rich_tree(
         The group to convert.  Comparisons must be complete to generate the
         tree effectively.
     verbosity : VerbositySetting, optional
-
-    severity_to_rich : Optional[Dict[Severity, str]], optional
-
+        The verbosity settings.
+    severity_to_rich : Dict[Severity, str], optional
+        A mapping of severity values to rich colors.
 
     Returns
     -------
-
-
+    rich.tree.Tree
     """
     severity_to_rich = severity_to_rich or default_severity_to_rich
 
     tree = rich.tree.Tree(
         get_tree_heading(group, severity_to_rich=severity_to_rich, verbosity=verbosity)
     )
+    for failure in group.prepare_failures:
+        if should_show_in_tree(failure, verbosity):
+            tree.add(
+                get_comparison_text_for_tree(failure, verbosity=verbosity)
+            )
+
     for config in group.configs:
         if isinstance(config, PreparedGroup):
             tree.add(
