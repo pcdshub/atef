@@ -42,4 +42,4 @@ async def test_check_device_smoke(monkeypatch, at2l0):  # noqa: F811
 
 @pytest.mark.asyncio
 async def test_check_ping_localhost_smoke():  # noqa: F811
-    await bin_check.main(filename=str(CONFIG_PATH / "ping_localhost.json"), verbose=2)
+    await bin_check.main(filename=str(CONFIG_PATH / "ping_localhost.json"))
