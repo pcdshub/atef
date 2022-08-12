@@ -103,6 +103,7 @@ def build_arg_parser(argparser=None):
             dest=setting.name,
             help=help_text,
             action="store_true",
+            default=setting in VerbositySetting.default,
         )
 
         if flag_name.startswith("show-"):
@@ -198,10 +199,10 @@ def get_comparison_text_for_tree(
     ----------
     item : Union[PreparedComparison, Exception]
         The item to add to the tree.
-    severity_to_rich : Optional[Dict[Severity, str]], optional
+    severity_to_rich : Dict[Severity, str], optional
         A mapping of severity values to rich colors.
-    verbose : int, optional
-        The verbosity level, where 0 is not verbose.
+    verbosity : VerbositySetting, optional
+        The verbosity settings.
 
     Returns
     -------
@@ -401,8 +402,8 @@ async def check_and_log(
         The configuration to check.
     console : rich.console.Console
         The rich console to write output to.
-    verbose : int, optional
-        The verbosity level for the output.
+    verbosity : VerbositySetting, optional
+        The verbosity settings.
     client : happi.Client, optional
         The happi client, if available.
     name_filter : Sequence[str], optional
@@ -447,7 +448,6 @@ async def check_and_log(
 async def main(
     filename: str,
     name_filter: Optional[Sequence[str]] = None,
-    verbose: int = 0,
     parallel: bool = False,
     *,
     cleanup: bool = True,
@@ -480,7 +480,6 @@ async def main(
             await check_and_log(
                 config_file,
                 console=console,
-                # verbose=verbose,
                 name_filter=name_filter,
                 parallel=parallel,
                 cache=cache,
