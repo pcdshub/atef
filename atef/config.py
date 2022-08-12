@@ -439,8 +439,8 @@ class PreparedConfiguration:
                 result=Result(
                     severity=Severity.internal_error,
                     reason=(
-                        f"Failed to instantiate configuration: {ex}."
-                        f"Configuration is: {config}"
+                        f"Failed to instantiate configuration: {ex}. "
+                        f"Configuration is: {config.name} ({config.description or ''!r})"
                     ),
                 ),
             )
@@ -452,8 +452,8 @@ class PreparedConfiguration:
                 result=Result(
                     severity=Severity.internal_error,
                     reason=(
-                        f"Failed to instantiate configuration: {ex}."
-                        f"Configuration is: {config}"
+                        f"Failed to instantiate configuration: {ex}. "
+                        f"Configuration is: {config.name} ({config.description or ''!r})"
                     ),
                 ),
             )
