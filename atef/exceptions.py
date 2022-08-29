@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import typing
-from typing import List, Optional
+from typing import Optional
 
 from .enums import Severity
 
 if typing.TYPE_CHECKING:
     from .check import Comparison
-    from .config import AnyConfiguration, PathItem
+    from .config import AnyConfiguration, PreparedConfiguration
 
 
 class ConfigFileLoadError(Exception):
@@ -28,6 +28,11 @@ class MissingHappiDeviceError(ConfigFileHappiError):
 
 class HappiLoadError(ConfigFileHappiError):
     """Config file load error: the happi device couldn't be instantiated."""
+    ...
+
+
+class HappiUnavailableError(ConfigFileHappiError):
+    """Config file load error: happi is unavailable."""
     ...
 
 
@@ -52,10 +57,12 @@ class PreparedComparisonException(Exception):
     exception: Exception
     #: The identifier used for the comparison.
     identifier: str
+    #: The relevant configuration
+    config: Optional[AnyConfiguration]
+    #: The parent container of the comparison that failed to prepare.
+    prepared: Optional[PreparedConfiguration] = None
     #: The comparison related to the exception, if applicable.
     comparison: Optional[Comparison]
-    #: The hierarhical path that led to this prepared comparison.
-    path: List[PathItem]
     #: The name of the associated configuration.
     name: Optional[str] = None
 
@@ -63,16 +70,21 @@ class PreparedComparisonException(Exception):
         self,
         exception: Exception,
         identifier: str,
+        message: Optional[str] = None,
+        config: Optional[AnyConfiguration] = None,
+        prepared: Optional[PreparedConfiguration] = None,
         comparison: Optional[Comparison] = None,
         name: Optional[str] = None,
-        path: Optional[List[PathItem]] = None,
     ):
-        super().__init__(str(exception))
+        if message is None:
+            message = str(exception)
+        super().__init__(message)
         self.exception = exception
         self.identifier = identifier
         self.comparison = comparison
+        self.config = config
+        self.prepared = prepared
         self.name = name
-        self.path = path or []
 
 
 class ToolException(Exception):

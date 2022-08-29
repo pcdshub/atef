@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
 import apischema
 import pytest
@@ -7,7 +7,48 @@ import pytest
 from .. import check, config, tools
 from ..cache import DataCache
 from ..check import Result, Severity
-from ..config import IdentifierAndComparison, ToolConfiguration
+from ..config import Comparison, PreparedToolConfiguration, ToolConfiguration
+
+
+async def check_tool(
+    tool: tools.Tool,
+    by_attr: Dict[str, List[Comparison]],
+    shared: Optional[List[Comparison]] = None,
+    cache: Optional[DataCache] = None,
+) -> Tuple[Severity, List[Result]]:
+    """
+    Convenience function for checking a tool without creating any configuration
+    instances.
+
+    Parameters
+    ----------
+    tool : Tool
+        The tool instance defining which tool to run and with what arguments.
+    cache : DataCache, optional
+        The data cache to use for this tool and other similar comparisons.
+
+    Returns
+    -------
+    overall_severity : Severity
+        Maximum severity found when running comparisons.
+
+    results : list of Result
+        Individual comparison results.
+    """
+    prepared = PreparedToolConfiguration.from_tool(
+        tool=tool,
+        by_attr=by_attr,
+        shared=shared,
+        cache=cache,
+    )
+
+    overall = await prepared.compare()
+    results = [
+        config.get_result_from_comparison(comparison)[1]
+        for comparison in prepared.comparisons
+    ]
+    return overall.severity, results
+
 
 config_and_severity = pytest.mark.parametrize(
     "conf, severity",
@@ -18,12 +59,9 @@ config_and_severity = pytest.mark.parametrize(
                     hosts=["127.0.0.1"],
                     count=1,
                 ),
-                checklist=[
-                    IdentifierAndComparison(
-                        ids=["max_time"],
-                        comparisons=[check.LessOrEqual(value=1)]
-                    ),
-                ]
+                by_attr={
+                    "max_time": [check.LessOrEqual(value=1)],
+                },
             ),
             Severity.success,
             id="all_good",
@@ -34,12 +72,9 @@ config_and_severity = pytest.mark.parametrize(
                     hosts=["127.0.0.1"],
                     count=1,
                 ),
-                checklist=[
-                    IdentifierAndComparison(
-                        ids=["max_time"],
-                        comparisons=[check.Less(value=0.0)]
-                    ),
-                ]
+                by_attr={
+                    "max_time": [check.Less(value=0.0)],
+                },
             ),
             Severity.error,
             id="must_fail",
@@ -59,7 +94,9 @@ def test_serializable(conf: ToolConfiguration, severity: Severity):
 async def test_result_severity(
     conf: ToolConfiguration, severity: Severity
 ):
-    overall, results = await config.check_tool(conf.tool, conf.checklist)
+    overall, _ = await check_tool(
+        conf.tool, by_attr=conf.by_attr, shared=conf.shared
+    )
     assert overall == severity
 
 
