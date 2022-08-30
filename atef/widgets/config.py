@@ -39,7 +39,7 @@ from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QFormLayout, QHBoxLayout, QInputDialog, QLabel,
                             QLayout, QLineEdit, QMainWindow, QMenu,
                             QMessageBox, QPlainTextEdit, QPushButton, QStyle,
-                            QTabWidget, QToolButton, QTreeWidget,
+                            QTableWidget, QTabWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from .. import util
@@ -683,6 +683,9 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
 
     This widget was formally named ``Overview`` in older versions of this
     application.
+
+    TODO support drag and drop to rearrange the configs in the group,
+    must persist through loads
     """
     filename = 'configuration_group_widget.ui'
 
@@ -691,9 +694,10 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
     tags_content: QVBoxLayout
     add_tag_button: QToolButton
 
-    add_config_button: QToolButton
+    add_config_button: QPushButton
     select_type_combo: QComboBox
-    scroll_content: QWidget
+
+    group_content_table: QTableWidget
 
     row_count: int
     row_mapping: Dict[OverviewRow, Tuple[Configuration, AtefItem]]
@@ -755,7 +759,7 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
         update_data: bool = True,
     ):
         """
-        Add an existing config to the tree and to the overview.
+        Add an existing config to the tree and to the group.
 
         This is the core method that modifies the tree and adds the row
         widget.
@@ -768,13 +772,14 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
             If True, the default, mutates the dataclass.
             Set to False during the initial reading of the file.
         """
-        func_name = self.func_names[type(config)]
-
+        # Create enclosed widget
         row = OverviewRow(config, self)
-        self.scroll_content.layout().insertWidget(
-            self.row_count,
-            row,
-        )
+        # Add widget to the end of the table
+        self.group_content_table.insertRow(self.row_count)
+        self.group_content_table.setCellWidget(self.row_count, 0, row)
+        self.group_content_table.setRowHeight(self.row_count, row.height())
+        # Add to the tree
+        func_name = self.func_names[type(config)]
         item = AtefItem(
             tree_parent=self.full_tree,
             name=config.name or 'untitled',
@@ -782,17 +787,17 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
         )
         page = Group(row.bridge)
         link_page(item, page)
+        # Add link to the new child page
         self.setup_child_nav_button(row.child_button, item)
+        # Keep track of the row wigets
         self.row_count += 1
-
         self.row_mapping[row] = (config, item)
 
         # If either of the widgets change the name, update tree
         row.bridge.name.changed_value.connect(
             partial(item.setText, 0)
         )
-        # Note: this is the only place in the UI where
-        # we add new config data
+        # Extend the dataclass
         if update_data:
             self.bridge.append(config)
 
@@ -812,10 +817,20 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
             dataclass.
         """
         config, tree_item = self.row_mapping[row]
+        # Remove from data structure
         self.bridge.remove_value(config)
-        self.full_tree.invisibleRootItem().removeChild(tree_item)
+        # Remove from tree
+        self.tree_item.removeChild(tree_item)
+        # Remove from table
+        for row_index in range(self.group_content_table.rowCount()):
+            if self.group_content_table.cellWidget(row_index, 0) is row:
+                self.group_content_table.removeRow(row_index)
+                break
+        # Adjust counter
         self.row_count -= 1
+        # Remove from tracker
         del self.row_mapping[row]
+        # Deallocate the widget
         row.deleteLater()
 
 
