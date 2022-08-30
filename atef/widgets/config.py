@@ -1,5 +1,21 @@
 """
 Widget classes designed for atef configuration.
+
+TODO: delete these comments later
+I'm going to copy some design goals from various gh/slack pages
+- Some of the existing ui screens will want some extensions, e.g. comparisons
+  will want to be able to show you which PVs/signals they'll be run on with
+  the introduction of by_attr vs shared, among other things. The top-level
+  object being itself a group config leaves a natural path for setting all of
+  this up without a huge shakeup- just add some fields/modifications to the
+  top-level screen and re-use it for all group layers.
+- Old structure (high level):
+  - ConfigurationFile > Configuration (Device, PV) >
+    > IdentifierAndComparison > Comparison (many kinds)
+- New structure (high level):
+  - ConfigurationFile > ConfigurationGroup >
+    > Configuration (Device, PV, Tool, Group)
+    > Comparison (many kinds)
 """
 from __future__ import annotations
 
@@ -29,8 +45,8 @@ from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
 from .. import util
 from ..check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
                      LessOrEqual, NotEquals, Range)
-from ..config import (Configuration, ConfigurationFile, DeviceConfiguration,
-                      IdentifierAndComparison, PVConfiguration)
+from ..config import (Configuration, ConfigurationFile, ConfigurationGroup,
+                      DeviceConfiguration, PVConfiguration, ToolConfiguration)
 from ..enums import Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod
@@ -263,7 +279,7 @@ class Tree(DesignerDisplay, QWidget):
         self.tree_widget.itemSelectionChanged.connect(
             self.show_selected_display
         )
-        self.tree_widget.setCurrentItem(self.overview_item)
+        self.tree_widget.setCurrentItem(self.root_item)
 
     def assemble_tree(self):
         """
@@ -271,13 +287,15 @@ class Tree(DesignerDisplay, QWidget):
         """
         self.tree_widget.setColumnCount(2)
         self.tree_widget.setHeaderLabels(['Node', 'Type'])
-        self.overview_item = AtefItem(
+        self.root_item = AtefItem(
             tree_parent=self.tree_widget,
-            name='Overview',
-            func_name='overview'
+            name='root',
+            func_name=ConfigurationGroupWidget.func_names[ConfigurationGroup]
         )
-        overview = Overview(self.bridge.configs)
-        link_page(item=self.overview_item, widget=overview)
+        root = ConfigurationGroupWidget(
+            QDataclassBridge(self.bridge.root.get())
+        )
+        link_page(item=self.root_item, widget=root)
 
     def show_selected_display(self, *args, **kwargs):
         """
@@ -546,175 +564,6 @@ def link_page(item: AtefItem, widget: PageWidget):
     widget.assign_tree_item(item)
 
 
-class Overview(PageWidget):
-    """
-    A view of all the top-level "Configuration" objects.
-
-    This widget allows us to browse our config names, classes, and
-    descriptions, as well as add new configs.
-    """
-    filename = 'config_overview.ui'
-
-    add_device_button: QPushButton
-    add_pv_button: QPushButton
-    scroll_content: QWidget
-
-    row_count: int
-    row_mapping: Dict[OverviewRow, Tuple[Configuration, AtefItem]]
-
-    def __init__(
-        self,
-        bridge: QDataclassBridge,
-        parent: Optional[QWidget] = None,
-    ):
-        super().__init__(bridge, parent=parent)
-        self.row_count = 0
-        self.row_mapping = {}
-        self.add_device_button.clicked.connect(self.add_device_config)
-        self.add_pv_button.clicked.connect(self.add_pv_config)
-
-    def assign_tree_item(self, item: AtefItem):
-        super().assign_tree_item(item)
-        self.initialize_overview()
-
-    def initialize_overview(self):
-        """
-        Read the configuration data and create the overview rows.
-        """
-        for config in self.bridge.get():
-            if isinstance(config, DeviceConfiguration):
-                self.add_device_config(config=config, update_data=False)
-            elif isinstance(config, PVConfiguration):
-                self.add_pv_config(config=config, update_data=False)
-            else:
-                raise RuntimeError(
-                    f'{config} is not a valid config!'
-                )
-
-    def add_device_config(
-        self,
-        checked: Optional[bool] = None,
-        config: Optional[DeviceConfiguration] = None,
-        update_data: bool = True,
-    ):
-        """
-        Add a device config row to the tree and to the overview.
-
-        This method exists so that we can make the "add_device_button" work.
-
-        Parameters
-        ----------
-        checked : bool
-            Expected argument from a QPushButton, unused
-        config : DeviceConfiguration, optional
-            The device configuration to add. If omitted, we'll create
-            a blank config.
-        update_data : bool, optional
-            If True, the default, mutates the dataclass.
-            Set to False during the initial reading of the file.
-        """
-        if config is None:
-            config = DeviceConfiguration()
-        self.add_config(config, update_data=update_data)
-
-    def add_pv_config(
-        self,
-        checked: Optional[bool] = None,
-        config: Optional[PVConfiguration] = None,
-        update_data: bool = True,
-    ):
-        """
-        Add a pv config row to the tree and to the overview.
-
-        This method exists so that we can make the "add_pv_button" work.
-
-        Parameters
-        ----------
-        checked : bool
-            Expected argument from a QPushButton, unused
-        config : PVConfiguration, optional
-            The PV configuration to add. If omitted, we'll create
-            a blank config.
-        update_data : bool, optional
-            If True, the default, mutates the dataclass.
-            Set to False during the initial reading of the file.
-        """
-        if config is None:
-            config = PVConfiguration()
-        self.add_config(config, update_data=update_data)
-
-    def add_config(
-        self,
-        config: Union[DeviceConfiguration, PVConfiguration],
-        update_data: bool = True,
-    ):
-        """
-        Add an existing config to the tree and to the overview.
-
-        This is the core method that modifies the tree and adds the row
-        widget.
-
-        Parameters
-        ----------
-        config : Configuration
-            A single configuration object.
-        update_data : bool, optional
-            If True, the default, mutates the dataclass.
-            Set to False during the initial reading of the file.
-        """
-        if isinstance(config, DeviceConfiguration):
-            func_name = 'device config'
-        else:
-            func_name = 'pv config'
-        row = OverviewRow(config, self)
-        self.scroll_content.layout().insertWidget(
-            self.row_count,
-            row,
-        )
-        item = AtefItem(
-            tree_parent=self.full_tree,
-            name=config.name or 'untitled',
-            func_name=func_name,
-        )
-        page = Group(row.bridge)
-        link_page(item, page)
-        self.setup_child_nav_button(row.child_button, item)
-        self.row_count += 1
-
-        self.row_mapping[row] = (config, item)
-
-        # If either of the widgets change the name, update tree
-        row.bridge.name.changed_value.connect(
-            partial(item.setText, 0)
-        )
-        # Note: this is the only place in the UI where
-        # we add new config data
-        if update_data:
-            self.bridge.append(config)
-
-    def delete_row(self, row: OverviewRow) -> None:
-        """
-        Delete a row and the corresponding data from the file.
-
-        This will remove the config data structure and the
-        tree node, and leave us in a state where adding a new
-        config will work as expected.
-
-        Parameters
-        ----------
-        row : OverviewRow
-            The row that we want to remove from the display.
-            This row has an associated tree item and config
-            dataclass.
-        """
-        config, tree_item = self.row_mapping[row]
-        self.bridge.remove_value(config)
-        self.full_tree.invisibleRootItem().removeChild(tree_item)
-        self.row_count -= 1
-        del self.row_mapping[row]
-        row.deleteLater()
-
-
 class ConfigTextMixin:
     """
     A mix-in class for proper name and desc widget handling.
@@ -810,6 +659,166 @@ class ConfigTextMixin:
         self.desc_edit.setFixedHeight(line_count * 13 + 12)
 
 
+class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
+    """
+    A widget that represents a ``ConfigurationGroup`` dataclass.
+
+    ``ConfigurationGroup`` is a configuration that holds other configurations.
+    There is a single ``ConfigurationGroup`` called "root" at the top of the
+    tree. Users can add additional groups under other groups in order to
+    organize their configurations in a way that makes the most sense to them.
+
+    All configurations have "name", "description", and "tags" fields.
+    ``ConfigurationGroup`` instances also have a list of ``Configuration``
+    instances and two special fields: "values" and "mode".
+
+    "values" allows us to define global constants that can be used or
+    overridden in sub-groups. TODO in a future version these will be useable
+    as comparison targets.
+
+    "mode" allows us to choose how to interpret the overall result from
+    all of the component configurations, and can be set to "all_" or "any_"
+    depending on if we need all the subconfigurations to pass or just one of
+    them- in case we have different running modes, for example.
+
+    This widget was formally named ``Overview`` in older versions of this
+    application.
+    """
+    filename = 'configuration_group_widget.ui'
+
+    name_edit: QLineEdit
+    desc_edit: QPlainTextEdit
+    tags_content: QVBoxLayout
+    add_tag_button: QToolButton
+
+    add_config_button: QToolButton
+    select_type_combo: QComboBox
+    scroll_content: QWidget
+
+    row_count: int
+    row_mapping: Dict[OverviewRow, Tuple[Configuration, AtefItem]]
+
+    func_names: ClassVar[Dict[type, str]] = {
+        DeviceConfiguration: "device config",
+        PVConfiguration: "pv config",
+        ToolConfiguration: "tool config",
+        ConfigurationGroup: "group config"
+    }
+    func_names_rev: ClassVar[Dict[str, type]] = {
+        value: key for key, value in func_names.items()
+    }
+    next_type: type[Configuration]
+
+    def __init__(
+        self,
+        bridge: QDataclassBridge,
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(bridge, parent=parent)
+        self.row_count = 0
+        self.row_mapping = {}
+        self.initialize_config_text()
+        self.add_config_button.connect(self.add_config_from_gui)
+        for text in self.func_names.values():
+            self.select_type_combo.addItem(text)
+        self.next_type = next(self.func_names)
+        self.select_type_combo.activated.connect(self.new_add_type)
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
+        self.initialize_configuration_group()
+
+    def initialize_configuration_group(self):
+        """
+        Read the configuration data and create the group rows.
+        """
+        for config in self.bridge.get():
+            self.add_config(config=config, update_data=False)
+
+    def add_config_from_gui(self, *args, **kwargs):
+        """
+        Add a new config row using the gui's button.
+
+        The type will depend on the selection in the combo box.
+        """
+        self.add_config(config=self.next_type())
+
+    def set_next_type(self, text: str, *args, **kwargs):
+        """
+        Cache the type that corresponds with the combo box selection.
+        """
+        self.next_type = self.func_names_rev[text]
+
+    def add_config(
+        self,
+        config: Configuration,
+        update_data: bool = True,
+    ):
+        """
+        Add an existing config to the tree and to the overview.
+
+        This is the core method that modifies the tree and adds the row
+        widget.
+
+        Parameters
+        ----------
+        config : Configuration
+            A single configuration object.
+        update_data : bool, optional
+            If True, the default, mutates the dataclass.
+            Set to False during the initial reading of the file.
+        """
+        func_name = self.func_names[type(config)]
+
+        row = OverviewRow(config, self)
+        self.scroll_content.layout().insertWidget(
+            self.row_count,
+            row,
+        )
+        item = AtefItem(
+            tree_parent=self.full_tree,
+            name=config.name or 'untitled',
+            func_name=func_name,
+        )
+        page = Group(row.bridge)
+        link_page(item, page)
+        self.setup_child_nav_button(row.child_button, item)
+        self.row_count += 1
+
+        self.row_mapping[row] = (config, item)
+
+        # If either of the widgets change the name, update tree
+        row.bridge.name.changed_value.connect(
+            partial(item.setText, 0)
+        )
+        # Note: this is the only place in the UI where
+        # we add new config data
+        if update_data:
+            self.bridge.append(config)
+
+    def delete_row(self, row: OverviewRow) -> None:
+        """
+        Delete a row and the corresponding data from the file.
+
+        This will remove the config data structure and the
+        tree node, and leave us in a state where adding a new
+        config will work as expected.
+
+        Parameters
+        ----------
+        row : OverviewRow
+            The row that we want to remove from the display.
+            This row has an associated tree item and config
+            dataclass.
+        """
+        config, tree_item = self.row_mapping[row]
+        self.bridge.remove_value(config)
+        self.full_tree.invisibleRootItem().removeChild(tree_item)
+        self.row_count -= 1
+        del self.row_mapping[row]
+        row.deleteLater()
+
+
 class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
     """
     A single row in the overview widget.
@@ -837,7 +846,7 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
     def __init__(
         self,
         config: Union[DeviceConfiguration, PVConfiguration],
-        overview: Overview,
+        overview: ConfigurationGroupWidget,
         *args,
         **kwargs
     ):
@@ -1087,7 +1096,8 @@ class Group(ConfigTextMixin, PageWidget):
     def add_checklist(
         self,
         checked: Optional[bool] = None,
-        id_and_comp: Optional[IdentifierAndComparison] = None,
+        # TODO this doesn't exist
+        # id_and_comp: Optional[IdentifierAndComparison] = None,
     ) -> None:
         """
         Add a new or existing checklist to the list of checklists.
@@ -1100,11 +1110,12 @@ class Group(ConfigTextMixin, PageWidget):
         id_and_comp : IdentifierAndComparison, optional
             The checklist to add. If omitted, we'll create a blank checklist.
         """
-        if id_and_comp is None:
-            id_and_comp = IdentifierAndComparison()
-        widget, bridge = self.checklist_list.add_item(id_and_comp)
-        item = self.setup_checklist_item_bridge(bridge)
-        self.setup_child_nav_button(widget.child_button, item)
+        # TODO this doesn't exist
+        # if id_and_comp is None:
+        #     id_and_comp = IdentifierAndComparison()
+        # widget, bridge = self.checklist_list.add_item(id_and_comp)
+        # item = self.setup_checklist_item_bridge(bridge)
+        # self.setup_child_nav_button(widget.child_button, item)
 
     def _cleanup_bridge_node(
         self,
