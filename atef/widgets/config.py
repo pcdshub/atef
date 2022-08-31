@@ -47,7 +47,7 @@ from ..check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
                      LessOrEqual, NotEquals, Range)
 from ..config import (Configuration, ConfigurationFile, ConfigurationGroup,
                       DeviceConfiguration, PVConfiguration, ToolConfiguration)
-from ..enums import Severity
+from ..enums import GroupResultMode, Severity
 from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
 from ..reduce import ReduceMethod
 from ..type_hints import PrimitiveType
@@ -659,7 +659,39 @@ class ConfigTextMixin:
         self.desc_edit.setFixedHeight(line_count * 13 + 12)
 
 
-class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
+class ConfigurationWidgetMixin(ConfigTextMixin):
+    """
+    Mix-in class for shared behavior among configuration widgets.
+
+    All configurations have names, descriptions, and tags as inherited from
+    the base "Configuration" dataclass.
+    """
+    tags_content: QVBoxLayout
+    add_tag_button: QToolButton
+
+    def initialize_config_mixin(self):
+        """
+        Make the name, description, and tags work as expected.
+        """
+        self.initialize_config_text()
+        tags_list = StrList(
+            data_list=self.bridge.tags,
+            layout=QHBoxLayout(),
+        )
+        self.tags_content.addWidget(tags_list)
+
+        def add_tag():
+            if tags_list.widgets and not tags_list.widgets[-1].line_edit.text().strip():
+                # Don't add another tag if we haven't filled out the last one
+                return
+
+            elem = tags_list.add_item('')
+            elem.line_edit.setFocus()
+
+        self.add_tag_button.clicked.connect(add_tag)
+
+
+class ConfigurationGroupWidget(ConfigurationWidgetMixin, PageWidget):
     """
     A widget that represents a ``ConfigurationGroup`` dataclass.
 
@@ -674,33 +706,34 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
 
     "values" allows us to define global constants that can be used or
     overridden in sub-groups. TODO in a future version these will be useable
-    as comparison targets.
+    as comparison targets, when that is the case they should be editable
+    from the GUI too.
 
     "mode" allows us to choose how to interpret the overall result from
     all of the component configurations, and can be set to "all_" or "any_"
     depending on if we need all the subconfigurations to pass or just one of
     them- in case we have different running modes, for example.
 
-    This widget was formally named ``Overview`` in older versions of this
-    application.
+    The individual configuration rows in this widget are arranged in
+    a QTableWidget with the intent of supporting drag and drop rearrangement
+    of the configurations.
 
     TODO support drag and drop to rearrange the configs in the group,
     must persist through loads
+
+    This widget was formally named ``Overview`` in older versions of this
+    application.
     """
     filename = 'configuration_group_widget.ui'
 
-    name_edit: QLineEdit
-    desc_edit: QPlainTextEdit
-    tags_content: QVBoxLayout
-    add_tag_button: QToolButton
-
     add_config_button: QPushButton
     select_type_combo: QComboBox
+    mode_combo: QComboBox
 
     group_content_table: QTableWidget
 
     row_count: int
-    row_mapping: Dict[OverviewRow, Tuple[Configuration, AtefItem]]
+    row_mapping: Dict[ConfigRowWidget, Tuple[Configuration, AtefItem]]
 
     func_names: ClassVar[Dict[type, str]] = {
         DeviceConfiguration: "device config",
@@ -721,12 +754,22 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
         super().__init__(bridge, parent=parent)
         self.row_count = 0
         self.row_mapping = {}
-        self.initialize_config_text()
+        self.initialize_config_mixin()
         self.add_config_button.connect(self.add_config_from_gui)
         for text in self.func_names.values():
             self.select_type_combo.addItem(text)
         self.next_type = next(self.func_names)
-        self.select_type_combo.activated.connect(self.new_add_type)
+        self.select_type_combo.textActivated.connect(self.set_next_type)
+
+        for result in GroupResultMode:
+            self.mode_combo.addItem(self.result_title(result))
+
+        self.mode_combo.setCurrentIndex(
+            self.mode_combo.findText(self.result_title(bridge.mode.get()))
+        )
+        self.mode_combo.textActivated.connect(self.change_mode)
+
+        self.initialize_configuration_group()
 
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
@@ -753,6 +796,24 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
         """
         self.next_type = self.func_names_rev[text]
 
+    def change_mode(self, title: str, *args, **kwargs):
+        """
+        GUI change of internal group enum mode.
+        """
+        self.bridge.mode.put(self.result_enum(title))
+
+    def result_title(self, result: GroupResultMode) -> str:
+        """
+        Pick a string to use to represent a group result mode choice.
+        """
+        return result.name.title().strip('_')
+
+    def result_enum(self, title: str) -> GroupResultMode:
+        """
+        Inversion of result_title to get an enum back.
+        """
+        return getattr(GroupResultMode, title.lower() + "_")
+
     def add_config(
         self,
         config: Configuration,
@@ -773,7 +834,7 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
             Set to False during the initial reading of the file.
         """
         # Create enclosed widget
-        row = OverviewRow(config, self)
+        row = ConfigRowWidget(config, self)
         # Add widget to the end of the table
         self.group_content_table.insertRow(self.row_count)
         self.group_content_table.setCellWidget(self.row_count, 0, row)
@@ -801,7 +862,7 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
         if update_data:
             self.bridge.append(config)
 
-    def delete_row(self, row: OverviewRow) -> None:
+    def delete_row(self, row: ConfigRowWidget) -> None:
         """
         Delete a row and the corresponding data from the file.
 
@@ -811,7 +872,7 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
 
         Parameters
         ----------
-        row : OverviewRow
+        row : ConfigRowWidget
             The row that we want to remove from the display.
             This row has an associated tree item and config
             dataclass.
@@ -834,12 +895,13 @@ class ConfigurationGroupWidget(ConfigTextMixin, PageWidget):
         row.deleteLater()
 
 
-class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
+class ConfigRowWidget(ConfigTextMixin, DesignerDisplay, QWidget):
     """
-    A single row in the overview widget.
+    A single row in a configuration group widget.
 
     This displays and provides means to edit the name and description
-    of a single configuration.
+    of a single configuration. It also contains a button for navigating
+    to the configuration-specific page.
 
     Parameters
     ----------
@@ -860,25 +922,28 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
 
     def __init__(
         self,
-        config: Union[DeviceConfiguration, PVConfiguration],
-        overview: ConfigurationGroupWidget,
+        config: Configuration,
+        group: ConfigurationGroupWidget,
         *args,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.bridge = QDataclassBridge(config, parent=self)
-        self.overview = overview
+        self.group = group
         self.initialize_row()
 
     def initialize_row(self):
         """
         Set up all the logic and starting state of the row widget.
         """
+        # Set up name, desc
         self.initialize_config_text()
-        if isinstance(self.bridge.data, DeviceConfiguration):
-            self.config_type.setText('Device Config')
-        else:
-            self.config_type.setText('PV Config')
+        # Make sure we know it's a device config, a pv config, etc.
+        self.config_type.setText(
+            ConfigurationGroupWidget.func_names[
+                type(self.bridge.data)
+            ].title()
+        )
         # Setup the lock and delete buttons
         self.lock_button.toggled.connect(self.handle_locking)
         self.name_edit.textChanged.connect(
@@ -965,7 +1030,157 @@ class OverviewRow(ConfigTextMixin, DesignerDisplay, QWidget):
             This argument is unused, but it will be sent by various button
             widgets via the "clicked" signal so it must be present.
         """
-        self.overview.delete_row(self)
+        self.group.delete_row(self)
+
+
+class SingleConfigurationMixin(ConfigurationWidgetMixin):
+    """
+    Mixin class for non-group configurations.
+
+    Each configuration needs to be able to create arbitrarily-
+    named nodes on the tree below them to hold lists of comparisons.
+
+    Each configuration always contains a "shared" node, which should
+    be hidden until the user wants to add elements to it.
+    """
+    add_node_button: QPushButton
+    add_shared_node_button: QPushButton
+
+    def initialize_single_configuration(self) -> None:
+        # Setup the name, description, and tags
+        self.initialize_config_mixin()
+        # Check if "shared" is empty or not
+        if self.bridge.shared.get():
+            # We have a shared, initialize now
+            self.initialized_shared_node()
+        else:
+            # We don't have it, do it later if needed
+            self.add_shared_node_button.connect(self.initialized_shared_node)
+
+    def create_config_list_node(self, node_name: str) -> AtefItem:
+        """
+        Create a new node below this configuration on the tree.
+
+        All sub-nodes represent lists of configurations.
+        """
+        return AtefItem(
+            tree_parent=self.tree_item,
+            name=node_name,
+            func_name='comparison list'
+        )
+
+    def initialized_shared_node(self):
+        # Create the "shared" node and its accompanying widget
+        self.shared_node = self.create_config_list_node('shared')
+        self.shared_page = SharedComparisonListWidget(
+            bridge=QDataclassBridge(
+                self.bridge.shared.get()
+            )
+        )
+        link_page(
+            item=self.shared_node,
+            widget=self.shared_page,
+        )
+        self.add_shared_node_button.hide()
+        # TODO add shared to node links list
+
+
+class DeviceConfigurationWidget(SingleConfigurationMixin, PageWidget):
+    """
+    PageWidget for manipulating a DeviceConfiguration dataclass instance.
+
+    Device configurations have a list of device names and a mapping from
+    attr to comparison list. The device names and attrs are selectable with
+    the assistance of happi.
+
+    Each attr will become a sub-node in the tree for selecting
+    comparison settings.
+    """
+    ...
+
+
+class PVConfigurationWidget(SingleConfigurationMixin, PageWidget):
+    """
+    PageWidget for manipulating a PVConfiguration dataclass instance.
+
+    PV configurations have a mapping from pvname to comparison.
+    The pv names can be filled in via typing or by bulk copy/paste.
+
+    Each pv will become a sub-node in the tree for selecting
+    comparison settings.
+    """
+    ...
+
+
+class ToolConfigurationWidget(SingleConfigurationMixin, PageWidget):
+    """
+    PageWidget for manipulating a ToolConfiguration dataclass instance
+
+    Tool configurations have a selector for which kind of tool to use,
+    and each tool has a unique widget for selecting the settings. For
+    example, the "Ping" tool has a "hosts" setting, among others.
+
+    Each tool also has a unique set of result attributes, each of which
+    can have a list of comparisons assigned to it.
+    The attribute names are unique to the tool type and will be
+    pre-filled in the UI as appropriate.
+    """
+    ...
+
+
+class PingWidget:
+    """
+    Widget to manipulate the "Ping" dataclass.
+    """
+    ...
+
+
+class ComparisonListMixin:
+    """
+    Mix-in class for comparison list PageWidgets.
+
+    The various configuration dataclasses contain lists of comparisons
+    designated by attribute names, PV names, the "shared" keyword,
+    and more. This mix-in class defined the shared behavior for
+    manipulating these lists.
+    """
+    ...
+
+
+class SharedComparisonListWidget(ComparisonListMixin, PageWidget):
+    """
+    A PageWidget for any of the "shared" comparison lists.
+
+    This is a list of comparisons that are not bound to singular attrs,
+    pvnames, or other identifiers, and are instead shared among them all.
+
+    This contains a helper widget for understanding which identifiers are
+    applicable and a way to add to these identifiers.
+    """
+    ...
+
+
+class OphydAttrComparisionListWidget(ComparisonListMixin, PageWidget):
+    """
+    A PageWidget for comparison lists designated by a specific ophyd attr.
+
+    This is a list of comparisons that are sourced from ophyd attribute
+    names.
+
+    This contains a helper widget for viewing the live value and happi
+    metadata from the specified attribute on each of the contained devices.
+    """
+    ...
+
+
+class PlainAttrComparisionListWidget(ComparisonListMixin, PageWidget):
+    """
+    A PageWidget for any of the "one identifier" comparison lists.
+
+    This is a list of comparisons that are bound to singular attrs,
+    pvnames, or other identifiers.
+    """
+    ...
 
 
 class Group(ConfigTextMixin, PageWidget):
@@ -2280,11 +2495,11 @@ class CompView(ConfigTextMixin, PageWidget):
     def __init__(
         self,
         bridge: QDataclassBridge,
-        id_and_comp: IdAndCompWidget,
+        configuration: Configuration,
         parent: Optional[QWidget] = None,
     ):
         super().__init__(bridge, parent=parent)
-        self.id_and_comp = id_and_comp
+        self.id_and_comp = configuration
         self.comparison_setup_done = False
 
     def assign_tree_item(self, item: AtefItem):
