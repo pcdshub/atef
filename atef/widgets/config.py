@@ -36,8 +36,8 @@ from qtpy.QtCore import QEvent, QObject, QPoint, Qt, QTimer
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import QClipboard, QColor, QGuiApplication, QPalette
 from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
-                            QFormLayout, QHBoxLayout, QInputDialog, QLabel,
-                            QLayout, QLineEdit, QMainWindow, QMenu,
+                            QFormLayout, QFrame, QHBoxLayout, QInputDialog,
+                            QLabel, QLayout, QLineEdit, QMainWindow, QMenu,
                             QMessageBox, QPlainTextEdit, QPushButton, QStyle,
                             QTableWidget, QTabWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
@@ -659,21 +659,64 @@ class ConfigTextMixin:
         self.desc_edit.setFixedHeight(line_count * 13 + 12)
 
 
-class ConfigurationWidgetMixin(ConfigTextMixin):
+class NameDescTagsWidget(DesignerDisplay, ConfigTextMixin):
     """
-    Mix-in class for shared behavior among configuration widgets.
+    Standard header widget with name, description, tags.
 
-    All configurations have names, descriptions, and tags as inherited from
-    the base "Configuration" dataclass.
+    Any of these will be automatically disabled if the data source is missing
+    the corresponding field.
+
+    This is intended to be included inside configuration and comparison page
+    widgets. The shared widget and shared UI file helps ensure some
+    consistency between these pages.
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        A dataclass bridge to a dataclass that has any or all of the
+        name, description, and tags fields.
+        See the ``atef.config.Configuration`` base class for an example
+        of what these should be.
+    parent : QWidget, optional
+        The page or other widget that contains this one.
     """
+    filename = 'name_desc_tags_widget.ui'
+
+    name_edit: QLineEdit
+    name_frame: QFrame
+    desc_edit: QPlainTextEdit
+    desc_frame: QFrame
     tags_content: QVBoxLayout
     add_tag_button: QToolButton
+    tags_frame: QFrame
 
-    def initialize_config_mixin(self):
-        """
-        Make the name, description, and tags work as expected.
-        """
-        self.initialize_config_text()
+    def __init__(
+        self,
+        bridge: QDataclassBridge,
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(parent=parent)
+        self.bridge = bridge
+        try:
+            bridge.name
+        except AttributeError:
+            self.name_frame.hide()
+        else:
+            self.initialize_config_name()
+        try:
+            bridge.description
+        except AttributeError:
+            self.desc_frame.hide()
+        else:
+            self.initialize_config_desc()
+        try:
+            bridge.tags
+        except AttributeError:
+            self.tags_frame.hide()
+        else:
+            self.initialize_config_tags()
+
+    def initialize_config_tags(self):
         tags_list = StrList(
             data_list=self.bridge.tags,
             layout=QHBoxLayout(),
@@ -691,7 +734,22 @@ class ConfigurationWidgetMixin(ConfigTextMixin):
         self.add_tag_button.clicked.connect(add_tag)
 
 
-class ConfigurationGroupWidget(ConfigurationWidgetMixin, PageWidget):
+class NameDescTagsMixin:
+    """
+    Mix-in class for including the NameDescTagsWidget in a display.
+
+    Supplies a helper function to set up the widget and place it into
+    the name_desc_tags_layout.
+    """
+    bridge: QDataclassBridge
+    name_desc_tags_layout: QVBoxLayout
+
+    def initialize_name_desc_tags(self):
+        header = NameDescTagsWidget(bridge=self.bridge, parent=self)
+        self.name_desc_tags_layout.addItem(header)
+
+
+class ConfigurationGroupWidget(NameDescTagsMixin, PageWidget):
     """
     A widget that represents a ``ConfigurationGroup`` dataclass.
 
@@ -754,7 +812,7 @@ class ConfigurationGroupWidget(ConfigurationWidgetMixin, PageWidget):
         super().__init__(bridge, parent=parent)
         self.row_count = 0
         self.row_mapping = {}
-        self.initialize_config_mixin()
+        self.initialize_name_desc_tags()
         self.add_config_button.connect(self.add_config_from_gui)
         for text in self.func_names.values():
             self.select_type_combo.addItem(text)
@@ -1033,7 +1091,7 @@ class ConfigRowWidget(ConfigTextMixin, DesignerDisplay, QWidget):
         self.group.delete_row(self)
 
 
-class SingleConfigurationMixin(ConfigurationWidgetMixin):
+class SingleConfigurationMixin(NameDescTagsMixin):
     """
     Mixin class for non-group configurations.
 
@@ -1048,7 +1106,7 @@ class SingleConfigurationMixin(ConfigurationWidgetMixin):
 
     def initialize_single_configuration(self) -> None:
         # Setup the name, description, and tags
-        self.initialize_config_mixin()
+        self.initialize_name_desc_tags()
         # Check if "shared" is empty or not
         if self.bridge.shared.get():
             # We have a shared, initialize now
