@@ -659,7 +659,7 @@ class ConfigTextMixin:
         self.desc_edit.setFixedHeight(line_count * 13 + 12)
 
 
-class NameDescTagsWidget(DesignerDisplay, ConfigTextMixin):
+class NameDescTagsWidget(DesignerDisplay, ConfigTextMixin, QWidget):
     """
     Standard header widget with name, description, tags.
 
@@ -1095,52 +1095,59 @@ class SingleConfigurationMixin(NameDescTagsMixin):
     """
     Mixin class for non-group configurations.
 
-    Each configuration needs to be able to create arbitrarily-
-    named nodes on the tree below them to hold lists of comparisons.
-
-    Each configuration always contains a "shared" node, which should
-    be hidden until the user wants to add elements to it.
+    Each configuration needs to be able to create comparisons
+    on the tree below them and TODO manage their order.
     """
-    add_node_button: QPushButton
-    add_shared_node_button: QPushButton
+    add_comparison_button: QPushButton
+    comparisons_layout: QVBoxLayout
 
     def initialize_single_configuration(self) -> None:
+        """
+        Do all the normal setup for configuration pages.
+        """
         # Setup the name, description, and tags
         self.initialize_name_desc_tags()
-        # Check if "shared" is empty or not
-        if self.bridge.shared.get():
-            # We have a shared, initialize now
-            self.initialized_shared_node()
-        else:
-            # We don't have it, do it later if needed
-            self.add_shared_node_button.connect(self.initialized_shared_node)
+        # Populate the comparisons: define in page widget
+        self.load_comparisons()
+        # Set up the button
+        self.add_comparison_button.connect(self.add_comparison_node)
 
-    def create_config_list_node(self, node_name: str) -> AtefItem:
+    def load_comparisions(self):
+        """
+        Set up the page with all the saved comparisons.
+
+        A subclass should implement this to read the dataclass and
+        call add_comparison_node as appropriate. It should also
+        load any additional contextual data needed to understand
+        the comparisons.
+        """
+        raise NotImplementedError("Must implement in page widget")
+
+    def add_comparison_node(
+        self,
+        comparison: Optional[Comparison] = None,
+        **kwargs,
+    ) -> None:
         """
         Create a new node below this configuration on the tree.
 
-        All sub-nodes represent lists of configurations.
-        """
-        return AtefItem(
-            tree_parent=self.tree_item,
-            name=node_name,
-            func_name='comparison list'
-        )
+        This creates the page widget, creates the AtefItem node,
+        and links them together as appropriate.
 
-    def initialized_shared_node(self):
-        # Create the "shared" node and its accompanying widget
-        self.shared_node = self.create_config_list_node('shared')
-        self.shared_page = SharedComparisonListWidget(
-            bridge=QDataclassBridge(
-                self.bridge.shared.get()
-            )
+        All sub-nodes represent single comparisons.
+        """
+        if comparison is None:
+            comparison = Equals()
+        widget = CompView(
+            bridge=QDataclassBridge(comparison),
+            parent=self,
         )
-        link_page(
-            item=self.shared_node,
-            widget=self.shared_page,
+        item = AtefItem(
+            tree_parent=self.tree_item,
+            name=comparison.name or 'untitled',
+            func_name='comparison'
         )
-        self.add_shared_node_button.hide()
-        # TODO add shared to node links list
+        link_page(item=item, widget=widget)
 
 
 class DeviceConfigurationWidget(SingleConfigurationMixin, PageWidget):
@@ -1151,10 +1158,29 @@ class DeviceConfigurationWidget(SingleConfigurationMixin, PageWidget):
     attr to comparison list. The device names and attrs are selectable with
     the assistance of happi.
 
-    Each attr will become a sub-node in the tree for selecting
+    Each comparison will become a sub-node in the tree for editing
     comparison settings.
     """
-    ...
+    devices_layout: QVBoxLayout
+    signals_layout: QVBoxLayout
+
+    def __init__(
+        self,
+        bridge: QDataclassBridge,
+        parent: Optional[QWidget] = None,
+    ):
+        super().__init__(bridge=bridge, parent=parent)
+        self.setup_happi_ophyd_widgets()
+        self.initialize_single_configuration()
+
+    def setup_happi_ophyd_widgets():
+        """
+        Set up the widgets that can be used to select devices and signals.
+        """
+        ...
+
+    def load_comparisons(self):
+        ...
 
 
 class PVConfigurationWidget(SingleConfigurationMixin, PageWidget):
@@ -1184,6 +1210,27 @@ class ToolConfigurationWidget(SingleConfigurationMixin, PageWidget):
     pre-filled in the UI as appropriate.
     """
     ...
+
+
+class AttrComparisonRowWidget(DesignerDisplay, ConfigTextMixin, QWidget):
+    """
+    A single row in a confguration widget that links an attr to a comparison.
+
+    An attr might be something like a pvname, a signal name, or a tool's
+    result field.
+    """
+    def __init__(
+        self,
+        bridge: QDataclassBridge,
+        parent: Union[
+            DeviceConfigurationWidget,
+            PVConfigurationWidget,
+            ToolConfigurationWidget,
+        ],
+    ):
+        super().__init__(parent=parent)
+        self.bridge = bridge
+        self.initialize_config_name()
 
 
 class PingWidget:
@@ -2553,11 +2600,10 @@ class CompView(ConfigTextMixin, PageWidget):
     def __init__(
         self,
         bridge: QDataclassBridge,
-        configuration: Configuration,
         parent: Optional[QWidget] = None,
     ):
         super().__init__(bridge, parent=parent)
-        self.id_and_comp = configuration
+        self.id_and_comp = None
         self.comparison_setup_done = False
 
     def assign_tree_item(self, item: AtefItem):

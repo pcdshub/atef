@@ -90,7 +90,7 @@
     <layout class="QVBoxLayout" name="comparisons_layout"/>
    </item>
    <item>
-    <widget class="QToolButton" name="toolButton">
+    <widget class="QToolButton" name="add_comparison_button">
      <property name="text">
       <string>+</string>
      </property>
