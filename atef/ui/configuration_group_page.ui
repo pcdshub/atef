@@ -7,36 +7,37 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>117</height>
+    <height>165</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
-   <property name="leftMargin">
-    <number>0</number>
-   </property>
-   <property name="topMargin">
-    <number>0</number>
-   </property>
-   <property name="rightMargin">
-    <number>0</number>
-   </property>
-   <property name="bottomMargin">
-    <number>0</number>
-   </property>
+   <item>
+    <layout class="QVBoxLayout" name="name_desc_tags_layout"/>
+   </item>
+   <item>
+    <widget class="Line" name="line">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_5">
      <property name="topMargin">
       <number>0</number>
      </property>
      <item>
-      <widget class="QLabel" name="label">
+      <widget class="QLabel" name="label_4">
        <property name="text">
-        <string>Global Values:</string>
+        <string>Mode:</string>
        </property>
       </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="mode_combo"/>
      </item>
      <item>
       <spacer name="horizontalSpacer_4">
@@ -51,36 +52,24 @@
        </property>
       </spacer>
      </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="group_content_table"/>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QLabel" name="label_4">
+      <widget class="QPushButton" name="add_config_button">
        <property name="text">
-        <string>Mode:</string>
+        <string>+ Add Config</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QComboBox" name="mode_combo"/>
+      <widget class="QComboBox" name="select_type_combo"/>
      </item>
     </layout>
-   </item>
-   <item>
-    <widget class="QTableWidget" name="values_table">
-     <column>
-      <property name="text">
-       <string>Name</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>Value</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
-       <string>Type</string>
-      </property>
-     </column>
-    </widget>
    </item>
   </layout>
  </widget>
