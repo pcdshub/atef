@@ -42,18 +42,18 @@ from qtpy.QtWidgets import (QAction, QCheckBox, QComboBox, QFileDialog,
                             QTableWidget, QTabWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 
-from .. import util
-from ..check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
-                     LessOrEqual, NotEquals, Range)
-from ..config import (Configuration, ConfigurationFile, ConfigurationGroup,
-                      DeviceConfiguration, PVConfiguration, ToolConfiguration)
-from ..enums import GroupResultMode, Severity
-from ..qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
-from ..reduce import ReduceMethod
-from ..type_hints import PrimitiveType
-from .core import DesignerDisplay
-from .happi import HappiDeviceComponentWidget
-from .ophyd import OphydAttributeData, OphydAttributeDataSummary
+from ... import util
+from ...check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
+                      LessOrEqual, NotEquals, Range)
+from ...config import (Configuration, ConfigurationFile, ConfigurationGroup,
+                       DeviceConfiguration, PVConfiguration, ToolConfiguration)
+from ...enums import GroupResultMode, Severity
+from ...qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
+from ...reduce import ReduceMethod
+from ...type_hints import PrimitiveType
+from ..core import DesignerDisplay
+from ..happi import HappiDeviceComponentWidget
+from ..ophyd import OphydAttributeData, OphydAttributeDataSummary
 
 logger = logging.getLogger(__name__)
 
