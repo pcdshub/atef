@@ -6,11 +6,11 @@ from __future__ import annotations
 from typing import ClassVar, Dict, List, Protocol
 from weakref import WeakKeyDictionary
 
-from qtpy.QtWidgets import (QComboBox, QHBoxLayout, QLayout, QLineEdit,
+from qtpy.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QPlainTextEdit, QStyle, QTableWidget, QToolButton,
                             QVBoxLayout, QWidget)
 
-from atef.config import ConfigurationGroup, GroupResultMode
+from atef.config import Configuration, ConfigurationGroup, GroupResultMode
 from atef.qt_helpers import QDataclassBridge, QDataclassList
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
@@ -60,7 +60,40 @@ class DataWidget(QWidget):
             self.bridge = bridge
 
 
-class NameDescTagsWidget(DesignerDisplay, DataWidget):
+class NameMixin:
+    """
+    Mixin class for distributing init_name
+    """
+    def init_name(self):
+        """
+        Set up the name_edit widget appropriately.
+        """
+        # Load starting text
+        load_name = self.bridge.name.get() or ''
+        self.last_name = load_name
+        self.name_edit.setText(load_name)
+        # Set up the saving/loading
+        self.name_edit.textEdited.connect(self.update_saved_name)
+        self.bridge.name.changed_value.connect(self.apply_new_name)
+
+    def update_saved_name(self, name: str):
+        """
+        When the user edits the name, write to the config.
+        """
+        self.last_name = self.name_edit.text()
+        self.bridge.name.put(name)
+
+    def apply_new_name(self, text: str):
+        """
+        If the text changed in the data, update the widget.
+
+        Only run if needed to avoid annoyance with cursor repositioning.
+        """
+        if text != self.last_name:
+            self.name_edit.setText(text)
+
+
+class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
     """
     Widget for displaying and editing the name, description, and tags fields.
 
@@ -105,34 +138,6 @@ class NameDescTagsWidget(DesignerDisplay, DataWidget):
             self.tags_container.hide()
         else:
             self.init_tags()
-
-    def init_name(self):
-        """
-        Set up the name_edit widget appropriately.
-        """
-        # Load starting text
-        load_name = self.bridge.name.get() or ''
-        self.last_name = load_name
-        self.name_edit.setText(load_name)
-        # Set up the saving/loading
-        self.name_edit.textEdited.connect(self.update_saved_name)
-        self.bridge.name.changed_value.connect(self.apply_new_name)
-
-    def update_saved_name(self, name: str):
-        """
-        When the user edits the name, write to the config.
-        """
-        self.last_name = self.name_edit.text()
-        self.bridge.name.put(name)
-
-    def apply_new_name(self, text: str):
-        """
-        If the text changed in the data, update the widget.
-
-        Only run if needed to avoid annoyance with cursor repositioning.
-        """
-        if text != self.last_name:
-            self.name_edit.setText(text)
 
     def init_desc(self):
         """
@@ -402,7 +407,6 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         # Set the initial combobox state
         self.update_mode_combo(self.bridge.mode.get())
         # TODO set up the values table
-        self.values_table.hide()
 
     def update_mode_combo(self, mode: GroupResultMode, **kwargs):
         """
@@ -415,3 +419,42 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         Take a user's combobox selection and use it to update the bridge.
         """
         self.bridge.mode.put(self.modes[index])
+
+
+class ConfigurationGroupRowWidget(DesignerDisplay, NameMixin, DataWidget):
+    """
+    A row summary of a ``Configuration`` instance of a ``ConfigurationGroup``.
+
+    You can view and edit the name from here, or delete the row.
+    This will also show the class of the configuration, e.g. if it
+    is a DeviceConfiguration for example, and will provide a
+    button for navigation to the correct child page.
+
+    The child_button and delete_button need to be set up by the page that
+    includes this widget, as this widget has no knowledge of page navigation
+    or of data outside of its ``Configuration`` instance, so it can't
+    delete itself or change the page without going outside of its intended
+    scope.
+    """
+    filename = "configuration_group_row_widget.ui"
+
+    name_edit = QLineEdit
+    type_label = QLabel
+    child_button = QToolButton
+    delete_button = QToolButton
+
+    def __init__(self, data: Configuration, **kwargs):
+        super().__init__(data=data, **kwargs)
+        self.init_name()
+        edit_filter = FrameOnEditFilter(parent=self)
+        if data.name:
+            edit_filter.set_edit_style(self.name_edit)
+        else:
+            edit_filter.set_no_edit_style(self.name_edit)
+        self.name_edit.installEventFilter(edit_filter)
+        self.name_edit.textChanged.connect(self.on_name_edit_text_changed)
+        self.on_name_edit_text_changed()
+        self.type_label.setText(data.__class__.__name__)
+
+    def on_name_edit_text_changed(self, **kwargs):
+        match_line_edit_text_width(self.name_edit)
