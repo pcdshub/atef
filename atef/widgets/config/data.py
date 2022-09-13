@@ -7,8 +7,8 @@ from typing import ClassVar, Dict, List, Protocol
 from weakref import WeakValueDictionary
 
 from qtpy.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLayout, QLineEdit,
-                            QPlainTextEdit, QStyle, QTableWidget, QToolButton,
-                            QVBoxLayout, QWidget)
+                            QPlainTextEdit, QPushButton, QStyle, QTableWidget,
+                            QToolButton, QVBoxLayout, QWidget)
 
 from atef.config import Configuration, ConfigurationGroup, GroupResultMode
 from atef.qt_helpers import QDataclassBridge, QDataclassList
@@ -269,7 +269,7 @@ class TagsWidget(QWidget):
         strlistelem : StrListElem
             The widget created by this function call.
         """
-        new_widget = TagsElem(starting_value)
+        new_widget = TagsElem(starting_value, self)
         self.widgets.append(new_widget)
         if not init:
             self.data_list.append(starting_value)
@@ -391,7 +391,9 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
     """
     filename = 'configuration_group_widget.ui'
 
+    values_label: QLabel
     values_table: QTableWidget  # TODO not used yet
+    add_value_button: QPushButton
     mode_combo: QComboBox
 
     def __init__(self, data: ConfigurationGroup, **kwargs):

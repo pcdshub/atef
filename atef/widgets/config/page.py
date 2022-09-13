@@ -29,7 +29,7 @@ from atef.config import (Configuration, ConfigurationGroup,
 
 from ..core import DesignerDisplay
 from .data import (ConfigurationGroupRowWidget, ConfigurationGroupWidget,
-                   NameDescTagsWidget)
+                   DataWidget, NameDescTagsWidget)
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -127,8 +127,8 @@ class PageWidget(QWidget):
     """
     Base class for widgets that coorespond to a tree node.
 
-    Contains utilities for navigating the tree and for loading
-    data widgets into placeholders.
+    Contains utilities for navigating and manipulating
+    the tree and for loading data widgets into placeholders.
 
     Must be linked up to the tree using the ``link_page``
     function after being instantiated, not during.
@@ -263,6 +263,18 @@ class PageWidget(QWidget):
         placeholder.setLayout(layout)
         placeholder.layout().addWidget(widget)
 
+    def connect_tree_node_name(self, widget: DataWidget):
+        """
+        Helper function for causing the tree name to update when name updates.
+        """
+        widget.bridge.name.changed_value.connect(self.set_new_node_name)
+
+    def set_new_node_name(self, name: str):
+        """
+        Change the name of our node in the tree widget.
+        """
+        self.tree_item.setText(0, name)
+
 
 class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     """
@@ -312,9 +324,11 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         super().assign_tree_item(item)
         # Make sure the parent button is set up properly
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
+        # Make sure the node name updates appropriately
+        self.connect_tree_node_name(self.name_desc_tags_widget)
 
     def add_config_row(self, config: Optional[Configuration] = None, **kwargs):
-        if config is None:
+        if not isinstance(config, Configuration):
             config = self.config_cls_options[
                 self.add_row_type_combo.currentText()
             ]()
