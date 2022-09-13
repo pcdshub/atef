@@ -258,7 +258,9 @@ class PageWidget(QWidget):
         """
         Helper function for slotting e.g. data widgets into placeholders.
         """
-        placeholder.setLayout(QVBoxLayout())
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        placeholder.setLayout(layout)
         placeholder.layout().addWidget(widget)
 
 
