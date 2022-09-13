@@ -182,7 +182,7 @@ class Window(DesignerDisplay, QMainWindow):
         try:
             return serialize(
                 ConfigurationFile,
-                tree.bridge.data,
+                tree.config_file,
             )
         except Exception:
             logger.exception('Error serializing file')
@@ -193,7 +193,7 @@ class Window(DesignerDisplay, QMainWindow):
 
         The parameters are open as to accept inputs from any signal.
         """
-        pprint(self.get_current_tree().bridge.data)
+        pprint(self.get_current_tree().config_file)
 
     def print_serialized(self, *args, **kwargs):
         """
