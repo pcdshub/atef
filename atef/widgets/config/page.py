@@ -268,6 +268,8 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     """
     Page that handles all components of a ConfigurationGroup.
     """
+    filename = 'configuration_group_page.ui'
+
     name_desc_tags_placeholder: QWidget
     config_group_placeholder: QWidget
     config_table: QTableWidget
@@ -297,16 +299,19 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             self.config_group_widget,
             self.config_group_placeholder,
         )
-        # Make sure the parent button is set up properly
-        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         # Fill in the rows from the initial data
         for config in data.configs:
             self.add_config_row(config)
         # Allow the user to add more rows
-        self.add_row_button.connect(self.add_config_row)
+        self.add_row_button.clicked.connect(self.add_config_row)
         # Fill in the row type selector box
         for option in self.config_cls_options:
             self.add_row_type_combo.addItem(option)
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
+        # Make sure the parent button is set up properly
+        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
 
     def add_config_row(self, config: Optional[Configuration] = None, **kwargs):
         if config is None:

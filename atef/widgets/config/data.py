@@ -4,7 +4,7 @@ Widgets used for manipulating the configuration data.
 from __future__ import annotations
 
 from typing import ClassVar, Dict, List, Protocol
-from weakref import WeakKeyDictionary
+from weakref import WeakValueDictionary
 
 from qtpy.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QPlainTextEdit, QStyle, QTableWidget, QToolButton,
@@ -46,17 +46,19 @@ class DataWidget(QWidget):
         when a widget is inserted into a layout.
     """
     _bridge_cache: ClassVar[
-        WeakKeyDictionary[AnyDataclass, QDataclassBridge]
-    ] = WeakKeyDictionary()
+        WeakValueDictionary[int, QDataclassBridge]
+    ] = WeakValueDictionary()
     bridge: QDataclassBridge
 
     def __init__(self, data: AnyDataclass, **kwargs):
         super().__init__(**kwargs)
         try:
-            self.bridge = self._bridge_cache[data]
+            # TODO figure out better way to cache these
+            # TODO worried about strange deallocation timing race conditions
+            self.bridge = self._bridge_cache[id(data)]
         except KeyError:
             bridge = QDataclassBridge(data)
-            self._bridge_cache[data] = bridge
+            self._bridge_cache[id(data)] = bridge
             self.bridge = bridge
 
 
@@ -402,7 +404,7 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
             self.mode_indices[result] = index
             self.modes.append(result)
         # Set up the bridge -> combo and combo -> bridge signals
-        self.bridge.mode.value_changed.connect(self.update_mode_combo)
+        self.bridge.mode.changed_value.connect(self.update_mode_combo)
         self.mode_combo.activated.connect(self.update_mode_bridge)
         # Set the initial combobox state
         self.update_mode_combo(self.bridge.mode.get())

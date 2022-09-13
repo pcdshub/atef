@@ -1212,7 +1212,7 @@ class ToolConfigurationWidget(SingleConfigurationMixin, PageWidget):
     ...
 
 
-class AttrComparisonRowWidget(DesignerDisplay, ConfigTextMixin, QWidget):
+class AttrComparisonRowWidget(ConfigTextMixin, QWidget):
     """
     A single row in a confguration widget that links an attr to a comparison.
 
