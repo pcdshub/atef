@@ -3,12 +3,13 @@ Widgets used for manipulating the configuration data.
 """
 from __future__ import annotations
 
-from typing import ClassVar, Dict, List, Protocol
+from typing import Any, ClassVar, Dict, List, Optional, Protocol
 from weakref import WeakValueDictionary
 
 from qtpy.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLayout, QLineEdit,
-                            QPlainTextEdit, QPushButton, QStyle, QTableWidget,
-                            QToolButton, QVBoxLayout, QWidget)
+                            QMessageBox, QPlainTextEdit, QPushButton, QStyle,
+                            QTableWidget, QTableWidgetItem, QToolButton,
+                            QVBoxLayout, QWidget)
 
 from atef.config import Configuration, ConfigurationGroup, GroupResultMode
 from atef.qt_helpers import QDataclassBridge, QDataclassList
@@ -394,7 +395,10 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
     values_label: QLabel
     values_table: QTableWidget  # TODO not used yet
     add_value_button: QPushButton
+    del_value_button: QPushButton
     mode_combo: QComboBox
+
+    adding_new_row: bool
 
     def __init__(self, data: ConfigurationGroup, **kwargs):
         super().__init__(data=data, **kwargs)
@@ -410,7 +414,14 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         self.mode_combo.activated.connect(self.update_mode_bridge)
         # Set the initial combobox state
         self.update_mode_combo(self.bridge.mode.get())
-        # TODO set up the values table
+        self.add_value_button.clicked.connect(self.add_value_to_table)
+        self.adding_new_row = False
+        for name, value in self.bridge.values.get().items():
+            self.add_value_to_table(name=name, value=value, startup=True)
+        self.on_table_edit(0, 0)
+        self.resize_table()
+        self.values_table.cellChanged.connect(self.on_table_edit)
+        self.del_value_button.clicked.connect(self.delete_selected_rows)
 
     def update_mode_combo(self, mode: GroupResultMode, **kwargs):
         """
@@ -423,6 +434,105 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         Take a user's combobox selection and use it to update the bridge.
         """
         self.bridge.mode.put(self.modes[index])
+
+    def add_value_to_table(
+        self,
+        checked: bool = False,
+        name: Optional[str] = None,
+        value: Any = None,
+        startup: bool = False,
+        **kwargs,
+    ):
+        self.adding_new_row = True
+        self.values_label.show()
+        self.values_table.show()
+        new_row = self.values_table.rowCount()
+        self.values_table.insertRow(new_row)
+        name_item = QTableWidgetItem()
+        name = name if name is not None else ''
+        value = value if value is not None else ''
+        name_item.setText(name)
+        value_item = QTableWidgetItem()
+        value_item.setText(value)
+        type_readback_widget = QLabel()
+        self.values_table.setItem(new_row, 0, name_item)
+        self.values_table.setItem(new_row, 1, value_item)
+        self.values_table.setCellWidget(new_row, 2, type_readback_widget)
+        self.resize_table()
+        self.adding_new_row = False
+        if not startup:
+            self.on_table_edit(new_row, 0)
+
+    def resize_table(self):
+        row_count = self.values_table.rowCount()
+        # Hide when the table is empty
+        if row_count:
+            self.values_label.show()
+            self.values_table.show()
+            self.del_value_button.show()
+        else:
+            self.values_label.hide()
+            self.values_table.hide()
+            self.del_value_button.hide()
+            return
+        # Resize the table, should fit up to 3 rows
+        per_row = 30
+        height = min((row_count + 1) * per_row, 4 * per_row)
+        self.values_table.setFixedHeight(height)
+
+    def on_table_edit(self, row: int, column: int):
+        if self.adding_new_row:
+            return
+        data = []
+        for row_index in range(self.values_table.rowCount()):
+            name = self.values_table.item(row_index, 0).text()
+            value_text = self.values_table.item(row_index, 1).text()
+            type_label = self.values_table.cellWidget(row_index, 2)
+            try:
+                value = float(value_text)
+            except (ValueError, TypeError):
+                # Not numeric
+                value = value_text
+                type_label.setText('str')
+            else:
+                # Numeric, but could be int or float
+                if '.' in value_text:
+                    type_label.setText('float')
+                else:
+                    try:
+                        value = int(value_text)
+                    except (ValueError, TypeError):
+                        # Something like 1e-4
+                        type_label.setText('float')
+                    else:
+                        # Something like 3
+                        type_label.setText('int')
+            data.append((name, value))
+        data_dict = {}
+        for name, value in sorted(data):
+            data_dict[name] = value
+        self.bridge.values.put(data_dict)
+
+    def delete_selected_rows(self, *args, **kwargs):
+        selected_rows = set()
+        for item in self.values_table.selectedItems():
+            selected_rows.add(item.row())
+        if not selected_rows:
+            return
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to delete '
+                f'these {len(selected_rows)} rows?'
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
+        for row in reversed(sorted(selected_rows)):
+            self.values_table.removeRow(row)
+        self.on_table_edit(0, 0)
+        self.resize_table()
 
 
 class ConfigurationGroupRowWidget(DesignerDisplay, NameMixin, DataWidget):

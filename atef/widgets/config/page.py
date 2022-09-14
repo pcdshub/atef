@@ -20,9 +20,9 @@ from typing import ClassVar, Dict, Optional, Type, Union
 from weakref import WeakValueDictionary
 
 from qtpy.QtGui import QDropEvent
-from qtpy.QtWidgets import (QComboBox, QPushButton, QStyle, QTableWidget,
-                            QToolButton, QTreeWidget, QTreeWidgetItem,
-                            QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QComboBox, QMessageBox, QPushButton, QStyle,
+                            QTableWidget, QToolButton, QTreeWidget,
+                            QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
@@ -209,7 +209,7 @@ class PageWidget(QWidget):
         Set up a button's style and make it navigate to a specific child page.
         """
         # Create a function that navigates to the right page
-        def inner_navigate(**kwargs):
+        def inner_navigate(*args, **kwargs):
             self.navigate_to(item)
 
         # Make the button work
@@ -343,15 +343,35 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             func_name=type(config).__name__,
         )
         link_page(item=config_item, widget=config_page)
-        self.setup_child_button(
-            button=config_row.child_button,
-            item=config_item,
+        self.setup_row_buttons(
+            config_row=config_row,
+            config_item=config_item,
         )
         row_count = self.config_table.rowCount()
         self.config_table.insertRow(row_count)
         self.config_table.setRowHeight(row_count, config_row.sizeHint().height())
         self.config_table.setCellWidget(row_count, 0, config_row)
         # self.resize_config_table()
+
+    def setup_row_buttons(
+        self,
+        config_row: ConfigurationGroupRowWidget,
+        config_item: AtefItem,
+    ):
+        self.setup_child_button(
+            button=config_row.child_button,
+            item=config_item,
+        )
+        delete_icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
+        config_row.delete_button.setIcon(delete_icon)
+
+        def inner_delete(*args, **kwargs):
+            self.delete_row(
+                row_widget=config_row,
+                item=config_item,
+            )
+
+        config_row.delete_button.clicked.connect(inner_delete)
 
     def resize_config_table(self):
         """
@@ -384,9 +404,9 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         self.config_table.removeRow(source)
         self.config_table.insertRow(dest)
         config_row = ConfigurationGroupRowWidget(data=config_data)
-        self.setup_child_button(
-            button=config_row.child_button,
-            item=config_item,
+        self.setup_row_buttons(
+            config_row=config_row,
+            config_item=config_item,
         )
         self.config_table.setRowHeight(dest, config_row.sizeHint().height())
         self.config_table.setCellWidget(dest, 0, config_row)
@@ -406,6 +426,36 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             if dest_row == -1:
                 dest_row = self.config_table.rowCount()
             self.move_config_row(selected_row, dest_row)
+
+    def delete_row(
+        self,
+        row_widget: ConfigurationGroupRowWidget,
+        item: AtefItem,
+    ):
+        # Confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to delete the '
+                f'{item.text(1)} named "{item.text(0)}"? '
+                'Note that this will delete any child nodes in the tree.'
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
+        # Get the identity of the configuration
+        configuration = row_widget.bridge.data
+        # Remove item from the tree
+        self.tree_item.removeChild(item)
+        # Remove row from the table
+        for row in range(self.config_table.rowCount()):
+            widget = self.config_table.cellWidget(row, 0)
+            if widget is row_widget:
+                self.config_table.removeRow(row)
+                break
+        # Remove configuration from the data structure
+        self.data.configs.remove(configuration)
 
 
 class DeviceConfigurationPage(PageWidget):

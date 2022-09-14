@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>146</height>
+    <height>149</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -83,6 +83,18 @@
        <height>70</height>
       </size>
      </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <property name="sortingEnabled">
+      <bool>true</bool>
+     </property>
+     <attribute name="horizontalHeaderDefaultSectionSize">
+      <number>100</number>
+     </attribute>
+     <attribute name="verticalHeaderVisible">
+      <bool>false</bool>
+     </attribute>
      <column>
       <property name="text">
        <string>Name</string>
@@ -101,11 +113,25 @@
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="add_value_button">
-     <property name="text">
-      <string>+ Add Global Value</string>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <property name="bottomMargin">
+      <number>0</number>
      </property>
-    </widget>
+     <item>
+      <widget class="QPushButton" name="add_value_button">
+       <property name="text">
+        <string>+ Add Global Value</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="del_value_button">
+       <property name="text">
+        <string>x Delete Selected</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
   </layout>
  </widget>

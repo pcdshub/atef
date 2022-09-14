@@ -262,6 +262,7 @@ class Tree(DesignerDisplay, QWidget):
             data=root_configuration_group,
         )
         link_page(item=self.root_item, widget=root_page)
+        root_page.parent_button.hide()
 
     def show_selected_display(self, *args, **kwargs):
         """
