@@ -452,9 +452,9 @@ class ConfigurationGroupRowWidget(DesignerDisplay, NameMixin, DataWidget):
         self.init_name()
         edit_filter = FrameOnEditFilter(parent=self)
         if data.name:
-            edit_filter.set_edit_style(self.name_edit)
-        else:
             edit_filter.set_no_edit_style(self.name_edit)
+        else:
+            edit_filter.set_edit_style(self.name_edit)
         self.name_edit.installEventFilter(edit_filter)
         self.name_edit.textChanged.connect(self.on_name_edit_text_changed)
         self.on_name_edit_text_changed()

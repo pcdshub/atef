@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import ClassVar, Dict, Optional, Type, Union
 from weakref import WeakValueDictionary
 
+from qtpy.QtGui import QDropEvent
 from qtpy.QtWidgets import (QComboBox, QPushButton, QStyle, QTableWidget,
                             QToolButton, QTreeWidget, QTreeWidgetItem,
                             QVBoxLayout, QWidget)
@@ -319,6 +320,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         # Fill in the row type selector box
         for option in self.config_cls_options:
             self.add_row_type_combo.addItem(option)
+        self.config_table.dropEvent = self.table_drop_event
 
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
@@ -332,8 +334,95 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             config = self.config_cls_options[
                 self.add_row_type_combo.currentText()
             ]()
+            self.data.configs.append(config)
         config_row = ConfigurationGroupRowWidget(data=config)
+        config_page = PAGE_MAP[type(config)](data=config)
+        config_item = AtefItem(
+            tree_parent=self.tree_item,
+            name=config.name or 'untitled',
+            func_name=type(config).__name__,
+        )
+        link_page(item=config_item, widget=config_page)
+        self.setup_child_button(
+            button=config_row.child_button,
+            item=config_item,
+        )
         row_count = self.config_table.rowCount()
         self.config_table.insertRow(row_count)
+        self.config_table.setRowHeight(row_count, config_row.sizeHint().height())
         self.config_table.setCellWidget(row_count, 0, config_row)
-        self.config_table.setRowHeight(row_count, config_row.height())
+        # self.resize_config_table()
+
+    def resize_config_table(self):
+        """
+        Make sure that the whole row widget is visible.
+        """
+        self.config_table.setColumnWidth(0, self.config_table.width() - 10)
+
+    def resizeEvent(self, *args, **kwargs) -> None:
+        """
+        Override resizeEvent to update the table column width when we resize.
+        """
+        self.resize_config_table()
+        return super().resizeEvent(*args, **kwargs)
+
+    def move_config_row(self, source: int, dest: int):
+        """
+        Move the row at index source to index dest.
+
+        Rearanges the table, the file, and the tree.
+        """
+        # Skip if into the same index
+        if source == dest:
+            return
+        config_data = self.data.configs.pop(source)
+        self.data.configs.insert(dest, config_data)
+        # Rearrange the tree
+        config_item = self.tree_item.takeChild(source)
+        self.tree_item.insertChild(dest, config_item)
+        # Rearrange the table: need a whole new widget or else segfault
+        self.config_table.removeRow(source)
+        self.config_table.insertRow(dest)
+        config_row = ConfigurationGroupRowWidget(data=config_data)
+        self.setup_child_button(
+            button=config_row.child_button,
+            item=config_item,
+        )
+        self.config_table.setRowHeight(dest, config_row.sizeHint().height())
+        self.config_table.setCellWidget(dest, 0, config_row)
+
+    def table_drop_event(self, event: QDropEvent):
+        """
+        Monkeypatch onto the table to allow us to drag/drop rows.
+
+        Shoutouts to stackoverflow
+        """
+        if event.source() is self.config_table:
+            selected_indices = self.config_table.selectedIndexes()
+            if not selected_indices:
+                return
+            selected_row = selected_indices[0].row()
+            dest_row = self.config_table.indexAt(event.pos()).row()
+            if dest_row == -1:
+                dest_row = self.config_table.rowCount()
+            self.move_config_row(selected_row, dest_row)
+
+
+class DeviceConfigurationPage(PageWidget):
+    ...
+
+
+class PVConfigurationPage(PageWidget):
+    ...
+
+
+class ToolConfigurationPage(PageWidget):
+    ...
+
+
+PAGE_MAP = {
+    ConfigurationGroup: ConfigurationGroupPage,
+    DeviceConfiguration: DeviceConfigurationPage,
+    PVConfiguration: PVConfigurationPage,
+    ToolConfiguration: ToolConfigurationPage,
+}
