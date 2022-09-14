@@ -450,15 +450,19 @@ class ConfigurationGroupRowWidget(DesignerDisplay, NameMixin, DataWidget):
     def __init__(self, data: Configuration, **kwargs):
         super().__init__(data=data, **kwargs)
         self.init_name()
-        edit_filter = FrameOnEditFilter(parent=self)
-        if data.name:
-            edit_filter.set_no_edit_style(self.name_edit)
-        else:
-            edit_filter.set_edit_style(self.name_edit)
-        self.name_edit.installEventFilter(edit_filter)
+        self.edit_filter = FrameOnEditFilter(parent=self)
+        self.name_edit.installEventFilter(self.edit_filter)
         self.name_edit.textChanged.connect(self.on_name_edit_text_changed)
         self.on_name_edit_text_changed()
         self.type_label.setText(data.__class__.__name__)
 
+    def adjust_edit_filter(self):
+        if self.bridge.name.get():
+            self.edit_filter.set_no_edit_style(self.name_edit)
+        else:
+            self.edit_filter.set_edit_style(self.name_edit)
+
     def on_name_edit_text_changed(self, **kwargs):
         match_line_edit_text_width(self.name_edit)
+        if not self.name_edit.hasFocus():
+            self.adjust_edit_filter()
