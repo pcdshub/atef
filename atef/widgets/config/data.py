@@ -3,6 +3,7 @@ Widgets used for manipulating the configuration data.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, ClassVar, Dict, List, Optional, Protocol
 from weakref import WeakValueDictionary
 
@@ -11,10 +12,13 @@ from qtpy.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QTableWidget, QTableWidgetItem, QToolButton,
                             QVBoxLayout, QWidget)
 
-from atef.config import Configuration, ConfigurationGroup, GroupResultMode
+from atef.config import (Configuration, ConfigurationGroup,
+                         DeviceConfiguration, GroupResultMode)
 from atef.qt_helpers import QDataclassBridge, QDataclassList
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
+
+from .utils import ComponentListWidget, DeviceListWidget
 
 
 class AnyDataclass(Protocol):
@@ -383,7 +387,7 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
 
     The fields handled here are:
 
-    - values: dict[str, Any] (TODO)
+    - values: dict[str, Any]
     - mode: GroupResultMode
 
     The configs field will be modified by the ConfigurationGroupRowWidget,
@@ -393,7 +397,7 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
     filename = 'configuration_group_widget.ui'
 
     values_label: QLabel
-    values_table: QTableWidget  # TODO not used yet
+    values_table: QTableWidget
     add_value_button: QPushButton
     del_value_button: QPushButton
     mode_combo: QComboBox
@@ -576,3 +580,98 @@ class ConfigurationGroupRowWidget(DesignerDisplay, NameMixin, DataWidget):
         match_line_edit_text_width(self.name_edit)
         if not self.name_edit.hasFocus():
             self.adjust_edit_filter()
+
+
+class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
+    """
+    Handle the unique static fields from DeviceConfiguration.
+
+    The fields handled fully here are:
+
+    - devices: List[str]
+
+    The fields handled partially here are:
+
+    - by_attr: Dict[str, List[Comparison]]
+    - shared: List[Comparison] = field(default_factory=list)
+
+    This will only put empty lists into the by_attr dict.
+    Filling those lists will be the responsibility of the
+    DeviceConfigurationPageWidget.
+
+    The shared list will be used a place to put configurations
+    that have had their attr deleted instead of just dropping
+    those entirely, but adding to the shared list will normally
+    be the repsonsibility of the page too.
+    """
+    filename = 'device_configuration_widget.ui'
+
+    devices_layout: QVBoxLayout
+    signals_layout: QVBoxLayout
+    # Link up to previous implementation of ComponentListWidget
+    component_name_list: QDataclassList
+
+    def __init__(self, data: DeviceConfiguration, **kwargs):
+        super().__init__(data=data, **kwargs)
+        self.device_widget = DeviceListWidget(
+            data_list=self.bridge.devices
+        )
+        list_holder = ListHolder(
+            some_list=list(self.bridge.by_attr.get()),
+        )
+        self.component_name_list = QDataclassList.of_type(str)(
+            data=list_holder,
+            attr='some_list',
+            parent=self,
+        )
+        self.component_name_list.added_value.connect(self.add_new_signal)
+        self.component_name_list.removed_value.connect(self.remove_signal)
+        self.cpt_widget = ComponentListWidget(
+            data_dict_value=self.bridge.by_attr,
+            get_device_list=self.get_device_list,
+        )
+        self.devices_layout.addWidget(self.device_widget)
+        self.signals_layout.addWidget(self.cpt_widget)
+
+    def get_device_list(self) -> List[str]:
+        return self.bridge.devices.get()
+
+    def add_new_signal(self, name: str):
+        comparisons_dict = self.bridge.by_attr.get()
+        if name not in comparisons_dict:
+            comparisons_dict[name] = []
+
+    def remove_signal(self, name: str):
+        comparisons_dict = self.bridge.by_attr.get()
+        try:
+            old_comparisons = comparisons_dict[name]
+        except KeyError:
+            # Nothing to do, there was nothing here
+            pass
+        else:
+            # Don't delete the comparisons, migrate to "shared" instead
+            for comparison in old_comparisons:
+                self.bridge.shared.append(comparison)
+            del comparisons_dict[name]
+
+
+@dataclass
+class ListHolder:
+    """Dummy dataclass to match ComponentListWidget API"""
+    some_list: List
+
+
+class ComparisonRowWidget(DesignerDisplay, NameMixin, DataWidget):
+    """
+    Handle one comparison instance embedded on a configuration page.
+
+    The attr_combo is controlled by the page this is placed in.
+    It may be a PV, it may be a signal, it may be a ping result, and
+    it might be a key value like "shared" with special meaning.
+    """
+    filename = 'comparison_row_widget.ui'
+
+    name_edit = QLineEdit
+    attr_combo = QComboBox
+    child_button = QToolButton
+    delete_button = QToolButton

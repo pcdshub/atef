@@ -458,8 +458,17 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         self.data.configs.remove(configuration)
 
 
-class DeviceConfigurationPage(PageWidget):
-    ...
+class DeviceConfigurationPage(DesignerDisplay, PageWidget):
+    """
+    Page that handles all components of a ConfigurationGroup.
+    """
+    filename = 'device_configuration_page.ui'
+
+    name_desc_tags_placeholder: QWidget
+    device_widget_placeholder: QWidget
+
+    comparisons_table: QTableWidget
+    add_comparison_button: QPushButton
 
 
 class PVConfigurationPage(PageWidget):
