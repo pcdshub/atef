@@ -12,6 +12,7 @@ from qtpy.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QTableWidget, QTableWidgetItem, QToolButton,
                             QVBoxLayout, QWidget)
 
+from atef.check import Comparison
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, GroupResultMode)
 from atef.qt_helpers import QDataclassBridge, QDataclassList
@@ -54,9 +55,11 @@ class DataWidget(QWidget):
         WeakValueDictionary[int, QDataclassBridge]
     ] = WeakValueDictionary()
     bridge: QDataclassBridge
+    data: AnyDataclass
 
     def __init__(self, data: AnyDataclass, **kwargs):
         super().__init__(**kwargs)
+        self.data = data
         try:
             # TODO figure out better way to cache these
             # TODO worried about strange deallocation timing race conditions
@@ -78,6 +81,7 @@ class NameMixin:
         # Load starting text
         load_name = self.bridge.name.get() or ''
         self.last_name = load_name
+        print(type(self.name_edit))
         self.name_edit.setText(load_name)
         # Set up the saving/loading
         self.name_edit.textEdited.connect(self.update_saved_name)
@@ -539,49 +543,6 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         self.resize_table()
 
 
-class ConfigurationGroupRowWidget(DesignerDisplay, NameMixin, DataWidget):
-    """
-    A row summary of a ``Configuration`` instance of a ``ConfigurationGroup``.
-
-    You can view and edit the name from here, or delete the row.
-    This will also show the class of the configuration, e.g. if it
-    is a DeviceConfiguration for example, and will provide a
-    button for navigation to the correct child page.
-
-    The child_button and delete_button need to be set up by the page that
-    includes this widget, as this widget has no knowledge of page navigation
-    or of data outside of its ``Configuration`` instance, so it can't
-    delete itself or change the page without going outside of its intended
-    scope.
-    """
-    filename = "configuration_group_row_widget.ui"
-
-    name_edit = QLineEdit
-    type_label = QLabel
-    child_button = QToolButton
-    delete_button = QToolButton
-
-    def __init__(self, data: Configuration, **kwargs):
-        super().__init__(data=data, **kwargs)
-        self.init_name()
-        self.edit_filter = FrameOnEditFilter(parent=self)
-        self.name_edit.installEventFilter(self.edit_filter)
-        self.name_edit.textChanged.connect(self.on_name_edit_text_changed)
-        self.on_name_edit_text_changed()
-        self.type_label.setText(data.__class__.__name__)
-
-    def adjust_edit_filter(self):
-        if self.bridge.name.get():
-            self.edit_filter.set_no_edit_style(self.name_edit)
-        else:
-            self.edit_filter.set_edit_style(self.name_edit)
-
-    def on_name_edit_text_changed(self, **kwargs):
-        match_line_edit_text_width(self.name_edit)
-        if not self.name_edit.hasFocus():
-            self.adjust_edit_filter()
-
-
 class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
     """
     Handle the unique static fields from DeviceConfiguration.
@@ -640,6 +601,7 @@ class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
         comparisons_dict = self.bridge.by_attr.get()
         if name not in comparisons_dict:
             comparisons_dict[name] = []
+            self.bridge.by_attr.updated.emit()
 
     def remove_signal(self, name: str):
         comparisons_dict = self.bridge.by_attr.get()
@@ -650,8 +612,10 @@ class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
             pass
         else:
             # Don't delete the comparisons, migrate to "shared" instead
+            self.bridge.by_attr.updated.emit()
             for comparison in old_comparisons:
                 self.bridge.shared.append(comparison)
+            self.bridge.shared.updated.emit()
             del comparisons_dict[name]
 
 
@@ -661,7 +625,59 @@ class ListHolder:
     some_list: List
 
 
-class ComparisonRowWidget(DesignerDisplay, NameMixin, DataWidget):
+class SimpleRowMixin(NameMixin):
+    """
+    Common behavior for these simple rows included on the various pages.
+    """
+    name_edit: QLineEdit
+    child_button: QToolButton
+    delete_button: QToolButton
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.init_name()
+        self.edit_filter = FrameOnEditFilter(parent=self)
+        self.name_edit.installEventFilter(self.edit_filter)
+        self.name_edit.textChanged.connect(self.on_name_edit_text_changed)
+        self.on_name_edit_text_changed()
+
+    def adjust_edit_filter(self):
+        if self.bridge.name.get():
+            self.edit_filter.set_no_edit_style(self.name_edit)
+        else:
+            self.edit_filter.set_edit_style(self.name_edit)
+
+    def on_name_edit_text_changed(self, **kwargs):
+        match_line_edit_text_width(self.name_edit)
+        if not self.name_edit.hasFocus():
+            self.adjust_edit_filter()
+
+
+class ConfigurationGroupRowWidget(DesignerDisplay, SimpleRowMixin, DataWidget):
+    """
+    A row summary of a ``Configuration`` instance of a ``ConfigurationGroup``.
+
+    You can view and edit the name from here, or delete the row.
+    This will also show the class of the configuration, e.g. if it
+    is a DeviceConfiguration for example, and will provide a
+    button for navigation to the correct child page.
+
+    The child_button and delete_button need to be set up by the page that
+    includes this widget, as this widget has no knowledge of page navigation
+    or of data outside of its ``Configuration`` instance, so it can't
+    delete itself or change the page without going outside of its intended
+    scope.
+    """
+    filename = "configuration_group_row_widget.ui"
+
+    type_label: QLabel
+
+    def __init__(self, data: Configuration, **kwargs):
+        super().__init__(data=data, **kwargs)
+        self.type_label.setText(data.__class__.__name__)
+
+
+class ComparisonRowWidget(DesignerDisplay, SimpleRowMixin, DataWidget):
     """
     Handle one comparison instance embedded on a configuration page.
 
@@ -671,7 +687,7 @@ class ComparisonRowWidget(DesignerDisplay, NameMixin, DataWidget):
     """
     filename = 'comparison_row_widget.ui'
 
-    name_edit = QLineEdit
     attr_combo = QComboBox
-    child_button = QToolButton
-    delete_button = QToolButton
+
+    def __init__(self, data: Comparison, **kwargs):
+        super().__init__(data=data, **kwargs)

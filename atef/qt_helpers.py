@@ -95,6 +95,7 @@ normalize_map = {
     'Value': object,
     'Dict': Dict,
     'str, Any': object,
+    'str, List': object,
     'GroupResultMode': str,
 }
 

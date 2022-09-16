@@ -16,21 +16,23 @@ a page widget will need to be linked up to the tree using the
 """
 from __future__ import annotations
 
-from typing import ClassVar, Dict, Optional, Type, Union
-from weakref import WeakValueDictionary
+from typing import ClassVar, Dict, Optional, Tuple, Type, Union
+from weakref import WeakSet, WeakValueDictionary
 
 from qtpy.QtGui import QDropEvent
 from qtpy.QtWidgets import (QComboBox, QMessageBox, QPushButton, QStyle,
                             QTableWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 
+from atef.check import Comparison, Equals
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
 
 from ..core import DesignerDisplay
-from .data import (ConfigurationGroupRowWidget, ConfigurationGroupWidget,
-                   DataWidget, NameDescTagsWidget)
+from .data import (ComparisonRowWidget, ConfigurationGroupRowWidget,
+                   ConfigurationGroupWidget, DataWidget,
+                   DeviceConfigurationWidget, NameDescTagsWidget)
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -329,8 +331,14 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         # Make sure the node name updates appropriately
         self.connect_tree_node_name(self.name_desc_tags_widget)
 
-    def add_config_row(self, config: Optional[Configuration] = None, **kwargs):
-        if not isinstance(config, Configuration):
+    def add_config_row(
+        self,
+        checked: bool = False,
+        config: Optional[Configuration] = None,
+        **kwargs,
+    ):
+        if config is None:
+            # New configuration
             config = self.config_cls_options[
                 self.add_row_type_combo.currentText()
             ]()
@@ -351,7 +359,6 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         self.config_table.insertRow(row_count)
         self.config_table.setRowHeight(row_count, config_row.sizeHint().height())
         self.config_table.setCellWidget(row_count, 0, config_row)
-        # self.resize_config_table()
 
     def setup_row_buttons(
         self,
@@ -469,6 +476,123 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
 
     comparisons_table: QTableWidget
     add_comparison_button: QPushButton
+
+    attr_selector_cache: WeakSet[QComboBox]
+
+    def __init__(self, data: DeviceConfiguration, **kwargs):
+        super().__init__(**kwargs)
+        self.data = data
+        # Create the static sub-widgets and place them
+        self.attr_selector_cache = WeakSet()
+        self.name_desc_tags_widget = NameDescTagsWidget(data=data)
+        self.device_config_widget = DeviceConfigurationWidget(data=data)
+        self.insert_widget(
+            self.name_desc_tags_widget,
+            self.name_desc_tags_placeholder,
+        )
+        self.insert_widget(
+            self.device_widget_placeholder,
+            self.device_config_widget,
+        )
+        # Fill in the rows from the initial data
+        for attr, configs in data.by_attr.items():
+            for config in configs:
+                self.add_comparison_row(
+                    attr=attr,
+                    comparison=config,
+                )
+        for config in data.shared:
+            self.add_comparison_row(
+                attr='shared',
+                comparison=config,
+            )
+        # Allow the user to add more rows
+        self.add_comparison_button.clicked.connect(self.add_comparison_row)
+        # When the attrs update, update the allowed attrs in each row
+        self.bridge.by_attr.updated.connect(self.update_combo_attrs)
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
+        # Make sure the parent button is set up properly
+        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
+        # Make sure the node name updates appropriately
+        self.connect_tree_node_name(self.name_desc_tags_widget)
+
+    def add_comparison_row(
+        self,
+        checked: bool = False,
+        attr: str = '',
+        comparison: Optional[Comparison] = None,
+    ):
+        if comparison is None:
+            # New comparison
+            comparison = Equals()
+            self.data.shared.append(comparison)
+        comp_row = ComparisonRowWidget(data=comparison)
+        # TODO page, item, buttons
+        self.attr_selector_cache.add(comp_row.attr_combo)
+        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
+        self.update_combo_attrs()
+        row_count = self.comparisons_table.rowCount()
+        self.comparisons_table.insertRow(row_count)
+        self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
+        self.comparisons_table.setCellWidget(row_count, 0, comp_row)
+
+    def resize_config_table(self):
+        """
+        Make sure that the whole row widget is visible.
+        """
+        self.config_table.setColumnWidth(0, self.config_table.width() - 10)
+
+    def resizeEvent(self, *args, **kwargs) -> None:
+        """
+        Override resizeEvent to update the table column width when we resize.
+        """
+        self.resize_config_table()
+        return super().resizeEvent(*args, **kwargs)
+
+    def update_combo_attrs(self):
+        """
+        For every row combobox, set the allowed values.
+        """
+        for combo in self.attr_selector_cache:
+            orig_value = combo.currentText()
+            combo.clear()
+            found_attr = False
+            for index, attr in enumerate(self.data.by_attr):
+                combo.addItem(attr)
+                if orig_value == attr:
+                    combo.setCurrentIndex(index)
+                    found_attr = True
+            combo.addItem('shared')
+            if not found_attr:
+                # Should be shared
+                combo.setCurrentIndex(combo.count() - 1)
+
+    def update_comparison_dicts(self, *args, **kwargs):
+        unsorted = []
+
+        for row_index in range(self.comparisons_table.rowCount()):
+            row_widget = self.comparisons_table.cellWidget(row_index, 0)
+            unsorted.append(
+                (row_widget.attr_combo.currentText(), row_widget.data)
+            )
+
+        def get_sort_key(elem: Tuple[str, Comparison]):
+            return (elem[0], elem[1].name)
+
+        by_attr = {
+            attr: comp
+            for attr, comp in sorted(unsorted, key=get_sort_key)
+            if attr != 'shared'
+        }
+        shared = [
+            comp
+            for attr, comp in sorted(unsorted, key=get_sort_key)
+            if attr == 'shared'
+        ]
+        self.data.by_attr = by_attr
+        self.data.shared = shared
 
 
 class PVConfigurationPage(PageWidget):
