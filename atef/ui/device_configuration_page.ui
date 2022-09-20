@@ -21,13 +21,6 @@
     <widget class="QWidget" name="device_widget_placeholder" native="true"/>
    </item>
    <item>
-    <widget class="Line" name="line">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item>
     <widget class="QTableWidget" name="comparisons_table">
      <column>
       <property name="text">

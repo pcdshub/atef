@@ -142,7 +142,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QFrame" name="frame">
+    <widget class="QFrame" name="desc_frame">
      <property name="frameShape">
       <enum>QFrame::StyledPanel</enum>
      </property>

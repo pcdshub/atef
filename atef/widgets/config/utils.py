@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import logging
 from itertools import zip_longest
-from typing import Callable, ClassVar, List, Optional
+from typing import Any, Callable, ClassVar, List, Optional
 
 from qtpy import QtWidgets
 from qtpy.QtCore import QPoint, Qt
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import QClipboard, QGuiApplication
-from qtpy.QtWidgets import QInputDialog, QMenu, QWidget
+from qtpy.QtWidgets import QInputDialog, QLineEdit, QMenu, QWidget
 
 from atef import util
 from atef.check import Comparison, Equals, Range
-from atef.qt_helpers import QDataclassList
+from atef.qt_helpers import QDataclassList, QDataclassValue
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
@@ -434,3 +434,73 @@ class BulkListWidget(StringListWithDialog):
             return
         new_pvs = [pv.strip() for pv in user_input.splitlines() if pv.strip()]
         self.edit_items(to_select, new_pvs)
+
+
+def user_string_to_bool(text: str) -> bool:
+    """
+    Interpret a user's input as a boolean value.
+
+    Strings like "true" should evaluate to True, strings
+    like "fa" should evaluate to False, numeric inputs like
+    1 or 2 should evaluate to True, numeric inputs like 0 or
+    0.0 should evaluate to False, etc.
+
+    Parameters
+    ----------
+    text : str
+        The user's text input as a string. This is usually
+        the value directly from a line edit widget.
+    """
+    if not text:
+        return False
+    try:
+        if text[0].lower() in ('n', 'f', '0'):
+            return False
+    except (IndexError, AttributeError):
+        # Not a string, let's be slightly helpful
+        return bool(text)
+    return True
+
+
+def setup_line_edit_data(
+    line_edit: QLineEdit,
+    value_obj: QDataclassValue,
+    from_str: Callable[[str], Any],
+    to_str: Callable[[Any], str],
+) -> None:
+    """
+    Setup a line edit for bilateral data exchange with a bridge.
+
+    Parameters
+    ----------
+    line_edit : QLineEdit
+        The line edit to set up.
+    value_obj : QDataclassValue
+        The bridge member that has the value we care about.
+    from_str : callable
+        A callable from str to the dataclass value. This is used
+        to interpret the contents of the line edit.
+    to_str : callable
+        A callable from the dataclass value to str. This is used
+        to fill the line edit when the dataclass updates.
+    """
+    def update_dataclass(text: str) -> None:
+        try:
+            value = from_str(text)
+        except ValueError:
+            return
+        value_obj.put(value)
+
+    def update_widget(value: Any) -> None:
+        if not line_edit.hasFocus():
+            try:
+                text = to_str(value)
+            except ValueError:
+                return
+            line_edit.setText(text)
+
+    starting_value = value_obj.get()
+    starting_text = to_str(starting_value)
+    line_edit.setText(starting_text)
+    line_edit.textEdited.connect(update_dataclass)
+    value_obj.changed_value.connect(update_widget)

@@ -4,22 +4,27 @@ Widgets used for manipulating the configuration data.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional, Protocol
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Protocol
 from weakref import WeakValueDictionary
 
-from qtpy.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QLayout, QLineEdit,
-                            QMessageBox, QPlainTextEdit, QPushButton, QStyle,
-                            QTableWidget, QTableWidgetItem, QToolButton,
-                            QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QLayout,
+                            QLineEdit, QMessageBox, QPlainTextEdit,
+                            QPushButton, QStyle, QTableWidget,
+                            QTableWidgetItem, QToolButton, QVBoxLayout,
+                            QWidget)
 
 from atef.check import Comparison
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, GroupResultMode)
+from atef.enums import Severity
 from atef.qt_helpers import QDataclassBridge, QDataclassList
+from atef.reduce import ReduceMethod
+from atef.type_hints import PrimitiveType
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
 
-from .utils import ComponentListWidget, DeviceListWidget
+from .utils import (ComponentListWidget, DeviceListWidget,
+                    setup_line_edit_data, user_string_to_bool)
 
 
 class AnyDataclass(Protocol):
@@ -117,12 +122,12 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
     filename = 'name_desc_tags_widget.ui'
 
     name_edit: QLineEdit
-    name_container: QWidget
+    name_frame: QFrame
     desc_edit: QPlainTextEdit
-    desc_container: QWidget
+    desc_frame: QFrame
     tags_content: QVBoxLayout
     add_tag_button: QToolButton
-    tags_container: QWidget
+    tags_frame: QFrame
     parent_button: QToolButton
 
     last_name: str
@@ -133,19 +138,19 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         try:
             self.bridge.name
         except AttributeError:
-            self.name_container.hide()
+            self.name_frame.hide()
         else:
             self.init_name()
         try:
             self.bridge.description
         except AttributeError:
-            self.desc_container.hide()
+            self.desc_frame.hide()
         else:
             self.init_desc()
         try:
             self.bridge.tags
         except AttributeError:
-            self.tags_container.hide()
+            self.tags_frame.hide()
         else:
             self.init_tags()
 
@@ -691,3 +696,323 @@ class ComparisonRowWidget(DesignerDisplay, SimpleRowWidget):
     def __init__(self, data: Comparison, **kwargs):
         super().__init__(data=data, **kwargs)
         self.setup_row()
+
+
+class GeneralComparisonWidget(DesignerDisplay, DataWidget):
+    """
+    Handle fields common to all Comparison data classes.
+    """
+    filename = 'general_comparison_widget.ui'
+
+    invert_combo: QComboBox
+    reduce_period_edit: QLineEdit
+    reduce_method_combo: QComboBox
+    string_combo: QComboBox
+    sev_on_failure_combo: QComboBox
+    if_disc_combo: QComboBox
+
+    bool_choices = ('False', 'True')
+    severity_choices = tuple(sev.name for sev in Severity)
+    reduce_choices = tuple(red.name for red in ReduceMethod)
+
+    invert_combo_items = bool_choices
+    reduce_method_combo_items = reduce_choices
+    string_combo_items = bool_choices
+    sev_on_failure_combo_items = severity_choices
+    if_disc_combo_items = severity_choices
+
+    def __init__(self, data: Comparison, **kwargs):
+        super().__init__(data=data, **kwargs)
+        # Fill the generic combobox options
+        for text in self.invert_combo_items:
+            self.invert_combo.addItem(text)
+        for text in self.reduce_method_combo_items:
+            self.reduce_method_combo.addItem(text)
+        for text in self.string_combo_items:
+            self.string_combo.addItem(text)
+        for text in self.sev_on_failure_combo_items:
+            self.sev_on_failure_combo.addItem(text)
+        for text in self.if_disc_combo_items:
+            self.if_disc_combo.addItem(text)
+        # Set up starting values based on the dataclass values
+        self.invert_combo.setCurrentIndex(int(self.bridge.invert.get()))
+        reduce_period = self.bridge.reduce_period.get()
+        if reduce_period is not None:
+            self.reduce_period_edit.setText(str(reduce_period))
+        self.reduce_method_combo.setCurrentIndex(
+            self.reduce_method_combo_items.index(
+                self.bridge.reduce_method.get().name
+            )
+        )
+        string_opt = self.bridge.string.get() or False
+        self.string_combo.setCurrentIndex(int(string_opt))
+        self.sev_on_failure_combo.setCurrentIndex(
+            self.sev_on_failure_combo_items.index(
+                self.bridge.severity_on_failure.get().name
+            )
+        )
+        self.if_disc_combo.setCurrentIndex(
+            self.if_disc_combo_items.index(
+                self.bridge.if_disconnected.get().name
+            )
+        )
+        # Set up the generic item signals in order from top to bottom
+        self.invert_combo.currentIndexChanged.connect(
+            self.new_invert_combo
+        )
+        self.reduce_period_edit.textEdited.connect(
+            self.new_reduce_period_edit
+        )
+        self.reduce_method_combo.currentTextChanged.connect(
+            self.new_reduce_method_combo
+        )
+        self.string_combo.currentIndexChanged.connect(
+            self.new_string_combo
+        )
+        self.sev_on_failure_combo.currentTextChanged.connect(
+            self.new_sev_on_failure_combo
+        )
+        self.if_disc_combo.currentTextChanged.connect(
+            self.new_if_disc_combo
+        )
+
+    def new_invert_combo(self, index: int) -> None:
+        """
+        Slot to handle user input in the generic "Invert" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        index : int
+            The index the user selects in the combo box.
+        """
+        self.bridge.invert.put(bool(index))
+
+    def new_reduce_period_edit(self, value: str) -> None:
+        """
+        Slot to handle user intput in the generic "Reduce Period" line edit.
+
+        Tries to interpet user input as a float. If this is not possible,
+        the period will not be updated.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        value : str
+            The string contents of the line edit.
+        """
+        try:
+            value = float(value)
+        except Exception:
+            pass
+        else:
+            self.bridge.reduce_period.put(value)
+
+    def new_reduce_method_combo(self, value: str) -> None:
+        """
+        Slot to handle user input in the generic "Reduce Method" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        value : str
+            The string contents of the combo box.
+        """
+        self.bridge.reduce_method.put(ReduceMethod[value])
+
+    def new_string_combo(self, index: int) -> None:
+        """
+        Slot to handle user input in the generic "String" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        index : int
+            The integer index of the combo box.
+        """
+        self.bridge.string.put(bool(index))
+
+    def new_sev_on_failure_combo(self, value: str) -> None:
+        """
+        Slot to handle user input in the "Severity on Failure" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        value : str
+            The string contents of the combo box.
+        """
+        self.bridge.severity_on_failure.put(Severity[value])
+
+    def new_if_disc_combo(self, value: str):
+        """
+        Slot to handle user input in the "If Disconnected" combo box.
+
+        Uses the current bridge to mutate the stored dataclass.
+
+        Parameters
+        ----------
+        value : str
+            The string contents of the combo box.
+        """
+        self.bridge.if_disconnected.put(Severity[value])
+
+
+class EqualsComparisonWidget(DesignerDisplay, DataWidget):
+    """
+    Handle fields and graphics unique to the Equals comparison.
+    """
+    filename = 'equals_comparison_widget.ui'
+    label_to_type: Dict[str, type] = {
+        'float': float,
+        'integer': int,
+        'bool': bool,
+        'string': str,
+    }
+    type_to_label: Dict[type, str] = {
+        value: key for key, value in label_to_type.items()
+    }
+    cast_from_user_str: Dict[type, Callable[[str], bool]] = {
+        tp: tp for tp in type_to_label
+    }
+    cast_from_user_str[bool] = user_string_to_bool
+
+    range_label: QLabel
+    atol_label: QLabel
+    atol_edit: QLineEdit
+    rtol_label: QLabel
+    rtol_edit: QLineEdit
+    data_type_label: QLabel
+    data_type_combo: QComboBox
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_equals_widget()
+
+    def setup_equals_widget(self) -> None:
+        """
+        Do all the setup needed to make this widget functional.
+
+        Things handled here:
+        - Set up the data type selection to know whether or not
+          atol/rtol/range means anything and so that we can allow
+          things like numeric strings. Use this selection to cast
+          the input from the value text box.
+        - Fill in the starting values for atol and rtol.
+        - Connect the various edit widgets to their correspoinding
+          data fields
+        - Set up the range_label for a summary of the allowed range
+        """
+        for option in self.label_to_type:
+            self.data_type_combo.addItem(option)
+        setup_line_edit_data(
+            line_edit=self.atol_edit,
+            value_obj=self.bridge.atol,
+            from_str=float,
+            to_str=str,
+        )
+        setup_line_edit_data(
+            line_edit=self.rtol_edit,
+            value_obj=self.bridge.rtol,
+            from_str=float,
+            to_str=str,
+        )
+        starting_value = self.bridge.value.get()
+        self.data_type_combo.setCurrentText(
+            self.type_to_label[type(starting_value)]
+        )
+        self.update_range_label(starting_value)
+        self.data_type_combo.currentTextChanged.connect(self.new_gui_type)
+        self.bridge.value.changed_value.connect(self.update_range_label)
+        self.bridge.atol.changed_value.connect(self.update_range_label)
+        self.bridge.rtol.changed_value.connect(self.update_range_label)
+
+    def update_range_label(self, *args, **kwargs) -> None:
+        """
+        Update the range label as appropriate.
+
+        If our value is an int or float, this will do calculations
+        using the atol and rtol to report the tolerance
+        of the range to the user.
+
+        If our value is a bool, this will summarize whether our
+        value is being interpretted as True or False.
+        """
+        value = self.bridge.value.get()
+        if not isinstance(value, (int, float, bool)):
+            return
+        if isinstance(value, bool):
+            text = f' ({value})'
+        else:
+            atol = self.bridge.atol.get() or 0
+            rtol = self.bridge.rtol.get() or 0
+
+            diff = atol + abs(rtol * value)
+            text = f'± {diff:.3g}'
+        self.range_label.setText(text)
+
+    def value_from_str(
+        self,
+        value: Optional[str] = None,
+        gui_type_str: Optional[str] = None,
+    ) -> PrimitiveType:
+        """
+        Convert our line edit value into a string based on the combobox.
+
+        Parameters
+        ----------
+        value : str, optional
+            The text contents of our line edit.
+        gui_type_str : str, optional
+            The text contents of our combobox.
+
+        Returns
+        -------
+        converted : Any
+            The casted datatype.
+        """
+        if value is None:
+            value = self.value_edit.text()
+        if gui_type_str is None:
+            gui_type_str = self.data_type_combo.currentText()
+        type_cast = self.cast_from_user_str[self.label_to_type[gui_type_str]]
+        return type_cast(value)
+
+    def new_gui_type(self, gui_type_str: str) -> None:
+        """
+        Slot for when the user changes the GUI data type.
+
+        Re-interprets our value as the selected type. This will
+        update the current value in the bridge as appropriate.
+
+        If we have a numeric type, we'll enable the range and
+        tolerance widgets. Otherwise, we'll disable them.
+
+        Parameters
+        ----------
+        gui_type_str : str
+            The user's text input from the data type combobox.
+        """
+        gui_type = self.label_to_type[gui_type_str]
+        # Try the gui value first
+        try:
+            new_value = self.value_from_str(gui_type_str=gui_type_str)
+        except ValueError:
+            # Try the bridge value second, or give up
+            try:
+                new_value = gui_type(self.bridge.value.get())
+            except ValueError:
+                new_value = None
+        if new_value is not None:
+            self.bridge.value.put(new_value)
+        self.range_label.setVisible(gui_type in (int, float, bool))
+        tol_vis = gui_type in (int, float)
+        self.atol_label.setVisible(tol_vis)
+        self.atol_edit.setVisible(tol_vis)
+        self.rtol_label.setVisible(tol_vis)
+        self.rtol_edit.setVisible(tol_vis)

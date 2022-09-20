@@ -32,7 +32,8 @@ from atef.config import (Configuration, ConfigurationGroup,
 from ..core import DesignerDisplay
 from .data import (ComparisonRowWidget, ConfigurationGroupRowWidget,
                    ConfigurationGroupWidget, DataWidget,
-                   DeviceConfigurationWidget, NameDescTagsWidget)
+                   DeviceConfigurationWidget, EqualsComparisonWidget,
+                   GeneralComparisonWidget, NameDescTagsWidget)
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -286,7 +287,9 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     filename = 'configuration_group_page.ui'
 
     name_desc_tags_placeholder: QWidget
+    name_desc_tags_widget: NameDescTagsWidget
     config_group_placeholder: QWidget
+    config_group_widget: ConfigurationGroupWidget
     config_table: QTableWidget
     add_row_button: QPushButton
     add_row_type_combo: QComboBox
@@ -472,7 +475,9 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     filename = 'device_configuration_page.ui'
 
     name_desc_tags_placeholder: QWidget
+    name_desc_tags_widget: NameDescTagsWidget
     device_widget_placeholder: QWidget
+    device_config_widget: DeviceConfigurationWidget
 
     comparisons_table: QTableWidget
     add_comparison_button: QPushButton
@@ -534,7 +539,17 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             comparison = Equals()
             self.data.shared.append(comparison)
         comp_row = ComparisonRowWidget(data=comparison)
-        # TODO page, item, buttons
+        comp_page = ComparisonPage(data=comparison)
+        comp_item = AtefItem(
+            tree_parent=self.tree_item,
+            name=comparison.name or 'untitled',
+            func_name=type(comparison).__name__,
+        )
+        link_page(item=comp_item, widget=comp_page)
+        self.setup_row_buttons(
+            comp_row=comp_row,
+            comp_item=comp_item,
+        )
         self.attr_selector_cache.add(comp_row.attr_combo)
         comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
         self.update_combo_attrs()
@@ -542,6 +557,26 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         self.comparisons_table.insertRow(row_count)
         self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
         self.comparisons_table.setCellWidget(row_count, 0, comp_row)
+
+    def setup_row_buttons(
+        self,
+        comp_row: ComparisonRowWidget,
+        comp_item: AtefItem,
+    ):
+        self.setup_child_button(
+            button=comp_row.child_button,
+            item=comp_item,
+        )
+        delete_icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
+        comp_row.delete_button.setIcon(delete_icon)
+
+        def inner_delete(*args, **kwargs):
+            self.delete_row(
+                row_widget=comp_row,
+                item=comp_item,
+            )
+
+        comp_row.delete_button.clicked.connect(inner_delete)
 
     def resize_comparisons_table(self):
         """
@@ -558,6 +593,36 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         """
         self.resize_comparisons_table()
         return super().resizeEvent(*args, **kwargs)
+
+    def delete_row(
+        self,
+        row_widget: ComparisonRowWidget,
+        item: AtefItem,
+    ):
+        # Confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to delete the '
+                f'{item.text(1)} named "{item.text(0)}"? '
+                'Note that this will delete any child nodes in the tree.'
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
+        # Get the identity of the comparison
+        comparison = row_widget.bridge.data
+        # Remove item from the tree
+        self.tree_item.removeChild(item)
+        # Remove row from the table
+        for row in range(self.comparisons_table.rowCount()):
+            widget = self.comparisons_table.cellWidget(row, 0)
+            if widget is row_widget:
+                self.comparisons_table.removeRow(row)
+                break
+        # Remove configuration from the data structure
+        self.data.configs.remove(comparison)
 
     def update_combo_attrs(self):
         """
@@ -622,3 +687,47 @@ PAGE_MAP = {
     PVConfiguration: PVConfigurationPage,
     ToolConfiguration: ToolConfigurationPage,
 }
+
+
+class ComparisonPage(DesignerDisplay, PageWidget):
+    """
+    Page that handles any comparison instance.
+
+    Contains a selector for switching which comparison type
+    we're using that will cause the type to change and the
+    active widget to be replaced with the specific widget.
+    TODO only Equals for now
+
+    Also contains standard fields for name, desc as appropriate
+    and fields common to all comparison instances at the bottom.
+    """
+    filename = 'comparison_page.ui'
+
+    name_desc_tags_placeholder: QWidget
+    name_desc_tags_widget: NameDescTagsWidget
+    specific_comparison_placeholder: QWidget
+    specific_comparison_widget: DataWidget
+    general_comparison_placeholder: QWidget
+    general_comparison_widget: GeneralComparisonWidget
+
+    specific_combo: QComboBox
+
+    def __init__(self, data: Comparison, **kwargs):
+        super().__init__(**kwargs)
+        self.data = data
+        self.name_desc_tags_widget = NameDescTagsWidget(data=data)
+        self.insert_widget(
+            self.name_desc_tags_widget,
+            self.name_desc_tags_placeholder,
+        )
+        self.general_comparison_widget = GeneralComparisonWidget(data=data)
+        self.insert_widget(
+            self.general_comparison_widget,
+            self.general_comparison_placeholder,
+        )
+        self.specific_combo.addItem('Equals')  # TODO expand to others
+        self.specific_comparison_widget = EqualsComparisonWidget(data=data)
+        self.insert_widget(
+            self.specific_comparison_widget,
+            self.specific_comparison_placeholder,
+        )
