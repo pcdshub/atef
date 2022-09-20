@@ -16,7 +16,7 @@ a page widget will need to be linked up to the tree using the
 """
 from __future__ import annotations
 
-from typing import ClassVar, Dict, Optional, Tuple, Type, Union
+from typing import ClassVar, Dict, List, Optional, Tuple, Type, Union
 from weakref import WeakSet, WeakValueDictionary
 
 from qtpy.QtGui import QDropEvent
@@ -491,8 +491,8 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             self.name_desc_tags_placeholder,
         )
         self.insert_widget(
-            self.device_widget_placeholder,
             self.device_config_widget,
+            self.device_widget_placeholder,
         )
         # Fill in the rows from the initial data
         for attr, configs in data.by_attr.items():
@@ -509,7 +509,12 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         # Allow the user to add more rows
         self.add_comparison_button.clicked.connect(self.add_comparison_row)
         # When the attrs update, update the allowed attrs in each row
-        self.bridge.by_attr.updated.connect(self.update_combo_attrs)
+        self.device_config_widget.bridge.by_attr.updated.connect(
+            self.update_combo_attrs
+        )
+        self.device_config_widget.bridge.by_attr.updated.connect(
+            self.update_comparison_dicts
+        )
 
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
@@ -538,17 +543,20 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
         self.comparisons_table.setCellWidget(row_count, 0, comp_row)
 
-    def resize_config_table(self):
+    def resize_comparisons_table(self):
         """
         Make sure that the whole row widget is visible.
         """
-        self.config_table.setColumnWidth(0, self.config_table.width() - 10)
+        self.comparisons_table.setColumnWidth(
+            0,
+            self.comparisons_table.width() - 10
+        )
 
     def resizeEvent(self, *args, **kwargs) -> None:
         """
         Override resizeEvent to update the table column width when we resize.
         """
-        self.resize_config_table()
+        self.resize_comparisons_table()
         return super().resizeEvent(*args, **kwargs)
 
     def update_combo_attrs(self):
@@ -570,7 +578,10 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                 combo.setCurrentIndex(combo.count() - 1)
 
     def update_comparison_dicts(self, *args, **kwargs):
-        unsorted = []
+        """
+        Rebuild by_attr and shared when user changes anything
+        """
+        unsorted: List[Tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.rowCount()):
             row_widget = self.comparisons_table.cellWidget(row_index, 0)
@@ -582,15 +593,17 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             return (elem[0], elem[1].name)
 
         by_attr = {
-            attr: comp
-            for attr, comp in sorted(unsorted, key=get_sort_key)
-            if attr != 'shared'
+            signal_name: []
+            for signal_name in sorted(
+                self.device_config_widget.component_name_list.get()
+            )
         }
-        shared = [
-            comp
-            for attr, comp in sorted(unsorted, key=get_sort_key)
-            if attr == 'shared'
-        ]
+        shared = []
+        for attr, comp in sorted(unsorted, key=get_sort_key):
+            if attr == 'shared':
+                shared.append(comp)
+            else:
+                by_attr[attr].append(comp)
         self.data.by_attr = by_attr
         self.data.shared = shared
 

@@ -25,7 +25,11 @@
     <widget class="QLineEdit" name="name_edit"/>
    </item>
    <item>
-    <widget class="QComboBox" name="attr_combo"/>
+    <widget class="QComboBox" name="attr_combo">
+     <property name="sizeAdjustPolicy">
+      <enum>QComboBox::AdjustToContents</enum>
+     </property>
+    </widget>
    </item>
    <item>
     <spacer name="horizontalSpacer">

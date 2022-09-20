@@ -81,7 +81,6 @@ class NameMixin:
         # Load starting text
         load_name = self.bridge.name.get() or ''
         self.last_name = load_name
-        print(type(self.name_edit))
         self.name_edit.setText(load_name)
         # Set up the saving/loading
         self.name_edit.textEdited.connect(self.update_saved_name)
@@ -588,7 +587,7 @@ class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
         self.component_name_list.added_value.connect(self.add_new_signal)
         self.component_name_list.removed_value.connect(self.remove_signal)
         self.cpt_widget = ComponentListWidget(
-            data_dict_value=self.bridge.by_attr,
+            data_list=self.component_name_list,
             get_device_list=self.get_device_list,
         )
         self.devices_layout.addWidget(self.device_widget)
@@ -612,11 +611,11 @@ class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
             pass
         else:
             # Don't delete the comparisons, migrate to "shared" instead
-            self.bridge.by_attr.updated.emit()
             for comparison in old_comparisons:
                 self.bridge.shared.append(comparison)
             self.bridge.shared.updated.emit()
             del comparisons_dict[name]
+            self.bridge.by_attr.updated.emit()
 
 
 @dataclass
@@ -625,7 +624,7 @@ class ListHolder:
     some_list: List
 
 
-class SimpleRowMixin(NameMixin):
+class SimpleRowWidget(NameMixin, DataWidget):
     """
     Common behavior for these simple rows included on the various pages.
     """
@@ -633,8 +632,7 @@ class SimpleRowMixin(NameMixin):
     child_button: QToolButton
     delete_button: QToolButton
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup_row(self):
         self.init_name()
         self.edit_filter = FrameOnEditFilter(parent=self)
         self.name_edit.installEventFilter(self.edit_filter)
@@ -653,7 +651,7 @@ class SimpleRowMixin(NameMixin):
             self.adjust_edit_filter()
 
 
-class ConfigurationGroupRowWidget(DesignerDisplay, SimpleRowMixin, DataWidget):
+class ConfigurationGroupRowWidget(DesignerDisplay, SimpleRowWidget):
     """
     A row summary of a ``Configuration`` instance of a ``ConfigurationGroup``.
 
@@ -674,10 +672,11 @@ class ConfigurationGroupRowWidget(DesignerDisplay, SimpleRowMixin, DataWidget):
 
     def __init__(self, data: Configuration, **kwargs):
         super().__init__(data=data, **kwargs)
+        self.setup_row()
         self.type_label.setText(data.__class__.__name__)
 
 
-class ComparisonRowWidget(DesignerDisplay, SimpleRowMixin, DataWidget):
+class ComparisonRowWidget(DesignerDisplay, SimpleRowWidget):
     """
     Handle one comparison instance embedded on a configuration page.
 
@@ -687,7 +686,8 @@ class ComparisonRowWidget(DesignerDisplay, SimpleRowMixin, DataWidget):
     """
     filename = 'comparison_row_widget.ui'
 
-    attr_combo = QComboBox
+    attr_combo: QComboBox
 
     def __init__(self, data: Comparison, **kwargs):
         super().__init__(data=data, **kwargs)
+        self.setup_row()
