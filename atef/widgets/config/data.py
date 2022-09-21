@@ -9,7 +9,7 @@ from weakref import WeakValueDictionary
 
 from qtpy.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QLayout,
                             QLineEdit, QMessageBox, QPlainTextEdit,
-                            QPushButton, QStyle, QTableWidget,
+                            QPushButton, QSpinBox, QStyle, QTableWidget,
                             QTableWidgetItem, QToolButton, QVBoxLayout,
                             QWidget)
 
@@ -19,6 +19,7 @@ from atef.config import (Configuration, ConfigurationGroup,
 from atef.enums import Severity
 from atef.qt_helpers import QDataclassBridge, QDataclassList
 from atef.reduce import ReduceMethod
+from atef.tools import Ping
 from atef.type_hints import PrimitiveType
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
@@ -694,6 +695,52 @@ class PVConfigurationWidget(DataWidget):
             self.bridge.shared.updated.emit()
             del comparisons_dict[name]
             self.bridge.by_pv.updated.emit()
+
+
+class PingWidget(DesignerDisplay, DataWidget):
+    """
+    Widget that modifies the fields in the Ping tool.
+
+    These fields are:
+    - hosts: List[str] = field(default_factory=list)
+    - count: int = 3
+    - encoding: str = "utf-8"
+
+    This will include a list widget on the left for the
+    hosts and a basic form on the right for the other
+    fields.
+    """
+    filename = "ping_widget.ui"
+
+    hosts_frame: QFrame
+    settings_frame: QFrame
+    count_spinbox: QSpinBox
+    encoding_edit: QLineEdit
+
+    hosts_widget: BulkListWidget
+
+    def __init__(self, data: Ping, **kwargs):
+        super().__init__(data=data, **kwargs)
+        # Add the list widget
+        self.hosts_widget = BulkListWidget(
+            data_list=self.bridge.hosts,
+        )
+        self.hosts_frame.layout().addChildWidget(self.hosts_widget)
+        # Set up the static fields
+        self.count_spinbox.setValue(self.bridge.count.get())
+        self.count_spinbox.editingFinished.connect(self.count_edited)
+        self.bridge.count.changed_value.connect(
+            self.count_spinbox.setValue
+        )
+        setup_line_edit_data(
+            self.encoding_edit,
+            self.bridge.encoding,
+            str,
+            str,
+        )
+
+    def count_edited(self):
+        self.bridge.count.put(self.count_spinbox.value())
 
 
 class SimpleRowWidget(NameMixin, DataWidget):
