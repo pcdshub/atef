@@ -16,7 +16,7 @@ a page widget will need to be linked up to the tree using the
 """
 from __future__ import annotations
 
-from typing import ClassVar, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 from weakref import WeakSet, WeakValueDictionary
 
 from qtpy.QtGui import QDropEvent
@@ -279,6 +279,67 @@ class PageWidget(QWidget):
         """
         self.tree_item.setText(0, name)
 
+    def setup_delete_row_button(
+        self,
+        table: QTableWidget,
+        item: AtefItem,
+        row: DataWidget,
+    ):
+        """
+        Configure a row's delete button to delete itself.
+        """
+        delete_icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
+        row.delete_button.setIcon(delete_icon)
+
+        def inner_delete(*args, **kwargs):
+            self.delete_table_row(
+                table=table,
+                row=row,
+                item=item,
+            )
+
+        row.delete_button.clicked.connect(inner_delete)
+
+    def delete_table_row(
+        self,
+        table: QTableWidget,
+        item: AtefItem,
+        row: DataWidget,
+    ):
+        """
+        Delete a row from the table and unlink the corresponding item nodes.
+        """
+        # Confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to delete the '
+                f'{item.text(1)} named "{item.text(0)}"? '
+                'Note that this will delete any child nodes in the tree.'
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
+        # Get the identity of the data
+        data = row.bridge.data
+        # Remove item from the tree
+        self.tree_item.removeChild(item)
+        # Remove row from the table
+        for row_index in range(table.rowCount()):
+            widget = table.cellWidget(row_index, 0)
+            if widget is row:
+                table.removeRow(row_index)
+                break
+        # Remove configuration from the data structure
+        self.remove_table_data(data)
+
+    def remove_table_data(self, data: Any):
+        """
+        Implement in subclass to remove the data after delete_table_row.
+        """
+        raise NotImplementedError()
+
 
 class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     """
@@ -372,16 +433,14 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             button=config_row.child_button,
             item=config_item,
         )
-        delete_icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
-        config_row.delete_button.setIcon(delete_icon)
+        self.setup_delete_row_button(
+            table=self.config_table,
+            item=config_item,
+            row=config_row,
+        )
 
-        def inner_delete(*args, **kwargs):
-            self.delete_row(
-                row_widget=config_row,
-                item=config_item,
-            )
-
-        config_row.delete_button.clicked.connect(inner_delete)
+    def remove_table_data(self, data: Configuration):
+        self.data.configs.remove(data)
 
     def resize_config_table(self):
         """
@@ -436,36 +495,6 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             if dest_row == -1:
                 dest_row = self.config_table.rowCount()
             self.move_config_row(selected_row, dest_row)
-
-    def delete_row(
-        self,
-        row_widget: ConfigurationGroupRowWidget,
-        item: AtefItem,
-    ):
-        # Confirmation dialog
-        reply = QMessageBox.question(
-            self,
-            'Confirm deletion',
-            (
-                'Are you sure you want to delete the '
-                f'{item.text(1)} named "{item.text(0)}"? '
-                'Note that this will delete any child nodes in the tree.'
-            ),
-        )
-        if reply != QMessageBox.Yes:
-            return
-        # Get the identity of the configuration
-        configuration = row_widget.bridge.data
-        # Remove item from the tree
-        self.tree_item.removeChild(item)
-        # Remove row from the table
-        for row in range(self.config_table.rowCount()):
-            widget = self.config_table.cellWidget(row, 0)
-            if widget is row_widget:
-                self.config_table.removeRow(row)
-                break
-        # Remove configuration from the data structure
-        self.data.configs.remove(configuration)
 
 
 class DeviceConfigurationPage(DesignerDisplay, PageWidget):
@@ -567,16 +596,24 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             button=comp_row.child_button,
             item=comp_item,
         )
-        delete_icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
-        comp_row.delete_button.setIcon(delete_icon)
+        self.setup_delete_row_button(
+            table=self.comparisons_table,
+            item=comp_item,
+            row=comp_row,
+        )
 
-        def inner_delete(*args, **kwargs):
-            self.delete_row(
-                row_widget=comp_row,
-                item=comp_item,
-            )
-
-        comp_row.delete_button.clicked.connect(inner_delete)
+    def remove_table_data(self, data: Comparison):
+        # This could be in several different places!
+        try:
+            self.data.shared.remove(data)
+        except ValueError:
+            for comp_list in self.data.by_attr.values():
+                try:
+                    comp_list.remove(data)
+                except ValueError:
+                    pass
+                else:
+                    break
 
     def resize_comparisons_table(self):
         """
@@ -593,36 +630,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         """
         self.resize_comparisons_table()
         return super().resizeEvent(*args, **kwargs)
-
-    def delete_row(
-        self,
-        row_widget: ComparisonRowWidget,
-        item: AtefItem,
-    ):
-        # Confirmation dialog
-        reply = QMessageBox.question(
-            self,
-            'Confirm deletion',
-            (
-                'Are you sure you want to delete the '
-                f'{item.text(1)} named "{item.text(0)}"? '
-                'Note that this will delete any child nodes in the tree.'
-            ),
-        )
-        if reply != QMessageBox.Yes:
-            return
-        # Get the identity of the comparison
-        comparison = row_widget.bridge.data
-        # Remove item from the tree
-        self.tree_item.removeChild(item)
-        # Remove row from the table
-        for row in range(self.comparisons_table.rowCount()):
-            widget = self.comparisons_table.cellWidget(row, 0)
-            if widget is row_widget:
-                self.comparisons_table.removeRow(row)
-                break
-        # Remove configuration from the data structure
-        self.data.configs.remove(comparison)
 
     def update_combo_attrs(self):
         """
