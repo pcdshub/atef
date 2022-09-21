@@ -15,7 +15,7 @@ from qtpy.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QLayout,
 
 from atef.check import Comparison
 from atef.config import (Configuration, ConfigurationGroup,
-                         DeviceConfiguration, GroupResultMode)
+                         DeviceConfiguration, GroupResultMode, PVConfiguration)
 from atef.enums import Severity
 from atef.qt_helpers import QDataclassBridge, QDataclassList
 from atef.reduce import ReduceMethod
@@ -23,7 +23,7 @@ from atef.type_hints import PrimitiveType
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
 
-from .utils import (ComponentListWidget, DeviceListWidget,
+from .utils import (BulkListWidget, ComponentListWidget, DeviceListWidget,
                     setup_line_edit_data, user_string_to_bool)
 
 
@@ -627,6 +627,73 @@ class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
 class ListHolder:
     """Dummy dataclass to match ComponentListWidget API"""
     some_list: List
+
+
+class PVConfigurationWidget(DataWidget):
+    """
+    Handle the unique static fields from PVConfiguration.
+
+    The fields handled partially here are:
+
+    - by_pv: Dict[str, List[Comparison]]
+    - shared: List[Comparison] = field(default_factory=list)
+
+    This will only put empty lists into the by_pv dict.
+    Filling those lists will be the responsibility of the
+    PVConfigurationPageWidget.
+
+    The shared list will be used a place to put configurations
+    that have had their pv deleted instead of just dropping
+    those entirely, but adding to the shared list will normally
+    be the repsonsibility of the page too.
+    """
+    # This is not a DesignerDisplay, it's just an augmented BulkListWidget
+    filename = None
+
+    pv_selector: BulkListWidget
+    # Link up to previous implementation of BulkListWidget
+    pvname_list: QDataclassList
+
+    def __init__(self, data: PVConfiguration, **kwargs):
+        super().__init__(data=data, **kwargs)
+        list_holder = ListHolder(
+            some_list=list(self.bridge.by_pv.get()),
+        )
+        self.pvname_list = QDataclassList.of_type(str)(
+            data=list_holder,
+            attr='some_list',
+            parent=self,
+        )
+        self.pvname_list.added_value.connect(self.add_new_signal)
+        self.pvname_list.removed_value.connect(self.remove_signal)
+        self.pv_selector = BulkListWidget(
+            data_list=self.pvname_list,
+        )
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+        self.layout().addWidget(self.pv_selector)
+
+    def add_new_signal(self, name: str):
+        comparisons_dict = self.bridge.by_pv.get()
+        if name not in comparisons_dict:
+            comparisons_dict[name] = []
+            self.bridge.by_pv.updated.emit()
+
+    def remove_signal(self, name: str):
+        comparisons_dict = self.bridge.by_pv.get()
+        try:
+            old_comparisons = comparisons_dict[name]
+        except KeyError:
+            # Nothing to do, there was nothing here
+            pass
+        else:
+            # Don't delete the comparisons, migrate to "shared" instead
+            for comparison in old_comparisons:
+                self.bridge.shared.append(comparison)
+            self.bridge.shared.updated.emit()
+            del comparisons_dict[name]
+            self.bridge.by_pv.updated.emit()
 
 
 class SimpleRowWidget(NameMixin, DataWidget):
