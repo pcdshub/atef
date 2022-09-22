@@ -695,7 +695,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
     pv_configuration_widget: PVConfigurationWidget
 
     comparisons_table: QTableWidget
-    add_comparison_button: QToolButton
+    add_comparison_button: QPushButton
 
     attr_selector_cache: WeakSet[QComboBox]
 
