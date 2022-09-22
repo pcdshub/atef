@@ -523,6 +523,8 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
         ToolConfiguration that has the contextual information for
         understanding attr.
     """
+    if not attr:
+        return 'Error loading context information'
     if isinstance(config, DeviceConfiguration):
         num_devices = len(config.devices)
         if num_devices == 0:

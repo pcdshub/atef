@@ -37,6 +37,7 @@ from .data import (ComparisonRowWidget, ConfigurationGroupRowWidget,
                    DeviceConfigurationWidget, EqualsComparisonWidget,
                    GeneralComparisonWidget, NameDescTagsWidget, PingWidget,
                    PVConfigurationWidget)
+from .utils import describe_comparison_context
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -1136,9 +1137,30 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             self.specific_comparison_placeholder,
         )
 
+    def showEvent(self, *args, **kwargs) -> None:
+        self.update_context()
+        return super().showEvent(*args, **kwargs)
+
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
         # Make sure the parent button is set up properly
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         # Make sure the node name updates appropriately
         self.connect_tree_node_name(self.name_desc_tags_widget)
+
+    def update_context(self):
+        config = self.parent_tree_item.widget.data
+        attr = ''
+        if self.data in config.shared:
+            attr = 'shared'
+        else:
+            try:
+                attr_dict = config.by_attr
+            except AttributeError:
+                attr_dict = config.by_pv
+            for attr_name, comparisons in attr_dict.items():
+                if self.data in comparisons:
+                    attr = attr_name
+                    break
+        desc = describe_comparison_context(attr=attr, config=config)
+        self.name_desc_tags_widget.extra_text_label.setText(desc)

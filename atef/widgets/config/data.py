@@ -118,7 +118,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
 
     As a convenience, this widget also holds a parent_button in a convenient
     place for page layouts, since it is expected that this will be near the
-    top of the page.
+    top of the page, and an "extra_text_label" QLabel for general use.
     """
     filename = 'name_desc_tags_widget.ui'
 
@@ -130,6 +130,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
     add_tag_button: QToolButton
     tags_frame: QFrame
     parent_button: QToolButton
+    extra_text_label: QLabel
 
     last_name: str
     last_desc: str
