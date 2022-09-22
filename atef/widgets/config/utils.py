@@ -12,7 +12,10 @@ from qtpy.QtWidgets import QInputDialog, QLineEdit, QMenu, QWidget
 
 from atef import util
 from atef.check import Comparison, Equals, Range
+from atef.config import (Configuration, DeviceConfiguration, PVConfiguration,
+                         ToolConfiguration)
 from atef.qt_helpers import QDataclassList, QDataclassValue
+from atef.tools import Ping
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
@@ -504,3 +507,89 @@ def setup_line_edit_data(
     line_edit.setText(starting_text)
     line_edit.textEdited.connect(update_dataclass)
     value_obj.changed_value.connect(update_widget)
+
+
+def describe_comparison_context(attr: str, config: Configuration) -> str:
+    """
+    Describe in words what value or values we are comparing to.
+
+    Parameters
+    ----------
+    attr : str
+        The attribute, pvname, or other string identifier we are going
+        to compare to. This can also be 'shared'.
+    config : Configuration
+        Typically a DeviceConfiguration, PVConfiguration, or
+        ToolConfiguration that has the contextual information for
+        understanding attr.
+    """
+    if isinstance(config, DeviceConfiguration):
+        num_devices = len(config.devices)
+        if num_devices == 0:
+            return 'Invalid comparison to zero devices'
+        if attr == 'shared':
+            num_signals = len(config.by_attr)
+            if num_signals == 0:
+                return 'Invalid comparison to zero signals'
+            if num_devices == 1 and num_signals == 1:
+                # device_name.signal_name
+                return (
+                    f'Comparison to value of {config.devices[0]}.'
+                    f'{list(config.by_attr)[0]}'
+                )
+            if num_devices > 1 and num_signals == 1:
+                return (
+                    f'Comparison to value of {list(config.by_attr)[0]} '
+                    f'signal on each of {num_devices} devices'
+                )
+            if num_devices == 1 and num_signals > 1:
+                return (
+                    f'Comparison to value of {num_signals} '
+                    f'signals on {config.devices[0]}'
+                )
+            return (
+                f'Comparison to value of {num_signals} signals '
+                f'on each of {num_devices} devices'
+            )
+        # Must be one specific signal
+        if num_devices == 1:
+            # device_name.signal_name
+            return f'Comparison to value of {config.devices[0]}.{attr}'
+        return (
+            f'Comparison to value of {attr} '
+            f'on each of {num_devices} devices'
+        )
+    if isinstance(config, PVConfiguration):
+        if attr == 'shared':
+            num_pvs = len(config.by_pv)
+            if num_pvs == 0:
+                return 'Invalid comparison to zero PVs'
+            if num_pvs == 1:
+                return f'Comparison to value of {list(config.by_pv)[0]}'
+            return f'Comparison to value of each of {num_pvs} pvs'
+        return f'Comparison to value of {attr}'
+    if isinstance(config, ToolConfiguration):
+        if isinstance(config.tool, Ping):
+            num_hosts = len(config.tool.hosts)
+            if num_hosts == 0:
+                return 'Invalid comparison to zero ping hosts'
+            if attr == 'shared':
+                if num_hosts == 1:
+                    return (
+                        'Comparison to all different results from pinging '
+                        f'{config.tool.hosts[0]}'
+                    )
+                return (
+                    'Comparison to all different results from pinging '
+                    f'{num_hosts} hosts'
+                )
+            if num_hosts == 1:
+                return (
+                    f'Comparison to {attr} result '
+                    f'from pinging {config.tool.hosts[0]}'
+                )
+            return (
+                f'Comparison to {attr} result from pinging {num_hosts} hosts'
+            )
+        return 'Comparison to unknown tool results'
+    return 'Invalid comparison'
