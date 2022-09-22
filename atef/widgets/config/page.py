@@ -1135,3 +1135,10 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             self.specific_comparison_widget,
             self.specific_comparison_placeholder,
         )
+
+    def assign_tree_item(self, item: AtefItem):
+        super().assign_tree_item(item)
+        # Make sure the parent button is set up properly
+        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
+        # Make sure the node name updates appropriately
+        self.connect_tree_node_name(self.name_desc_tags_widget)
