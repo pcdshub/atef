@@ -725,7 +725,7 @@ class PingWidget(DesignerDisplay, DataWidget):
         self.hosts_widget = BulkListWidget(
             data_list=self.bridge.hosts,
         )
-        self.hosts_frame.layout().addChildWidget(self.hosts_widget)
+        self.hosts_frame.layout().addWidget(self.hosts_widget)
         # Set up the static fields
         self.count_spinbox.setValue(self.bridge.count.get())
         self.count_spinbox.editingFinished.connect(self.count_edited)

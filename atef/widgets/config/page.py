@@ -16,6 +16,7 @@ a page widget will need to be linked up to the tree using the
 """
 from __future__ import annotations
 
+import dataclasses
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 from weakref import WeakSet, WeakValueDictionary
 
@@ -881,6 +882,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
 
     comparisons_table: QTableWidget
     add_comparison_button: QPushButton
+    tool_select_combo: QComboBox
 
     attr_selector_cache: WeakSet[QComboBox]
 
@@ -888,6 +890,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
     tool_map: ClassVar[Dict[Type[Tool], Tuple[Type[ToolResult], Type[DataWidget]]]] = {
         Ping: (PingResult, PingWidget),
     }
+    tool_names: Dict[str, Type[Tool]]
 
     def __init__(self, data: ToolConfiguration, **kwargs):
         super().__init__(**kwargs)
@@ -899,7 +902,6 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             self.name_desc_tags_widget,
             self.name_desc_tags_placeholder,
         )
-        self.new_tool_widget(data.tool)  # TODO make func to switch tools
         # Fill in the rows from the initial data
         for attr, configs in data.by_attr.items():
             for config in configs:
@@ -914,13 +916,39 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             )
         # Allow the user to add more rows
         self.add_comparison_button.clicked.connect(self.add_comparison_row)
-        # When the attrs update, update the allowed attrs in each row
-        self.pv_configuration_widget.bridge.by_pv.updated.connect(
-            self.update_combo_attrs
+        # Set up our specific tool handling (must be after filling rows)
+        self.new_tool(data.tool)
+        self.tool_names = {}
+        for tool in self.tool_map:
+            self.tool_select_combo.addItem(tool.__name__)
+            self.tool_names[tool.__name__] = tool
+        self.tool_select_combo.activated.connect(self.new_tool_selected)
+
+    def new_tool(self, tool: Tool):
+        # Replace the tool data structure
+        self.data.tool = tool
+        # Look up our tool
+        _, widget_type = self.tool_map[type(tool)]
+        # Create a new tool widget and place it
+        new_widget = widget_type(data=tool)
+        self.insert_widget(
+            new_widget,
+            self.tool_placeholder,
         )
-        self.pv_configuration_widget.bridge.by_pv.updated.connect(
-            self.update_comparison_dicts
-        )
+        # Replace reference to old tool widget
+        self.tool_widget = new_widget
+        # Set by_attr correctly to match the result type
+        # Also migrates lost comparisons to shared
+        self.update_comparison_dicts()
+        # Update the selection choices to match the tool
+        self.update_combo_attrs()
+
+    def new_tool_selected(self, tool_name: str):
+        tool_type = self.tool_names[tool_name]
+        if isinstance(self.data.tool, tool_type):
+            return
+        new_tool = tool_type()
+        self.new_tool_widget(new_tool)
 
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
@@ -979,7 +1007,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         try:
             self.data.shared.remove(data)
         except ValueError:
-            for comp_list in self.data.by_pv.values():
+            for comp_list in self.data.by_attr.values():
                 try:
                     comp_list.remove(data)
                 except ValueError:
@@ -1011,7 +1039,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             orig_value = combo.currentText()
             combo.clear()
             found_attr = False
-            for index, attr in enumerate(self.data.by_pv):
+            for index, attr in enumerate(self.data.by_attr):
                 combo.addItem(attr)
                 if orig_value == attr:
                     combo.setCurrentIndex(index)
@@ -1036,19 +1064,16 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         def get_sort_key(elem: Tuple[str, Comparison]):
             return (elem[0], elem[1].name)
 
-        by_pv = {
-            pvname: []
-            for pvname in sorted(
-                self.pv_configuration_widget.pvname_list.get()
-            )
-        }
+        result_type, _ = self.tool_map[type(self.data.tool)]
+        field_names = sorted(field.name for field in dataclasses.fields(result_type))
+        by_attr = {name: [] for name in field_names}
         shared = []
         for attr, comp in sorted(unsorted, key=get_sort_key):
             if attr == 'shared':
                 shared.append(comp)
             else:
-                by_pv[attr].append(comp)
-        self.data.by_pv = by_pv
+                by_attr[attr].append(comp)
+        self.data.by_attr = by_attr
         self.data.shared = shared
 
 

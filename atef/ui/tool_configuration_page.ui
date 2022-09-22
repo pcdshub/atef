@@ -15,7 +15,14 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="QWidget" name="name_desc_tags_placeholder" native="true"/>
+    <widget class="QWidget" name="name_desc_tags_placeholder" native="true">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+    </widget>
    </item>
    <item>
     <widget class="Line" name="line">
@@ -52,19 +59,26 @@
     </layout>
    </item>
    <item>
-    <widget class="QWidget" name="tool_placeholder" native="true"/>
+    <widget class="QWidget" name="tool_placeholder" native="true">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+    </widget>
    </item>
    <item>
-    <widget class="QTableWidget" name="comparison_table">
+    <widget class="QTableWidget" name="comparisons_table">
      <column>
       <property name="text">
-       <string>Comparison</string>
+       <string>Comparisons</string>
       </property>
      </column>
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="pushButton">
+    <widget class="QPushButton" name="add_comparison_button">
      <property name="text">
       <string>+ Add Comparison</string>
      </property>

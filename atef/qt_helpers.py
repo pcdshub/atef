@@ -97,6 +97,7 @@ normalize_map = {
     'str, Any': object,
     'str, List': object,
     'GroupResultMode': str,
+    'tools.Tool': object,
 }
 
 
