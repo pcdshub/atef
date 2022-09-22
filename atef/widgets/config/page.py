@@ -1065,7 +1065,15 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             return (elem[0], elem[1].name)
 
         result_type, _ = self.tool_map[type(self.data.tool)]
-        field_names = sorted(field.name for field in dataclasses.fields(result_type))
+        gui_compatible_fields = set((
+            int, float, str, bool,
+            'int', 'float', 'str', 'bool',
+        ))
+        field_names = sorted(
+            field.name
+            for field in dataclasses.fields(result_type)
+            if field.type in gui_compatible_fields
+        )
         by_attr = {name: [] for name in field_names}
         shared = []
         for attr, comp in sorted(unsorted, key=get_sort_key):
