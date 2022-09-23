@@ -938,6 +938,65 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         self.data.by_pv = by_pv
         self.data.shared = shared
 
+    def replace_comparison(
+        self,
+        old_comparison: Comparison,
+        new_comparison: Comparison,
+        comp_item: AtefItem,
+    ):
+        """
+        Find old_comparison and replace it with new_comparison.
+
+        Also finds the row widget and replaces it with a new row widget.
+        """
+        def replace_in_list(
+            old: Comparison,
+            new: Comparison,
+            comparison_list: List[Comparison],
+        ):
+            index = comparison_list.index(old)
+            comparison_list[index] = new
+
+        try:
+            replace_in_list(
+                old=old_comparison,
+                new=new_comparison,
+                comparison_list=self.data.shared,
+            )
+        except ValueError:
+            for comp_list in self.data.by_pv.values():
+                try:
+                    replace_in_list(
+                        old=old_comparison,
+                        new=new_comparison,
+                        comparison_list=comp_list,
+                    )
+                except ValueError:
+                    continue
+                else:
+                    break
+
+        found_row = None
+        prev_attr_index = 0
+        for row_index in range(self.comparisons_table.rowCount()):
+            widget = self.comparisons_table.cellWidget(row_index, 0)
+            if widget.data is old_comparison:
+                found_row = row_index
+                prev_attr_index = widget.attr_combo.currentIndex()
+                break
+        if found_row is None:
+            return
+        comp_row = ComparisonRowWidget(data=new_comparison)
+        self.setup_row_buttons(
+            comp_row=comp_row,
+            comp_item=comp_item,
+        )
+        self.attr_selector_cache.add(comp_row.attr_combo)
+        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
+        self.comparisons_table.setCellWidget(found_row, 0, comp_row)
+        self.update_combo_attrs()
+        comp_row.attr_combo.setCurrentIndex(prev_attr_index)
+
 
 class ToolConfigurationPage(DesignerDisplay, PageWidget):
     """
@@ -1157,6 +1216,65 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 by_attr[attr].append(comp)
         self.data.by_attr = by_attr
         self.data.shared = shared
+
+    def replace_comparison(
+        self,
+        old_comparison: Comparison,
+        new_comparison: Comparison,
+        comp_item: AtefItem,
+    ):
+        """
+        Find old_comparison and replace it with new_comparison.
+
+        Also finds the row widget and replaces it with a new row widget.
+        """
+        def replace_in_list(
+            old: Comparison,
+            new: Comparison,
+            comparison_list: List[Comparison],
+        ):
+            index = comparison_list.index(old)
+            comparison_list[index] = new
+
+        try:
+            replace_in_list(
+                old=old_comparison,
+                new=new_comparison,
+                comparison_list=self.data.shared,
+            )
+        except ValueError:
+            for comp_list in self.data.by_attr.values():
+                try:
+                    replace_in_list(
+                        old=old_comparison,
+                        new=new_comparison,
+                        comparison_list=comp_list,
+                    )
+                except ValueError:
+                    continue
+                else:
+                    break
+
+        found_row = None
+        prev_attr_index = 0
+        for row_index in range(self.comparisons_table.rowCount()):
+            widget = self.comparisons_table.cellWidget(row_index, 0)
+            if widget.data is old_comparison:
+                found_row = row_index
+                prev_attr_index = widget.attr_combo.currentIndex()
+                break
+        if found_row is None:
+            return
+        comp_row = ComparisonRowWidget(data=new_comparison)
+        self.setup_row_buttons(
+            comp_row=comp_row,
+            comp_item=comp_item,
+        )
+        self.attr_selector_cache.add(comp_row.attr_combo)
+        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
+        self.comparisons_table.setCellWidget(found_row, 0, comp_row)
+        self.update_combo_attrs()
+        comp_row.attr_combo.setCurrentIndex(prev_attr_index)
 
 
 PAGE_MAP = {
