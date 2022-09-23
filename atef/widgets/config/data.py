@@ -1004,6 +1004,7 @@ class EqualsComparisonWidget(DesignerDisplay, DataWidget):
     rtol_edit: QLineEdit
     data_type_label: QLabel
     data_type_combo: QComboBox
+    comp_symbol_label: QLabel
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1131,3 +1132,9 @@ class EqualsComparisonWidget(DesignerDisplay, DataWidget):
         self.atol_edit.setVisible(tol_vis)
         self.rtol_label.setVisible(tol_vis)
         self.rtol_edit.setVisible(tol_vis)
+
+
+class NotEqualsComparisonWidget(EqualsComparisonWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.comp_symbol_label.setText('≠')

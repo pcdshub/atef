@@ -25,7 +25,7 @@ from qtpy.QtWidgets import (QComboBox, QMessageBox, QPushButton, QStyle,
                             QTableWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 
-from atef.check import Comparison, Equals
+from atef.check import Comparison, Equals, NotEquals
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
@@ -35,9 +35,10 @@ from ..core import DesignerDisplay
 from .data import (ComparisonRowWidget, ConfigurationGroupRowWidget,
                    ConfigurationGroupWidget, DataWidget,
                    DeviceConfigurationWidget, EqualsComparisonWidget,
-                   GeneralComparisonWidget, NameDescTagsWidget, PingWidget,
+                   GeneralComparisonWidget, NameDescTagsWidget,
+                   NotEqualsComparisonWidget, PingWidget,
                    PVConfigurationWidget)
-from .utils import describe_comparison_context
+from .utils import cast_dataclass, describe_comparison_context
 
 
 def link_page(item: AtefItem, widget: PageWidget):
@@ -266,9 +267,13 @@ class PageWidget(QWidget):
         """
         Helper function for slotting e.g. data widgets into placeholders.
         """
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        placeholder.setLayout(layout)
+        if placeholder.layout() is None:
+            layout = QVBoxLayout()
+            layout.setContentsMargins(0, 0, 0, 0)
+            placeholder.setLayout(layout)
+        else:
+            for old_widget in placeholder.children():
+                placeholder.layout().removeWidget(old_widget)
         placeholder.layout().addWidget(widget)
 
     def connect_tree_node_name(self, widget: DataWidget):
@@ -682,6 +687,65 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                 by_attr[attr].append(comp)
         self.data.by_attr = by_attr
         self.data.shared = shared
+
+    def replace_comparison(
+        self,
+        old_comparison: Comparison,
+        new_comparison: Comparison,
+        comp_item: AtefItem,
+    ):
+        """
+        Find old_comparison and replace it with new_comparison.
+
+        Also finds the row widget and replaces it with a new row widget.
+        """
+        def replace_in_list(
+            old: Comparison,
+            new: Comparison,
+            comparison_list: List[Comparison],
+        ):
+            index = comparison_list.index(old)
+            comparison_list[index] = new
+
+        try:
+            replace_in_list(
+                old=old_comparison,
+                new=new_comparison,
+                comparison_list=self.data.shared,
+            )
+        except ValueError:
+            for comp_list in self.data.by_attr.values():
+                try:
+                    replace_in_list(
+                        old=old_comparison,
+                        new=new_comparison,
+                        comparison_list=comp_list,
+                    )
+                except ValueError:
+                    continue
+                else:
+                    break
+
+        found_row = None
+        prev_attr_index = 0
+        for row_index in range(self.comparisons_table.rowCount()):
+            widget = self.comparisons_table.cellWidget(row_index, 0)
+            if widget.data is old_comparison:
+                found_row = row_index
+                prev_attr_index = widget.attr_combo.currentIndex()
+                break
+        if found_row is None:
+            return
+        comp_row = ComparisonRowWidget(data=new_comparison)
+        self.setup_row_buttons(
+            comp_row=comp_row,
+            comp_item=comp_item,
+        )
+        self.attr_selector_cache.add(comp_row.attr_combo)
+        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
+        self.comparisons_table.setCellWidget(found_row, 0, comp_row)
+        self.update_combo_attrs()
+        comp_row.attr_combo.setCurrentIndex(prev_attr_index)
 
 
 class PVConfigurationPage(DesignerDisplay, PageWidget):
@@ -1101,7 +1165,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
     Contains a selector for switching which comparison type
     we're using that will cause the type to change and the
     active widget to be replaced with the specific widget.
-    TODO only Equals for now
 
     Also contains standard fields for name, desc as appropriate
     and fields common to all comparison instances at the bottom.
@@ -1117,29 +1180,23 @@ class ComparisonPage(DesignerDisplay, PageWidget):
 
     specific_combo: QComboBox
 
+    # Defines the valid comparisons and their edit widgets
+    comp_map: ClassVar[Dict[Comparison, DataWidget]] = {
+        Equals: EqualsComparisonWidget,
+        NotEquals: NotEqualsComparisonWidget,
+    }
+    comp_types: Dict[str, Comparison]
+
     def __init__(self, data: Comparison, **kwargs):
         super().__init__(**kwargs)
-        self.data = data
-        self.name_desc_tags_widget = NameDescTagsWidget(data=data)
-        self.insert_widget(
-            self.name_desc_tags_widget,
-            self.name_desc_tags_placeholder,
-        )
-        self.general_comparison_widget = GeneralComparisonWidget(data=data)
-        self.insert_widget(
-            self.general_comparison_widget,
-            self.general_comparison_placeholder,
-        )
-        self.specific_combo.addItem('Equals')  # TODO expand to others
-        self.specific_comparison_widget = EqualsComparisonWidget(data=data)
-        self.insert_widget(
-            self.specific_comparison_widget,
-            self.specific_comparison_placeholder,
-        )
-
-    def showEvent(self, *args, **kwargs) -> None:
-        self.update_context()
-        return super().showEvent(*args, **kwargs)
+        self.comp_types = {}
+        for index, comp_type in enumerate(self.comp_map):
+            self.specific_combo.addItem(comp_type.__name__)
+            if isinstance(data, comp_type):
+                self.specific_combo.setCurrentIndex(index)
+            self.comp_types[comp_type.__name__] = comp_type
+        self.new_comparison(comparison=data)
+        self.specific_combo.activated.connect(self.select_comparison_type)
 
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
@@ -1147,6 +1204,68 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         # Make sure the node name updates appropriately
         self.connect_tree_node_name(self.name_desc_tags_widget)
+
+    def new_comparison(self, comparison: Comparison):
+        """
+        Set up the widgets for a new comparison and save it as self.data.
+
+        ComparisonPage is unique in that the comparison can be swapped out
+        while the page is loaded. This method doesn't handle the complexity
+        of how to manage this in the Configuration instance, but it does
+        make sure all the widgets on this page connect to the new
+        comparison.
+
+        This is accomplished by discarding the old widgets in favor
+        of new widgets.
+        """
+        name_widget = NameDescTagsWidget(data=comparison)
+        self.insert_widget(
+            name_widget,
+            self.name_desc_tags_placeholder,
+        )
+        general_widget = GeneralComparisonWidget(data=comparison)
+        self.insert_widget(
+            general_widget,
+            self.general_comparison_placeholder,
+        )
+        SpecificWidgetType = self.comp_map[type(comparison)]
+        new_specific_widget = SpecificWidgetType(data=comparison)
+        self.insert_widget(
+            new_specific_widget,
+            self.specific_comparison_placeholder,
+        )
+        self.name_desc_tags_widget = name_widget
+        self.general_comparison_widget = general_widget
+        self.specific_comparison_widget = new_specific_widget
+        self.data = comparison
+
+    def select_comparison_type(self, new_type_index: int):
+        """
+        The user wants to change to a different comparison type.
+
+        This needs to do the following:
+        - create a new dataclass with as much overlap with
+          the previous dataclass as possible, but using the new type
+        - replace references in the configuration to the old dataclass
+          with the new dataclass, including in the row widgets
+        - call self.new_comparison to update the edit widgets here
+        """
+        new_type_name = self.specific_combo.itemText(new_type_index)
+        new_type = self.comp_types[new_type_name]
+        if isinstance(self.data, new_type):
+            return
+        comparison = cast_dataclass(data=self.data, new_type=new_type)
+        self.parent_tree_item.widget.replace_comparison(
+            old_comparison=self.data,
+            new_comparison=comparison,
+            comp_item=self.tree_item,
+        )
+        self.tree_item.setText(1, new_type.__name__)
+        self.new_comparison(comparison=comparison)
+
+    def showEvent(self, *args, **kwargs) -> None:
+        self.update_context()
+        return super().showEvent(*args, **kwargs)
 
     def update_context(self):
         config = self.parent_tree_item.widget.data

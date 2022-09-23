@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from itertools import zip_longest
-from typing import Any, Callable, ClassVar, List, Optional
+from typing import Any, Callable, ClassVar, List, Optional, Type
 
 from qtpy import QtWidgets
 from qtpy.QtCore import QPoint, Qt
@@ -595,3 +596,28 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
             )
         return 'Comparison to unknown tool results'
     return 'Invalid comparison'
+
+
+def cast_dataclass(data: Any, new_type: Type) -> Any:
+    """
+    Convert one dataclass to another, keeping values in any same-named fields.
+
+    Parameters
+    ----------
+    data : Any dataclass instance
+        The dataclass instance that we'd like to convert.
+    new_type : Any dataclass
+        The dataclass type that we'd like to convert.
+
+    Returns
+    -------
+    casted_data : instance of new_type
+        The new dataclass instance.
+    """
+    new_fields = dataclasses.fields(new_type)
+    field_names = set(field.name for field in new_fields)
+    new_kwargs = {
+        key: value for key, value in dataclasses.asdict(data).items()
+        if key in field_names
+    }
+    return new_type(**new_kwargs)
