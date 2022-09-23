@@ -1145,3 +1145,59 @@ class NotEqualsComparisonWidget(EqualsComparisonWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.comp_symbol_label.setText('≠')
+
+
+class GtLtBaseWidget(DesignerDisplay, DataWidget):
+    """
+    Base widget for comparisons like greater, less, etc.
+
+    This class should be subclassed to define "symbol" and
+    instantiated with the appropriate comparison data class.
+
+    These comparisons have the following properties in common:
+    - The only unique field is "value"
+    - The comparison can be represented by a single symbol
+    """
+    filename = 'gtltbase_widget.ui'
+
+    value_edit: QLineEdit
+    comp_symbol_label: QLineEdit
+    symbol: str
+
+    def __init__(self, data: Comparison, **kwargs):
+        super().__init__(data=data, **kwargs)
+        setup_line_edit_data(
+            line_edit=self.value_edit,
+            value_obj=self.bridge.value,
+            from_str=float,
+            to_str=str,
+        )
+        self.comp_symbol_label.setText(self.symbol)
+
+
+class GreaterComparisonWidget(GtLtBaseWidget):
+    """
+    Widget to handle the "Greater" comparison.
+    """
+    symbol = '>'
+
+
+class GreaterOrEqualComparisonWidget(GtLtBaseWidget):
+    """
+    Widget to handle the "GreaterOrEqual" comparison.
+    """
+    symbol = '≥'
+
+
+class LessComparisonWidget(GtLtBaseWidget):
+    """
+    Widget to handle the "Less" comparison.
+    """
+    symbol = '<'
+
+
+class LessOrEqualComparisonWidget(GtLtBaseWidget):
+    """
+    Widget to handle the "LessOrEqual" comparison.
+    """
+    symbol = '≤'
