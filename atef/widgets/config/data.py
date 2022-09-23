@@ -980,11 +980,12 @@ class GeneralComparisonWidget(DesignerDisplay, DataWidget):
         self.bridge.if_disconnected.put(Severity[value])
 
 
-class EqualsComparisonWidget(DesignerDisplay, DataWidget):
+class EqualsMixin:
     """
-    Handle fields and graphics unique to the Equals comparison.
+    Utilities for atol/rtol style data widgets
+
+    Used in EqualsComparisonWidget and ValueRowWidget
     """
-    filename = 'equals_comparison_widget.ui'
     label_to_type: Dict[str, type] = {
         'float': float,
         'integer': int,
@@ -1007,11 +1008,6 @@ class EqualsComparisonWidget(DesignerDisplay, DataWidget):
     rtol_edit: QLineEdit
     data_type_label: QLabel
     data_type_combo: QComboBox
-    comp_symbol_label: QLabel
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setup_equals_widget()
 
     def setup_equals_widget(self) -> None:
         """
@@ -1141,6 +1137,18 @@ class EqualsComparisonWidget(DesignerDisplay, DataWidget):
         self.atol_edit.setVisible(tol_vis)
         self.rtol_label.setVisible(tol_vis)
         self.rtol_edit.setVisible(tol_vis)
+
+
+class EqualsComparisonWidget(DesignerDisplay, EqualsMixin, DataWidget):
+    """
+    Handle fields and graphics unique to the Equals comparison.
+    """
+    filename = 'equals_comparison_widget.ui'
+    comp_symbol_label: QLabel
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_equals_widget()
 
 
 class NotEqualsComparisonWidget(EqualsComparisonWidget):
@@ -1411,3 +1419,53 @@ class RangeComparisonWidget(DesignerDisplay, DataWidget):
         self.right_yellow_line.setFixedWidth(int(
             real_space * right_range/total_range
         ))
+
+
+class ValueRowWidget(DesignerDisplay, EqualsMixin, DataWidget):
+    """
+    Row widget for the "Value" dataclass used in "ValueSet".
+
+    A "ValueSet" is made up of a number of "Value" objects.
+    This row widget is a bit larger than the comparison or
+    configuration row widgets because there will not be
+    a sub-page for modifying the fields. The following
+    fields are handled here:
+
+    - value: PrimitiveType
+    - description: str = ""
+    - rtol: Optional[Number] = None
+    - atol: Optional[Number] = None
+    - severity: Severity = Severity.success
+
+    Note that this ends up being similar to the equals widget
+    due to the same rtol/atol structure.
+    """
+    filename = 'value_row_widget.ui'
+    severity_combo: QComboBox
+    severity_map: Dict[int, Severity]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_equals_widget()
+        self.setup_value_row()
+
+    def setup_value_row(self):
+        """
+        Set up the description field and severity selector.
+        """
+        setup_line_edit_data(
+            line_edit=self.desc_edit,
+            value_obj=self.bridge.description,
+            from_str=str,
+            to_str=str,
+        )
+        self.severity_map = {}
+        for index, sev in enumerate(Severity):
+            self.severity_combo.addItem(sev.name)
+            if sev == self.bridge.severity.get():
+                self.severity_combo.setCurrentIndex(index)
+            self.severity_map[index] = sev
+        self.severity_combo.activated.connect(self.new_severity_selected)
+
+    def new_severity_selected(self, index: int):
+        self.bridge.severity.put(self.severity_map[index])
