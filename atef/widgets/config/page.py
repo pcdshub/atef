@@ -26,7 +26,7 @@ from qtpy.QtWidgets import (QComboBox, QMessageBox, QPushButton, QStyle,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from atef.check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
-                        LessOrEqual, NotEquals)
+                        LessOrEqual, NotEquals, Range)
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
@@ -40,7 +40,7 @@ from .data import (ComparisonRowWidget, ConfigurationGroupRowWidget,
                    GreaterOrEqualComparisonWidget, LessComparisonWidget,
                    LessOrEqualComparisonWidget, NameDescTagsWidget,
                    NotEqualsComparisonWidget, PingWidget,
-                   PVConfigurationWidget)
+                   PVConfigurationWidget, RangeComparisonWidget)
 from .utils import cast_dataclass, describe_comparison_context
 
 
@@ -1318,6 +1318,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         GreaterOrEqual: GreaterOrEqualComparisonWidget,
         Less: LessComparisonWidget,
         LessOrEqual: LessOrEqualComparisonWidget,
+        Range: RangeComparisonWidget,
     }
     comp_types: Dict[str, Comparison]
 
