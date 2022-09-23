@@ -152,6 +152,7 @@ class PageWidget(QWidget):
         super().__init__(**kwargs)
         self.parent_button = None
         self.child_button_map = WeakValueDictionary()
+        self.has_connected_tree = False
 
     def assign_tree_item(self, item: AtefItem):
         """
@@ -166,9 +167,11 @@ class PageWidget(QWidget):
         self.parent_tree_item = item.parent_tree_item
         self.full_tree = item.full_tree
         # Make sure we update our parent button's tooltip on tree changes
-        self.full_tree.itemChanged.connect(
-            self._update_parent_tooltip_from_tree,
-        )
+        if not self.has_connected_tree:
+            self.full_tree.itemChanged.connect(
+                self._update_parent_tooltip_from_tree,
+            )
+            self.has_connected_tree = True
 
     def _update_parent_tooltip_from_tree(
         self,
@@ -272,8 +275,10 @@ class PageWidget(QWidget):
             layout.setContentsMargins(0, 0, 0, 0)
             placeholder.setLayout(layout)
         else:
-            for old_widget in placeholder.children():
-                placeholder.layout().removeWidget(old_widget)
+            old_widget = placeholder.layout().takeAt(0).widget()
+            if old_widget is not None:
+                # old_widget.setParent(None)
+                old_widget.deleteLater()
         placeholder.layout().addWidget(widget)
 
     def connect_tree_node_name(self, widget: DataWidget):
@@ -378,6 +383,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         self.data = data
         # Create the static sub-widgets and place them
         self.name_desc_tags_widget = NameDescTagsWidget(data=data)
+        self.parent_button = self.name_desc_tags_widget.parent_button
         self.config_group_widget = ConfigurationGroupWidget(data=data)
         self.insert_widget(
             self.name_desc_tags_widget,
@@ -528,6 +534,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.name_desc_tags_widget = NameDescTagsWidget(data=data)
+        self.parent_button = self.name_desc_tags_widget.parent_button
         self.device_config_widget = DeviceConfigurationWidget(data=data)
         self.insert_widget(
             self.name_desc_tags_widget,
@@ -770,6 +777,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.name_desc_tags_widget = NameDescTagsWidget(data=data)
+        self.parent_button = self.name_desc_tags_widget.parent_button
         self.pv_configuration_widget = PVConfigurationWidget(data=data)
         self.insert_widget(
             self.name_desc_tags_widget,
@@ -963,6 +971,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.name_desc_tags_widget = NameDescTagsWidget(data=data)
+        self.parent_button = self.name_desc_tags_widget.parent_button
         self.insert_widget(
             self.name_desc_tags_widget,
             self.name_desc_tags_placeholder,
@@ -1219,6 +1228,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         of new widgets.
         """
         name_widget = NameDescTagsWidget(data=comparison)
+        self.parent_button = name_widget.parent_button
         self.insert_widget(
             name_widget,
             self.name_desc_tags_placeholder,
@@ -1238,6 +1248,13 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.general_comparison_widget = general_widget
         self.specific_comparison_widget = new_specific_widget
         self.data = comparison
+        try:
+            item = self.tree_item
+        except AttributeError:
+            pass
+        else:
+            # Reinitialize this for the new name/desc/tags widget
+            self.assign_tree_item(item)
 
     def select_comparison_type(self, new_type_index: int):
         """
@@ -1262,6 +1279,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         )
         self.tree_item.setText(1, new_type.__name__)
         self.new_comparison(comparison=comparison)
+        self.update_context()
 
     def showEvent(self, *args, **kwargs) -> None:
         self.update_context()

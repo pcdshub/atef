@@ -997,6 +997,7 @@ class EqualsComparisonWidget(DesignerDisplay, DataWidget):
     }
     cast_from_user_str[bool] = user_string_to_bool
 
+    value_edit: QLabel
     range_label: QLabel
     atol_label: QLabel
     atol_edit: QLineEdit
@@ -1026,6 +1027,12 @@ class EqualsComparisonWidget(DesignerDisplay, DataWidget):
         """
         for option in self.label_to_type:
             self.data_type_combo.addItem(option)
+        setup_line_edit_data(
+            line_edit=self.value_edit,
+            value_obj=self.bridge.value,
+            from_str=self.value_from_str,
+            to_str=str,
+        )
         setup_line_edit_data(
             line_edit=self.atol_edit,
             value_obj=self.bridge.atol,
