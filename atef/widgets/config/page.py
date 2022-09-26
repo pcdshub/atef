@@ -35,12 +35,11 @@ from atef.tools import Ping, PingResult, Tool, ToolResult
 from ..core import DesignerDisplay
 from .data import (ComparisonRowWidget, ConfigurationGroupRowWidget,
                    ConfigurationGroupWidget, DataWidget,
-                   DeviceConfigurationWidget, EqualsComparisonWidget,
-                   GeneralComparisonWidget, GreaterComparisonWidget,
-                   GreaterOrEqualComparisonWidget, LessComparisonWidget,
-                   LessOrEqualComparisonWidget, NameDescTagsWidget,
-                   NotEqualsComparisonWidget, PingWidget,
-                   PVConfigurationWidget, RangeComparisonWidget)
+                   DeviceConfigurationWidget, EqualsWidget,
+                   GeneralComparisonWidget, GreaterOrEqualWidget,
+                   GreaterWidget, LessOrEqualWidget, LessWidget,
+                   NameDescTagsWidget, NotEqualsWidget, PingWidget,
+                   PVConfigurationWidget, RangeWidget)
 from .utils import cast_dataclass, describe_comparison_context
 
 
@@ -1312,13 +1311,13 @@ class ComparisonPage(DesignerDisplay, PageWidget):
 
     # Defines the valid comparisons and their edit widgets
     comp_map: ClassVar[Dict[Comparison, DataWidget]] = {
-        Equals: EqualsComparisonWidget,
-        NotEquals: NotEqualsComparisonWidget,
-        Greater: GreaterComparisonWidget,
-        GreaterOrEqual: GreaterOrEqualComparisonWidget,
-        Less: LessComparisonWidget,
-        LessOrEqual: LessOrEqualComparisonWidget,
-        Range: RangeComparisonWidget,
+        Equals: EqualsWidget,
+        NotEquals: NotEqualsWidget,
+        Greater: GreaterWidget,
+        GreaterOrEqual: GreaterOrEqualWidget,
+        Less: LessWidget,
+        LessOrEqual: LessOrEqualWidget,
+        Range: RangeWidget,
     }
     comp_types: Dict[str, Comparison]
 

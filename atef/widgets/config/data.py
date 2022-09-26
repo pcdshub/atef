@@ -984,7 +984,7 @@ class EqualsMixin:
     """
     Utilities for atol/rtol style data widgets
 
-    Used in EqualsComparisonWidget and ValueRowWidget
+    Used in EqualsWidget and ValueRowWidget
     """
     label_to_type: Dict[str, type] = {
         'float': float,
@@ -1139,7 +1139,7 @@ class EqualsMixin:
         self.rtol_edit.setVisible(tol_vis)
 
 
-class EqualsComparisonWidget(DesignerDisplay, EqualsMixin, DataWidget):
+class EqualsWidget(DesignerDisplay, EqualsMixin, DataWidget):
     """
     Handle fields and graphics unique to the Equals comparison.
     """
@@ -1151,7 +1151,7 @@ class EqualsComparisonWidget(DesignerDisplay, EqualsMixin, DataWidget):
         self.setup_equals_widget()
 
 
-class NotEqualsComparisonWidget(EqualsComparisonWidget):
+class NotEqualsWidget(EqualsWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.comp_symbol_label.setText('≠')
@@ -1185,35 +1185,35 @@ class GtLtBaseWidget(DesignerDisplay, DataWidget):
         self.comp_symbol_label.setText(self.symbol)
 
 
-class GreaterComparisonWidget(GtLtBaseWidget):
+class GreaterWidget(GtLtBaseWidget):
     """
     Widget to handle the "Greater" comparison.
     """
     symbol = '>'
 
 
-class GreaterOrEqualComparisonWidget(GtLtBaseWidget):
+class GreaterOrEqualWidget(GtLtBaseWidget):
     """
     Widget to handle the "GreaterOrEqual" comparison.
     """
     symbol = '≥'
 
 
-class LessComparisonWidget(GtLtBaseWidget):
+class LessWidget(GtLtBaseWidget):
     """
     Widget to handle the "Less" comparison.
     """
     symbol = '<'
 
 
-class LessOrEqualComparisonWidget(GtLtBaseWidget):
+class LessOrEqualWidget(GtLtBaseWidget):
     """
     Widget to handle the "LessOrEqual" comparison.
     """
     symbol = '≤'
 
 
-class RangeComparisonWidget(DesignerDisplay, DataWidget):
+class RangeWidget(DesignerDisplay, DataWidget):
     """
     Widget to handle the "Range" comparison.
 
