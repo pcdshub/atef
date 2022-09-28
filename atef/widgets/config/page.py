@@ -21,12 +21,12 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 from weakref import WeakSet, WeakValueDictionary
 
 from qtpy.QtGui import QDropEvent
-from qtpy.QtWidgets import (QComboBox, QMessageBox, QPushButton, QStyle,
-                            QTableWidget, QToolButton, QTreeWidget,
+from qtpy.QtWidgets import (QComboBox, QMessageBox, QPushButton, QSizePolicy,
+                            QStyle, QTableWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from atef.check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
-                        LessOrEqual, NotEquals, Range)
+                        LessOrEqual, NotEquals, Range, ValueSet)
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
@@ -39,7 +39,7 @@ from .data import (ComparisonRowWidget, ConfigurationGroupRowWidget,
                    GeneralComparisonWidget, GreaterOrEqualWidget,
                    GreaterWidget, LessOrEqualWidget, LessWidget,
                    NameDescTagsWidget, NotEqualsWidget, PingWidget,
-                   PVConfigurationWidget, RangeWidget)
+                   PVConfigurationWidget, RangeWidget, ValueSetWidget)
 from .utils import cast_dataclass, describe_comparison_context
 
 
@@ -1306,6 +1306,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
     specific_comparison_widget: DataWidget
     general_comparison_placeholder: QWidget
     general_comparison_widget: GeneralComparisonWidget
+    bottom_spacer: QWidget
 
     specific_combo: QComboBox
 
@@ -1318,6 +1319,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         Less: LessWidget,
         LessOrEqual: LessOrEqualWidget,
         Range: RangeWidget,
+        ValueSet: ValueSetWidget,
     }
     comp_types: Dict[str, Comparison]
 
@@ -1380,6 +1382,17 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         else:
             # Reinitialize this for the new name/desc/tags widget
             self.assign_tree_item(item)
+        # Fix the layout spacing, some comparisons want spacing and some don't
+        if isinstance(comparison, ValueSet):
+            self.bottom_spacer.setSizePolicy(
+                QSizePolicy.Maximum,
+                QSizePolicy.Maximum,
+            )
+        else:
+            self.bottom_spacer.setSizePolicy(
+                QSizePolicy.Expanding,
+                QSizePolicy.Expanding,
+            )
 
     def select_comparison_type(self, new_type_index: int):
         """

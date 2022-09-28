@@ -8,14 +8,14 @@ from typing import Any, Callable, ClassVar, Dict, List, Optional, Protocol
 from weakref import WeakValueDictionary
 
 from pydm.widgets.drawing import PyDMDrawingLine
-from qtpy.QtGui import QColor
+from qtpy.QtGui import QColor, QDropEvent
 from qtpy.QtWidgets import (QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel,
                             QLayout, QLineEdit, QMessageBox, QPlainTextEdit,
                             QPushButton, QSpinBox, QStyle, QTableWidget,
                             QTableWidgetItem, QToolButton, QVBoxLayout,
                             QWidget)
 
-from atef.check import Comparison
+from atef.check import Comparison, Value
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, GroupResultMode, PVConfiguration)
 from atef.enums import Severity
@@ -1441,7 +1441,10 @@ class ValueRowWidget(DesignerDisplay, EqualsMixin, DataWidget):
     due to the same rtol/atol structure.
     """
     filename = 'value_row_widget.ui'
+
     severity_combo: QComboBox
+    delete_button: QToolButton
+
     severity_map: Dict[int, Severity]
 
     def __init__(self, *args, **kwargs):
@@ -1469,3 +1472,132 @@ class ValueRowWidget(DesignerDisplay, EqualsMixin, DataWidget):
 
     def new_severity_selected(self, index: int):
         self.bridge.severity.put(self.severity_map[index])
+
+
+class ValueSetWidget(DesignerDisplay, DataWidget):
+    """
+    Widget for modifying the unique fields in "ValueSet"
+
+    The only unique field is currently "values".
+
+    This is an ordered sequence of values, where the first
+    value to match in the order is the result of the
+    comparison.
+
+    To support this ordering, this widget has a table with
+    drag and drop enabled.
+    """
+    filename = 'value_set_widget.ui'
+
+    value_table: QTableWidget
+    add_value_button: QPushButton
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Fill in the rows from the initial data
+        for value in self.bridge.values.get():
+            self.add_value_row(value)
+        # Allow the user to add more rows
+        self.add_value_button.clicked.connect(self.add_value_row)
+        # Make the table respond to drop events
+        self.value_table.dropEvent = self.table_drop_event
+
+    def add_value_row(
+        self,
+        checked: bool = False,
+        value: Optional[Value] = None,
+        **kwargs,
+    ):
+        if value is None:
+            # New value
+            value = Value(value=0.0)
+            self.bridge.values.append(value)
+        value_row = ValueRowWidget(data=value)
+        self.setup_delete_button(value_row)
+        row_count = self.value_table.rowCount()
+        self.value_table.insertRow(row_count)
+        self.value_table.setRowHeight(row_count, value_row.sizeHint().height())
+        self.value_table.setCellWidget(row_count, 0, value_row)
+
+    def setup_delete_button(self, value_row: ValueRowWidget):
+        delete_icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
+        value_row.delete_button.setIcon(delete_icon)
+
+        def inner_delete(*args, **kwargs):
+            self.delete_table_row(value_row)
+
+        value_row.delete_button.clicked.connect(inner_delete)
+
+    def delete_table_row(self, row: ValueRowWidget):
+        # Get the identity of the data
+        data = row.bridge.data
+        # Confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to delete the '
+                f'Value with description "{data.description}"? '
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
+        # Remove row from the table
+        for row_index in range(self.value_table.rowCount()):
+            widget = self.value_table.cellWidget(row_index, 0)
+            if widget is row:
+                self.value_table.removeRow(row_index)
+                break
+        # Remove configuration from the data structure
+        self.bridge.values.remove_value(data)
+
+    def resize_value_table(self):
+        """
+        Make sure that the whole row widget is visible.
+        """
+        self.value_table.setColumnWidth(0, self.value_table.width() - 10)
+
+    def resizeEvent(self, *args, **kwargs) -> None:
+        """
+        Override resizeEvent to update the table column width when we resize.
+        """
+        self.resize_value_table()
+        return super().resizeEvent(*args, **kwargs)
+
+    def move_config_row(self, source: int, dest: int):
+        """
+        Move the row at index source to index dest.
+
+        Rearanges the table and the file.
+        """
+        # Skip if into the same index
+        if source == dest:
+            return
+        # Rearrange the file first
+        data = self.bridge.values.get()
+        value = data.pop(source)
+        data.insert(dest, value)
+        self.bridge.values.updated.emit()
+        # Rearrange the table: need a whole new widget or else segfault
+        self.value_table.removeRow(source)
+        self.value_table.insertRow(dest)
+        value_row = ValueRowWidget(data=value)
+        self.setup_delete_button(value_row)
+        self.value_table.setRowHeight(dest, value_row.sizeHint().height())
+        self.value_table.setCellWidget(dest, 0, value_row)
+
+    def table_drop_event(self, event: QDropEvent):
+        """
+        Monkeypatch onto the table to allow us to drag/drop rows.
+
+        Shoutouts to stackoverflow
+        """
+        if event.source() is self.value_table:
+            selected_indices = self.value_table.selectedIndexes()
+            if not selected_indices:
+                return
+            selected_row = selected_indices[0].row()
+            dest_row = self.value_table.indexAt(event.pos()).row()
+            if dest_row == -1:
+                dest_row = self.value_table.rowCount()
+            self.move_config_row(selected_row, dest_row)
