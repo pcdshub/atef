@@ -34,7 +34,7 @@ from atef.config import (Configuration, ConfigurationGroup,
 from atef.tools import Ping, PingResult, Tool, ToolResult
 
 from ..core import DesignerDisplay
-from .data import (AnyValueWidget, ComparisonRowWidget,
+from .data import (AnyComparisonWidget, AnyValueWidget, ComparisonRowWidget,
                    ConfigurationGroupRowWidget, ConfigurationGroupWidget,
                    DataWidget, DeviceConfigurationWidget, EqualsWidget,
                    GeneralComparisonWidget, GreaterOrEqualWidget,
@@ -584,7 +584,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     ):
         if comparison is None:
             # New comparison
-            comparison = Equals()
+            comparison = Equals(name='untitled')
             self.data.shared.append(comparison)
         comp_row = ComparisonRowWidget(data=comparison)
         comp_page = ComparisonPage(data=comparison)
@@ -827,7 +827,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
     ):
         if comparison is None:
             # New comparison
-            comparison = Equals()
+            comparison = Equals(name='untitled')
             self.data.shared.append(comparison)
         comp_row = ComparisonRowWidget(data=comparison)
         comp_page = ComparisonPage(data=comparison)
@@ -1101,7 +1101,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
     ):
         if comparison is None:
             # New comparison
-            comparison = Equals()
+            comparison = Equals(name='untitled')
             self.data.shared.append(comparison)
         comp_row = ComparisonRowWidget(data=comparison)
         comp_page = ComparisonPage(data=comparison)
@@ -1322,6 +1322,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         Range: RangeWidget,
         ValueSet: ValueSetWidget,
         AnyValue: AnyValueWidget,
+        AnyComparison: AnyComparisonWidget,
     }
     comp_types: Dict[str, Comparison]
 
@@ -1356,6 +1357,8 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         This is accomplished by discarding the old widgets in favor
         of new widgets.
         """
+        old_type = type(self.data)
+        new_type = type(comparison)
         name_widget = NameDescTagsWidget(data=comparison)
         self.parent_button = name_widget.parent_button
         self.insert_widget(
@@ -1384,6 +1387,11 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         else:
             # Reinitialize this for the new name/desc/tags widget
             self.assign_tree_item(item)
+        # Extra setup and/or teardown from AnyComparison
+        if issubclass(old_type, AnyComparison):
+            self.clean_up_any_comparison()
+        if issubclass(new_type, AnyComparison):
+            self.setup_any_comparison()
         # Fix the layout spacing, some comparisons want spacing and some don't
         if isinstance(comparison, (ValueSet, AnyValue, AnyComparison)):
             # Maximum = "shrink spacer to the size hint (0, 0)"
@@ -1428,6 +1436,13 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         return super().showEvent(*args, **kwargs)
 
     def update_context(self):
+        parent_widget = self.parent_tree_item.widget
+        if isinstance(parent_widget, ComparisonPage):
+            parent_widget.update_context()
+            self.name_desc_tags_widget.extra_text_label.setText(
+                parent_widget.name_desc_tags_widget.extra_text_label.text()
+            )
+            return
         config = self.parent_tree_item.widget.data
         attr = ''
         if self.data in config.shared:
@@ -1443,3 +1458,35 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                     break
         desc = describe_comparison_context(attr=attr, config=config)
         self.name_desc_tags_widget.extra_text_label.setText(desc)
+
+    def setup_any_comparison(self):
+        """
+        Special setup for when an AnyComparison is added.
+
+        Assumes that we already have widgets loaded and data initialized
+        for the AnyComparison.
+
+        - Adds and initializes a sub-node for each comparison.
+        - Makes sure sub-nodes are managed properly as the AnyComparison
+          updates.
+        """
+        self.update_subpages()
+        self.specific_comparison_widget.bridge.comparisons.updated.connect(
+            self.update_subpages,
+        )
+
+    def update_subpages(self):
+        """
+        Update nodes based on the current AnyComparison state.
+
+        This may add or remove pages as appropriate.
+        """
+        ...
+
+    def clean_up_any_comparison(self):
+        """
+        Special teardown for when an AnyComparison is removed.
+
+        - Cleans up all the sub-nodes.
+        """
+        self.tree_item.takeChildren()

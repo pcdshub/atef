@@ -16,7 +16,7 @@ from qtpy.QtWidgets import (QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel,
                             QTableWidgetItem, QToolButton, QVBoxLayout,
                             QWidget)
 
-from atef.check import Comparison, Value
+from atef.check import Comparison, Equals, Value
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, GroupResultMode, PVConfiguration)
 from atef.enums import Severity
@@ -1708,3 +1708,114 @@ class AnyValueWidget(DesignerDisplay, DataWidget):
         for row in reversed(sorted(selected_rows)):
             self.values_table.removeRow(row)
         self.on_table_edit(0, 0)
+
+
+class AnyComparisonWidget(DesignerDisplay, DataWidget):
+    """
+    Widget for modifying the unique fields in "AnyComparison"
+
+    The only unique field is currently "comparisons".
+
+    This is an unordered sequence of other comparisons.
+    The comparison passes if any of these sub-comparisons
+    passes.
+
+    This widget will use the ComparisonRowWidget to fill a table,
+    much like the various configuration pages.
+
+    This widget will rely on the ComparisonPage to set up and
+    handle the necessary sub-pages that this needs to create.
+    """
+    filename = 'any_comparison_widget.ui'
+
+    comparisons_table: QTableWidget
+    add_comparison_button: QPushButton
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Fill the table
+        for comparison in self.bridge.comparisons.get():
+            self.add_comparison(comparison)
+        # Make the create row button work
+        self.add_comparison_button.clicked.connect(self.add_comparison)
+        self.resize_comparisons_table()
+
+    def add_comparison(
+        self,
+        checked: bool = False,
+        comparison: Optional[Comparison] = None,
+        **kwargs,
+    ):
+        if comparison is None:
+            comparison = Equals(name='untitled')
+            new_comparison = True
+        else:
+            new_comparison = False
+        comp_row = ComparisonRowWidget(data=comparison)
+        comp_row.attr_combo.hide()
+        row_count = self.comparisons_table.rowCount()
+        self.comparisons_table.insertRow(row_count)
+        self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
+        self.comparisons_table.setCellWidget(row_count, 0, comp_row)
+        if new_comparison:
+            self.update_comparison_list()
+        self.setup_delete_button(comp_row)
+
+    def setup_delete_button(self, comparison_row: ComparisonRowWidget):
+        delete_icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
+        comparison_row.delete_button.setIcon(delete_icon)
+
+        def inner_delete(*args, **kwargs):
+            self.delete_table_row(comparison_row)
+
+        comparison_row.delete_button.clicked.connect(inner_delete)
+
+    def delete_table_row(self, row: ComparisonRowWidget):
+        # Get the identity of the data
+        data = row.bridge.data
+        # Confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to delete the '
+                f'{type(data).__name__} named "{data.name}"? '
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
+        # Remove row from the table
+        for row_index in range(self.comparisons_table.rowCount()):
+            widget = self.comparisons_table.cellWidget(row_index, 0)
+            if widget is row:
+                self.comparisons_table.removeRow(row_index)
+                break
+        self.update_comparison_list()
+
+    def update_comparison_list(self):
+        unsorted: List[Comparison] = []
+
+        for row_index in range(self.comparisons_table.rowCount()):
+            row_widget = self.comparisons_table.cellWidget(row_index, 0)
+            unsorted.append(row_widget.data)
+
+        def get_sort_key(elem: Comparison):
+            return elem.name
+
+        self.bridge.comparisons.put(sorted(unsorted, key=get_sort_key))
+
+    def resize_comparisons_table(self):
+        """
+        Make sure that the whole row widget is visible.
+        """
+        self.comparisons_table.setColumnWidth(
+            0,
+            self.comparisons_table.width() - 10
+        )
+
+    def resizeEvent(self, *args, **kwargs) -> None:
+        """
+        Override resizeEvent to update the table column width when we resize.
+        """
+        self.resize_comparisons_table()
+        return super().resizeEvent(*args, **kwargs)
