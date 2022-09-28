@@ -3,6 +3,7 @@ Widgets used for manipulating the configuration data.
 """
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Protocol
 from weakref import WeakValueDictionary
@@ -1601,3 +1602,109 @@ class ValueSetWidget(DesignerDisplay, DataWidget):
             if dest_row == -1:
                 dest_row = self.value_table.rowCount()
             self.move_config_row(selected_row, dest_row)
+
+
+class AnyValueWidget(DesignerDisplay, DataWidget):
+    """
+    Widget for modifying the unique fields in "AnyValue"
+
+    The only unique field is currently "values".
+
+    This is an unordered sequence of primitive values.
+    The comparison passes if the actual value matches any
+    of these primitives.
+
+    This widget will have a table of values similar to the one
+    used in the global values attribute in ConfigurationGroup.
+    The table is used to make editing easy and to communicate
+    with the user how each type is being interpretted by the
+    GUI. There is no drag and drop, instead the parameters
+    will be saved in a static sort order.
+    """
+    filename = 'any_value_widget.ui'
+
+    values_table: QTableWidget
+    add_value_button: QPushButton
+    del_value_button: QPushButton
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_value_button.clicked.connect(self.add_value_to_table)
+        self.adding_new_row = False
+        for value in self.bridge.values.get():
+            self.add_value_to_table(value=value, startup=True)
+        self.on_table_edit(0, 0)
+        self.values_table.cellChanged.connect(self.on_table_edit)
+        self.del_value_button.clicked.connect(self.delete_selected_rows)
+
+    def add_value_to_table(
+        self,
+        checked: bool = False,
+        value: Any = None,
+        startup: bool = False,
+        **kwargs,
+    ):
+        self.adding_new_row = True
+        new_row = self.values_table.rowCount()
+        self.values_table.insertRow(new_row)
+        value = value if value is not None else ''
+        value_item = QTableWidgetItem()
+        value_item.setText(value)
+        type_readback_widget = QLabel()
+        self.values_table.setItem(new_row, 0, value_item)
+        self.values_table.setCellWidget(new_row, 1, type_readback_widget)
+        self.adding_new_row = False
+        if not startup:
+            self.on_table_edit(new_row, 0)
+
+    def on_table_edit(self, row: int, column: int):
+        if self.adding_new_row:
+            return
+        data = defaultdict(list)
+        for row_index in range(self.values_table.rowCount()):
+            value_text = self.values_table.item(row_index, 0).text()
+            type_label = self.values_table.cellWidget(row_index, 1)
+            try:
+                value = float(value_text)
+            except (ValueError, TypeError):
+                # Not numeric
+                value = value_text
+                type_label.setText('str')
+            else:
+                # Numeric, but could be int or float
+                if '.' in value_text:
+                    type_label.setText('float')
+                else:
+                    try:
+                        value = int(value_text)
+                    except (ValueError, TypeError):
+                        # Something like 1e-4
+                        type_label.setText('float')
+                    else:
+                        # Something like 3
+                        type_label.setText('int')
+            data[type(value)].append(value)
+        final_values = []
+        for datatype in sorted(data, key=str):
+            final_values.extend(sorted(data[datatype]))
+        self.bridge.values.put(final_values)
+
+    def delete_selected_rows(self, *args, **kwargs):
+        selected_rows = set()
+        for item in self.values_table.selectedItems():
+            selected_rows.add(item.row())
+        if not selected_rows:
+            return
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to delete '
+                f'these {len(selected_rows)} rows?'
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
+        for row in reversed(sorted(selected_rows)):
+            self.values_table.removeRow(row)
+        self.on_table_edit(0, 0)

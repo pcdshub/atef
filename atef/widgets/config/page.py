@@ -25,17 +25,18 @@ from qtpy.QtWidgets import (QComboBox, QMessageBox, QPushButton, QSizePolicy,
                             QStyle, QTableWidget, QToolButton, QTreeWidget,
                             QTreeWidgetItem, QVBoxLayout, QWidget)
 
-from atef.check import (Comparison, Equals, Greater, GreaterOrEqual, Less,
-                        LessOrEqual, NotEquals, Range, ValueSet)
+from atef.check import (AnyComparison, AnyValue, Comparison, Equals, Greater,
+                        GreaterOrEqual, Less, LessOrEqual, NotEquals, Range,
+                        ValueSet)
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 
 from ..core import DesignerDisplay
-from .data import (ComparisonRowWidget, ConfigurationGroupRowWidget,
-                   ConfigurationGroupWidget, DataWidget,
-                   DeviceConfigurationWidget, EqualsWidget,
+from .data import (AnyValueWidget, ComparisonRowWidget,
+                   ConfigurationGroupRowWidget, ConfigurationGroupWidget,
+                   DataWidget, DeviceConfigurationWidget, EqualsWidget,
                    GeneralComparisonWidget, GreaterOrEqualWidget,
                    GreaterWidget, LessOrEqualWidget, LessWidget,
                    NameDescTagsWidget, NotEqualsWidget, PingWidget,
@@ -1320,6 +1321,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         LessOrEqual: LessOrEqualWidget,
         Range: RangeWidget,
         ValueSet: ValueSetWidget,
+        AnyValue: AnyValueWidget,
     }
     comp_types: Dict[str, Comparison]
 
@@ -1383,12 +1385,14 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             # Reinitialize this for the new name/desc/tags widget
             self.assign_tree_item(item)
         # Fix the layout spacing, some comparisons want spacing and some don't
-        if isinstance(comparison, ValueSet):
+        if isinstance(comparison, (ValueSet, AnyValue, AnyComparison)):
+            # Maximum = "shrink spacer to the size hint (0, 0)"
             self.bottom_spacer.setSizePolicy(
                 QSizePolicy.Maximum,
                 QSizePolicy.Maximum,
             )
         else:
+            # Expanding = "make spacer take up as much space as possible"
             self.bottom_spacer.setSizePolicy(
                 QSizePolicy.Expanding,
                 QSizePolicy.Expanding,

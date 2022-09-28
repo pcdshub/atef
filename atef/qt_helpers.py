@@ -249,6 +249,13 @@ class QDataclassList(QDataclassElem):
         """
         return getattr(self.data, self.attr)
 
+    def put(self, values: List[Any]) -> None:
+        """
+        Replace the current list of values.
+        """
+        setattr(self.data, self.attr, values)
+        self.updated.emit()
+
     def append(self, new_value: Any) -> None:
         """
         Add a new value to the end of the list and update consumers.
