@@ -17,6 +17,7 @@ a page widget will need to be linked up to the tree using the
 from __future__ import annotations
 
 import dataclasses
+from collections import OrderedDict
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 from weakref import WeakSet, WeakValueDictionary
 
@@ -1328,6 +1329,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
 
     def __init__(self, data: Comparison, **kwargs):
         super().__init__(**kwargs)
+        self.data = data
         self.comp_types = {}
         for index, comp_type in enumerate(self.comp_map):
             self.specific_combo.addItem(comp_type.__name__)
@@ -1343,6 +1345,10 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         # Make sure the node name updates appropriately
         self.connect_tree_node_name(self.name_desc_tags_widget)
+        # Extra setup and/or teardown from AnyComparison
+        self.clean_up_any_comparison()
+        if isinstance(self.data, AnyComparison):
+            self.setup_any_comparison()
 
     def new_comparison(self, comparison: Comparison):
         """
@@ -1357,8 +1363,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         This is accomplished by discarding the old widgets in favor
         of new widgets.
         """
-        old_type = type(self.data)
-        new_type = type(comparison)
         name_widget = NameDescTagsWidget(data=comparison)
         self.parent_button = name_widget.parent_button
         self.insert_widget(
@@ -1387,11 +1391,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         else:
             # Reinitialize this for the new name/desc/tags widget
             self.assign_tree_item(item)
-        # Extra setup and/or teardown from AnyComparison
-        if issubclass(old_type, AnyComparison):
-            self.clean_up_any_comparison()
-        if issubclass(new_type, AnyComparison):
-            self.setup_any_comparison()
         # Fix the layout spacing, some comparisons want spacing and some don't
         if isinstance(comparison, (ValueSet, AnyValue, AnyComparison)):
             # Maximum = "shrink spacer to the size hint (0, 0)"
@@ -1480,8 +1479,120 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         Update nodes based on the current AnyComparison state.
 
         This may add or remove pages as appropriate.
+
+        The node order should match the sequence in the table,
+        even though this sequence is arbitrary and the user is not
+        in control of it.
         """
-        ...
+        # Cache the previous selection
+        pre_selected = self.full_tree.selectedItems()
+        display_order = OrderedDict()
+        table = self.specific_comparison_widget.comparisons_table
+        for row_index in range(table.rowCount()):
+            widget = table.cellWidget(row_index, 0)
+            comp = widget.data
+            display_order[id(comp)] = comp
+        # Pull off all of the existing items
+        old_items = self.tree_item.takeChildren()
+        old_item_map = {
+            id(item.widget.data): item for item in old_items
+        }
+        # Add items back as needed, may be a mix of old and new
+        new_item = None
+        for ident, comp in display_order.items():
+            try:
+                item = old_item_map[ident]
+            except KeyError:
+                # Need to make a new page/item
+                new_item = self.add_sub_comparison_node(comp)
+            else:
+                # An old item existed, add it again
+                self.tree_item.addChild(item)
+        # Fix selection if it changed
+        post_selected = self.full_tree.selectedItems()
+        if (
+            new_item is not None
+            and pre_selected
+            and post_selected
+            and pre_selected[0] is not post_selected[0]
+        ):
+            # Selection normal and changed, usually the new item
+            self.full_tree.setCurrentItem(new_item)
+
+    def add_sub_comparison_node(self, comparison: Comparison) -> AtefItem:
+        page = ComparisonPage(data=comparison)
+        item = AtefItem(
+            tree_parent=self.tree_item,
+            name=comparison.name,
+            func_name=type(comparison).__name__,
+        )
+        link_page(item=item, widget=page)
+        self.setup_row_buttons(
+            comparison=comparison,
+            item=item,
+        )
+        return item
+
+    def replace_comparison(
+        self,
+        old_comparison: Comparison,
+        new_comparison: Comparison,
+        comp_item: AtefItem,
+    ):
+        """
+        Find old_comparison and replace it with new_comparison.
+
+        Also finds the row widget and replaces it with a new row widget
+        via calling methods on the AnyComparison widget.
+
+        This is only valid when our data type is AnyComparison
+        """
+        def replace_in_list(
+            old: Comparison,
+            new: Comparison,
+            comparison_list: List[Comparison],
+        ):
+            index = comparison_list.index(old)
+            comparison_list[index] = new
+
+        replace_in_list(
+            old=old_comparison,
+            new=new_comparison,
+            comparison_list=self.data.comparisons,
+        )
+        self.specific_comparison_widget.replace_row_widget(
+            old_comparison=old_comparison,
+            new_comparison=new_comparison,
+        )
+        self.setup_row_buttons(
+            comparison=new_comparison,
+            item=comp_item,
+        )
+
+    def setup_row_buttons(
+        self,
+        comparison: Comparison,
+        item: AtefItem,
+    ):
+        """
+        Find the row widget and set up the buttons.
+
+        Only valid when we use AnyComparison.
+
+        - The child button should navigate to the child page
+        - The delete button exists but should need no extra handling here
+        """
+        table: QTableWidget = self.specific_comparison_widget.comparisons_table
+        for index in range(table.rowCount()):
+            row_widget = table.cellWidget(index, 0)
+            if row_widget.data is comparison:
+                break
+        if row_widget.data is not comparison:
+            return
+        self.setup_child_button(
+            button=row_widget.child_button,
+            item=item,
+        )
 
     def clean_up_any_comparison(self):
         """

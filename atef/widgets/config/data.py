@@ -1792,6 +1792,24 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
                 break
         self.update_comparison_list()
 
+    def replace_row_widget(
+        self,
+        old_comparison: Comparison,
+        new_comparison: Comparison,
+    ):
+        """
+        Replace the row corresponding with old_comparison with a new row.
+        """
+        for row_index in range(self.comparisons_table.rowCount()):
+            row_widget = self.comparisons_table.cellWidget(row_index, 0)
+            if row_widget.data is old_comparison:
+                index_to_replace = row_index
+        new_row = ComparisonRowWidget(data=new_comparison)
+        new_row.attr_combo.hide()
+        self.comparisons_table.setCellWidget(index_to_replace, 0, new_row)
+        self.setup_delete_button(new_row)
+        self.update_comparison_list()
+
     def update_comparison_list(self):
         unsorted: List[Comparison] = []
 
