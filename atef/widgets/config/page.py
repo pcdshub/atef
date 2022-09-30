@@ -1420,6 +1420,23 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         new_type = self.comp_types[new_type_name]
         if isinstance(self.data, new_type):
             return
+        if isinstance(self.data, (ValueSet, AnyValue, AnyComparison)):
+            # These can have lots of sub-items and will need a warning
+            type_name = type(self.data).__name__
+            reply = QMessageBox.question(
+                self,
+                'Confirm type change',
+                (
+                    'Are you sure you want to change the comparison type? '
+                    f'{type_name} may have many sub-items, '
+                    'Which will be deleted if you change the type '
+                    f'to {new_type_name}.'
+                ),
+            )
+            if reply != QMessageBox.Yes:
+                # Reset the combo box, the user cancelled
+                self.specific_combo.setCurrentText(type_name)
+                return
         comparison = cast_dataclass(data=self.data, new_type=new_type)
         self.parent_tree_item.widget.replace_comparison(
             old_comparison=self.data,
