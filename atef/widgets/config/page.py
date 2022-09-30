@@ -849,6 +849,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         self.comparisons_table.insertRow(row_count)
         self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
         self.comparisons_table.setCellWidget(row_count, 0, comp_row)
+        self.resize_comparisons_table()
 
     def setup_row_buttons(
         self,

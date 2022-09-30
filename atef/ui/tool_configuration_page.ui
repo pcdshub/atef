@@ -70,6 +70,9 @@
    </item>
    <item>
     <widget class="QTableWidget" name="comparisons_table">
+     <attribute name="verticalHeaderVisible">
+      <bool>false</bool>
+     </attribute>
      <column>
       <property name="text">
        <string>Comparisons</string>
