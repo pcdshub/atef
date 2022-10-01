@@ -385,6 +385,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     def __init__(self, data: ConfigurationGroup, **kwargs):
         super().__init__(**kwargs)
         self.data = data
+        self.setup_done = False
         # Create the static sub-widgets and place them
         self.name_desc_tags_widget = NameDescTagsWidget(data=data)
         self.parent_button = self.name_desc_tags_widget.parent_button
@@ -397,9 +398,6 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             self.config_group_widget,
             self.config_group_placeholder,
         )
-        # Fill in the rows from the initial data
-        for config in data.configs:
-            self.add_config_row(config)
         # Allow the user to add more rows
         self.add_row_button.clicked.connect(self.add_config_row)
         # Fill in the row type selector box
@@ -409,6 +407,11 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
 
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
+        if not self.setup_done:
+            # Fill in the rows from the initial data
+            for config in self.data.configs:
+                self.add_config_row(config=config)
+            self.setup_done = True
         # Make sure the parent button is set up properly
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         # Make sure the node name updates appropriately
@@ -548,6 +551,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             self.device_config_widget,
             self.device_widget_placeholder,
         )
+        # TODO relocate these to link step
         # Fill in the rows from the initial data
         for attr, configs in data.by_attr.items():
             for config in configs:
