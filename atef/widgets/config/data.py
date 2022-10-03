@@ -1497,7 +1497,7 @@ class ValueSetWidget(DesignerDisplay, DataWidget):
         super().__init__(*args, **kwargs)
         # Fill in the rows from the initial data
         for value in self.bridge.values.get():
-            self.add_value_row(value)
+            self.add_value_row(value=value)
         # Allow the user to add more rows
         self.add_value_button.clicked.connect(self.add_value_row)
         # Make the table respond to drop events
