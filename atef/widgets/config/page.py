@@ -538,6 +538,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     def __init__(self, data: DeviceConfiguration, **kwargs):
         super().__init__(**kwargs)
         self.data = data
+        self.setup_done = False
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.name_desc_tags_widget = NameDescTagsWidget(data=data)
@@ -551,31 +552,32 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             self.device_config_widget,
             self.device_widget_placeholder,
         )
-        # TODO relocate these to link step
-        # Fill in the rows from the initial data
-        for attr, configs in data.by_attr.items():
-            for config in configs:
-                self.add_comparison_row(
-                    attr=attr,
-                    comparison=config,
-                )
-        for config in data.shared:
-            self.add_comparison_row(
-                attr='shared',
-                comparison=config,
-            )
-        # Allow the user to add more rows
-        self.add_comparison_button.clicked.connect(self.add_comparison_row)
-        # When the attrs update, update the allowed attrs in each row
-        self.device_config_widget.bridge.by_attr.updated.connect(
-            self.update_combo_attrs
-        )
-        self.device_config_widget.bridge.by_attr.updated.connect(
-            self.update_comparison_dicts
-        )
 
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
+        if not self.setup_done:
+            # Fill in the rows from the initial data
+            for attr, configs in self.data.by_attr.items():
+                for config in configs:
+                    self.add_comparison_row(
+                        attr=attr,
+                        comparison=config,
+                    )
+            for config in self.data.shared:
+                self.add_comparison_row(
+                    attr='shared',
+                    comparison=config,
+                )
+            # Allow the user to add more rows
+            self.add_comparison_button.clicked.connect(self.add_comparison_row)
+            # When the attrs update, update the allowed attrs in each row
+            self.device_config_widget.bridge.by_attr.updated.connect(
+                self.update_combo_attrs
+            )
+            self.device_config_widget.bridge.by_attr.updated.connect(
+                self.update_comparison_dicts
+            )
+            self.setup_done = True
         # Make sure the parent button is set up properly
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         # Make sure the node name updates appropriately
@@ -782,6 +784,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
     def __init__(self, data: PVConfiguration, **kwargs):
         super().__init__(**kwargs)
         self.data = data
+        self.setup_done = False
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.name_desc_tags_widget = NameDescTagsWidget(data=data)
@@ -795,30 +798,32 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             self.pv_configuration_widget,
             self.pv_widget_placeholder,
         )
-        # Fill in the rows from the initial data
-        for attr, configs in data.by_pv.items():
-            for config in configs:
-                self.add_comparison_row(
-                    attr=attr,
-                    comparison=config,
-                )
-        for config in data.shared:
-            self.add_comparison_row(
-                attr='shared',
-                comparison=config,
-            )
-        # Allow the user to add more rows
-        self.add_comparison_button.clicked.connect(self.add_comparison_row)
-        # When the attrs update, update the allowed attrs in each row
-        self.pv_configuration_widget.bridge.by_pv.updated.connect(
-            self.update_combo_attrs
-        )
-        self.pv_configuration_widget.bridge.by_pv.updated.connect(
-            self.update_comparison_dicts
-        )
 
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
+        if not self.setup_done:
+            # Fill in the rows from the initial data
+            for attr, configs in self.data.by_pv.items():
+                for config in configs:
+                    self.add_comparison_row(
+                        attr=attr,
+                        comparison=config,
+                    )
+            for config in self.data.shared:
+                self.add_comparison_row(
+                    attr='shared',
+                    comparison=config,
+                )
+            # Allow the user to add more rows
+            self.add_comparison_button.clicked.connect(self.add_comparison_row)
+            # When the attrs update, update the allowed attrs in each row
+            self.pv_configuration_widget.bridge.by_pv.updated.connect(
+                self.update_combo_attrs
+            )
+            self.pv_configuration_widget.bridge.by_pv.updated.connect(
+                self.update_comparison_dicts
+            )
+            self.setup_done = True
         # Make sure the parent button is set up properly
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         # Make sure the node name updates appropriately
@@ -1036,6 +1041,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
     def __init__(self, data: ToolConfiguration, **kwargs):
         super().__init__(**kwargs)
         self.data = data
+        self.setup_done = False
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.name_desc_tags_widget = NameDescTagsWidget(data=data)
@@ -1044,56 +1050,32 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             self.name_desc_tags_widget,
             self.name_desc_tags_placeholder,
         )
-        # Fill in the rows from the initial data
-        for attr, configs in data.by_attr.items():
-            for config in configs:
-                self.add_comparison_row(
-                    attr=attr,
-                    comparison=config,
-                )
-        for config in data.shared:
-            self.add_comparison_row(
-                attr='shared',
-                comparison=config,
-            )
-        # Allow the user to add more rows
-        self.add_comparison_button.clicked.connect(self.add_comparison_row)
-        # Set up our specific tool handling (must be after filling rows)
-        self.new_tool(data.tool)
-        self.tool_names = {}
-        for tool in self.tool_map:
-            self.tool_select_combo.addItem(tool.__name__)
-            self.tool_names[tool.__name__] = tool
-        self.tool_select_combo.activated.connect(self.new_tool_selected)
-
-    def new_tool(self, tool: Tool):
-        # Replace the tool data structure
-        self.data.tool = tool
-        # Look up our tool
-        _, widget_type = self.tool_map[type(tool)]
-        # Create a new tool widget and place it
-        new_widget = widget_type(data=tool)
-        self.insert_widget(
-            new_widget,
-            self.tool_placeholder,
-        )
-        # Replace reference to old tool widget
-        self.tool_widget = new_widget
-        # Set by_attr correctly to match the result type
-        # Also migrates lost comparisons to shared
-        self.update_comparison_dicts()
-        # Update the selection choices to match the tool
-        self.update_combo_attrs()
-
-    def new_tool_selected(self, tool_name: str):
-        tool_type = self.tool_names[tool_name]
-        if isinstance(self.data.tool, tool_type):
-            return
-        new_tool = tool_type()
-        self.new_tool_widget(new_tool)
 
     def assign_tree_item(self, item: AtefItem):
         super().assign_tree_item(item)
+        if not self.setup_done:
+            # Fill in the rows from the initial data
+            for attr, configs in self.data.by_attr.items():
+                for config in configs:
+                    self.add_comparison_row(
+                        attr=attr,
+                        comparison=config,
+                    )
+            for config in self.data.shared:
+                self.add_comparison_row(
+                    attr='shared',
+                    comparison=config,
+                )
+            # Allow the user to add more rows
+            self.add_comparison_button.clicked.connect(self.add_comparison_row)
+            # Set up our specific tool handling (must be after filling rows)
+            self.new_tool(self.data.tool)
+            self.tool_names = {}
+            for tool in self.tool_map:
+                self.tool_select_combo.addItem(tool.__name__)
+                self.tool_names[tool.__name__] = tool
+            self.tool_select_combo.activated.connect(self.new_tool_selected)
+            self.setup_done = True
         # Make sure the parent button is set up properly
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         # Make sure the node name updates appropriately
@@ -1284,6 +1266,32 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         self.comparisons_table.setCellWidget(found_row, 0, comp_row)
         self.update_combo_attrs()
         comp_row.attr_combo.setCurrentIndex(prev_attr_index)
+
+    def new_tool(self, tool: Tool):
+        # Replace the tool data structure
+        self.data.tool = tool
+        # Look up our tool
+        _, widget_type = self.tool_map[type(tool)]
+        # Create a new tool widget and place it
+        new_widget = widget_type(data=tool)
+        self.insert_widget(
+            new_widget,
+            self.tool_placeholder,
+        )
+        # Replace reference to old tool widget
+        self.tool_widget = new_widget
+        # Set by_attr correctly to match the result type
+        # Also migrates lost comparisons to shared
+        self.update_comparison_dicts()
+        # Update the selection choices to match the tool
+        self.update_combo_attrs()
+
+    def new_tool_selected(self, tool_name: str):
+        tool_type = self.tool_names[tool_name]
+        if isinstance(self.data.tool, tool_type):
+            return
+        new_tool = tool_type()
+        self.new_tool_widget(new_tool)
 
 
 PAGE_MAP = {
