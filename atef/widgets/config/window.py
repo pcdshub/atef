@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import os.path
 from pprint import pprint
 from typing import Optional
@@ -169,6 +170,8 @@ class Window(DesignerDisplay, QMainWindow):
         try:
             with open(filename, 'w') as fd:
                 json.dump(serialized, fd, indent=2)
+                # Ends file on newline as per pre-commit
+                fd.write('\n')
         except OSError:
             logger.exception(f'Error saving file {filename}')
         else:
