@@ -470,7 +470,7 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         value = value if value is not None else ''
         name_item.setText(name)
         value_item = QTableWidgetItem()
-        value_item.setText(value)
+        value_item.setText(str(value))
         type_readback_widget = QLabel()
         self.values_table.setItem(new_row, 0, name_item)
         self.values_table.setItem(new_row, 1, value_item)
