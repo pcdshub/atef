@@ -1735,7 +1735,7 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
         super().__init__(*args, **kwargs)
         # Fill the table
         for comparison in self.bridge.comparisons.get():
-            self.add_comparison(comparison)
+            self.add_comparison(comparison=comparison)
         # Make the create row button work
         self.add_comparison_button.clicked.connect(self.add_comparison)
         self.resize_comparisons_table()
