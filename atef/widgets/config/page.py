@@ -468,7 +468,14 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         """
         Make sure that the whole row widget is visible.
         """
-        self.config_table.setColumnWidth(0, self.config_table.width() - 10)
+        self.config_table.setColumnWidth(0, self.config_table.width())
+
+    def showEvent(self, *args, **kwargs) -> None:
+        """
+        Override showEvent to update the table column width on first show.
+        """
+        self.resize_config_table()
+        return super().showEvent(*args, **kwargs)
 
     def resizeEvent(self, *args, **kwargs) -> None:
         """
@@ -648,8 +655,15 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         """
         self.comparisons_table.setColumnWidth(
             0,
-            self.comparisons_table.width() - 10
+            self.comparisons_table.width()
         )
+
+    def showEvent(self, *args, **kwargs) -> None:
+        """
+        Override showEvent to update the table column width on first show.
+        """
+        self.resize_comparisons_table()
+        return super().showEvent(*args, **kwargs)
 
     def resizeEvent(self, *args, **kwargs) -> None:
         """
@@ -896,8 +910,15 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         """
         self.comparisons_table.setColumnWidth(
             0,
-            self.comparisons_table.width() - 10
+            self.comparisons_table.width()
         )
+
+    def showEvent(self, *args, **kwargs) -> None:
+        """
+        Override showEvent to update the table column width on first show.
+        """
+        self.resize_comparisons_table()
+        return super().showEvent(*args, **kwargs)
 
     def resizeEvent(self, *args, **kwargs) -> None:
         """
@@ -1148,8 +1169,15 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         """
         self.comparisons_table.setColumnWidth(
             0,
-            self.comparisons_table.width() - 10
+            self.comparisons_table.width()
         )
+
+    def showEvent(self, *args, **kwargs) -> None:
+        """
+        Override showEvent to update the table column width on first show.
+        """
+        self.resize_comparisons_table()
+        return super().showEvent(*args, **kwargs)
 
     def resizeEvent(self, *args, **kwargs) -> None:
         """
