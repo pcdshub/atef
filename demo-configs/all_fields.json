@@ -238,69 +238,52 @@
             "EPICS"
           ],
           "by_pv": {
-            "IM2K0:XTES:MMS.RBV": []
+            "IM2K0:XTES:MMS.RBV": [
+              {
+                "ValueSet": {
+                  "name": "ValueSet",
+                  "description": "Set a severity for each different position the target can be in",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": false,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "values": [
+                    {
+                      "value": 1,
+                      "description": "Integer representing OUT",
+                      "rtol": null,
+                      "atol": null,
+                      "severity": 0
+                    },
+                    {
+                      "value": 2,
+                      "description": "Integer representing YAG",
+                      "rtol": null,
+                      "atol": null,
+                      "severity": 1
+                    },
+                    {
+                      "value": 3,
+                      "description": "Integer representing DIAMOND",
+                      "rtol": null,
+                      "atol": null,
+                      "severity": 1
+                    },
+                    {
+                      "value": 4,
+                      "description": "Integer representing RETICLE",
+                      "rtol": null,
+                      "atol": null,
+                      "severity": 2
+                    }
+                  ]
+                }
+              }
+            ]
           },
           "shared": [
-            {
-              "ValueSet": {
-                "name": "ValueSet",
-                "description": "Set a severity for each different position the target can be in",
-                "invert": false,
-                "reduce_period": null,
-                "reduce_method": "average",
-                "string": false,
-                "severity_on_failure": 2,
-                "if_disconnected": 2,
-                "values": [
-                  {
-                    "value": 1,
-                    "description": "Integer representing OUT",
-                    "rtol": null,
-                    "atol": null,
-                    "severity": 0
-                  },
-                  {
-                    "value": 2,
-                    "description": "Integer representing YAG",
-                    "rtol": null,
-                    "atol": null,
-                    "severity": 1
-                  },
-                  {
-                    "value": 3,
-                    "description": "Integer representing DIAMOND",
-                    "rtol": null,
-                    "atol": null,
-                    "severity": 1
-                  },
-                  {
-                    "value": 4,
-                    "description": "Integer representing RETICLE",
-                    "rtol": null,
-                    "atol": null,
-                    "severity": 2
-                  }
-                ]
-              }
-            },
-            {
-              "AnyValue": {
-                "name": "AnyValue",
-                "description": "Pass if the state isn't Unknown",
-                "invert": false,
-                "reduce_period": null,
-                "reduce_method": "average",
-                "string": true,
-                "severity_on_failure": 2,
-                "if_disconnected": 2,
-                "values": [
-                  "DIAMOND",
-                  "OUT",
-                  "RETICLE",
-                  "YAG"
-                ]
-              }
-            },
             {
               "AnyComparison": {
                 "name": "AnyComparison",
@@ -381,6 +364,24 @@
                       ]
                     }
                   }
+                ]
+              }
+            },
+            {
+              "AnyValue": {
+                "name": "AnyValue",
+                "description": "Pass if the state isn't Unknown",
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": true,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "values": [
+                  "DIAMOND",
+                  "OUT",
+                  "RETICLE",
+                  "YAG"
                 ]
               }
             }
