@@ -522,7 +522,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             selected_row = selected_indices[0].row()
             dest_row = self.config_table.indexAt(event.pos()).row()
             if dest_row == -1:
-                dest_row = self.config_table.rowCount()
+                dest_row = self.config_table.rowCount() - 1
             self.move_config_row(selected_row, dest_row)
 
 
