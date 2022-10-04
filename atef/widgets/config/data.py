@@ -1571,19 +1571,6 @@ class ValueSetWidget(DesignerDisplay, DataWidget):
         # Remove configuration from the data structure
         self.bridge.values.remove_value(data)
 
-    def resize_value_table(self):
-        """
-        Make sure that the whole row widget is visible.
-        """
-        self.value_table.setColumnWidth(0, self.value_table.width() - 10)
-
-    def resizeEvent(self, *args, **kwargs) -> None:
-        """
-        Override resizeEvent to update the table column width when we resize.
-        """
-        self.resize_value_table()
-        return super().resizeEvent(*args, **kwargs)
-
     def move_config_row(self, source: int, dest: int):
         """
         Move the row at index source to index dest.
@@ -1757,7 +1744,6 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
             self.add_comparison(comparison=comparison)
         # Make the create row button work
         self.add_comparison_button.clicked.connect(self.add_comparison)
-        self.resize_comparisons_table()
 
     def add_comparison(
         self,
@@ -1840,19 +1826,3 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
             return elem.name
 
         self.bridge.comparisons.put(sorted(unsorted, key=get_sort_key))
-
-    def resize_comparisons_table(self):
-        """
-        Make sure that the whole row widget is visible.
-        """
-        self.comparisons_table.setColumnWidth(
-            0,
-            self.comparisons_table.width() - 10
-        )
-
-    def resizeEvent(self, *args, **kwargs) -> None:
-        """
-        Override resizeEvent to update the table column width when we resize.
-        """
-        self.resize_comparisons_table()
-        return super().resizeEvent(*args, **kwargs)

@@ -464,26 +464,6 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     def remove_table_data(self, data: Configuration):
         self.data.configs.remove(data)
 
-    def resize_config_table(self):
-        """
-        Make sure that the whole row widget is visible.
-        """
-        self.config_table.setColumnWidth(0, self.config_table.width())
-
-    def showEvent(self, *args, **kwargs) -> None:
-        """
-        Override showEvent to update the table column width on first show.
-        """
-        self.resize_config_table()
-        return super().showEvent(*args, **kwargs)
-
-    def resizeEvent(self, *args, **kwargs) -> None:
-        """
-        Override resizeEvent to update the table column width when we resize.
-        """
-        self.resize_config_table()
-        return super().resizeEvent(*args, **kwargs)
-
     def move_config_row(self, source: int, dest: int):
         """
         Move the row at index source to index dest.
@@ -648,29 +628,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                     pass
                 else:
                     break
-
-    def resize_comparisons_table(self):
-        """
-        Make sure that the whole row widget is visible.
-        """
-        self.comparisons_table.setColumnWidth(
-            0,
-            self.comparisons_table.width()
-        )
-
-    def showEvent(self, *args, **kwargs) -> None:
-        """
-        Override showEvent to update the table column width on first show.
-        """
-        self.resize_comparisons_table()
-        return super().showEvent(*args, **kwargs)
-
-    def resizeEvent(self, *args, **kwargs) -> None:
-        """
-        Override resizeEvent to update the table column width when we resize.
-        """
-        self.resize_comparisons_table()
-        return super().resizeEvent(*args, **kwargs)
 
     def update_combo_attrs(self):
         """
@@ -874,7 +831,6 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         self.comparisons_table.insertRow(row_count)
         self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
         self.comparisons_table.setCellWidget(row_count, 0, comp_row)
-        self.resize_comparisons_table()
 
     def setup_row_buttons(
         self,
@@ -903,29 +859,6 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                     pass
                 else:
                     break
-
-    def resize_comparisons_table(self):
-        """
-        Make sure that the whole row widget is visible.
-        """
-        self.comparisons_table.setColumnWidth(
-            0,
-            self.comparisons_table.width()
-        )
-
-    def showEvent(self, *args, **kwargs) -> None:
-        """
-        Override showEvent to update the table column width on first show.
-        """
-        self.resize_comparisons_table()
-        return super().showEvent(*args, **kwargs)
-
-    def resizeEvent(self, *args, **kwargs) -> None:
-        """
-        Override resizeEvent to update the table column width when we resize.
-        """
-        self.resize_comparisons_table()
-        return super().resizeEvent(*args, **kwargs)
 
     def update_combo_attrs(self):
         """
@@ -1162,29 +1095,6 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                     pass
                 else:
                     break
-
-    def resize_comparisons_table(self):
-        """
-        Make sure that the whole row widget is visible.
-        """
-        self.comparisons_table.setColumnWidth(
-            0,
-            self.comparisons_table.width()
-        )
-
-    def showEvent(self, *args, **kwargs) -> None:
-        """
-        Override showEvent to update the table column width on first show.
-        """
-        self.resize_comparisons_table()
-        return super().showEvent(*args, **kwargs)
-
-    def resizeEvent(self, *args, **kwargs) -> None:
-        """
-        Override resizeEvent to update the table column width when we resize.
-        """
-        self.resize_comparisons_table()
-        return super().resizeEvent(*args, **kwargs)
 
     def update_combo_attrs(self):
         """

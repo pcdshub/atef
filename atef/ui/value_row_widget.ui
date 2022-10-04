@@ -29,42 +29,8 @@
    <property name="verticalSpacing">
     <number>3</number>
    </property>
-   <item row="1" column="0">
-    <widget class="QLineEdit" name="value_edit">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-       <horstretch>5</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="5" rowspan="2">
-    <widget class="QToolButton" name="delete_button">
-     <property name="text">
-      <string>...</string>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="3">
-    <widget class="QLineEdit" name="atol_edit">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-       <horstretch>2</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-    </widget>
-   </item>
    <item row="0" column="1">
     <widget class="QComboBox" name="data_type_combo"/>
-   </item>
-   <item row="0" column="4">
-    <widget class="QLabel" name="label_4">
-     <property name="text">
-      <string>Severity on match:</string>
-     </property>
-    </widget>
    </item>
    <item row="1" column="3">
     <widget class="QLineEdit" name="rtol_edit">
@@ -76,20 +42,23 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="1">
-    <widget class="QLabel" name="range_label">
+   <item row="0" column="4">
+    <widget class="QLabel" name="label_4">
      <property name="text">
-      <string>+- indicator</string>
+      <string>Severity on match:</string>
      </property>
     </widget>
    </item>
    <item row="1" column="4">
     <widget class="QComboBox" name="severity_combo"/>
    </item>
-   <item row="0" column="2">
-    <widget class="QLabel" name="atol_label">
-     <property name="text">
-      <string>atol</string>
+   <item row="1" column="0">
+    <widget class="QLineEdit" name="value_edit">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+       <horstretch>5</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
      </property>
     </widget>
    </item>
@@ -106,32 +75,41 @@
      </property>
     </widget>
    </item>
+   <item row="0" column="2">
+    <widget class="QLabel" name="atol_label">
+     <property name="text">
+      <string>atol</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="3">
+    <widget class="QLineEdit" name="atol_edit">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+       <horstretch>2</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QLabel" name="range_label">
+     <property name="text">
+      <string>+- indicator</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="5" rowspan="2">
+    <widget class="QToolButton" name="delete_button">
+     <property name="text">
+      <string>...</string>
+     </property>
+    </widget>
+   </item>
    <item row="1" column="2">
     <widget class="QLabel" name="rtol_label">
      <property name="text">
       <string>rtol</string>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="6" rowspan="2">
-    <widget class="QWidget" name="widget" native="true">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="minimumSize">
-      <size>
-       <width>10</width>
-       <height>0</height>
-      </size>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>10</width>
-       <height>16777215</height>
-      </size>
      </property>
     </widget>
    </item>
