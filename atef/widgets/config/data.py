@@ -491,6 +491,7 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         value_item = QTableWidgetItem()
         value_item.setText(str(value))
         type_readback_widget = QLabel()
+        type_readback_widget.setMargin(3)
         self.values_table.setItem(new_row, 0, name_item)
         self.values_table.setItem(new_row, 1, value_item)
         self.values_table.setCellWidget(new_row, 2, type_readback_widget)
@@ -1657,6 +1658,7 @@ class AnyValueWidget(DesignerDisplay, DataWidget):
         value_item = QTableWidgetItem()
         value_item.setText(value)
         type_readback_widget = QLabel()
+        type_readback_widget.setMargin(3)
         self.values_table.setItem(new_row, 0, value_item)
         self.values_table.setCellWidget(new_row, 1, type_readback_widget)
         self.adding_new_row = False
