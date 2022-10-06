@@ -187,14 +187,14 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
     window = Window(show_welcome=False)
     qtbot.add_widget(window)
     test_configs = pathlib.Path(__file__).parent / 'configs'
-    for config_path in test_configs.iterdir():
-        if config_path.is_file() and config_path.suffix == '.json':
-            source = str(config_path)
-            dest = str(tmp_path / config_path.name)
-            window.open_file(filename=source)
-            window.save_as(filename=dest)
-            with open(source, 'r') as fd:
-                source_lines = fd.readlines()
-            with open(dest, 'r') as fd:
-                dest_lines = fd.readlines()
-            assert source_lines == dest_lines
+    for filename in ('lfe.json', 'all_fields.json'):
+        config_path = test_configs / filename
+        source = str(config_path)
+        dest = str(tmp_path / filename)
+        window.open_file(filename=source)
+        window.save_as(filename=dest)
+        with open(source, 'r') as fd:
+            source_lines = fd.readlines()
+        with open(dest, 'r') as fd:
+            dest_lines = fd.readlines()
+        assert source_lines == dest_lines
