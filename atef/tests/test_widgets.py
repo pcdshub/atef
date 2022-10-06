@@ -4,6 +4,7 @@ import pathlib
 import apischema
 import pytest
 import yaml
+from pytestqt.qtbot import QtBot
 
 from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
                          ProcedureStep, PydmDisplayStep, TyphosDisplayStep)
@@ -169,7 +170,31 @@ def test_create_widget(request: pytest.FixtureRequest, group: ProcedureStep):
     widget.deleteLater()
 
 
-@pytest.mark.xfail(reason="Configuration GUI rework in progress")
-def test_config_window_basic():
-    from ..widgets.config import Window
-    Window()
+def test_config_window_basic(qtbot: QtBot):
+    """
+    Pass if the config gui can open
+    """
+    from ..widgets.config.window import Window
+    window = Window()
+    qtbot.add_widget(window)
+
+
+def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
+    """
+    Pass if the config gui can open a file and save the same file back
+    """
+    from ..widgets.config.window import Window
+    window = Window(show_welcome=False)
+    qtbot.add_widget(window)
+    test_configs = pathlib.Path(__file__).parent / 'configs'
+    for config_path in test_configs.iterdir():
+        if config_path.is_file() and config_path.suffix == '.json':
+            source = str(config_path)
+            dest = str(tmp_path / config_path.name)
+            window.open_file(filename=source)
+            window.save_as(filename=dest)
+            with open(source, 'r') as fd:
+                source_lines = fd.readlines()
+            with open(dest, 'r') as fd:
+                dest_lines = fd.readlines()
+            assert source_lines == dest_lines
