@@ -62,7 +62,7 @@ class StringListWithDialog(DesignerDisplay, QWidget):
         self.allow_duplicates = allow_duplicates
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         starting_list = self.data_list.get()
         for starting_value in starting_list or []:
             self._add_item(starting_value, init=True)
@@ -220,7 +220,7 @@ class StringListWithDialog(DesignerDisplay, QWidget):
             else:
                 self._edit_item(old, new)
 
-    def _show_context_menu(self, pos: QPoint):
+    def _show_context_menu(self, pos: QPoint) -> None:
         """
         Displays a context menu that provides copy & remove actions
         to the user
@@ -257,12 +257,12 @@ class DeviceListWidget(StringListWithDialog):
 
     _search_widget: Optional[HappiDeviceComponentWidget] = None
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         super()._setup_ui()
         self.item_add_request.connect(self._open_device_chooser)
         self.item_edit_request.connect(self._open_device_chooser)
 
-    def _open_device_chooser(self, to_select: Optional[List[str]] = None):
+    def _open_device_chooser(self, to_select: Optional[List[str]] = None) -> None:
         """
         Hook: User requested adding/editing an existing device.
 
@@ -304,12 +304,12 @@ class ComponentListWidget(StringListWithDialog):
         self.get_device_list = get_device_list
         super().__init__(data_list=data_list, allow_duplicates=allow_duplicates, **kwargs)
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         super()._setup_ui()
         self.item_add_request.connect(self._open_component_chooser)
         self.item_edit_request.connect(self._open_component_chooser)
 
-    def _open_component_chooser(self, to_select: Optional[List[str]] = None):
+    def _open_component_chooser(self, to_select: Optional[List[str]] = None) -> None:
         """
         Hook: User requested adding/editing a componen.
 
@@ -406,12 +406,12 @@ class BulkListWidget(StringListWithDialog):
     String list widget that uses a multi-line text box for entry and edit.
     """
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         super()._setup_ui()
         self.item_add_request.connect(self._open_multiline)
         self.item_edit_request.connect(self._open_multiline)
 
-    def _open_multiline(self, to_select: Optional[List[str]] = None):
+    def _open_multiline(self, to_select: Optional[List[str]] = None) -> None:
         """
         User requested adding new strings or editing existing ones.
 

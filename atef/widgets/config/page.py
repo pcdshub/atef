@@ -45,7 +45,7 @@ from .data import (AnyComparisonWidget, AnyValueWidget, ComparisonRowWidget,
 from .utils import cast_dataclass, describe_comparison_context
 
 
-def link_page(item: AtefItem, widget: PageWidget):
+def link_page(item: AtefItem, widget: PageWidget) -> None:
     """
     Link a page widget to an atef tree item.
 
@@ -158,7 +158,7 @@ class PageWidget(QWidget):
         self.child_button_map = WeakValueDictionary()
         self.has_connected_tree = False
 
-    def assign_tree_item(self, item: AtefItem):
+    def assign_tree_item(self, item: AtefItem) -> None:
         """
         Updates this page with references to the tree.
 
@@ -181,7 +181,7 @@ class PageWidget(QWidget):
         self,
         item: QTreeWidgetItem,
         **kwargs,
-    ):
+    ) -> None:
         """
         Update the parent tooltip if our parent's name changes.
         """
@@ -190,7 +190,7 @@ class PageWidget(QWidget):
         if item is self.parent_tree_item:
             self.update_parent_tooltip()
 
-    def update_parent_tooltip(self):
+    def update_parent_tooltip(self) -> None:
         """
         Ensure that the to-parent tooltip is updated, accurate, and helpful.
         """
@@ -203,7 +203,7 @@ class PageWidget(QWidget):
             f"({nav_parent.text(1)})"
         )
 
-    def setup_parent_button(self, button: QToolButton):
+    def setup_parent_button(self, button: QToolButton) -> None:
         """
         Set up a button's style and make it navigate to our parent page.
 
@@ -219,7 +219,7 @@ class PageWidget(QWidget):
         # Make sure the button's starting tooltip is correct
         self.update_parent_tooltip()
 
-    def setup_child_button(self, button: QToolButton, item: AtefItem):
+    def setup_child_button(self, button: QToolButton, item: AtefItem) -> None:
         """
         Set up a button's style and make it navigate to a specific child page.
         """
@@ -237,7 +237,7 @@ class PageWidget(QWidget):
             f"Navigate to child {item.text(1)}"
         )
 
-    def navigate_to(self, item: AtefItem, *args, **kwargs):
+    def navigate_to(self, item: AtefItem, *args, **kwargs) -> None:
         """
         Make the tree switch to a specific item.
 
@@ -250,7 +250,7 @@ class PageWidget(QWidget):
         """
         self.full_tree.setCurrentItem(item)
 
-    def navigate_to_parent(self, *args, **kwargs):
+    def navigate_to_parent(self, *args, **kwargs) -> None:
         """
         Make the tree switch to this widget's parent in the tree.
         """
@@ -270,7 +270,7 @@ class PageWidget(QWidget):
         else:
             return self.full_tree.topLevelItem(0)
 
-    def insert_widget(self, widget: QWidget, placeholder: QWidget):
+    def insert_widget(self, widget: QWidget, placeholder: QWidget) -> None:
         """
         Helper function for slotting e.g. data widgets into placeholders.
         """
@@ -285,13 +285,13 @@ class PageWidget(QWidget):
                 old_widget.deleteLater()
         placeholder.layout().addWidget(widget)
 
-    def connect_tree_node_name(self, widget: DataWidget):
+    def connect_tree_node_name(self, widget: DataWidget) -> None:
         """
         Helper function for causing the tree name to update when name updates.
         """
         widget.bridge.name.changed_value.connect(self.set_new_node_name)
 
-    def set_new_node_name(self, name: str):
+    def set_new_node_name(self, name: str) -> None:
         """
         Change the name of our node in the tree widget.
         """
@@ -302,7 +302,7 @@ class PageWidget(QWidget):
         table: QTableWidget,
         item: AtefItem,
         row: DataWidget,
-    ):
+    ) -> None:
         """
         Configure a row's delete button to delete itself.
         """
@@ -323,7 +323,7 @@ class PageWidget(QWidget):
         table: QTableWidget,
         item: AtefItem,
         row: DataWidget,
-    ):
+    ) -> None:
         """
         Delete a row from the table and unlink the corresponding item nodes.
         """
@@ -352,7 +352,7 @@ class PageWidget(QWidget):
         # Remove configuration from the data structure
         self.remove_table_data(data)
 
-    def remove_table_data(self, data: Any):
+    def remove_table_data(self, data: Any) -> None:
         """
         Implement in subclass to remove the data after delete_table_row.
         """
@@ -405,7 +405,10 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             self.add_row_type_combo.addItem(option)
         self.config_table.dropEvent = self.table_drop_event
 
-    def assign_tree_item(self, item: AtefItem):
+    def assign_tree_item(self, item: AtefItem) -> None:
+        """
+        Link-time setup of existing sub-nodes and navigation.
+        """
         super().assign_tree_item(item)
         if not self.setup_done:
             # Fill in the rows from the initial data
@@ -422,7 +425,22 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         checked: bool = False,
         config: Optional[Configuration] = None,
         **kwargs,
-    ):
+    ) -> None:
+        """
+        Add a new row to the configuration table.
+
+        This also creates a Configuration instance if necessary, creates
+        the corresponding page, and does all the related setup.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument.
+        config : Configuration, optional
+            The configuration to add. If omitted, we'll create a blank
+            configuration of the selected type from the add_row_type_combo.
+        """
         if config is None:
             # New configuration
             config = self.config_cls_options[
@@ -450,7 +468,17 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         self,
         config_row: ConfigurationGroupRowWidget,
         config_item: AtefItem,
-    ):
+    ) -> None:
+        """
+        Make the child navigation and delete buttons work on a specific row.
+
+        Parameters
+        ----------
+        config_row : ConfigurationGroupRowWidget
+            The row widget to do the setup on.
+        config_item : AtefItem
+            The item corresponding to the page associated with the row widget.
+        """
         self.setup_child_button(
             button=config_row.child_button,
             item=config_item,
@@ -461,10 +489,13 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             row=config_row,
         )
 
-    def remove_table_data(self, data: Configuration):
+    def remove_table_data(self, data: Configuration) -> None:
+        """
+        Remove the data associated with a given configuration.
+        """
         self.data.configs.remove(data)
 
-    def move_config_row(self, source: int, dest: int):
+    def move_config_row(self, source: int, dest: int) -> None:
         """
         Move the row at index source to index dest.
 
@@ -489,7 +520,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         self.config_table.setRowHeight(dest, config_row.sizeHint().height())
         self.config_table.setCellWidget(dest, 0, config_row)
 
-    def table_drop_event(self, event: QDropEvent):
+    def table_drop_event(self, event: QDropEvent) -> None:
         """
         Monkeypatch onto the table to allow us to drag/drop rows.
 
@@ -540,7 +571,10 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             self.device_widget_placeholder,
         )
 
-    def assign_tree_item(self, item: AtefItem):
+    def assign_tree_item(self, item: AtefItem) -> None:
+        """
+        Link-time setup of existing sub-nodes and navigation.
+        """
         super().assign_tree_item(item)
         if not self.setup_done:
             # Fill in the rows from the initial data
@@ -575,7 +609,24 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         checked: bool = False,
         attr: str = '',
         comparison: Optional[Comparison] = None,
-    ):
+    ) -> None:
+        """
+        Add a new row to the comparison table.
+
+        This also creates a default Equals instance if necessary, creates
+        the corresponding page, and does all the related setup.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument.
+        attr : str, optional
+            The signal attr name associated with this comparison.
+        config : Comparison, optional
+            The comparison to add. If omitted, we'll create a blank
+            Equals comparison.
+        """
         if comparison is None:
             # New comparison
             comparison = Equals(name='untitled')
@@ -605,7 +656,17 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         self,
         comp_row: ComparisonRowWidget,
         comp_item: AtefItem,
-    ):
+    ) -> None:
+        """
+        Make the child navigation and delete buttons work on a specific row.
+
+        Parameters
+        ----------
+        comp_row : ConfigurationGroupRowWidget
+            The row widget to do the setup on.
+        comp_item : AtefItem
+            The item corresponding to the page associated with the row widget.
+        """
         self.setup_child_button(
             button=comp_row.child_button,
             item=comp_item,
@@ -616,7 +677,10 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             row=comp_row,
         )
 
-    def remove_table_data(self, data: Comparison):
+    def remove_table_data(self, data: Comparison) -> None:
+        """
+        Remove the data associated with a given configuration.
+        """
         # This could be in several different places!
         try:
             self.data.shared.remove(data)
@@ -629,7 +693,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                 else:
                     break
 
-    def update_combo_attrs(self):
+    def update_combo_attrs(self) -> None:
         """
         For every row combobox, set the allowed values.
         """
@@ -647,7 +711,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                 # Should be shared
                 combo.setCurrentIndex(combo.count() - 1)
 
-    def update_comparison_dicts(self, *args, **kwargs):
+    def update_comparison_dicts(self, *args, **kwargs) -> None:
         """
         Rebuild by_attr and shared when user changes anything
         """
@@ -682,7 +746,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         old_comparison: Comparison,
         new_comparison: Comparison,
         comp_item: AtefItem,
-    ):
+    ) -> None:
         """
         Find old_comparison and replace it with new_comparison.
 
@@ -771,7 +835,10 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             self.pv_widget_placeholder,
         )
 
-    def assign_tree_item(self, item: AtefItem):
+    def assign_tree_item(self, item: AtefItem) -> None:
+        """
+        Link-time setup of existing sub-nodes and navigation.
+        """
         super().assign_tree_item(item)
         if not self.setup_done:
             # Fill in the rows from the initial data
@@ -807,6 +874,23 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         attr: str = '',
         comparison: Optional[Comparison] = None,
     ):
+        """
+        Add a new row to the comparison table.
+
+        This also creates a default Equals instance if necessary, creates
+        the corresponding page, and does all the related setup.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument.
+        attr : str, optional
+            The pv name associated with this comparison.
+        config : Comparison, optional
+            The comparison to add. If omitted, we'll create a blank
+            Equals comparison.
+        """
         if comparison is None:
             # New comparison
             comparison = Equals(name='untitled')
@@ -836,7 +920,17 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         self,
         comp_row: ComparisonRowWidget,
         comp_item: AtefItem,
-    ):
+    ) -> None:
+        """
+        Make the child navigation and delete buttons work on a specific row.
+
+        Parameters
+        ----------
+        comp_row : ConfigurationGroupRowWidget
+            The row widget to do the setup on.
+        comp_item : AtefItem
+            The item corresponding to the page associated with the row widget.
+        """
         self.setup_child_button(
             button=comp_row.child_button,
             item=comp_item,
@@ -847,7 +941,10 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             row=comp_row,
         )
 
-    def remove_table_data(self, data: Comparison):
+    def remove_table_data(self, data: Comparison) -> None:
+        """
+        Remove the data associated with a given configuration.
+        """
         # This could be in several different places!
         try:
             self.data.shared.remove(data)
@@ -860,7 +957,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                 else:
                     break
 
-    def update_combo_attrs(self):
+    def update_combo_attrs(self) -> None:
         """
         For every row combobox, set the allowed values.
         """
@@ -878,7 +975,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                 # Should be shared
                 combo.setCurrentIndex(combo.count() - 1)
 
-    def update_comparison_dicts(self, *args, **kwargs):
+    def update_comparison_dicts(self, *args, **kwargs) -> None:
         """
         Rebuild by_attr and shared when user changes anything
         """
@@ -913,7 +1010,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         old_comparison: Comparison,
         new_comparison: Comparison,
         comp_item: AtefItem,
-    ):
+    ) -> None:
         """
         Find old_comparison and replace it with new_comparison.
 
@@ -1007,7 +1104,10 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             self.name_desc_tags_placeholder,
         )
 
-    def assign_tree_item(self, item: AtefItem):
+    def assign_tree_item(self, item: AtefItem) -> None:
+        """
+        Link-time setup of existing sub-nodes and navigation.
+        """
         super().assign_tree_item(item)
         if not self.setup_done:
             # Fill in the rows from the initial data
@@ -1042,7 +1142,24 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         checked: bool = False,
         attr: str = '',
         comparison: Optional[Comparison] = None,
-    ):
+    ) -> None:
+        """
+        Add a new row to the comparison table.
+
+        This also creates a default Equals instance if necessary, creates
+        the corresponding page, and does all the related setup.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument.
+        attr : str, optional
+            The tool result attr name associated with this comparison.
+        config : Comparison, optional
+            The comparison to add. If omitted, we'll create a blank
+            Equals comparison.
+        """
         if comparison is None:
             # New comparison
             comparison = Equals(name='untitled')
@@ -1072,7 +1189,17 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         self,
         comp_row: ComparisonRowWidget,
         comp_item: AtefItem,
-    ):
+    ) -> None:
+        """
+        Make the child navigation and delete buttons work on a specific row.
+
+        Parameters
+        ----------
+        comp_row : ConfigurationGroupRowWidget
+            The row widget to do the setup on.
+        comp_item : AtefItem
+            The item corresponding to the page associated with the row widget.
+        """
         self.setup_child_button(
             button=comp_row.child_button,
             item=comp_item,
@@ -1083,7 +1210,10 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             row=comp_row,
         )
 
-    def remove_table_data(self, data: Comparison):
+    def remove_table_data(self, data: Comparison) -> None:
+        """
+        Remove the data associated with a given configuration.
+        """
         # This could be in several different places!
         try:
             self.data.shared.remove(data)
@@ -1096,7 +1226,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 else:
                     break
 
-    def update_combo_attrs(self):
+    def update_combo_attrs(self) -> None:
         """
         For every row combobox, set the allowed values.
         """
@@ -1114,7 +1244,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 # Should be shared
                 combo.setCurrentIndex(combo.count() - 1)
 
-    def update_comparison_dicts(self, *args, **kwargs):
+    def update_comparison_dicts(self, *args, **kwargs) -> None:
         """
         Rebuild by_attr and shared when user changes anything
         """
@@ -1154,7 +1284,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         old_comparison: Comparison,
         new_comparison: Comparison,
         comp_item: AtefItem,
-    ):
+    ) -> None:
         """
         Find old_comparison and replace it with new_comparison.
 
@@ -1208,7 +1338,12 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         self.update_combo_attrs()
         comp_row.attr_combo.setCurrentIndex(prev_attr_index)
 
-    def new_tool(self, tool: Tool):
+    def new_tool(self, tool: Tool) -> None:
+        """
+        Replace the loaded tool (if applicable) with a new tool instance.
+
+        This will update the data class and the GUI widgets appropriately.
+        """
         # Replace the tool data structure
         self.data.tool = tool
         # Look up our tool
@@ -1227,7 +1362,10 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         # Update the selection choices to match the tool
         self.update_combo_attrs()
 
-    def new_tool_selected(self, tool_name: str):
+    def new_tool_selected(self, tool_name: str) -> None:
+        """
+        Slot for when the user selects a new tool type from the combo box.
+        """
         tool_type = self.tool_names[tool_name]
         if isinstance(self.data.tool, tool_type):
             return
@@ -1293,7 +1431,10 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.new_comparison(comparison=data)
         self.specific_combo.activated.connect(self.select_comparison_type)
 
-    def assign_tree_item(self, item: AtefItem):
+    def assign_tree_item(self, item: AtefItem) -> None:
+        """
+        Link-time setup of existing sub-nodes and navigation.
+        """
         super().assign_tree_item(item)
         # Make sure the parent button is set up properly
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
@@ -1304,7 +1445,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         if isinstance(self.data, AnyComparison):
             self.setup_any_comparison()
 
-    def new_comparison(self, comparison: Comparison):
+    def new_comparison(self, comparison: Comparison) -> None:
         """
         Set up the widgets for a new comparison and save it as self.data.
 
@@ -1359,7 +1500,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                 QSizePolicy.Expanding,
             )
 
-    def select_comparison_type(self, new_type_index: int):
+    def select_comparison_type(self, new_type_index: int) -> None:
         """
         The user wants to change to a different comparison type.
 
@@ -1402,10 +1543,19 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.update_context()
 
     def showEvent(self, *args, **kwargs) -> None:
+        """
+        Whenever the page is shown, update the context text.
+        """
         self.update_context()
         return super().showEvent(*args, **kwargs)
 
-    def update_context(self):
+    def update_context(self) -> None:
+        """
+        Update the context text in the top right of the page.
+
+        This will then have information about which signals, PVs, or
+        other data is being compared against.
+        """
         parent_widget = self.parent_tree_item.widget
         if isinstance(parent_widget, ComparisonPage):
             parent_widget.update_context()
@@ -1429,7 +1579,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         desc = describe_comparison_context(attr=attr, config=config)
         self.name_desc_tags_widget.extra_text_label.setText(desc)
 
-    def setup_any_comparison(self):
+    def setup_any_comparison(self) -> None:
         """
         Special setup for when an AnyComparison is added.
 
@@ -1445,7 +1595,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             self.update_subpages,
         )
 
-    def update_subpages(self):
+    def update_subpages(self) -> None:
         """
         Update nodes based on the current AnyComparison state.
 
@@ -1491,6 +1641,9 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             self.full_tree.setCurrentItem(new_item)
 
     def add_sub_comparison_node(self, comparison: Comparison) -> AtefItem:
+        """
+        For the AnyComparison, add a sub-comparison.
+        """
         page = ComparisonPage(data=comparison)
         item = AtefItem(
             tree_parent=self.tree_item,
@@ -1509,7 +1662,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         old_comparison: Comparison,
         new_comparison: Comparison,
         comp_item: AtefItem,
-    ):
+    ) -> None:
         """
         Find old_comparison and replace it with new_comparison.
 
@@ -1544,7 +1697,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self,
         comparison: Comparison,
         item: AtefItem,
-    ):
+    ) -> None:
         """
         Find the row widget and set up the buttons.
 
@@ -1565,7 +1718,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             item=item,
         )
 
-    def clean_up_any_comparison(self):
+    def clean_up_any_comparison(self) -> None:
         """
         Special teardown for when an AnyComparison is removed.
 

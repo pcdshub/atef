@@ -83,7 +83,7 @@ class NameMixin:
     """
     Mixin class for distributing init_name
     """
-    def init_name(self):
+    def init_name(self) -> None:
         """
         Set up the name_edit widget appropriately.
         """
@@ -95,14 +95,14 @@ class NameMixin:
         self.name_edit.textEdited.connect(self.update_saved_name)
         self.bridge.name.changed_value.connect(self.apply_new_name)
 
-    def update_saved_name(self, name: str):
+    def update_saved_name(self, name: str) -> None:
         """
         When the user edits the name, write to the config.
         """
         self.last_name = self.name_edit.text()
         self.bridge.name.put(name)
 
-    def apply_new_name(self, text: str):
+    def apply_new_name(self, text: str) -> None:
         """
         If the text changed in the data, update the widget.
 
@@ -159,7 +159,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         else:
             self.init_tags()
 
-    def init_desc(self):
+    def init_desc(self) -> None:
         """
         Set up the desc_edit widget appropriately.
         """
@@ -172,14 +172,14 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         self.bridge.description.changed_value.connect(self.apply_new_desc)
         self.desc_edit.textChanged.connect(self.update_text_height)
 
-    def update_saved_desc(self):
+    def update_saved_desc(self) -> None:
         """
         When the user edits the desc, write to the config.
         """
         self.last_desc = self.desc_edit.toPlainText()
         self.bridge.description.put(self.last_desc)
 
-    def apply_new_desc(self, desc: str):
+    def apply_new_desc(self, desc: str) -> None:
         """
         When some other widget updates the description, update it here.
         """
@@ -206,14 +206,14 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
             pass
         return super().resizeEvent(*args, **kwargs)
 
-    def update_text_height(self):
+    def update_text_height(self) -> None:
         """
         When the user edits the desc, make the text box the correct height.
         """
         line_count = max(self.desc_edit.document().size().toSize().height(), 1)
         self.desc_edit.setFixedHeight(line_count * 13 + 12)
 
-    def init_tags(self):
+    def init_tags(self) -> None:
         """
         Set up the various tags widgets appropriately.
         """
@@ -223,7 +223,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         )
         self.tags_content.addWidget(tags_list)
 
-        def add_tag():
+        def add_tag() -> None:
             if tags_list.widgets and not tags_list.widgets[-1].line_edit.text().strip():
                 # Don't add another tag if we haven't filled out the last one
                 return
@@ -459,13 +459,13 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         self.values_table.cellChanged.connect(self.on_table_edit)
         self.del_value_button.clicked.connect(self.delete_selected_rows)
 
-    def update_mode_combo(self, mode: GroupResultMode, **kwargs):
+    def update_mode_combo(self, mode: GroupResultMode, **kwargs) -> None:
         """
         Take a mode from the bridge and use it to update the combobox.
         """
         self.mode_combo.setCurrentIndex(self.mode_indices[mode])
 
-    def update_mode_bridge(self, index: int, **kwargs):
+    def update_mode_bridge(self, index: int, **kwargs) -> None:
         """
         Take a user's combobox selection and use it to update the bridge.
         """
@@ -478,7 +478,21 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         value: Any = None,
         startup: bool = False,
         **kwargs,
-    ):
+    ) -> None:
+        """
+        Adds a new value to the global values table.
+
+        The default value is an empty string name with an empty string value.
+
+        Parameters
+        ----------
+        name : str, optional
+            The name to use for this global value.
+        value : Any, optional
+            The value to associate with the above name.
+        startup : bool, optional
+            Set to True if this is being added during widget initialization.
+        """
         self.adding_new_row = True
         self.values_label.show()
         self.values_table.show()
@@ -500,7 +514,14 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         if not startup:
             self.on_table_edit(new_row, 0)
 
-    def resize_table(self):
+    def resize_table(self) -> None:
+        """
+        Set the table to a fixed height to show the available rows.
+
+        This allows us to contract the table's size when there are few rows,
+        increase the size as we add rows, and set a maximum size after which
+        the table will acquire a scrollbar.
+        """
         row_count = self.values_table.rowCount()
         # Hide when the table is empty
         if row_count:
@@ -517,7 +538,16 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
         height = min((row_count + 1) * per_row, 4 * per_row)
         self.values_table.setFixedHeight(height)
 
-    def on_table_edit(self, row: int, column: int):
+    def on_table_edit(self, row: int, column: int) -> None:
+        """
+        Slot for updating the saved values when the table is edited.
+
+        Regardless of which row or column is changed, we'll reconstruct
+        the entire values dictionary to make sure it is serialized with
+        consistent ordering.
+
+        The arguments are passed by the qt signal but are unused.
+        """
         if self.adding_new_row:
             return
         data = []
@@ -550,7 +580,10 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
             data_dict[name] = value
         self.bridge.values.put(data_dict)
 
-    def delete_selected_rows(self, *args, **kwargs):
+    def delete_selected_rows(self, *args, **kwargs) -> None:
+        """
+        Remove the selected rows from the values table.
+        """
         selected_rows = set()
         for item in self.values_table.selectedItems():
             selected_rows.add(item.row())
@@ -624,15 +657,42 @@ class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
         self.signals_layout.addWidget(self.cpt_widget)
 
     def get_device_list(self) -> List[str]:
+        """
+        Returns a list of the names of the configured happi devices.
+        """
         return self.bridge.devices.get()
 
-    def add_new_signal(self, name: str):
+    def add_new_signal(self, name: str) -> None:
+        """
+        Add a new signal for use in the comparison selectors.
+
+        These are stored as the keys in the by_attr dictionary.
+        A new signal should start as mapping to an empty list.
+
+        Parameters
+        ----------
+        name : str
+            The attr name of the signal to add.
+        """
         comparisons_dict = self.bridge.by_attr.get()
         if name not in comparisons_dict:
             comparisons_dict[name] = []
             self.bridge.by_attr.updated.emit()
 
-    def remove_signal(self, name: str):
+    def remove_signal(self, name: str) -> None:
+        """
+        Remove an existing signal from the usage pool for the comparisons.
+
+        These are stored as the keys in the by_attr dictionary.
+        When we remove a signal, any orphaned comparisons should
+        migrate over to the "shared" comparisons list to avoid losing
+        them.
+
+        Parameters
+        ----------
+        name : str
+            The attr name of the signal to remove.
+        """
         comparisons_dict = self.bridge.by_attr.get()
         try:
             old_comparisons = comparisons_dict[name]
@@ -650,7 +710,13 @@ class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
 
 @dataclass
 class ListHolder:
-    """Dummy dataclass to match ComponentListWidget API"""
+    """
+    Dummy dataclass to match ComponentListWidget API
+
+    Previous versions of the application used lists to store
+    things like signals, etc., and the widgets written for this
+    version assume that a dataclass with a list attribute exists.
+    """
     some_list: List
 
 
@@ -699,13 +765,37 @@ class PVConfigurationWidget(DataWidget):
         self.setLayout(layout)
         self.layout().addWidget(self.pv_selector)
 
-    def add_new_signal(self, name: str):
+    def add_new_signal(self, name: str) -> None:
+        """
+        Add a new pv for use in the comparison selectors.
+
+        These are stored as the keys in the by_pv dictionary.
+        A new signal should start as mapping to an empty list.
+
+        Parameters
+        ----------
+        name : str
+            The pv name to add.
+        """
         comparisons_dict = self.bridge.by_pv.get()
         if name not in comparisons_dict:
             comparisons_dict[name] = []
             self.bridge.by_pv.updated.emit()
 
-    def remove_signal(self, name: str):
+    def remove_signal(self, name: str) -> None:
+        """
+        Remove an existing pv from the usage pool for the comparisons.
+
+        These are stored as the keys in the by_pv dictionary.
+        When we remove a pv, any orphaned comparisons should
+        migrate over to the "shared" comparisons list to avoid losing
+        them.
+
+        Parameters
+        ----------
+        name : str
+            The pv name to remove.
+        """
         comparisons_dict = self.bridge.by_pv.get()
         try:
             old_comparisons = comparisons_dict[name]
@@ -763,7 +853,10 @@ class PingWidget(DesignerDisplay, DataWidget):
             str,
         )
 
-    def count_edited(self):
+    def count_edited(self) -> None:
+        """
+        If the user edits the count, update the dataclass.
+        """
         self.bridge.count.put(self.count_spinbox.value())
 
 
@@ -775,20 +868,29 @@ class SimpleRowWidget(NameMixin, DataWidget):
     child_button: QToolButton
     delete_button: QToolButton
 
-    def setup_row(self):
+    def setup_row(self) -> None:
+        """
+        Make the commonalities in simple row widgets functional.
+        """
         self.init_name()
         self.edit_filter = FrameOnEditFilter(parent=self)
         self.name_edit.installEventFilter(self.edit_filter)
         self.name_edit.textChanged.connect(self.on_name_edit_text_changed)
         self.on_name_edit_text_changed()
 
-    def adjust_edit_filter(self):
+    def adjust_edit_filter(self) -> None:
+        """
+        Toggle between edit/no edit style modes based on having a valid name.
+        """
         if self.bridge.name.get():
             self.edit_filter.set_no_edit_style(self.name_edit)
         else:
             self.edit_filter.set_edit_style(self.name_edit)
 
-    def on_name_edit_text_changed(self, **kwargs):
+    def on_name_edit_text_changed(self, **kwargs) -> None:
+        """
+        Updates the style of our name edit appropriately on text change.
+        """
         match_line_edit_text_width(self.name_edit)
         if not self.name_edit.hasFocus():
             self.adjust_edit_filter()
@@ -987,7 +1089,7 @@ class GeneralComparisonWidget(DesignerDisplay, DataWidget):
         """
         self.bridge.severity_on_failure.put(Severity[value])
 
-    def new_if_disc_combo(self, value: str):
+    def new_if_disc_combo(self, value: str) -> None:
         """
         Slot to handle user input in the "If Disconnected" combo box.
 
@@ -1173,6 +1275,11 @@ class EqualsWidget(DesignerDisplay, EqualsMixin, DataWidget):
 
 
 class NotEqualsWidget(EqualsWidget):
+    """
+    Handle the NotEquals comparison.
+
+    This is simply an equals widget with the not equals symbol.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.comp_symbol_label.setText('≠')
@@ -1350,7 +1457,7 @@ class RangeWidget(DesignerDisplay, DataWidget):
         self.update_visualization()
         return super().resizeEvent(*args, **kwargs)
 
-    def update_visualization(self, *args, **kwargs):
+    def update_visualization(self, *args, **kwargs) -> None:
         """
         Make the visualization match the current data state.
         """
@@ -1473,7 +1580,7 @@ class ValueRowWidget(DesignerDisplay, EqualsMixin, DataWidget):
         self.setup_equals_widget()
         self.setup_value_row()
 
-    def setup_value_row(self):
+    def setup_value_row(self) -> None:
         """
         Set up the description field and severity selector.
         """
@@ -1491,7 +1598,10 @@ class ValueRowWidget(DesignerDisplay, EqualsMixin, DataWidget):
             self.severity_map[index] = sev
         self.severity_combo.activated.connect(self.new_severity_selected)
 
-    def new_severity_selected(self, index: int):
+    def new_severity_selected(self, index: int) -> None:
+        """
+        Update the data when the user updates the severity combobox.
+        """
         self.bridge.severity.put(self.severity_map[index])
 
 
@@ -1528,7 +1638,21 @@ class ValueSetWidget(DesignerDisplay, DataWidget):
         checked: bool = False,
         value: Optional[Value] = None,
         **kwargs,
-    ):
+    ) -> None:
+        """
+        Adds a new or existing value to the table.
+
+        New values are added to the data as well.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument.
+        value : Value, optional
+            The Value to add to the table. If omitted, a Value with value
+            0.0 will be generated as a default and added to the data.
+        """
         if value is None:
             # New value
             value = Value(value=0.0)
@@ -1540,7 +1664,12 @@ class ValueSetWidget(DesignerDisplay, DataWidget):
         self.value_table.setRowHeight(row_count, value_row.sizeHint().height())
         self.value_table.setCellWidget(row_count, 0, value_row)
 
-    def setup_delete_button(self, value_row: ValueRowWidget):
+    def setup_delete_button(self, value_row: ValueRowWidget) -> None:
+        """
+        Set up a row's delete button.
+
+        The button needs to have the correct style and functionality.
+        """
         delete_icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
         value_row.delete_button.setIcon(delete_icon)
 
@@ -1549,7 +1678,10 @@ class ValueSetWidget(DesignerDisplay, DataWidget):
 
         value_row.delete_button.clicked.connect(inner_delete)
 
-    def delete_table_row(self, row: ValueRowWidget):
+    def delete_table_row(self, row: ValueRowWidget) -> None:
+        """
+        Delete a row and its associated data.
+        """
         # Get the identity of the data
         data = row.bridge.data
         # Confirmation dialog
@@ -1572,7 +1704,7 @@ class ValueSetWidget(DesignerDisplay, DataWidget):
         # Remove configuration from the data structure
         self.bridge.values.remove_value(data)
 
-    def move_config_row(self, source: int, dest: int):
+    def move_config_row(self, source: int, dest: int) -> None:
         """
         Move the row at index source to index dest.
 
@@ -1594,7 +1726,7 @@ class ValueSetWidget(DesignerDisplay, DataWidget):
         self.value_table.setRowHeight(dest, value_row.sizeHint().height())
         self.value_table.setCellWidget(dest, 0, value_row)
 
-    def table_drop_event(self, event: QDropEvent):
+    def table_drop_event(self, event: QDropEvent) -> None:
         """
         Monkeypatch onto the table to allow us to drag/drop rows.
 
@@ -1650,7 +1782,22 @@ class AnyValueWidget(DesignerDisplay, DataWidget):
         value: Any = None,
         startup: bool = False,
         **kwargs,
-    ):
+    ) -> None:
+        """
+        Add a new value to the table.
+
+        The default value is empty string.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument.
+        value : any, optional
+            The value to add. If omitted, the default value is empty string.
+        startup : bool, optional
+            Set to true during widget startup.
+        """
         self.adding_new_row = True
         new_row = self.values_table.rowCount()
         self.values_table.insertRow(new_row)
@@ -1665,7 +1812,16 @@ class AnyValueWidget(DesignerDisplay, DataWidget):
         if not startup:
             self.on_table_edit(new_row, 0)
 
-    def on_table_edit(self, row: int, column: int):
+    def on_table_edit(self, row: int, column: int) -> None:
+        """
+        Slot for updating the saved values when the table is edited.
+
+        Regardless of which row or column is changed, we'll reconstruct
+        the entire values dictionary to make sure it is serialized with
+        consistent ordering.
+
+        The arguments are passed by the qt signal but are unused.
+        """
         if self.adding_new_row:
             return
         data = defaultdict(list)
@@ -1697,7 +1853,10 @@ class AnyValueWidget(DesignerDisplay, DataWidget):
             final_values.extend(sorted(data[datatype]))
         self.bridge.values.put(final_values)
 
-    def delete_selected_rows(self, *args, **kwargs):
+    def delete_selected_rows(self, *args, **kwargs) -> None:
+        """
+        Remove the selected rows from the values table.
+        """
         selected_rows = set()
         for item in self.values_table.selectedItems():
             selected_rows.add(item.row())
@@ -1752,7 +1911,21 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
         checked: bool = False,
         comparison: Optional[Comparison] = None,
         **kwargs,
-    ):
+    ) -> None:
+        """
+        Add a new or existing comparison to the table.
+
+        New comparisons are also added to the data.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument.
+        comparison : Comparison, optional
+            The comparison to add to the table. If omitted, an Equals
+            comparison is created.
+        """
         if comparison is None:
             comparison = Equals(name='untitled')
             new_comparison = True
@@ -1768,7 +1941,12 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
             self.update_comparison_list()
         self.setup_delete_button(comp_row)
 
-    def setup_delete_button(self, comparison_row: ComparisonRowWidget):
+    def setup_delete_button(self, comparison_row: ComparisonRowWidget) -> None:
+        """
+        Set up a row's delete button.
+
+        The button needs to have the correct style and functionality.
+        """
         delete_icon = self.style().standardIcon(QStyle.SP_TitleBarCloseButton)
         comparison_row.delete_button.setIcon(delete_icon)
 
@@ -1777,7 +1955,10 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
 
         comparison_row.delete_button.clicked.connect(inner_delete)
 
-    def delete_table_row(self, row: ComparisonRowWidget):
+    def delete_table_row(self, row: ComparisonRowWidget) -> None:
+        """
+        Delete a row and its associated data.
+        """
         # Get the identity of the data
         data = row.bridge.data
         # Confirmation dialog
@@ -1803,7 +1984,7 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
         self,
         old_comparison: Comparison,
         new_comparison: Comparison,
-    ):
+    ) -> None:
         """
         Replace the row corresponding with old_comparison with a new row.
         """
@@ -1817,7 +1998,7 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
         self.setup_delete_button(new_row)
         self.update_comparison_list()
 
-    def update_comparison_list(self):
+    def update_comparison_list(self) -> None:
         unsorted: List[Comparison] = []
 
         for row_index in range(self.comparisons_table.rowCount()):
