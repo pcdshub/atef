@@ -35,9 +35,10 @@ from atef.config import (Configuration, ConfigurationGroup,
 from atef.tools import Ping, PingResult, Tool, ToolResult
 
 from ..core import DesignerDisplay
-from .data import (AnyComparisonWidget, AnyValueWidget, ComparisonRowWidget,
-                   ConfigurationGroupRowWidget, ConfigurationGroupWidget,
-                   DataWidget, DeviceConfigurationWidget, EqualsWidget,
+from .data import (AnyComparisonWidget, AnyDataclass, AnyValueWidget,
+                   ComparisonRowWidget, ConfigurationGroupRowWidget,
+                   ConfigurationGroupWidget, DataWidget,
+                   DeviceConfigurationWidget, EqualsWidget,
                    GeneralComparisonWidget, GreaterOrEqualWidget,
                    GreaterWidget, LessOrEqualWidget, LessWidget,
                    NameDescTagsWidget, NotEqualsWidget, PingWidget,
@@ -146,14 +147,22 @@ class PageWidget(QWidget):
     Must be linked up to the tree using the ``link_page``
     function after being instantiated, not during.
     """
+    # Linkage attributes
     tree_item: AtefItem
     parent_tree_item: AtefItem
     full_tree: QTreeWidget
 
+    # Common placeholder defined in the page ui files
+    name_desc_tags_placeholder: QWidget
+    name_desc_tags_widget: NameDescTagsWidget
+
+    # Set during runtime
+    data: AnyDataclass
     parent_button: Optional[QToolButton]
 
-    def __init__(self, **kwargs):
+    def __init__(self, data: AnyDataclass, **kwargs):
         super().__init__(**kwargs)
+        self.data = data
         self.parent_button = None
         self.child_button_map = WeakValueDictionary()
         self.has_connected_tree = False
@@ -358,6 +367,32 @@ class PageWidget(QWidget):
         """
         raise NotImplementedError()
 
+    def setup_name_desc_tags_init(self):
+        """
+        Common init-time setup for the name/desc/tags header widgets.
+
+        Run this after super().__init__ in a PageWidget subclass
+        to initialize the header if the page has a name/desc/tags widget.
+        """
+        widget = NameDescTagsWidget(data=self.data)
+        self.parent_button = widget.parent_button
+        self.insert_widget(
+            widget,
+            self.name_desc_tags_placeholder,
+        )
+        # Assign last for deallocation order concerns when running this twice
+        self.name_desc_tags_widget = widget
+
+    def setup_name_desc_tags_link(self):
+        """
+        Common link-time setup for the name/desc/tags header widgets.
+
+        Run this after super().assign_tree_item in a PageWidget subclass
+        to initialize the header if the page has a name/desc/tags widget.
+        """
+        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
+        self.connect_tree_node_name(self.name_desc_tags_widget)
+
 
 class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     """
@@ -365,8 +400,6 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     """
     filename = 'configuration_group_page.ui'
 
-    name_desc_tags_placeholder: QWidget
-    name_desc_tags_widget: NameDescTagsWidget
     config_group_placeholder: QWidget
     config_group_widget: ConfigurationGroupWidget
     config_table: QTableWidget
@@ -383,17 +416,11 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     }
 
     def __init__(self, data: ConfigurationGroup, **kwargs):
-        super().__init__(**kwargs)
-        self.data = data
+        super().__init__(data=data, **kwargs)
         self.setup_done = False
         # Create the static sub-widgets and place them
-        self.name_desc_tags_widget = NameDescTagsWidget(data=data)
-        self.parent_button = self.name_desc_tags_widget.parent_button
+        self.setup_name_desc_tags_init()
         self.config_group_widget = ConfigurationGroupWidget(data=data)
-        self.insert_widget(
-            self.name_desc_tags_widget,
-            self.name_desc_tags_placeholder,
-        )
         self.insert_widget(
             self.config_group_widget,
             self.config_group_placeholder,
@@ -415,10 +442,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             for config in self.data.configs:
                 self.add_config_row(config=config)
             self.setup_done = True
-        # Make sure the parent button is set up properly
-        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
-        # Make sure the node name updates appropriately
-        self.connect_tree_node_name(self.name_desc_tags_widget)
+        self.setup_name_desc_tags_link()
 
     def add_config_row(
         self,
@@ -543,8 +567,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     """
     filename = 'device_configuration_page.ui'
 
-    name_desc_tags_placeholder: QWidget
-    name_desc_tags_widget: NameDescTagsWidget
     device_widget_placeholder: QWidget
     device_config_widget: DeviceConfigurationWidget
 
@@ -554,18 +576,12 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     attr_selector_cache: WeakSet[QComboBox]
 
     def __init__(self, data: DeviceConfiguration, **kwargs):
-        super().__init__(**kwargs)
-        self.data = data
+        super().__init__(data=data, **kwargs)
         self.setup_done = False
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
-        self.name_desc_tags_widget = NameDescTagsWidget(data=data)
-        self.parent_button = self.name_desc_tags_widget.parent_button
+        self.setup_name_desc_tags_init()
         self.device_config_widget = DeviceConfigurationWidget(data=data)
-        self.insert_widget(
-            self.name_desc_tags_widget,
-            self.name_desc_tags_placeholder,
-        )
         self.insert_widget(
             self.device_config_widget,
             self.device_widget_placeholder,
@@ -599,10 +615,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                 self.update_comparison_dicts
             )
             self.setup_done = True
-        # Make sure the parent button is set up properly
-        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
-        # Make sure the node name updates appropriately
-        self.connect_tree_node_name(self.name_desc_tags_widget)
+        self.setup_name_desc_tags_link()
 
     def add_comparison_row(
         self,
@@ -807,8 +820,6 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
     """
     filename = 'pv_configuration_page.ui'
 
-    name_desc_tags_placeholder: QWidget
-    name_desc_tags_widget: NameDescTagsWidget
     pv_widget_placeholder: QWidget
     pv_configuration_widget: PVConfigurationWidget
 
@@ -818,18 +829,12 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
     attr_selector_cache: WeakSet[QComboBox]
 
     def __init__(self, data: PVConfiguration, **kwargs):
-        super().__init__(**kwargs)
-        self.data = data
+        super().__init__(data=data, **kwargs)
         self.setup_done = False
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
-        self.name_desc_tags_widget = NameDescTagsWidget(data=data)
-        self.parent_button = self.name_desc_tags_widget.parent_button
+        self.setup_name_desc_tags_init()
         self.pv_configuration_widget = PVConfigurationWidget(data=data)
-        self.insert_widget(
-            self.name_desc_tags_widget,
-            self.name_desc_tags_placeholder,
-        )
         self.insert_widget(
             self.pv_configuration_widget,
             self.pv_widget_placeholder,
@@ -863,10 +868,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                 self.update_comparison_dicts
             )
             self.setup_done = True
-        # Make sure the parent button is set up properly
-        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
-        # Make sure the node name updates appropriately
-        self.connect_tree_node_name(self.name_desc_tags_widget)
+        self.setup_name_desc_tags_link()
 
     def add_comparison_row(
         self,
@@ -1074,8 +1076,6 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
     """
     filename = 'tool_configuration_page.ui'
 
-    name_desc_tags_placeholder: QWidget
-    name_desc_tags_widget: NameDescTagsWidget
     tool_placeholder: QWidget
     tool_widget: DataWidget
 
@@ -1092,17 +1092,11 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
     tool_names: Dict[str, Type[Tool]]
 
     def __init__(self, data: ToolConfiguration, **kwargs):
-        super().__init__(**kwargs)
-        self.data = data
+        super().__init__(data=data, **kwargs)
         self.setup_done = False
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
-        self.name_desc_tags_widget = NameDescTagsWidget(data=data)
-        self.parent_button = self.name_desc_tags_widget.parent_button
-        self.insert_widget(
-            self.name_desc_tags_widget,
-            self.name_desc_tags_placeholder,
-        )
+        self.setup_name_desc_tags_init()
 
     def assign_tree_item(self, item: AtefItem) -> None:
         """
@@ -1132,10 +1126,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 self.tool_names[tool.__name__] = tool
             self.tool_select_combo.activated.connect(self.new_tool_selected)
             self.setup_done = True
-        # Make sure the parent button is set up properly
-        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
-        # Make sure the node name updates appropriately
-        self.connect_tree_node_name(self.name_desc_tags_widget)
+        self.setup_name_desc_tags_link()
 
     def add_comparison_row(
         self,
@@ -1394,8 +1385,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
     """
     filename = 'comparison_page.ui'
 
-    name_desc_tags_placeholder: QWidget
-    name_desc_tags_widget: NameDescTagsWidget
     specific_comparison_placeholder: QWidget
     specific_comparison_widget: DataWidget
     general_comparison_placeholder: QWidget
@@ -1420,8 +1409,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
     comp_types: Dict[str, Comparison]
 
     def __init__(self, data: Comparison, **kwargs):
-        super().__init__(**kwargs)
-        self.data = data
+        super().__init__(data=data, **kwargs)
         self.comp_types = {}
         for index, comp_type in enumerate(self.comp_map):
             self.specific_combo.addItem(comp_type.__name__)
@@ -1436,10 +1424,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         Link-time setup of existing sub-nodes and navigation.
         """
         super().assign_tree_item(item)
-        # Make sure the parent button is set up properly
-        self.setup_parent_button(self.name_desc_tags_widget.parent_button)
-        # Make sure the node name updates appropriately
-        self.connect_tree_node_name(self.name_desc_tags_widget)
+        self.setup_name_desc_tags_link()
         # Extra setup and/or teardown from AnyComparison
         self.clean_up_any_comparison()
         if isinstance(self.data, AnyComparison):
@@ -1458,12 +1443,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         This is accomplished by discarding the old widgets in favor
         of new widgets.
         """
-        name_widget = NameDescTagsWidget(data=comparison)
-        self.parent_button = name_widget.parent_button
-        self.insert_widget(
-            name_widget,
-            self.name_desc_tags_placeholder,
-        )
         general_widget = GeneralComparisonWidget(data=comparison)
         self.insert_widget(
             general_widget,
@@ -1475,10 +1454,10 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             new_specific_widget,
             self.specific_comparison_placeholder,
         )
-        self.name_desc_tags_widget = name_widget
         self.general_comparison_widget = general_widget
         self.specific_comparison_widget = new_specific_widget
         self.data = comparison
+        self.setup_name_desc_tags_init()
         try:
             item = self.tree_item
         except AttributeError:
