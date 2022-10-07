@@ -94,10 +94,10 @@ def test_serializable(conf: ToolConfiguration, severity: Severity):
 async def test_result_severity(
     conf: ToolConfiguration, severity: Severity
 ):
-    overall, _ = await check_tool(
+    overall, results = await check_tool(
         conf.tool, by_attr=conf.by_attr, shared=conf.shared
     )
-    assert overall == severity
+    assert overall == severity, results
 
 
 @pytest.mark.parametrize(
