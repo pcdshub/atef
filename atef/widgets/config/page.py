@@ -367,7 +367,41 @@ class PageWidget(QWidget):
         """
         raise NotImplementedError()
 
-    def setup_name_desc_tags_init(self):
+    def setup_row_buttons(
+        self,
+        row_widget: DataWidget,
+        item: AtefItem,
+        table: QTableWidget,
+    ) -> None:
+        """
+        Make the child navigation and delete buttons work on a table row.
+
+        This is valid for any PageWidget that has a QTableWidget that
+        contains row widgets that have "child_button" and "delete_button"
+        attributes. It is a shortcut that calls setup_child_button and
+        setup_delete_row_button in one go.
+
+        Parameters
+        ----------
+        row_widget : DataWidget
+            The widget that we need to modify. Should have a "child_button"
+            and a "delete_button" attribute.
+        item : AtefItem
+            The item corresponding to the page associated with the row widget.
+        table : QTableWidget
+            The table that the widget exists in.
+        """
+        self.setup_child_button(
+            button=row_widget.child_button,
+            item=item,
+        )
+        self.setup_delete_row_button(
+            table=table,
+            item=item,
+            row=row_widget,
+        )
+
+    def setup_name_desc_tags_init(self) -> None:
         """
         Common init-time setup for the name/desc/tags header widgets.
 
@@ -383,7 +417,7 @@ class PageWidget(QWidget):
         # Assign last for deallocation order concerns when running this twice
         self.name_desc_tags_widget = widget
 
-    def setup_name_desc_tags_link(self):
+    def setup_name_desc_tags_link(self) -> None:
         """
         Common link-time setup for the name/desc/tags header widgets.
 
@@ -480,38 +514,14 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         )
         link_page(item=config_item, widget=config_page)
         self.setup_row_buttons(
-            config_row=config_row,
-            config_item=config_item,
+            row_widget=config_row,
+            item=config_item,
+            table=self.config_table,
         )
         row_count = self.config_table.rowCount()
         self.config_table.insertRow(row_count)
         self.config_table.setRowHeight(row_count, config_row.sizeHint().height())
         self.config_table.setCellWidget(row_count, 0, config_row)
-
-    def setup_row_buttons(
-        self,
-        config_row: ConfigurationGroupRowWidget,
-        config_item: AtefItem,
-    ) -> None:
-        """
-        Make the child navigation and delete buttons work on a specific row.
-
-        Parameters
-        ----------
-        config_row : ConfigurationGroupRowWidget
-            The row widget to do the setup on.
-        config_item : AtefItem
-            The item corresponding to the page associated with the row widget.
-        """
-        self.setup_child_button(
-            button=config_row.child_button,
-            item=config_item,
-        )
-        self.setup_delete_row_button(
-            table=self.config_table,
-            item=config_item,
-            row=config_row,
-        )
 
     def remove_table_data(self, data: Configuration) -> None:
         """
@@ -538,8 +548,9 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         self.config_table.insertRow(dest)
         config_row = ConfigurationGroupRowWidget(data=config_data)
         self.setup_row_buttons(
-            config_row=config_row,
-            config_item=config_item,
+            row_widget=config_row,
+            item=config_item,
+            table=self.config_table,
         )
         self.config_table.setRowHeight(dest, config_row.sizeHint().height())
         self.config_table.setCellWidget(dest, 0, config_row)
@@ -653,8 +664,9 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         )
         link_page(item=comp_item, widget=comp_page)
         self.setup_row_buttons(
-            comp_row=comp_row,
-            comp_item=comp_item,
+            row_widget=comp_row,
+            item=comp_item,
+            table=self.comparisons_table,
         )
         self.attr_selector_cache.add(comp_row.attr_combo)
         comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
@@ -664,31 +676,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         self.comparisons_table.insertRow(row_count)
         self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
         self.comparisons_table.setCellWidget(row_count, 0, comp_row)
-
-    def setup_row_buttons(
-        self,
-        comp_row: ComparisonRowWidget,
-        comp_item: AtefItem,
-    ) -> None:
-        """
-        Make the child navigation and delete buttons work on a specific row.
-
-        Parameters
-        ----------
-        comp_row : ConfigurationGroupRowWidget
-            The row widget to do the setup on.
-        comp_item : AtefItem
-            The item corresponding to the page associated with the row widget.
-        """
-        self.setup_child_button(
-            button=comp_row.child_button,
-            item=comp_item,
-        )
-        self.setup_delete_row_button(
-            table=self.comparisons_table,
-            item=comp_item,
-            row=comp_row,
-        )
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -804,8 +791,9 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             return
         comp_row = ComparisonRowWidget(data=new_comparison)
         self.setup_row_buttons(
-            comp_row=comp_row,
-            comp_item=comp_item,
+            row_widget=comp_row,
+            item=comp_item,
+            table=self.comparisons_table,
         )
         self.attr_selector_cache.add(comp_row.attr_combo)
         comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
@@ -906,8 +894,9 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         )
         link_page(item=comp_item, widget=comp_page)
         self.setup_row_buttons(
-            comp_row=comp_row,
-            comp_item=comp_item,
+            row_widget=comp_row,
+            item=comp_item,
+            table=self.comparisons_table,
         )
         self.attr_selector_cache.add(comp_row.attr_combo)
         comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
@@ -917,31 +906,6 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         self.comparisons_table.insertRow(row_count)
         self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
         self.comparisons_table.setCellWidget(row_count, 0, comp_row)
-
-    def setup_row_buttons(
-        self,
-        comp_row: ComparisonRowWidget,
-        comp_item: AtefItem,
-    ) -> None:
-        """
-        Make the child navigation and delete buttons work on a specific row.
-
-        Parameters
-        ----------
-        comp_row : ConfigurationGroupRowWidget
-            The row widget to do the setup on.
-        comp_item : AtefItem
-            The item corresponding to the page associated with the row widget.
-        """
-        self.setup_child_button(
-            button=comp_row.child_button,
-            item=comp_item,
-        )
-        self.setup_delete_row_button(
-            table=self.comparisons_table,
-            item=comp_item,
-            row=comp_row,
-        )
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -1057,8 +1021,9 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             return
         comp_row = ComparisonRowWidget(data=new_comparison)
         self.setup_row_buttons(
-            comp_row=comp_row,
-            comp_item=comp_item,
+            row_widget=comp_row,
+            item=comp_item,
+            table=self.comparisons_table,
         )
         self.attr_selector_cache.add(comp_row.attr_combo)
         comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
@@ -1164,8 +1129,9 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         )
         link_page(item=comp_item, widget=comp_page)
         self.setup_row_buttons(
-            comp_row=comp_row,
-            comp_item=comp_item,
+            row_widget=comp_row,
+            item=comp_item,
+            table=self.comparisons_table,
         )
         self.attr_selector_cache.add(comp_row.attr_combo)
         comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
@@ -1175,31 +1141,6 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         self.comparisons_table.insertRow(row_count)
         self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
         self.comparisons_table.setCellWidget(row_count, 0, comp_row)
-
-    def setup_row_buttons(
-        self,
-        comp_row: ComparisonRowWidget,
-        comp_item: AtefItem,
-    ) -> None:
-        """
-        Make the child navigation and delete buttons work on a specific row.
-
-        Parameters
-        ----------
-        comp_row : ConfigurationGroupRowWidget
-            The row widget to do the setup on.
-        comp_item : AtefItem
-            The item corresponding to the page associated with the row widget.
-        """
-        self.setup_child_button(
-            button=comp_row.child_button,
-            item=comp_item,
-        )
-        self.setup_delete_row_button(
-            table=self.comparisons_table,
-            item=comp_item,
-            row=comp_row,
-        )
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -1320,8 +1261,9 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             return
         comp_row = ComparisonRowWidget(data=new_comparison)
         self.setup_row_buttons(
-            comp_row=comp_row,
-            comp_item=comp_item,
+            row_widget=comp_row,
+            item=comp_item,
+            table=self.comparisons_table,
         )
         self.attr_selector_cache.add(comp_row.attr_combo)
         comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
@@ -1630,7 +1572,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             func_name=type(comparison).__name__,
         )
         link_page(item=item, widget=page)
-        self.setup_row_buttons(
+        self.setup_any_comparison_row_buttons(
             comparison=comparison,
             item=item,
         )
@@ -1667,12 +1609,12 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             old_comparison=old_comparison,
             new_comparison=new_comparison,
         )
-        self.setup_row_buttons(
+        self.setup_any_comparison_row_buttons(
             comparison=new_comparison,
             item=comp_item,
         )
 
-    def setup_row_buttons(
+    def setup_any_comparison_row_buttons(
         self,
         comparison: Comparison,
         item: AtefItem,
