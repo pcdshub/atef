@@ -166,6 +166,7 @@ class PageWidget(QWidget):
         self.parent_button = None
         self.child_button_map = WeakValueDictionary()
         self.has_connected_tree = False
+        self.comp_table_setup_done = False
 
     def assign_tree_item(self, item: AtefItem) -> None:
         """
@@ -427,6 +428,105 @@ class PageWidget(QWidget):
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         self.connect_tree_node_name(self.name_desc_tags_widget)
 
+    def setup_comparison_table_link(
+        self,
+        by_attr_key: str,
+        data_widget: Optional[DataWidget],
+    ) -> bool:
+        """
+        Common link-time setup for the comparison tables.
+
+        This is used for pages that contain comparison instances. All of these
+        pages need to:
+        - read the starting configuration
+        - fill the table widgets appropriately
+        - setup the add button
+        - make sure the options for comparison target attrs update appropriately
+        - make sure the stored data updates when the user manipulates the table
+
+        For this method to work, the page needs the following:
+        - Methods named "add_comparison_row", "update_combo_attrs", and
+          "update_comparison_dicts" with signatures matching the not
+          not implement stub methods here.
+        - A button with the "clicked" signal named "add_comparison_button".
+
+        Parameters
+        ----------
+        by_attr_key : str
+            Either 'by_attr' or 'by_pv', the attr we need to use to find the
+            data structure and the bridge.
+        data_widget : DataWidget or None.
+            A widget with a QDataclassBridge named bridge to the underlying
+            dataclass. If None, we'll skip some of the setup here.
+
+        Returns
+        -------
+        did_setup : bool
+            True if we ran the setup routines here.
+        """
+        if not self.comp_table_setup_done:
+            for attr, configs in getattr(self.data, by_attr_key).items():
+                for config in configs:
+                    self.add_comparison_row(
+                        attr=attr,
+                        comparison=config,
+                    )
+            for config in self.data.shared:
+                self.add_comparison_row(
+                    attr='shared',
+                    comparison=config,
+                )
+            # Allow the user to add more rows
+            self.add_comparison_button.clicked.connect(self.add_comparison_row)
+            if data_widget is not None:
+                # When the attrs update, update the allowed attrs in each row
+                getattr(data_widget.bridge, by_attr_key).updated.connect(
+                    self.update_combo_attrs
+                )
+                getattr(data_widget.bridge, by_attr_key).updated.connect(
+                    self.update_comparison_dicts
+                )
+            self.comp_table_setup_done = True
+            return True
+        return False
+
+    def add_comparison_row(
+        self,
+        checked: bool = False,
+        attr: str = '',
+        comparison: Optional[Comparison] = None,
+    ) -> None:
+        """
+        Add a new row to the comparison table.
+
+        This also creates a default Equals instance if necessary, creates
+        the corresponding page, and does all the related setup.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument.
+        attr : str, optional
+            The signal attr name associated with this comparison.
+        config : Comparison, optional
+            The comparison to add. If omitted, we'll create a blank
+            Equals comparison.
+        """
+        raise NotImplementedError()
+
+    def update_combo_attrs(self) -> None:
+        """
+        For every row combobox, set the allowed values.
+        """
+        raise NotImplementedError()
+
+    def update_comparison_dicts(self) -> None:
+        """
+        Rebuild by_attr/by_pv and shared when user changes anything.
+        """
+        raise NotImplementedError()
+
 
 class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     """
@@ -588,7 +688,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
 
     def __init__(self, data: DeviceConfiguration, **kwargs):
         super().__init__(data=data, **kwargs)
-        self.setup_done = False
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.setup_name_desc_tags_init()
@@ -603,29 +702,10 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         Link-time setup of existing sub-nodes and navigation.
         """
         super().assign_tree_item(item)
-        if not self.setup_done:
-            # Fill in the rows from the initial data
-            for attr, configs in self.data.by_attr.items():
-                for config in configs:
-                    self.add_comparison_row(
-                        attr=attr,
-                        comparison=config,
-                    )
-            for config in self.data.shared:
-                self.add_comparison_row(
-                    attr='shared',
-                    comparison=config,
-                )
-            # Allow the user to add more rows
-            self.add_comparison_button.clicked.connect(self.add_comparison_row)
-            # When the attrs update, update the allowed attrs in each row
-            self.device_config_widget.bridge.by_attr.updated.connect(
-                self.update_combo_attrs
-            )
-            self.device_config_widget.bridge.by_attr.updated.connect(
-                self.update_comparison_dicts
-            )
-            self.setup_done = True
+        self.setup_comparison_table_link(
+            by_attr_key='by_attr',
+            data_widget=self.device_config_widget,
+        )
         self.setup_name_desc_tags_link()
 
     def add_comparison_row(
@@ -637,19 +717,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         """
         Add a new row to the comparison table.
 
-        This also creates a default Equals instance if necessary, creates
-        the corresponding page, and does all the related setup.
-
-        Parameters
-        ----------
-        checked : bool, optional
-            Unused. Button "clicked" signals often pass this as the first
-            positional argument.
-        attr : str, optional
-            The signal attr name associated with this comparison.
-        config : Comparison, optional
-            The comparison to add. If omitted, we'll create a blank
-            Equals comparison.
+        See PageWidget for full docstring.
         """
         if comparison is None:
             # New comparison
@@ -818,7 +886,6 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
 
     def __init__(self, data: PVConfiguration, **kwargs):
         super().__init__(data=data, **kwargs)
-        self.setup_done = False
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.setup_name_desc_tags_init()
@@ -833,29 +900,10 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         Link-time setup of existing sub-nodes and navigation.
         """
         super().assign_tree_item(item)
-        if not self.setup_done:
-            # Fill in the rows from the initial data
-            for attr, configs in self.data.by_pv.items():
-                for config in configs:
-                    self.add_comparison_row(
-                        attr=attr,
-                        comparison=config,
-                    )
-            for config in self.data.shared:
-                self.add_comparison_row(
-                    attr='shared',
-                    comparison=config,
-                )
-            # Allow the user to add more rows
-            self.add_comparison_button.clicked.connect(self.add_comparison_row)
-            # When the attrs update, update the allowed attrs in each row
-            self.pv_configuration_widget.bridge.by_pv.updated.connect(
-                self.update_combo_attrs
-            )
-            self.pv_configuration_widget.bridge.by_pv.updated.connect(
-                self.update_comparison_dicts
-            )
-            self.setup_done = True
+        self.setup_comparison_table_link(
+            by_attr_key='by_pv',
+            data_widget=self.pv_configuration_widget,
+        )
         self.setup_name_desc_tags_link()
 
     def add_comparison_row(
@@ -867,19 +915,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         """
         Add a new row to the comparison table.
 
-        This also creates a default Equals instance if necessary, creates
-        the corresponding page, and does all the related setup.
-
-        Parameters
-        ----------
-        checked : bool, optional
-            Unused. Button "clicked" signals often pass this as the first
-            positional argument.
-        attr : str, optional
-            The pv name associated with this comparison.
-        config : Comparison, optional
-            The comparison to add. If omitted, we'll create a blank
-            Equals comparison.
+        See PageWidget for full docstring.
         """
         if comparison is None:
             # New comparison
@@ -1058,7 +1094,6 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
 
     def __init__(self, data: ToolConfiguration, **kwargs):
         super().__init__(data=data, **kwargs)
-        self.setup_done = False
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.setup_name_desc_tags_init()
@@ -1068,21 +1103,10 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         Link-time setup of existing sub-nodes and navigation.
         """
         super().assign_tree_item(item)
-        if not self.setup_done:
-            # Fill in the rows from the initial data
-            for attr, configs in self.data.by_attr.items():
-                for config in configs:
-                    self.add_comparison_row(
-                        attr=attr,
-                        comparison=config,
-                    )
-            for config in self.data.shared:
-                self.add_comparison_row(
-                    attr='shared',
-                    comparison=config,
-                )
-            # Allow the user to add more rows
-            self.add_comparison_button.clicked.connect(self.add_comparison_row)
+        if self.setup_comparison_table_link(
+            by_attr_key='by_attr',
+            data_widget=None,
+        ):
             # Set up our specific tool handling (must be after filling rows)
             self.new_tool(self.data.tool)
             self.tool_names = {}
@@ -1090,7 +1114,6 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 self.tool_select_combo.addItem(tool.__name__)
                 self.tool_names[tool.__name__] = tool
             self.tool_select_combo.activated.connect(self.new_tool_selected)
-            self.setup_done = True
         self.setup_name_desc_tags_link()
 
     def add_comparison_row(
@@ -1102,19 +1125,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         """
         Add a new row to the comparison table.
 
-        This also creates a default Equals instance if necessary, creates
-        the corresponding page, and does all the related setup.
-
-        Parameters
-        ----------
-        checked : bool, optional
-            Unused. Button "clicked" signals often pass this as the first
-            positional argument.
-        attr : str, optional
-            The tool result attr name associated with this comparison.
-        config : Comparison, optional
-            The comparison to add. If omitted, we'll create a blank
-            Equals comparison.
+        See PageWidget for the full docstring.
         """
         if comparison is None:
             # New comparison
