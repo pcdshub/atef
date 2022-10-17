@@ -693,9 +693,10 @@ class OphydDeviceTableView(QtWidgets.QTableView):
     @property
     def selected_attribute_data(self) -> List[OphydAttributeData]:
         """The OphydAttributeData items that correspond to the selection."""
+        unique_indexes = {ind.row(): ind for ind in self.selectedIndexes()}
         data = [
             self.get_data_from_proxy_index(index)
-            for index in self.selectedIndexes()
+            for index in unique_indexes.values()
         ]
         return [datum for datum in data if datum is not None]
 
