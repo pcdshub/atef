@@ -254,7 +254,7 @@ class DescriptionStepWidget(StepWidgetBase, QtWidgets.QFrame):
 
 class ExpandableFrame(QtWidgets.QFrame):
     """
-    A `QtWidgets.QFrame` that can be toggled with a mouse clik.
+    A `QtWidgets.QFrame` that can be toggled with a mouse click.
 
     Contains a QVBoxLayout layout which can have one or more user-provided
     widgets.

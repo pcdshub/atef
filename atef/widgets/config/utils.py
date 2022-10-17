@@ -311,7 +311,7 @@ class ComponentListWidget(StringListWithDialog):
 
     def _open_component_chooser(self, to_select: Optional[List[str]] = None) -> None:
         """
-        Hook: User requested adding/editing a componen.
+        Hook: User requested adding/editing a component.
 
         Parameters
         ----------
