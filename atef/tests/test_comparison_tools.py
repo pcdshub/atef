@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
@@ -91,13 +92,14 @@ def test_serializable(conf: ToolConfiguration, severity: Severity):
 
 @config_and_severity
 @pytest.mark.asyncio
+@pytest.mark.skipif(sys.platform == 'win32', reason='Ping tool fails on Windows')
 async def test_result_severity(
     conf: ToolConfiguration, severity: Severity
 ):
-    overall, _ = await check_tool(
+    overall, results = await check_tool(
         conf.tool, by_attr=conf.by_attr, shared=conf.shared
     )
-    assert overall == severity
+    assert overall == severity, results
 
 
 @pytest.mark.parametrize(

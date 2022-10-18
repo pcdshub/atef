@@ -1,0 +1,444 @@
+{
+  "version": 0,
+  "root": {
+    "name": "All Fields Demo",
+    "description": "Demo config that uses all data structures and all fields to demonstrate that the atef GUI is functional. If all the widgets in here correlate 1:1 with the demo file and it saves back the same file it opens, then the GUI isn't horribly broken.",
+    "tags": [
+      "root",
+      "demo"
+    ],
+    "configs": [
+      {
+        "ConfigurationGroup": {
+          "name": "Some Any Group",
+          "description": "Show that a group with \"any\" mode still works. Define some extra/override some global values.",
+          "tags": [
+            "any"
+          ],
+          "configs": [
+            {
+              "PVConfiguration": {
+                "name": "Some real PV",
+                "description": "Comparison to one PV that should pass",
+                "tags": null,
+                "by_pv": {
+                  "GDET:FEE1:241:ENRC": [
+                    {
+                      "Greater": {
+                        "name": "Connected",
+                        "description": "Make sure the gas detector PV is connected and the value exists in some reasonable capacity",
+                        "invert": false,
+                        "reduce_period": null,
+                        "reduce_method": "average",
+                        "string": null,
+                        "severity_on_failure": 2,
+                        "if_disconnected": 2,
+                        "value": -10.0
+                      }
+                    }
+                  ]
+                },
+                "shared": []
+              }
+            },
+            {
+              "PVConfiguration": {
+                "name": "Nonsense PV",
+                "description": "Comparison to one PV that should fail",
+                "tags": null,
+                "by_pv": {
+                  "aafsec3cwa3ed": [],
+                  "asecvase": [],
+                  "aw4gsdxcv": [],
+                  "awsetas32": [],
+                  "ewaasdfasdf": []
+                },
+                "shared": [
+                  {
+                    "NotEquals": {
+                      "name": "Connected",
+                      "description": "Throwaway comparison to garbled pv names",
+                      "invert": false,
+                      "reduce_period": null,
+                      "reduce_method": "average",
+                      "string": null,
+                      "severity_on_failure": 2,
+                      "if_disconnected": 2,
+                      "value": 0.0,
+                      "rtol": null,
+                      "atol": null
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "values": {
+            "apples": "yum",
+            "float": 2.718
+          },
+          "mode": "any"
+        }
+      },
+      {
+        "DeviceConfiguration": {
+          "name": "Device",
+          "description": "Include a device configuration and use it to do all the basic comparisons",
+          "tags": [
+            "device",
+            "ophyd"
+          ],
+          "devices": [
+            "im1l0",
+            "im2l0",
+            "im3l0",
+            "im4l0"
+          ],
+          "by_attr": {
+            "cam_power": [
+              {
+                "Equals": {
+                  "name": "camera on",
+                  "description": "Pass if the camera is on",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": 1,
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            ],
+            "detector.event_rate": [
+              {
+                "GreaterOrEqual": {
+                  "name": "getting images",
+                  "description": "Pass if the image rate is one or greater",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": 1.0
+                }
+              }
+            ],
+            "filter_wheel.error_message": [
+              {
+                "Equals": {
+                  "name": "no filter wheel error",
+                  "description": "Pass if no filter wheel error",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": "",
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            ],
+            "focus_motor.user_readback": [
+              {
+                "LessOrEqual": {
+                  "name": "negative focus warning",
+                  "description": "Warn if the focus motor is negative, indicating it should be homed",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 1,
+                  "if_disconnected": 2,
+                  "value": 0.0
+                }
+              }
+            ],
+            "target.state": [
+              {
+                "Equals": {
+                  "name": "target out",
+                  "description": "Warn if the target is not out",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": true,
+                  "severity_on_failure": 1,
+                  "if_disconnected": 2,
+                  "value": "OUT",
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            ],
+            "y_motor.user_readback": [
+              {
+                "Range": {
+                  "name": "user readback realistic",
+                  "description": "Pass if the readback is within the expected range",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "low": -200.0,
+                  "high": 50.0,
+                  "warn_low": -100.0,
+                  "warn_high": 10.0,
+                  "inclusive": true
+                }
+              }
+            ],
+            "y_motor.velocity": [
+              {
+                "Greater": {
+                  "name": "velocity nonzero",
+                  "description": "Pass if the velocity is nonzero",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": 0.0
+                }
+              }
+            ],
+            "zoom_motor.user_readback": [
+              {
+                "Less": {
+                  "name": "negative zoom warning",
+                  "description": "Warn if the zoom motor is negative, indicating it should be homed",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 1,
+                  "if_disconnected": 2,
+                  "value": 1.0
+                }
+              }
+            ]
+          },
+          "shared": []
+        }
+      },
+      {
+        "PVConfiguration": {
+          "name": "PV",
+          "description": "Include a PV configuration and use it to do all of the more advanced comparisons.",
+          "tags": [
+            "PV",
+            "EPICS"
+          ],
+          "by_pv": {
+            "IM2K0:XTES:MMS.RBV": [
+              {
+                "ValueSet": {
+                  "name": "ValueSet",
+                  "description": "Set a severity for each different position the target can be in",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": false,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "values": [
+                    {
+                      "value": 1,
+                      "description": "Integer representing OUT",
+                      "rtol": null,
+                      "atol": null,
+                      "severity": 0
+                    },
+                    {
+                      "value": 2,
+                      "description": "Integer representing YAG",
+                      "rtol": null,
+                      "atol": null,
+                      "severity": 1
+                    },
+                    {
+                      "value": 3,
+                      "description": "Integer representing DIAMOND",
+                      "rtol": null,
+                      "atol": null,
+                      "severity": 1
+                    },
+                    {
+                      "value": 4,
+                      "description": "Integer representing RETICLE",
+                      "rtol": null,
+                      "atol": null,
+                      "severity": 2
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "shared": [
+            {
+              "AnyComparison": {
+                "name": "AnyComparison",
+                "description": "This comparison contains comparisons. Here we'll include a few overlapping comparisons and some arbitrary nesting just to make sure it works.",
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "comparisons": [
+                  {
+                    "GreaterOrEqual": {
+                      "name": "Basic 1",
+                      "description": null,
+                      "invert": false,
+                      "reduce_period": null,
+                      "reduce_method": "average",
+                      "string": null,
+                      "severity_on_failure": 2,
+                      "if_disconnected": 2,
+                      "value": 0.0
+                    }
+                  },
+                  {
+                    "Less": {
+                      "name": "Basic 2",
+                      "description": null,
+                      "invert": false,
+                      "reduce_period": null,
+                      "reduce_method": "average",
+                      "string": null,
+                      "severity_on_failure": 2,
+                      "if_disconnected": 2,
+                      "value": 100.0
+                    }
+                  },
+                  {
+                    "AnyComparison": {
+                      "name": "Nested",
+                      "description": null,
+                      "invert": false,
+                      "reduce_period": null,
+                      "reduce_method": "average",
+                      "string": null,
+                      "severity_on_failure": 2,
+                      "if_disconnected": 2,
+                      "comparisons": [
+                        {
+                          "AnyComparison": {
+                            "name": "Nested 2",
+                            "description": null,
+                            "invert": false,
+                            "reduce_period": null,
+                            "reduce_method": "average",
+                            "string": null,
+                            "severity_on_failure": 2,
+                            "if_disconnected": 2,
+                            "comparisons": [
+                              {
+                                "NotEquals": {
+                                  "name": "Nested 3",
+                                  "description": null,
+                                  "invert": false,
+                                  "reduce_period": null,
+                                  "reduce_method": "average",
+                                  "string": null,
+                                  "severity_on_failure": 2,
+                                  "if_disconnected": 2,
+                                  "value": -1,
+                                  "rtol": null,
+                                  "atol": null
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "AnyValue": {
+                "name": "AnyValue",
+                "description": "Pass if the state isn't Unknown",
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": true,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "values": [
+                  "DIAMOND",
+                  "OUT",
+                  "RETICLE",
+                  "YAG"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "ToolConfiguration": {
+          "name": "Ping",
+          "description": "Let's ping some commonly accessible servers and some garbled ones too",
+          "tags": [
+            "tool",
+            "ping"
+          ],
+          "tool": {
+            "Ping": {
+              "hosts": [
+                "psbuild-rhel7-01",
+                "psdev",
+                "xpp-control",
+                "aw3fhskjen"
+              ],
+              "count": 3,
+              "encoding": "utf-8"
+            }
+          },
+          "by_attr": {
+            "max_time": [],
+            "min_time": [],
+            "num_alive": [
+              {
+                "Equals": {
+                  "name": "three alive",
+                  "description": "The three real hosts should be a live, the keyboard mash should not be",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": 3,
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            ],
+            "num_unresponsive": []
+          },
+          "shared": []
+        }
+      }
+    ],
+    "values": {
+      "float": 3.14,
+      "integer": 42,
+      "text": "text"
+    },
+    "mode": "all"
+  }
+}

@@ -6,49 +6,54 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
+    <width>376</width>
     <height>38</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QHBoxLayout" name="horizontalLayout_2">
-   <item alignment="Qt::AlignLeft">
-    <widget class="QComboBox" name="comp_combobox">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
+  <layout class="QHBoxLayout" name="horizontalLayout">
+   <item>
+    <widget class="QToolButton" name="child_button">
+     <property name="text">
+      <string>...</string>
      </property>
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="comp_content"/>
+    <widget class="QLineEdit" name="name_edit"/>
    </item>
-   <item alignment="Qt::AlignRight">
-    <widget class="QPushButton" name="del_button">
+   <item>
+    <widget class="QComboBox" name="attr_combo">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
-     <property name="minimumSize">
+     <property name="sizeAdjustPolicy">
+      <enum>QComboBox::AdjustToContents</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="horizontalSpacer">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
       <size>
-       <width>20</width>
+       <width>40</width>
        <height>20</height>
       </size>
      </property>
-     <property name="maximumSize">
-      <size>
-       <width>20</width>
-       <height>20</height>
-      </size>
-     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QToolButton" name="delete_button">
      <property name="text">
-      <string>X</string>
+      <string>...</string>
      </property>
     </widget>
    </item>

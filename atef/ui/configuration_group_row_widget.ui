@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>425</width>
-    <height>41</height>
+    <width>400</width>
+    <height>38</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,18 +15,14 @@
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
    <item>
-    <widget class="QLabel" name="name_label">
+    <widget class="QToolButton" name="child_button">
      <property name="text">
-      <string>name_placeholder</string>
+      <string>...</string>
      </property>
     </widget>
    </item>
    <item>
-    <widget class="QLineEdit" name="name_edit">
-     <property name="text">
-      <string>name_placeholder</string>
-     </property>
-    </widget>
+    <widget class="QLineEdit" name="name_edit"/>
    </item>
    <item>
     <spacer name="horizontalSpacer">
@@ -42,16 +38,16 @@
     </spacer>
    </item>
    <item>
-    <widget class="QPushButton" name="rename_button">
+    <widget class="QLabel" name="type_label">
      <property name="text">
-      <string>Rename</string>
+      <string>TextLabel</string>
      </property>
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="confirm_button">
+    <widget class="QToolButton" name="delete_button">
      <property name="text">
-      <string>Confirm</string>
+      <string>...</string>
      </property>
     </widget>
    </item>

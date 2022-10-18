@@ -56,14 +56,21 @@ class QDataclassBridge(QObject):
             # 3. A list of values -> make a QDataclassList
             # 4. A list of dataclasses -> QDataclassList (object)
             normalized = normalize_annotation(field.type)
-            if List in normalized:
+            if Dict in normalized:
+                # Use dataclass value and override to object type
+                NestedClass = QDataclassValue
+                dtype = object
+            elif List in normalized:
+                # Make sure we have list manipulation methods
                 NestedClass = QDataclassList
+                dtype = normalized[-1]
             else:
                 NestedClass = QDataclassValue
+                dtype = normalized[-1]
             setattr(
                 self,
                 field.name,
-                NestedClass.of_type(normalized[-1])(
+                NestedClass.of_type(dtype)(
                     data,
                     field.name,
                     parent=self,
@@ -86,6 +93,11 @@ normalize_map = {
     'PrimitiveType': object,
     'Sequence': List,
     'Value': object,
+    'Dict': Dict,
+    'str, Any': object,
+    'str, List': object,
+    'GroupResultMode': str,
+    'tools.Tool': object,
 }
 
 
@@ -236,6 +248,13 @@ class QDataclassList(QDataclassElem):
         Return the current list of values.
         """
         return getattr(self.data, self.attr)
+
+    def put(self, values: List[Any]) -> None:
+        """
+        Replace the current list of values.
+        """
+        setattr(self.data, self.attr, values)
+        self.updated.emit()
 
     def append(self, new_value: Any) -> None:
         """

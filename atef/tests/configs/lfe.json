@@ -1,0 +1,314 @@
+{
+  "version": 0,
+  "root": {
+    "name": "lfe demo",
+    "description": "Demo config that uses real values, not necessarily in the optimal way",
+    "tags": null,
+    "configs": [
+      {
+        "ConfigurationGroup": {
+          "name": "at2l0",
+          "description": "Check that AT2L0 is out and without errors.",
+          "tags": [
+            "attenuator"
+          ],
+          "configs": [
+            {
+              "DeviceConfiguration": {
+                "name": "blade states",
+                "description": "Check that the individual blades are all out",
+                "tags": null,
+                "devices": [
+                  "at2l0"
+                ],
+                "by_attr": {
+                  "blade_01.state.state": [],
+                  "blade_02.state.state": [],
+                  "blade_03.state.state": [],
+                  "blade_04.state.state": [],
+                  "blade_05.state.state": [],
+                  "blade_06.state.state": [],
+                  "blade_07.state.state": [],
+                  "blade_08.state.state": [],
+                  "blade_09.state.state": [],
+                  "blade_10.state.state": [],
+                  "blade_11.state.state": [],
+                  "blade_12.state.state": [],
+                  "blade_13.state.state": [],
+                  "blade_14.state.state": [],
+                  "blade_15.state.state": [],
+                  "blade_16.state.state": [],
+                  "blade_17.state.state": [],
+                  "blade_18.state.state": [],
+                  "blade_19.state.state": []
+                },
+                "shared": [
+                  {
+                    "Equals": {
+                      "name": "blades out",
+                      "description": "every blade should be out",
+                      "invert": false,
+                      "reduce_period": null,
+                      "reduce_method": "average",
+                      "string": true,
+                      "severity_on_failure": 2,
+                      "if_disconnected": 2,
+                      "value": "OUT",
+                      "rtol": null,
+                      "atol": null
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "DeviceConfiguration": {
+                "name": "basic checks",
+                "description": "Checks on individual signals",
+                "tags": null,
+                "devices": [
+                  "at2l0"
+                ],
+                "by_attr": {
+                  "calculator.actual_transmission": [
+                    {
+                      "Equals": {
+                        "name": "transmission",
+                        "description": "calculated transmission should be full",
+                        "invert": false,
+                        "reduce_period": null,
+                        "reduce_method": "average",
+                        "string": null,
+                        "severity_on_failure": 2,
+                        "if_disconnected": 2,
+                        "value": 1.0,
+                        "rtol": null,
+                        "atol": null
+                      }
+                    }
+                  ],
+                  "error_summary_bitmask": [
+                    {
+                      "Equals": {
+                        "name": "errors",
+                        "description": "there should be no errors",
+                        "invert": false,
+                        "reduce_period": null,
+                        "reduce_method": "average",
+                        "string": null,
+                        "severity_on_failure": 2,
+                        "if_disconnected": 2,
+                        "value": 0,
+                        "rtol": null,
+                        "atol": null
+                      }
+                    }
+                  ]
+                },
+                "shared": []
+              }
+            }
+          ],
+          "values": {},
+          "mode": "all"
+        }
+      },
+      {
+        "DeviceConfiguration": {
+          "name": "imagers",
+          "description": "all checks for imaging devices",
+          "tags": [
+            "imager",
+            "camera"
+          ],
+          "devices": [
+            "im1l0",
+            "im2l0",
+            "im3l0",
+            "im4l0"
+          ],
+          "by_attr": {
+            "detector.image_counter": [
+              {
+                "Greater": {
+                  "name": "camera running",
+                  "description": "pass if counter value is changing",
+                  "invert": false,
+                  "reduce_period": 1.0,
+                  "reduce_method": "std",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": 1.0
+                }
+              }
+            ],
+            "detector.trigger_mode": [
+              {
+                "Equals": {
+                  "name": "target out",
+                  "description": "state must be out",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": true,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": "OUT",
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            ],
+            "target.state": [
+              {
+                "NotEquals": {
+                  "name": "camera triggered",
+                  "description": "camera must not be in free run",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": true,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": "Free Run",
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            ]
+          },
+          "shared": []
+        }
+      },
+      {
+        "DeviceConfiguration": {
+          "name": "valves",
+          "description": "make sure all the valves are open",
+          "tags": [
+            "valve",
+            "vacuum"
+          ],
+          "devices": [
+            "tv1l0_vgc01",
+            "tv2l0_vgc01",
+            "tv2l0_vgc02",
+            "tv4l0_vgc01",
+            "tv5l0_vgc01",
+            "tv6l0_vgc01",
+            "bt2l0_pleg_vgc01",
+            "mr1l0_homs_vgc01",
+            "mr2l0_homs_vgc01",
+            "mr2l0_homs_vgc_02",
+            "pc1l0_xtes_vgc01"
+          ],
+          "by_attr": {
+            "closed_limit": [
+              {
+                "Equals": {
+                  "name": "is not closed",
+                  "description": "pass if valve is not closed, according to the limit switch",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": 0,
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            ],
+            "open_limit": [
+              {
+                "Equals": {
+                  "name": "is open",
+                  "description": "pass if valve is open, according to the limit switch",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": 1,
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            ]
+          },
+          "shared": []
+        }
+      },
+      {
+        "PVConfiguration": {
+          "name": "gauge pressures",
+          "description": "make sure we're at vacuum",
+          "tags": null,
+          "by_pv": {
+            "AT2L0:SOLID:GCC:01:PRESS_RBV": [],
+            "AT2L0:SOLID:PIN:01:PRESS_RBV": [],
+            "BT2L0:PLEG:GCC:01:PRESS_RBV": [],
+            "BT2L0:PLEG:PIP:01:PRESS_RBV": [],
+            "HX3:MON:GCC:01:PMON": [],
+            "MR1L0:HOMS:GCC:01:PRESS_RBV": [],
+            "MR2L0:HOMS:GCC:01:PRESS_RBV": [],
+            "MR2L0:HOMS:PIP:01:PRESS_RBV": [],
+            "PA1L0:GCC:01:PRESS_RBV": [],
+            "PA1L0:PIN:01:PRESS_RBV": [],
+            "RTDSL0:PIP:01:PRESS_RBV": [],
+            "RTDSL0:PIP:02:PRESS_RBV": [],
+            "RTDSL0:PIP:03:PRESS_RBV": [],
+            "RTDSL0:PIP:04:PRESS_RBV": [],
+            "RTDSL0:PIP:05:PRESS_RBV": [],
+            "SL1L0:POWER:GCC:01:PRESS_RBV": [],
+            "SL1L0:POWER:PIN:01:PRESS_RBV": [],
+            "SP1L0:KMONO:GCC:01:PMON": [],
+            "SP1L0:KMONO:PIP:01:PRESS_RBV": [],
+            "ST1L0:XTES:GCC:01:PRESS_RBV": [],
+            "ST1L0:XTES:PIP:01:PRESS_RBV": [],
+            "TV1L0:GCC:01:PRESS_RBV": [],
+            "TV2L0:GCC:01:PRESS_RBV": [],
+            "TV2L0:GCC:02:PRESS_RBV": [],
+            "TV2L0:PIP:01:PRESS_RBV": [],
+            "TV2L0:PIP:02:PRESS_RBV": [],
+            "TV2L0:PIP:03:PRESS_RBV": [],
+            "TV3L0:PIP:01:PRESS_RBV": [],
+            "TV4L0:GCC:01:PRESS_RBV": [],
+            "TV4L0:GCC:02:PRESS_RBV": [],
+            "TV4L0:PIP:01:PRESS_RBV": [],
+            "TV4L0:PIP:02:PRESS_RBV": [],
+            "TV5L0:GCC:01:PRESS_RBV": [],
+            "TV5L0:GCC:02:PRESS_RBV": [],
+            "TV5L0:GCC:03:PRESS_RBV": [],
+            "TV5L0:GFS:01:PRESS_RBV": [],
+            "TV5L0:PIP:01:PMON": [],
+            "TV5L0:PIP:01:PRESS_RBV": [],
+            "TV5L0:PIP:02:PMON": [],
+            "TV5L0:PIP:02:PRESS_RBV": [],
+            "TV5L0:PIP:03:PMON": [],
+            "TV5L0:PIP:03:PRESS_RBV": []
+          },
+          "shared": [
+            {
+              "Less": {
+                "name": "good vacuum",
+                "description": "make sure we have some level of vacuum everywhere",
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "value": 1e-06
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "values": {},
+    "mode": "all"
+  }
+}

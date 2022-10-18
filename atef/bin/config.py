@@ -9,7 +9,7 @@ from pydm import exception
 from qtpy.QtWidgets import QApplication
 
 from ..type_hints import AnyPath
-from ..widgets.config import Window
+from ..widgets.config.window import Window
 
 logger = logging.getLogger(__name__)
 
