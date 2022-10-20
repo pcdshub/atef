@@ -17,6 +17,7 @@ from atef.config import (Configuration, DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
 from atef.qt_helpers import QDataclassList, QDataclassValue
 from atef.tools import Ping
+from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
@@ -372,6 +373,16 @@ class ComponentListWidget(StringListWithDialog):
                 high=summary.maximum,
             )
             self.suggest_comparison.emit(comparison)
+
+        def open_arch_viewer():
+            widget = get_archive_viewer()
+            self._arch = widget
+            widget.show()
+            # widget.activateWindow()
+
+        menu.addSection("Open Archive Data viewer")
+        archive_viewer_all = menu.addAction("View all selected")
+        archive_viewer_all.triggered.connect(open_arch_viewer)
 
         menu.addSection("Add all selected")
         add_without_action = menu.addAction("Add selected without comparison")
