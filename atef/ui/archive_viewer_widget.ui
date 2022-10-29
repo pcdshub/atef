@@ -98,7 +98,14 @@
       <widget class="QLineEdit" name="input_field"/>
      </item>
      <item>
-      <widget class="QListWidget" name="string_list"/>
+      <widget class="QTableView" name="curve_list"/>
+     </item>
+     <item>
+      <widget class="QPushButton" name="redraw_button">
+       <property name="text">
+        <string>Redraw Curves</string>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>
