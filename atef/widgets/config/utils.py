@@ -375,10 +375,10 @@ class ComponentListWidget(StringListWithDialog):
             self.suggest_comparison.emit(comparison)
 
         def open_arch_viewer():
-            widget = get_archive_viewer()
-            self._arch = widget
-            widget.show()
-            # widget.activateWindow()
+            arch_widget = get_archive_viewer()
+            for datum in data:
+                arch_widget.add_signal(datum.pvname)
+            arch_widget.show()
 
         menu.addSection("Open Archive Data viewer")
         archive_viewer_all = menu.addAction("View all selected")
