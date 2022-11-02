@@ -8,11 +8,15 @@ import pytest
 from ..archive_device import ArchivedValue, make_archived_device
 from . import conftest
 
+# skip these devices, subclassing is too involved to be automated
+SKIP_CLS = ['LightpathMixin', 'LightpathInOutCptMixin']
+
 all_pcdsdevice_classes = pytest.mark.parametrize(
     "cls",
     [
         pytest.param(cls, id=f"{cls.__module__}.{cls.__name__}")
-        for cls in pcdsdevices.tests.conftest.find_all_device_classes()
+        for cls
+        in pcdsdevices.tests.conftest.find_all_device_classes(skip=SKIP_CLS)
     ]
 )
 
