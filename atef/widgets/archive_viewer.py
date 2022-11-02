@@ -5,7 +5,7 @@ Widget classes designed for PV archiver interaction
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional
 
 from pydm.widgets.archiver_time_plot import PyDMArchiverTimePlot
 from qtpy import QtCore, QtGui, QtWidgets
@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 archive_viewer_singleton = None
 symbol_map = {'None': None, 'circle': 'o', 'square': 's',
               'cross': '+', 'star': 'star'}
+
+style_map = {'solid': QtCore.Qt.SolidLine,
+             'dash': QtCore.Qt.DashLine, 'dot': QtCore.Qt.DotLine}
 
 
 def get_archive_viewer() -> ArchiverViewerWidget:
@@ -91,13 +94,18 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.curve_list.setItemDelegateForColumn(1, self.colorDelegate)
 
         # symbol delegate
-        self.symbolDelegate = SymbolDelegate()
+        self.symbolDelegate = EnumDelegate(enums=symbol_map)
         self.curve_list.setItemDelegateForColumn(2, self.symbolDelegate)
+
+        # style delegate
+        self.styleDelegate = EnumDelegate(enums=style_map)
+        self.curve_list.setItemDelegateForColumn(3, self.styleDelegate)
 
         # delete button in last column
         self.deleteDelegate = DeleteDelegate()
         # -1 doesn't work sadly
-        self.curve_list.setItemDelegateForColumn(3, self.deleteDelegate)
+        del_col = len(self.model.headers) - 1
+        self.curve_list.setItemDelegateForColumn(del_col, self.deleteDelegate)
         self.deleteDelegate.delete_request.connect(self.model.removeRow)
 
         for pv in (self._pv_list or []):
@@ -157,8 +165,10 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             self.time_plot.addYChannel(
                 y_channel=f'ca://{pv[0]}',
                 name=f'{pv[0]}',
-                symbol=symbol_map[pv[1]['symbol']],
+                symbol=pv[1]['symbol'],
                 color=pv[1]['color'],
+                lineStyle=pv[1]['lineStyle'],
+                lineWidth=pv[1]['lineWidth'],
                 useArchiveData=True
             )
 
@@ -189,14 +199,15 @@ class PVModel(QtCore.QAbstractTableModel):
         # fill out here and feed into super
         super().__init__(*args, **kwargs)
         self.pvs: List[List[str, dict]] = pvs or []
-        self.headers = ['PV Name', 'color', 'symbol', 'remove']
+        self.headers = ['PV Name', 'color', 'symbol', 'lineStyle',
+                        'lineWidth', 'remove']
 
     def data(self, index, role):
         if index.column() == 0:
             # name column, no edit permissions
             if role == QtCore.Qt.DisplayRole:
                 return self.pvs[index.row()][0]
-        elif index.column() == 3:
+        elif index.column() == (len(self.headers) - 1):
             if role == QtCore.Qt.DisplayRole:
                 return 'delete?'
         else:
@@ -256,7 +267,10 @@ class PVModel(QtCore.QAbstractTableModel):
             QtCore.QModelIndex(), row, row
         )
         self.pvs.insert(
-            row, ['name', {'color': QtGui.QColor(255, 0, 0), 'symbol': 'circle'}]
+            row, ['name', {'color': QtGui.QColor(255, 0, 0),
+                           'symbol': 'o',
+                           'lineWidth': 2,
+                           'lineStyle': QtCore.Qt.SolidLine}]
         )
         self.endInsertRows()
         return True
@@ -290,7 +304,7 @@ class PVModel(QtCore.QAbstractTableModel):
         index_2 = self.createIndex(0, 3)
         self.insertRow(0, index_1)
         # TO-DO: Need to validate the pv's here, ouside of just the input fields
-        self.pvs[0] = [pv, {'color': QtGui.QColor(255, 0, 0), 'symbol': 'circle'}]
+        self.pvs[0][0] = pv
         self.dataChanged.emit(index_1, index_2)
         return True
 
@@ -317,7 +331,12 @@ class ColorDelegate(QtWidgets.QStyledItemDelegate):
             model.setData(index, color, QtCore.Qt.EditRole)
 
 
-class SymbolDelegate(QtWidgets.QStyledItemDelegate):
+class EnumDelegate(QtWidgets.QStyledItemDelegate):
+    def __init__(self, *args, enums: Dict[str, Any], **kwargs) -> None:
+        self.enums = enums
+        self.enums_inv = {value: key for key, value in self.enums.items()}
+        super().__init__(*args, **kwargs)
+
     def createEditor(
         self,
         parent: QtWidgets.QWidget,
@@ -325,7 +344,7 @@ class SymbolDelegate(QtWidgets.QStyledItemDelegate):
         index: QtCore.QModelIndex
     ) -> QtWidgets.QWidget:
         combo = QtWidgets.QComboBox(parent=parent)
-        combo.insertItems(0, list(symbol_map.keys()))
+        combo.insertItems(0, list(self.enums.keys()))
         return combo
 
     def setModelData(
@@ -335,7 +354,10 @@ class SymbolDelegate(QtWidgets.QStyledItemDelegate):
         index: QtCore.QModelIndex
     ) -> None:
         value = editor.currentText()
-        model.setData(index, value, QtCore.Qt.EditRole)
+        model.setData(index, self.enums[value], QtCore.Qt.EditRole)
+
+    def displayText(self, value: Any, locale: QtCore.QLocale) -> str:
+        return str(self.enums_inv[value])
 
 
 class DeleteDelegate(QtWidgets.QStyledItemDelegate):
