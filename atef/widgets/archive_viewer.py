@@ -5,6 +5,8 @@ Widget classes designed for PV archiver interaction
 from __future__ import annotations
 
 import logging
+import os
+import urllib
 from typing import Any, ClassVar, Dict, List, Optional
 
 from pydm.widgets.archiver_time_plot import PyDMArchiverTimePlot
@@ -17,9 +19,10 @@ from atef.widgets.core import DesignerDisplay
 
 logger = logging.getLogger(__name__)
 archive_viewer_singleton = None
+ARCHIVER_URLS = ['http://pscaa01.slac.stanford.edu',
+                 'http://pscaa02.slac.stanford.edu']
 symbol_map = {'None': None, 'circle': 'o', 'square': 's',
               'cross': '+', 'star': 'star'}
-
 style_map = {'solid': QtCore.Qt.SolidLine,
              'dash': QtCore.Qt.DashLine, 'dot': QtCore.Qt.DotLine}
 
@@ -34,12 +37,48 @@ def get_archive_viewer() -> ArchiverViewerWidget:
     ArchiveViewerWidget
         the widget instance
     """
-    if archive_viewer_singleton:
-        return archive_viewer_singleton
-    else:
-        return ArchiverViewerWidget()
+    global archive_viewer_singleton
+    if archive_viewer_singleton is None:
+        archive_viewer_singleton = ArchiverViewerWidget()
+    return archive_viewer_singleton
 
 
+def get_pingable_url(urls: List[str]) -> str:
+    """
+    Get valid archiver URLS from the urls
+
+    Returns
+    -------
+    str
+        a valid archiver url
+    """
+    for url in urls:
+        try:
+            _ = urllib.request.urlopen(url, timeout=1)
+        except urllib.error.URLError as e:
+            if e.reason.errno and e.reason.errno < 400:
+                # timeouts give socket.timeout and have no errno
+                # here we only care if the server exists
+                # connection refused is ok
+                return url + ':17668'
+
+
+class ArchiverError(Exception):
+    """ Archiver related exceptions """
+    ...
+
+
+# TO-DO: crosshair hover over plot?
+#   -> time_plot.enableCrosshair
+# TO-DO: scaling / dealing with different scales
+# TO-DO: set the units in the label? maybe ignore it, nothing else has it
+# TO-DO: set up validator on QLineEdit, PV exists, has data?
+# TO-DO: Turn off autoscale.  Set to 1 day automatically
+# TO-DO: Make redraw retain scale.
+# TO-DO: get rid of bars
+#   - to reproduce
+#       - plot, zoom out to fill data, then redraw.  bars will remain
+#   - not plotstyle?...
 class ArchiverViewerWidget(DesignerDisplay, QWidget):
     """
     Archiver time plot viewer
@@ -61,22 +100,18 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
     ):
         super().__init__(parent=parent)
 
-        # list_holder = ListHolder(
-        #     some_list=list(self.)
-        # )
-        # self.pv_list = QDataclassList.of_type(str)(
-        #     data=,
-        #     attr='some_list'
-        #     parent=self
-        # )
+        # set the PYDM_ARCHIVER_URL if not already set
+        if not os.environ.get('PYDM_ARCHIVER_URL'):
+            archiver_url = get_pingable_url(ARCHIVER_URLS)
+            if archiver_url is None:
+                raise ArchiverError('Cannot reach any archiver urls')
+            print(f'setting archiver url to: {archiver_url}')
+            os.environ['PYDM_ARCHIVER_URL'] = archiver_url
+
         self._pv_list = pvs
         for pv in pvs:
             self.model.add_signal(pv)
 
-        # - look for correct archiver url, take one that pings or look for env var
-        # - connect curve_list to plot
-        # - connect buttons on string lists?
-        # - set up validator on QLineEdit
         self._setup_ui()
         self._setup_range_buttons()
 
@@ -149,8 +184,6 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             # grab and clear text
             pv = self.input_field.text()
 
-            # TO-DO: Further validation?  Check if PV exists?
-
             # add item
             self.add_signal(pv)
 
@@ -180,11 +213,6 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             logger.debug('left axis does not exist to rename')
 
         self.time_plot.setShowLegend(True)
-
-    # TO-DO: crosshair hover over plot?
-    #   -> time_plot.enableCrosshair
-    # TO-DO: scaling / dealing with different scales
-    # TO-DO: set the units in the label?
 
     def add_signal(self, pv: str) -> None:
         success = self.model.add_signal(pv)
@@ -303,7 +331,6 @@ class PVModel(QtCore.QAbstractTableModel):
         index_1 = self.createIndex(0, 0)
         index_2 = self.createIndex(0, 3)
         self.insertRow(0, index_1)
-        # TO-DO: Need to validate the pv's here, ouside of just the input fields
         self.pvs[0][0] = pv
         self.dataChanged.emit(index_1, index_2)
         return True
