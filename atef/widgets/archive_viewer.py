@@ -4,11 +4,13 @@ Widget classes designed for PV archiver interaction
 
 from __future__ import annotations
 
+import datetime
 import logging
 import os
 import urllib
 from typing import Any, ClassVar, Dict, List, Optional
 
+from archapp.interactive import EpicsArchive
 from pydm.widgets.archiver_time_plot import PyDMArchiverTimePlot
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QRegularExpression
@@ -105,8 +107,14 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             archiver_url = get_pingable_url(ARCHIVER_URLS)
             if archiver_url is None:
                 raise ArchiverError('Cannot reach any archiver urls')
-            print(f'setting archiver url to: {archiver_url}')
+            # need to set environment variable for archiver data plugin
+            logger.debug(f'setting archiver url to: {archiver_url}')
             os.environ['PYDM_ARCHIVER_URL'] = archiver_url
+        else:
+            archiver_url = os.environ['PYDM_ARCHIVER_URL']
+
+        url_core = archiver_url.removeprefix('http://').split('.', 1)[0]
+        self.archapp = EpicsArchive(url_core)
 
         self._pv_list = pvs
         for pv in pvs:
@@ -184,6 +192,16 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             # grab and clear text
             pv = self.input_field.text()
 
+            # check if data exists
+            data = self.get_pv_data_snippet(pv)
+            if len(data['data']) < 3:
+                QtWidgets.QMessageBox.information(
+                    self,
+                    'Invalid PV',
+                    '< 3 datapoints from last two days found in '
+                    'archiver app, skipping add'
+                )
+
             # add item
             self.add_signal(pv)
 
@@ -195,18 +213,22 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
         self.time_plot.clearCurves()
         for pv in pv_data:
+
+            data = self.get_pv_data_snippet(pv[0])
+
             self.time_plot.addYChannel(
                 y_channel=f'ca://{pv[0]}',
-                name=f'{pv[0]}',
+                name=f'{pv[0]} ({data["meta"].get("EGU","")})',
                 symbol=pv[1]['symbol'],
                 color=pv[1]['color'],
                 lineStyle=pv[1]['lineStyle'],
                 lineWidth=pv[1]['lineWidth'],
-                useArchiveData=True
+                useArchiveData=True,
+                yAxisName='yAxis'
             )
 
         try:
-            self.time_plot.setLabel('left', text='')
+            self.time_plot.setLabel('yAxis', text='')
         except Exception:
             # pyqtgraph raises a vanilla exception
             # if a better way to find the left axis name exists, use it
@@ -219,6 +241,15 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         if success:
             self._update_curves()
             self.input_field.clear()
+
+    def get_pv_data_snippet(self, pv: str) -> Dict[str, Any]:
+        # use raw get for json metadata
+        # also sidesteps an issue where some PV's aren't found using
+        # the normal EpicsArchive.get()
+        today = datetime.datetime.today()
+        prev = today - datetime.timedelta(days=2)
+        data = self.archapp._data.get_raw(pv, prev, today)
+        return data
 
 
 class PVModel(QtCore.QAbstractTableModel):
