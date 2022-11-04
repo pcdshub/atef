@@ -48,11 +48,12 @@ def get_archive_viewer() -> ArchiverViewerWidget:
 def get_pingable_url(urls: List[str]) -> str:
     """
     Get valid archiver URLS from the urls
+    Looks only for an response code below 400, as a proxy ping test.
 
     Returns
     -------
     str
-        a valid archiver url
+        a responsive url
     """
     for url in urls:
         try:
@@ -72,15 +73,12 @@ class ArchiverError(Exception):
 
 # TO-DO: crosshair hover over plot?
 #   -> time_plot.enableCrosshair
-# TO-DO: scaling / dealing with different scales
-# TO-DO: set the units in the label? maybe ignore it, nothing else has it
-# TO-DO: set up validator on QLineEdit, PV exists, has data?
+# TO-DO: scaling / dealing with different scales between curves
 # TO-DO: Turn off autoscale.  Set to 1 day automatically
+# TO-DO: make buttons work after manual zoom
 # TO-DO: Make redraw retain scale.
-# TO-DO: get rid of bars
-#   - to reproduce
-#       - plot, zoom out to fill data, then redraw.  bars will remain
-#   - not plotstyle?...
+# TO-DO: Cycle colors on curve add
+# TO-DO: get rid of bars --> Known bug with PydmArchiveTimePlot
 class ArchiverViewerWidget(DesignerDisplay, QWidget):
     """
     Archiver time plot viewer
@@ -146,7 +144,6 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
         # delete button in last column
         self.deleteDelegate = DeleteDelegate()
-        # -1 doesn't work sadly
         del_col = len(self.model.headers) - 1
         self.curve_list.setItemDelegateForColumn(del_col, self.deleteDelegate)
         self.deleteDelegate.delete_request.connect(self.model.removeRow)
@@ -158,7 +155,6 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self._setup_pv_selector()
 
         self.redraw_button.clicked.connect(self._update_curves)
-        # pass
 
     def _setup_range_buttons(self):
         def _set_time_span_fn(s: float):
@@ -172,7 +168,10 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
                 The time span in seconds
             """
             def fn():
-                self.time_plot.setTimeSpan(s)
+                now = datetime.datetime.today()
+                prev = now - datetime.timedelta(seconds=s)
+                self.time_plot.setMaxXRange(now.timestamp())
+                self.time_plot.setMinXRange(prev.timestamp())
                 self.time_plot.updateXAxis()
             return fn
 
@@ -181,7 +180,6 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.button_month.clicked.connect(_set_time_span_fn(24*60*60*30))
 
     def _setup_pv_selector(self):
-        # inputs get made into list items
         # validate PV form, returnPressed unless valid
         regexp = QRegularExpression(r'^\w+(:\w+)+(\.\w+)*$')
         validator = QRegularExpressionValidator(regexp)
@@ -198,9 +196,10 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
                 QtWidgets.QMessageBox.information(
                     self,
                     'Invalid PV',
-                    '< 3 datapoints from last two days found in '
+                    'Fewer than 3 datapoints from last two days found in '
                     'archiver app, skipping add'
                 )
+                return
 
             # add item
             self.add_signal(pv)
@@ -211,6 +210,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         # grab all the list items
         pv_data = self.curve_list.model().pvs
 
+        # Re-add curves
         self.time_plot.clearCurves()
         for pv in pv_data:
 
