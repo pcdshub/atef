@@ -5,6 +5,7 @@ Widget classes designed for PV archiver interaction
 from __future__ import annotations
 
 import datetime
+import itertools
 import logging
 import os
 import urllib
@@ -27,6 +28,10 @@ symbol_map = {'None': None, 'circle': 'o', 'square': 's',
               'cross': '+', 'star': 'star'}
 style_map = {'solid': QtCore.Qt.SolidLine,
              'dash': QtCore.Qt.DashLine, 'dot': QtCore.Qt.DotLine}
+color_cycle = itertools.cycle(
+    [QtGui.QColor('red'), QtGui.QColor('blue'),
+     QtGui.QColor('green'), QtGui.QColor('white')]
+)
 
 
 def get_archive_viewer() -> ArchiverViewerWidget:
@@ -326,7 +331,7 @@ class PVModel(QtCore.QAbstractTableModel):
             QtCore.QModelIndex(), row, row
         )
         self.pvs.insert(
-            row, ['name', {'color': QtGui.QColor(255, 0, 0),
+            row, ['name', {'color': next(color_cycle),
                            'symbol': 'o',
                            'lineWidth': 2,
                            'lineStyle': QtCore.Qt.SolidLine}]
