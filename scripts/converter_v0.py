@@ -10,7 +10,7 @@ import json
 import logging
 import pathlib
 from dataclasses import dataclass, field
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 import apischema
 import yaml
@@ -141,6 +141,94 @@ class PrototypeConfigurationFile:
         return apischema.deserialize(cls, serialized_config)
 
 
+def _split_shared_checklist(
+    checklist: List[IdentifierAndComparison],
+) -> Tuple[List[Comparison], Dict[str, List[Comparison]]]:
+    """
+    Split a prototype "checklist", consisting of pairs of identifiers and
+    comparisons into the new format of "shared" and "per-identifier" (i.e.,
+    pv/attr) comparisons.
+
+    Parameters
+    ----------
+    checklist : List[IdentifierAndComparison]
+        The prototype checklist.
+
+    Returns
+    -------
+    List[Comparison]
+        Shared comparisons.
+    Dict[str, List[Comparison]]
+        Per-identifier comparisons, with the identifier as the key.
+    """
+    shared = []
+    by_identifier = {}
+    if len(checklist) == 1:
+        # If there is only one checklist, the comparisons can be considered
+        # "shared".
+        for check in checklist:
+            for comparison in check.comparisons:
+                shared.append(comparison)
+                for identifier in check.ids:
+                    by_identifier.setdefault(identifier, [])
+    else:
+        # Otherwise, comparisons from every checklist will become
+        # per-identifier.
+        for check in checklist:
+            for comparison in check.comparisons:
+                for identifier in check.ids:
+                    by_identifier.setdefault(identifier, []).append(comparison)
+    return shared, by_identifier
+
+
+def convert_configuration(config: AnyConfiguration) -> atef.config.AnyConfiguration:
+    """
+    Convert a prototype Configuration to a supported one.
+
+    Parameters
+    ----------
+    config : AnyConfiguration
+        The old prototype configuration.
+
+    Returns
+    -------
+    atef.config.AnyConfiguration
+        The new and supported configuration.
+    """
+    if not isinstance(config, (DeviceConfiguration, PVConfiguration, ToolConfiguration)):
+        raise ValueError(f"Unexpected and unsupported config type: {type(config)}")
+
+    shared, by_identifier = _split_shared_checklist(config.checklist)
+    if isinstance(config, DeviceConfiguration):
+        return atef.config.DeviceConfiguration(
+            name=config.name,
+            description=config.description,
+            tags=config.tags,
+            devices=config.devices,
+            by_attr=by_identifier,
+            shared=shared,
+        )
+
+    if isinstance(config, PVConfiguration):
+        return atef.config.PVConfiguration(
+            name=config.name,
+            description=config.description,
+            tags=config.tags,
+            by_pv=by_identifier,
+            shared=shared,
+        )
+
+    if isinstance(config, ToolConfiguration):
+        return atef.config.ToolConfiguration(
+            name=config.name,
+            description=config.description,
+            tags=config.tags,
+            tool=config.tool,
+            shared=shared,
+            by_attr=by_identifier,
+        )
+
+
 def load(filename: AnyPath) -> atef.config.ConfigurationFile:
     """
     Load the provided prototype atef configuration file to the latest
@@ -159,43 +247,8 @@ def load(filename: AnyPath) -> atef.config.ConfigurationFile:
     old = PrototypeConfigurationFile.from_file(filename)
     new = atef.config.ConfigurationFile()
     for config in old.configs:
-        new_config = None
-        if isinstance(config, DeviceConfiguration):
-            new_config = atef.config.DeviceConfiguration(
-                name=config.name,
-                description=config.description,
-                tags=config.tags,
-                devices=config.devices,
-            )
-            for check in config.checklist:
-                for comparison in check.comparisons:
-                    for attr in check.ids:
-                        new_config.by_attr.setdefault(attr, []).append(comparison)
-        elif isinstance(config, PVConfiguration):
-            new_config = atef.config.PVConfiguration(
-                name=config.name,
-                description=config.description,
-                tags=config.tags,
-            )
-            for check in config.checklist:
-                for comparison in check.comparisons:
-                    for pvname in check.ids:
-                        new_config.by_pv.setdefault(pvname, []).append(comparison)
-        elif isinstance(config, ToolConfiguration):
-            new_config = atef.config.ToolConfiguration(
-                name=config.name,
-                description=config.description,
-                tags=config.tags,
-                tool=config.tool,
-            )
-            for check in config.checklist:
-                for comparison in check.comparisons:
-                    for attr in check.ids:
-                        new_config.by_attr.setdefault(attr, []).append(comparison)
-        else:
-            raise ValueError(type(config))
-
-        new.root.configs.append(new_config)
+        config = cast(AnyConfiguration, config)
+        new.root.configs.append(convert_configuration(config))
     return new
 
 
