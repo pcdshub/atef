@@ -50,10 +50,12 @@ def get_archive_viewer() -> ArchiverViewerWidget:
     return archive_viewer_singleton
 
 
-def get_pingable_url(urls: List[str]) -> str:
+def get_reachable_url(urls: List[str]) -> str:
     """
     Get valid archiver URLS from the urls
     Looks only for an response code below 400, as a proxy ping test.
+    Ideally the urls provided by the env var work, but for now we
+    err on the side fo caution
 
     Returns
     -------
@@ -64,7 +66,15 @@ def get_pingable_url(urls: List[str]) -> str:
         try:
             _ = urllib.request.urlopen(url, timeout=1)
         except urllib.error.URLError as e:
-            if e.reason.errno and e.reason.errno < 400:
+            if isinstance(e, urllib.error.HTTPError):
+                # HTTPError subclasses URLError, separates code
+                errno = e.code
+            elif e.reason.errno:
+                errno = e.reason.errno
+            else:
+                errno = -1
+
+            if 0 < errno < 400:
                 # timeouts give socket.timeout and have no errno
                 # here we only care if the server exists
                 # connection refused is ok
@@ -106,7 +116,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
         # set the PYDM_ARCHIVER_URL if not already set
         if not os.environ.get('PYDM_ARCHIVER_URL'):
-            archiver_url = get_pingable_url(ARCHIVER_URLS)
+            archiver_url = get_reachable_url(ARCHIVER_URLS)
             if archiver_url is None:
                 raise ArchiverError('Cannot reach any archiver urls')
             # need to set environment variable for archiver data plugin
