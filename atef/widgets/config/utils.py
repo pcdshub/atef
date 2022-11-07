@@ -377,7 +377,8 @@ class ComponentListWidget(StringListWithDialog):
         def open_arch_viewer():
             arch_widget = get_archive_viewer()
             for datum in data:
-                arch_widget.add_signal(datum.pvname)
+                dev_attr = '.'.join((datum.signal.parent.name, datum.attr))
+                arch_widget.add_signal(datum.pvname, dev_attr=dev_attr)
             arch_widget.show()
 
         menu.addSection("Open Archive Data viewer")

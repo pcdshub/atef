@@ -82,8 +82,7 @@ class ArchiverError(Exception):
 # TO-DO: Turn off autoscale.  Set to 1 day automatically
 # TO-DO: make buttons work after manual zoom
 # TO-DO: Make redraw retain scale.
-# TO-DO: Cycle colors on curve add
-# TO-DO: get rid of bars --> Known bug with PydmArchiveTimePlot
+# TO-DO: set tooltips
 class ArchiverViewerWidget(DesignerDisplay, QWidget):
     """
     Archiver time plot viewer
@@ -137,15 +136,15 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         # set up delegates
         # Color picker delegate
         self.colorDelegate = ColorDelegate()
-        self.curve_list.setItemDelegateForColumn(1, self.colorDelegate)
+        self.curve_list.setItemDelegateForColumn(2, self.colorDelegate)
 
         # symbol delegate
         self.symbolDelegate = EnumDelegate(enums=symbol_map)
-        self.curve_list.setItemDelegateForColumn(2, self.symbolDelegate)
+        self.curve_list.setItemDelegateForColumn(3, self.symbolDelegate)
 
         # style delegate
         self.styleDelegate = EnumDelegate(enums=style_map)
-        self.curve_list.setItemDelegateForColumn(3, self.styleDelegate)
+        self.curve_list.setItemDelegateForColumn(4, self.styleDelegate)
 
         # delete button in last column
         self.deleteDelegate = DeleteDelegate()
@@ -195,17 +194,6 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             # grab and clear text
             pv = self.input_field.text()
 
-            # check if data exists
-            data = self.get_pv_data_snippet(pv)
-            if len(data['data']) < 3:
-                QtWidgets.QMessageBox.information(
-                    self,
-                    'Invalid PV',
-                    'Fewer than 3 datapoints from last two days found in '
-                    'archiver app, skipping add'
-                )
-                return
-
             # add item
             self.add_signal(pv)
 
@@ -241,8 +229,20 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
         self.time_plot.setShowLegend(True)
 
-    def add_signal(self, pv: str) -> None:
-        success = self.model.add_signal(pv)
+    def add_signal(self, pv: str, dev_attr: Optional[str] = None) -> None:
+        # check if data exists
+        data = self.get_pv_data_snippet(pv)
+        if data and len(data['data']) < 3:
+            QtWidgets.QMessageBox.information(
+                self,
+                'Invalid PV',
+                'Fewer than 3 datapoints from last two days found in '
+                'archiver app, skipping add'
+            )
+            return
+
+        success = self.model.add_signal(pv, dev_attr=dev_attr)
+
         if success:
             self._update_curves()
             self.input_field.clear()
@@ -263,8 +263,8 @@ class PVModel(QtCore.QAbstractTableModel):
         # fill out here and feed into super
         super().__init__(*args, **kwargs)
         self.pvs: List[List[str, dict]] = pvs or []
-        self.headers = ['PV Name', 'color', 'symbol', 'lineStyle',
-                        'lineWidth', 'remove']
+        self.headers = ['PV Name', 'component', 'color', 'symbol',
+                        'lineStyle', 'lineWidth', 'remove']
 
     def data(self, index, role):
         if index.column() == 0:
@@ -276,12 +276,11 @@ class PVModel(QtCore.QAbstractTableModel):
                 return 'delete?'
         else:
             # data column.  Each column gets its own data delegate
-            if role == QtCore.Qt.DisplayRole:
-                name, data = self.pvs[index.row()]
-                return data[self.headers[index.column()]]
-            if role in (QtCore.Qt.EditRole, QtCore.Qt.BackgroundRole):
+            if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
+                        QtCore.Qt.BackgroundRole):
+                _, data = self.pvs[index.row()]
                 col_name = self.headers[index.column()]
-                return self.pvs[index.row()][1][col_name]
+                return data[col_name]
 
     def rowCount(self, index): return len(self.pvs)
 
@@ -332,6 +331,7 @@ class PVModel(QtCore.QAbstractTableModel):
         )
         self.pvs.insert(
             row, ['name', {'color': next(color_cycle),
+                           'component': 'N/A',
                            'symbol': 'o',
                            'lineWidth': 2,
                            'lineStyle': QtCore.Qt.SolidLine}]
@@ -339,7 +339,7 @@ class PVModel(QtCore.QAbstractTableModel):
         self.endInsertRows()
         return True
 
-    def add_signal(self, pv: str) -> bool:
+    def add_signal(self, pv: str, dev_attr: Optional[str] = None) -> bool:
         """
         Add a signal to the widget.
 
@@ -368,6 +368,8 @@ class PVModel(QtCore.QAbstractTableModel):
         index_2 = self.createIndex(0, 3)
         self.insertRow(0, index_1)
         self.pvs[0][0] = pv
+        if dev_attr:
+            self.pvs[0][1]['component'] = dev_attr
         self.dataChanged.emit(index_1, index_2)
         return True
 
