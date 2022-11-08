@@ -14,7 +14,7 @@ from typing import Any, ClassVar, Dict, List, Optional
 from archapp.interactive import EpicsArchive
 from pydm.widgets.archiver_time_plot import PyDMArchiverTimePlot
 from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import QRegularExpression
+from qtpy.QtCore import QRegularExpression, Qt
 from qtpy.QtGui import QRegularExpressionValidator
 from qtpy.QtWidgets import QWidget
 
@@ -26,8 +26,8 @@ ARCHIVER_URLS = ['http://pscaa01.slac.stanford.edu',
                  'http://pscaa02.slac.stanford.edu']
 symbol_map = {'None': None, 'circle': 'o', 'square': 's',
               'cross': '+', 'star': 'star'}
-style_map = {'solid': QtCore.Qt.SolidLine,
-             'dash': QtCore.Qt.DashLine, 'dot': QtCore.Qt.DotLine}
+style_map = {'solid': Qt.SolidLine,
+             'dash': Qt.DashLine, 'dot': Qt.DotLine}
 color_cycle = itertools.cycle(
     [QtGui.QColor('red'), QtGui.QColor('blue'),
      QtGui.QColor('green'), QtGui.QColor('white')]
@@ -37,7 +37,7 @@ color_cycle = itertools.cycle(
 def get_archive_viewer() -> ArchiverViewerWidget:
     """
     Only allow one viewer to be open at a time.
-    Makes it unambiguous whether where to send PV's to.
+    Makes it unambiguous where to send PV's to.
 
     Returns
     -------
@@ -55,7 +55,7 @@ def get_reachable_url(urls: List[str]) -> str:
     Get valid archiver URLS from the urls
     Looks only for an response code below 400, as a proxy ping test.
     Ideally the urls provided by the env var work, but for now we
-    err on the side fo caution
+    err on the side of caution
 
     Returns
     -------
@@ -81,6 +81,21 @@ def get_reachable_url(urls: List[str]) -> str:
                 return url
 
 
+def _success_decorator(method):
+    """
+    Decorator for qt methods that want to return True if successful and
+    False otherwise.  Wraps the method in a simple try-except.
+    """
+    def _dec(self, *args, **kwargs):
+        try:
+            method(self, *args, **kwargs)
+            return True
+        except Exception as e:
+            logger.debug(e)
+            return False
+    return _dec
+
+
 class ArchiverError(Exception):
     """ Archiver related exceptions """
     ...
@@ -104,7 +119,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self,
         parent: Optional[QtWidgets.QWidget] = None,
         pvs: List[str] = []
-    ):
+    ) -> None:
         super().__init__(parent=parent)
 
         # set the PYDM_ARCHIVER_URL if not already set
@@ -133,9 +148,16 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             self.model.add_signal(pv)
 
         self._setup_ui()
-        self._setup_range_buttons()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
+        """
+        Initial set up for this widget.
+        - initializes PVModel
+        - assigns delegates to columns for data handling
+        - wire up various buttons
+        - adds pvs if provided at init
+        """
+        self.setWindowTitle('Epics PV Archive Viewer')
 
         # set up table view for PV info
         self.model = PVModel(parent=self)
@@ -148,11 +170,11 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.colorDelegate = ColorDelegate()
         self.curve_list.setItemDelegateForColumn(2, self.colorDelegate)
 
-        # symbol delegate
+        # line symbol delegate
         self.symbolDelegate = EnumDelegate(enums=symbol_map)
         self.curve_list.setItemDelegateForColumn(3, self.symbolDelegate)
 
-        # style delegate
+        # line style delegate
         self.styleDelegate = EnumDelegate(enums=style_map)
         self.curve_list.setItemDelegateForColumn(4, self.styleDelegate)
 
@@ -162,19 +184,21 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.curve_list.setItemDelegateForColumn(del_col, self.deleteDelegate)
         self.deleteDelegate.delete_request.connect(self.model.removeRow)
 
-        for pv in (self._pv_list or []):
-            self.model.add_signal(pv)
-
         # set up list selector
         self._setup_pv_selector()
 
         self.redraw_button.clicked.connect(self._update_curves)
 
-    def _setup_range_buttons(self):
+        # set up time range buttons
+        self._setup_range_buttons()
+
+        for pv in (self._pv_list or []):
+            self.model.add_signal(pv)
+
+    def _setup_range_buttons(self) -> None:
         def _set_time_span_fn(s: float):
             """
             Set the time span of the plot.
-            Currently only works if view-all has not been selected?...
 
             Parameters
             ----------
@@ -192,7 +216,11 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.button_week.clicked.connect(_set_time_span_fn(24*60*60*7))
         self.button_month.clicked.connect(_set_time_span_fn(24*60*60*30))
 
-    def _setup_pv_selector(self):
+    def _setup_pv_selector(self) -> None:
+        """
+        Set up pv validation on input field line edit.
+        Attempts to pass pv name to ``ArchiveViewerWidget.add_signal()``
+        """
         # validate PV form, returnPressed unless valid
         regexp = QRegularExpression(r'^\w+(:\w+)+(\.\w+)*$')
         validator = QRegularExpressionValidator(regexp)
@@ -209,6 +237,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.input_field.returnPressed.connect(_add_item)
 
     def _update_curves(self):
+        """ Clears the timeplot and adds any PV's present in the PVModel """
         # grab all the list items
         pv_data = self.curve_list.model().pvs
 
@@ -239,6 +268,22 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.time_plot.setShowLegend(True)
 
     def add_signal(self, pv: str, dev_attr: Optional[str] = None) -> None:
+        """
+        Adds a PV to the ArchiverViewerWidget's PVModel
+        Ensures PV's have at least 3 data points in the archiver before
+        adding a PV to the model
+
+        Updates the time plot widget and clears the input field if
+        successful
+
+        Parameters
+        ----------
+        pv : str
+            the PV to be added (eg. MR2L0:RTD:1:TEMP)
+        dev_attr : Optional[str], optional
+            the ophyd attribute name corresponding to the ``pv``,
+            by default None
+        """
         # check if data exists
         data = self.get_pv_data_snippet(pv)
         if data and len(data['data']) < 3:
@@ -257,7 +302,21 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             self.input_field.clear()
 
     def get_pv_data_snippet(self, pv: str) -> Dict[str, Any]:
-        # use raw get for json metadata
+        """
+        Queries archapp.EpicsArchive for a small amount of data for use
+        in verifying the PV
+
+        Parameters
+        ----------
+        pv : str
+            the pv to get data for
+
+        Returns
+        -------
+        Dict[str, Any]
+            data dictionary, with keys ['data', 'meta']
+        """
+        # use get_raw for json metadata
         # also sidesteps an issue where some PV's aren't found using
         # the normal EpicsArchive.get()
         today = datetime.datetime.today()
@@ -267,29 +326,46 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
 
 class PVModel(QtCore.QAbstractTableModel):
-    def __init__(self, *args, pvs=[], **kwargs):
-        # standard item model needs to be init with columns and rows
-        # fill out here and feed into super
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.pvs: List[List[str, dict]] = pvs or []
+        self.pvs: List[List[str, dict]] = []
         self.headers = ['PV Name', 'component', 'color', 'symbol',
                         'lineStyle', 'lineWidth', 'remove']
 
-    def data(self, index, role):
+    def data(self, index: QtCore.QModelIndex, role: int) -> Any:
+        """
+        Returns the data stored under the given role for the item
+        referred to by the index.
+
+        Parameters
+        ----------
+        index : QtCore.QModelIndex
+            An index referring to a cell of the TableView
+        role : int
+            The requested data role.
+
+        Returns
+        -------
+        Any
+            the requested data
+        """
         if index.column() == 0:
             # name column, no edit permissions
-            if role == QtCore.Qt.DisplayRole:
+            if role == Qt.DisplayRole:
                 return self.pvs[index.row()][0]
         elif index.column() == (len(self.headers) - 1):
-            if role == QtCore.Qt.DisplayRole:
+            if role == Qt.DisplayRole:
                 return 'delete?'
         else:
             # data column.  Each column gets its own data delegate
-            if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
-                        QtCore.Qt.BackgroundRole):
+            if role in (Qt.DisplayRole, Qt.EditRole,
+                        Qt.BackgroundRole):
                 _, data = self.pvs[index.row()]
                 col_name = self.headers[index.column()]
                 return data[col_name]
+
+        # if nothing is found, return invalid QVariant
+        return QtCore.QVariant()
 
     def rowCount(self, index): return len(self.pvs)
 
@@ -298,43 +374,113 @@ class PVModel(QtCore.QAbstractTableModel):
     def headerData(
         self,
         section: int,
-        orientation: QtCore.Qt.Orientation,
+        orientation: Qt.Orientation,
         role: int
     ) -> Any:
-        if role != QtCore.Qt.DisplayRole:
+        """
+        Returns the header data for the model.
+        Currently only displays horizontal header data
+        """
+        if role != Qt.DisplayRole:
             return
 
-        if orientation == QtCore.Qt.Horizontal:
+        if orientation == Qt.Horizontal:
             return self.headers[section]
 
-    def flags(self, index):
-        if (index.column() != 0):
-            return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsEnabled
-        else:
-            return QtCore.Qt.ItemIsEnabled
+    def flags(self, index: QtCore.QModelIndex) -> Qt.ItemFlag:
+        """
+        Returns the item flags for the given ``index``.  The returned
+        item flag controls what behaviors the item supports.
 
+        Parameters
+        ----------
+        index : QtCore.QModelIndex
+            the index referring to a cell of the TableView
+
+        Returns
+        -------
+        QtCore.Qt.ItemFlag
+            the ItemFlag corresponding to the cell
+        """
+        if (index.column() > 1):
+            return Qt.ItemIsEditable | Qt.ItemIsEnabled
+        else:
+            return Qt.ItemIsEnabled
+
+    @_success_decorator
     def removeRow(
         self,
         row: int,
         parent: QtCore.QModelIndex = QtCore.QModelIndex()
     ) -> bool:
-        """ augment existing implementation """
+        """
+        Removes a row from child items of parent.
+        Overrides existing implementation
+
+        Parameters
+        ----------
+        row : int
+            index of row to remove
+        parent : QtCore.QModelIndex, optional
+            the parent index, by default QtCore.QModelIndex()
+
+        Returns
+        -------
+        bool
+            True if removal is successful
+        """
         self.beginRemoveRows(parent, row, row)
         del self.pvs[row]
         self.endRemoveRows()
 
-    def setData(self, index, value, role=QtCore.Qt.EditRole):
-        """ Edit the data """
+    @_success_decorator
+    def setData(
+        self,
+        index: QtCore.QModelIndex,
+        value: Any,
+        role: int = Qt.EditRole
+    ) -> bool:
+        """
+        Set the ``role`` data at the given ``index`` to ``value``
+
+        Parameters
+        ----------
+        index : QtCore.QModelIndex
+            index to set data at
+        value : Any
+            data to set at index
+        role : int, optional
+            role enum, by default QtCore.Qt.EditRole
+
+        Returns
+        -------
+        bool
+            True if data successfully set
+        """
         self.pvs[index.row()][1][self.headers[index.column()]] = value
         # one index changed, so top_left == bottom_right
         self.dataChanged.emit(index, index)
-        return True
 
+    @_success_decorator
     def insertRow(
         self,
         row: int,
         parent: QtCore.QModelIndex = QtCore.QModelIndex()
     ) -> bool:
+        """_summary_
+
+        Parameters
+        ----------
+        row : int
+            locationto insert row at
+        parent : QtCore.QModelIndex, optional
+            the parent index, by default QtCore.QModelIndex()
+
+        Returns
+        -------
+        bool
+            True if successful, False otherwise
+        """
         self.beginInsertRows(
             QtCore.QModelIndex(), row, row
         )
@@ -343,10 +489,9 @@ class PVModel(QtCore.QAbstractTableModel):
                            'component': 'N/A',
                            'symbol': 'o',
                            'lineWidth': 2,
-                           'lineStyle': QtCore.Qt.SolidLine}]
+                           'lineStyle': Qt.SolidLine}]
         )
         self.endInsertRows()
-        return True
 
     def add_signal(self, pv: str, dev_attr: Optional[str] = None) -> bool:
         """
@@ -384,6 +529,9 @@ class PVModel(QtCore.QAbstractTableModel):
 
 
 class ColorDelegate(QtWidgets.QStyledItemDelegate):
+    """
+    Delegate for selecting a color.  Creates a QColorDialog for selection
+    """
     def createEditor(
         self,
         parent: QtWidgets.QWidget,
@@ -402,10 +550,14 @@ class ColorDelegate(QtWidgets.QStyledItemDelegate):
         # no parent allows pop-out
         color = editor.currentColor()
         if color.isValid():
-            model.setData(index, color, QtCore.Qt.EditRole)
+            model.setData(index, color, Qt.EditRole)
 
 
 class EnumDelegate(QtWidgets.QStyledItemDelegate):
+    """
+    Delegate for selecting from a list of options.  Takes a dictionary
+    at init that maps option names to their values.
+    """
     def __init__(self, *args, enums: Dict[str, Any], **kwargs) -> None:
         self.enums = enums
         self.enums_inv = {value: key for key, value in self.enums.items()}
@@ -428,13 +580,17 @@ class EnumDelegate(QtWidgets.QStyledItemDelegate):
         index: QtCore.QModelIndex
     ) -> None:
         value = editor.currentText()
-        model.setData(index, self.enums[value], QtCore.Qt.EditRole)
+        model.setData(index, self.enums[value], Qt.EditRole)
 
     def displayText(self, value: Any, locale: QtCore.QLocale) -> str:
         return str(self.enums_inv[value])
 
 
 class DeleteDelegate(QtWidgets.QStyledItemDelegate):
+    """
+    Delegate for creating a delete button.  Provides a ``delete_request``
+    signal that emits if the button is pressed
+    """
     delete_request = QtCore.Signal(int)
 
     def createEditor(
