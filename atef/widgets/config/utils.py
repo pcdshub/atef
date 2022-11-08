@@ -382,7 +382,8 @@ class ComponentListWidget(StringListWithDialog):
             arch_widget.show()
 
         menu.addSection("Open Archive Data viewer")
-        archive_viewer_all = menu.addAction("View all selected")
+        archive_viewer_all = menu.addAction("View all selected in "
+                                            "Archive Viewer")
         archive_viewer_all.triggered.connect(open_arch_viewer)
 
         menu.addSection("Add all selected")

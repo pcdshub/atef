@@ -17,6 +17,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
 
 from ..qt_helpers import copy_to_clipboard
+from .archive_viewer import get_archive_viewer
 from .core import DesignerDisplay
 
 logger = logging.getLogger(__name__)
@@ -734,6 +735,7 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
     device_table_view: OphydDeviceTableView
     button_update_data: QtWidgets.QPushButton
     button_select_attrs: QtWidgets.QPushButton
+    button_archive_view: QtWidgets.QPushButton
 
     def __init__(
         self,
@@ -794,6 +796,8 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
             self.attributes_selected.emit
         )
 
+        self.button_archive_view.clicked.connect(self._open_archive_viewer)
+
     def _create_context_menu(self):
         """Handler for when the device table view is right clicked."""
         attrs = self.device_table_view.selected_attribute_data
@@ -815,6 +819,18 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
             self._custom_menu.exec_(top_left)
         else:
             self.attributes_selected.emit(attrs)
+
+    def _open_archive_viewer(self):
+        """ Handler for opening Archive Viewer Widget """
+        data = self.device_table_view.selected_attribute_data
+        if not data:
+            return
+
+        arch_widget = get_archive_viewer()
+        for datum in data:
+            dev_attr = '.'.join((datum.signal.parent.name, datum.attr))
+            arch_widget.add_signal(datum.pvname, dev_attr=dev_attr)
+        arch_widget.show()
 
     def closeEvent(self, ev: QtGui.QCloseEvent):
         super().closeEvent(ev)
