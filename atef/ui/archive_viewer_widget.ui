@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>776</width>
-    <height>550</height>
+    <width>861</width>
+    <height>626</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -23,7 +23,10 @@
    <item>
     <widget class="PyDMArchiverTimePlot" name="time_plot">
      <property name="toolTip">
-      <string/>
+      <string>Right-click to open plot options</string>
+     </property>
+     <property name="toolTipDuration">
+      <number>5000</number>
      </property>
     </widget>
    </item>

@@ -86,11 +86,6 @@ class ArchiverError(Exception):
     ...
 
 
-# TO-DO: crosshair hover over plot?
-#   -> time_plot.enableCrosshair
-# TO-DO: scaling / dealing with different scales between curves
-# TO-DO: Make redraw retain scale.
-# TO-DO: set tooltips
 class ArchiverViewerWidget(DesignerDisplay, QWidget):
     """
     Archiver time plot viewer
