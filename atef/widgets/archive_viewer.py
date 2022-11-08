@@ -78,7 +78,7 @@ def get_reachable_url(urls: List[str]) -> str:
                 # timeouts give socket.timeout and have no errno
                 # here we only care if the server exists
                 # connection refused is ok
-                return url + ':17668'
+                return url
 
 
 class ArchiverError(Exception):
@@ -114,11 +114,18 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
                 raise ArchiverError('Cannot reach any archiver urls')
             # need to set environment variable for archiver data plugin
             logger.debug(f'setting archiver url to: {archiver_url}')
-            os.environ['PYDM_ARCHIVER_URL'] = archiver_url
+            # pydm requires the port to be added
+            os.environ['PYDM_ARCHIVER_URL'] = archiver_url + ':17668'
         else:
             archiver_url = os.environ['PYDM_ARCHIVER_URL']
+            # ensure the port has been added for pydm
+            # this handling needs work, but should suffice for now
+            if not archiver_url.endswith(':17668'):
+                archiver_url += ':17668'
+                os.environ['PYDM_ARCHIVER_URL'] = archiver_url
 
-        url_core = archiver_url.removeprefix('http://').split('.', 1)[0]
+        # EpicsArchive wants a stripped down url
+        url_core = archiver_url.removeprefix('http://').removesuffix(':17668')
         self.archapp = EpicsArchive(url_core)
 
         self._pv_list = pvs
