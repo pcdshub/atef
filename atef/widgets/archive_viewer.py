@@ -89,8 +89,6 @@ class ArchiverError(Exception):
 # TO-DO: crosshair hover over plot?
 #   -> time_plot.enableCrosshair
 # TO-DO: scaling / dealing with different scales between curves
-# TO-DO: Turn off autoscale.  Set to 1 day automatically
-# TO-DO: make buttons work after manual zoom
 # TO-DO: Make redraw retain scale.
 # TO-DO: set tooltips
 class ArchiverViewerWidget(DesignerDisplay, QWidget):
@@ -184,8 +182,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             def fn():
                 now = datetime.datetime.today()
                 prev = now - datetime.timedelta(seconds=s)
-                self.time_plot.setMaxXRange(now.timestamp())
-                self.time_plot.setMinXRange(prev.timestamp())
+                self.time_plot.setXRange(prev.timestamp(), now.timestamp())
                 self.time_plot.updateXAxis()
             return fn
 
