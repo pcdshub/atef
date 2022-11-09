@@ -823,8 +823,6 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
     def _open_archive_viewer(self):
         """ Handler for opening Archive Viewer Widget """
         data = self.device_table_view.selected_attribute_data
-        if not data:
-            return
 
         arch_widget = get_archive_viewer()
         for datum in data:

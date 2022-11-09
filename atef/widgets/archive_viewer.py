@@ -8,6 +8,7 @@ import datetime
 import itertools
 import logging
 import os
+import re
 import urllib
 from typing import Any, ClassVar, Dict, List, Optional
 
@@ -136,7 +137,13 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             # ensure the port has been added for pydm
             # this handling needs work, but should suffice for now
             if not archiver_url.endswith(':17668'):
-                archiver_url += ':17668'
+                port_re = re.search(r'(:\d+)$', archiver_url)
+                if port_re and (port_re[0] != ':17668'):
+                    logger.warning(f'PYDM_ARCHIVER_URL ({archiver_url}) does '
+                                   'not end with port 17668, replacing port')
+                    archiver_url = archiver_url.replace(port_re[0], ':17668')
+                else:
+                    archiver_url += ':17668'
                 os.environ['PYDM_ARCHIVER_URL'] = archiver_url
 
         # EpicsArchive wants a stripped down url
@@ -291,7 +298,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
                 self,
                 'Invalid PV',
                 'Fewer than 3 datapoints from last two days found in '
-                'archiver app, skipping add'
+                f'archiver app for pv ({pv}), skipping add'
             )
             return
 
