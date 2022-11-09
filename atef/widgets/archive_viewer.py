@@ -474,12 +474,13 @@ class PVModel(QtCore.QAbstractTableModel):
         row: int,
         parent: QtCore.QModelIndex = QtCore.QModelIndex()
     ) -> bool:
-        """_summary_
+        """
+        Inserts a row into the model, initializing data fields where possible
 
         Parameters
         ----------
         row : int
-            locationto insert row at
+            location to insert row at
         parent : QtCore.QModelIndex, optional
             the parent index, by default QtCore.QModelIndex()
 
@@ -526,7 +527,7 @@ class PVModel(QtCore.QAbstractTableModel):
 
         # add item to list
         index_1 = self.createIndex(0, 0)
-        index_2 = self.createIndex(0, 3)
+        index_2 = self.createIndex(0, len(self.headers) - 1)
         self.insertRow(0, index_1)
         self.pvs[0][0] = pv
         if dev_attr:
