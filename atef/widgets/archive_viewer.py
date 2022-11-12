@@ -294,13 +294,10 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         # check if data exists
         data = self.get_pv_data_snippet(pv)
         if data and len(data['data']) < 3:
-            QtWidgets.QMessageBox.information(
-                self,
-                'Invalid PV',
+            logger.warning(
                 'Fewer than 3 datapoints from last two days found in '
-                f'archiver app for pv ({pv}), skipping add'
+                f'archiver app for pv ({pv})'
             )
-            return
 
         success = self.model.add_signal(pv, dev_attr=dev_attr)
 
