@@ -57,11 +57,34 @@
         <widget class="QTableView" name="curve_list"/>
        </item>
        <item>
-        <widget class="QPushButton" name="redraw_button">
-         <property name="text">
-          <string>Redraw Curves</string>
+        <layout class="QHBoxLayout" name="list_ctrl_layout">
+         <property name="leftMargin">
+          <number>2</number>
          </property>
-        </widget>
+         <property name="topMargin">
+          <number>2</number>
+         </property>
+         <property name="rightMargin">
+          <number>2</number>
+         </property>
+         <property name="bottomMargin">
+          <number>2</number>
+         </property>
+         <item>
+          <widget class="QPushButton" name="redraw_button">
+           <property name="text">
+            <string>Redraw Curves</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="clear_button">
+           <property name="text">
+            <string>Clear Curves </string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </item>

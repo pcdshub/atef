@@ -17,7 +17,7 @@ from pydm.widgets.archiver_time_plot import PyDMArchiverTimePlot
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QRegularExpression, Qt
 from qtpy.QtGui import QRegularExpressionValidator
-from qtpy.QtWidgets import QWidget
+from qtpy.QtWidgets import QStyle, QWidget
 
 from atef.widgets.core import DesignerDisplay
 
@@ -115,6 +115,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
     input_field: QtWidgets.QLineEdit
     curve_list: QtWidgets.QTableView
     redraw_button: QtWidgets.QPushButton
+    clear_button: QtWidgets.QPushButton
 
     def __init__(
         self,
@@ -195,7 +196,12 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self._setup_pv_selector()
 
         self.redraw_button.clicked.connect(self._update_curves)
+        self.clear_button.clicked.connect(self._clear_curves)
 
+        ricon = self.style().standardIcon(QStyle.SP_BrowserReload)
+        self.redraw_button.setIcon(ricon)
+        cicon = self.style().standardIcon(QStyle.SP_DialogDiscardButton)
+        self.clear_button.setIcon(cicon)
         # set up time range buttons
         self._setup_range_buttons()
 
@@ -273,6 +279,13 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             logger.debug('left axis does not exist to rename')
 
         self.time_plot.setShowLegend(True)
+
+    def _clear_curves(self):
+        """ Clears the curves in the model and updates the plot """
+        for i in range(len(self.model.pvs)):
+            self.model.removeRow(i)
+
+        self._update_curves()
 
     def add_signal(self, pv: str, dev_attr: Optional[str] = None) -> None:
         """
