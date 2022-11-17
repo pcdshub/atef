@@ -377,7 +377,14 @@ class ComponentListWidget(StringListWithDialog):
         def open_arch_viewer():
             arch_widget = get_archive_viewer()
             for datum in data:
-                dev_attr = '.'.join((datum.signal.parent.name, datum.attr))
+                try:
+                    parent_dev = (datum.signal.parent
+                                  or datum.signal.biological_parent)
+                    dev_attr = '.'.join((parent_dev.name, datum.attr))
+                except Exception as e:
+                    logger.debug('unable to resolve full device-attribute '
+                                 f'string: {e}')
+                    dev_attr = 'N/A'
                 arch_widget.add_signal(datum.pvname, dev_attr=dev_attr)
             arch_widget.show()
 
