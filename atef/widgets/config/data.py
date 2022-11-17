@@ -19,7 +19,8 @@ from qtpy.QtWidgets import (QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel,
 
 from atef.check import Comparison, Equals, Value
 from atef.config import (Configuration, ConfigurationGroup,
-                         DeviceConfiguration, GroupResultMode, PVConfiguration)
+                         DeviceConfiguration, GroupResultMode, PVConfiguration,
+                         ToolConfiguration)
 from atef.enums import Severity
 from atef.qt_helpers import QDataclassBridge, QDataclassList
 from atef.reduce import ReduceMethod
@@ -244,7 +245,8 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
 
     def init_viewer(self, attr: str, config: Configuration) -> None:
         """ Set up the archive viewer button """
-        if hasattr(config, 'by_attr') or hasattr(config, 'by_pv'):
+        if ((hasattr(config, 'by_attr') or hasattr(config, 'by_pv'))
+                and not isinstance(config, ToolConfiguration)):
             icon = self.style().standardIcon(QStyle.SP_FileDialogContentsView)
             self.action_button.setIcon(icon)
             self.action_button.setToolTip('Open Archive Viewer with '
