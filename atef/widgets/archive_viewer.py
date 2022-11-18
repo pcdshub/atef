@@ -535,11 +535,6 @@ class PVModel(QtCore.QAbstractTableModel):
         # don't insert if already present
         if pv in [row[0] for row in self.pvs]:
             logger.debug(f'{pv} already in model.  Skipping add')
-            QtWidgets.QMessageBox.information(
-                self.parent(),
-                'Duplicate PV',
-                'PV already exists in list, skipping add'
-            )
             return False
 
         # add item to list
