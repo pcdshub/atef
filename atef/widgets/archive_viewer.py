@@ -5,6 +5,7 @@ Widget classes designed for PV archiver interaction
 from __future__ import annotations
 
 import datetime
+import functools
 import itertools
 import logging
 import os
@@ -195,8 +196,8 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         # set up list selector
         self._setup_pv_selector()
 
-        self.redraw_button.clicked.connect(self._update_curves)
-        self.clear_button.clicked.connect(self._clear_curves)
+        self.redraw_button.clicked.connect(self.update_curves)
+        self.clear_button.clicked.connect(self.clear_curves)
 
         ricon = self.style().standardIcon(QStyle.SP_BrowserReload)
         self.redraw_button.setIcon(ricon)
@@ -249,7 +250,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
         self.input_field.returnPressed.connect(_add_item)
 
-    def _update_curves(self):
+    def update_curves(self):
         """ Clears the timeplot and adds any PV's present in the PVModel """
         # grab all the list items
         pv_data = self.curve_list.model().pvs
@@ -280,14 +281,19 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
         self.time_plot.setShowLegend(True)
 
-    def _clear_curves(self):
+    def clear_curves(self):
         """ Clears the curves in the model and updates the plot """
-        for i in range(len(self.model.pvs)):
-            self.model.removeRow(i)
+        while len(self.model.pvs) > 0:
+            self.model.removeRow(0)
 
-        self._update_curves()
+        self.update_curves()
 
-    def add_signal(self, pv: str, dev_attr: Optional[str] = None) -> None:
+    def add_signal(
+        self,
+        pv: str,
+        dev_attr: Optional[str] = None,
+        update_curves: bool = True
+    ) -> None:
         """
         Adds a PV to the ArchiverViewerWidget's PVModel
         Ensures PV's have at least 3 data points in the archiver before
@@ -314,10 +320,11 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
         success = self.model.add_signal(pv, dev_attr=dev_attr)
 
-        if success:
-            self._update_curves()
+        if success and update_curves:
+            self.update_curves()
             self.input_field.clear()
 
+    @functools.lru_cache()
     def get_pv_data_snippet(self, pv: str) -> Dict[str, Any]:
         """
         Queries archapp.EpicsArchive for a small amount of data for use

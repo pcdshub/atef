@@ -385,7 +385,10 @@ class ComponentListWidget(StringListWithDialog):
                     logger.debug('unable to resolve full device-attribute '
                                  f'string: {e}')
                     dev_attr = 'N/A'
-                arch_widget.add_signal(datum.pvname, dev_attr=dev_attr)
+                arch_widget.add_signal(
+                    datum.pvname, dev_attr=dev_attr, update_curves=False
+                )
+                arch_widget.update_curves()
             arch_widget.show()
 
         menu.addSection("Open Archive Data viewer")

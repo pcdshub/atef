@@ -168,6 +168,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         # if there's a pv, show the button for archive widget.
         # info would be filled in after init... don't show at start
         self.action_button.hide()
+        self._viewer_initialized = False
 
     def init_desc(self) -> None:
         """
@@ -234,6 +235,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         self.tags_content.addWidget(tags_list)
 
         def add_tag() -> None:
+            print('add_tag')
             if tags_list.widgets and not tags_list.widgets[-1].line_edit.text().strip():
                 # Don't add another tag if we haven't filled out the last one
                 return
@@ -245,6 +247,10 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
 
     def init_viewer(self, attr: str, config: Configuration) -> None:
         """ Set up the archive viewer button """
+        if self._viewer_initialized:
+            # make sure this only happens once per instance
+            return
+
         if ((hasattr(config, 'by_attr') or hasattr(config, 'by_pv'))
                 and not isinstance(config, ToolConfiguration)):
             icon = self.style().standardIcon(QStyle.SP_FileDialogContentsView)
@@ -253,7 +259,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
                                           'relevant signals')
             self.action_button.show()
 
-        def open_viewer(*args, **kwargs):
+        def open_arch_viewer(*args, **kwargs):
             # only query PV info once requested.  grabbing devices and
             # their relevant PVs can be time consuming
             pv_list = get_relevant_pvs(attr, config)
@@ -268,10 +274,12 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
                 return
             widget = get_archive_viewer()
             for pv, dev_attr in pv_list:
-                widget.add_signal(pv, dev_attr=dev_attr)
+                widget.add_signal(pv, dev_attr=dev_attr, update_curves=False)
+            widget.update_curves()
             widget.show()
 
-        self.action_button.clicked.connect(open_viewer)
+        self.action_button.clicked.connect(open_arch_viewer)
+        self._viewer_initialized = True
 
 
 class TagsWidget(QWidget):
