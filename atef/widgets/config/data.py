@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Protocol
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Protocol,
+                    Tuple)
 from weakref import WeakValueDictionary
 
 from pydm.widgets.drawing import PyDMDrawingLine
@@ -18,17 +19,20 @@ from qtpy.QtWidgets import (QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel,
 
 from atef.check import Comparison, Equals, Value
 from atef.config import (Configuration, ConfigurationGroup,
-                         DeviceConfiguration, GroupResultMode, PVConfiguration)
+                         DeviceConfiguration, GroupResultMode, PVConfiguration,
+                         ToolConfiguration)
 from atef.enums import Severity
 from atef.qt_helpers import QDataclassBridge, QDataclassList
 from atef.reduce import ReduceMethod
 from atef.tools import Ping
 from atef.type_hints import PrimitiveType
+from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
 
 from .utils import (BulkListWidget, ComponentListWidget, DeviceListWidget,
-                    setup_line_edit_data, user_string_to_bool)
+                    get_relevant_pvs, setup_line_edit_data,
+                    user_string_to_bool)
 
 
 class AnyDataclass(Protocol):
@@ -133,10 +137,12 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
     add_tag_button: QToolButton
     tags_frame: QFrame
     parent_button: QToolButton
+    action_button: QToolButton
     extra_text_label: QLabel
 
     last_name: str
     last_desc: str
+    pvs: List[Tuple[str, str]]  # (pv, attrname)
 
     def __init__(self, data: AnyDataclass, **kwargs):
         super().__init__(data=data, **kwargs)
@@ -158,6 +164,11 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
             self.tags_frame.hide()
         else:
             self.init_tags()
+
+        # if there's a pv, show the button for archive widget.
+        # info would be filled in after init... don't show at start
+        self.action_button.hide()
+        self._viewer_initialized = False
 
     def init_desc(self) -> None:
         """
@@ -224,6 +235,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         self.tags_content.addWidget(tags_list)
 
         def add_tag() -> None:
+            print('add_tag')
             if tags_list.widgets and not tags_list.widgets[-1].line_edit.text().strip():
                 # Don't add another tag if we haven't filled out the last one
                 return
@@ -232,6 +244,42 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
             elem.line_edit.setFocus()
 
         self.add_tag_button.clicked.connect(add_tag)
+
+    def init_viewer(self, attr: str, config: Configuration) -> None:
+        """ Set up the archive viewer button """
+        if self._viewer_initialized:
+            # make sure this only happens once per instance
+            return
+
+        if ((hasattr(config, 'by_attr') or hasattr(config, 'by_pv'))
+                and not isinstance(config, ToolConfiguration)):
+            icon = self.style().standardIcon(QStyle.SP_FileDialogContentsView)
+            self.action_button.setIcon(icon)
+            self.action_button.setToolTip('Open Archive Viewer with '
+                                          'relevant signals')
+            self.action_button.show()
+
+        def open_arch_viewer(*args, **kwargs):
+            # only query PV info once requested.  grabbing devices and
+            # their relevant PVs can be time consuming
+            pv_list = get_relevant_pvs(attr, config)
+            if len(pv_list) == 0:
+                QMessageBox.information(
+                    self,
+                    'No Archived PVs',
+                    'No valid PVs found to plot with archive viewer. '
+                    'Signal may be a derived signal'
+                )
+                self.action_button.hide()
+                return
+            widget = get_archive_viewer()
+            for pv, dev_attr in pv_list:
+                widget.add_signal(pv, dev_attr=dev_attr, update_curves=False)
+            widget.update_curves()
+            widget.show()
+
+        self.action_button.clicked.connect(open_arch_viewer)
+        self._viewer_initialized = True
 
 
 class TagsWidget(QWidget):

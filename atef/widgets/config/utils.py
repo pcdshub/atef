@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from itertools import zip_longest
-from typing import Any, Callable, ClassVar, List, Optional, Type
+from typing import Any, Callable, ClassVar, List, Optional, Tuple, Type
 
 from qtpy import QtWidgets
 from qtpy.QtCore import QPoint, Qt
@@ -17,6 +17,7 @@ from atef.config import (Configuration, DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
 from atef.qt_helpers import QDataclassList, QDataclassValue
 from atef.tools import Ping
+from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
@@ -311,7 +312,7 @@ class ComponentListWidget(StringListWithDialog):
 
     def _open_component_chooser(self, to_select: Optional[List[str]] = None) -> None:
         """
-        Hook: User requested adding/editing a componen.
+        Hook: User requested adding/editing a component.
 
         Parameters
         ----------
@@ -372,6 +373,28 @@ class ComponentListWidget(StringListWithDialog):
                 high=summary.maximum,
             )
             self.suggest_comparison.emit(comparison)
+
+        def open_arch_viewer():
+            arch_widget = get_archive_viewer()
+            for datum in data:
+                try:
+                    parent_dev = (datum.signal.parent
+                                  or datum.signal.biological_parent)
+                    dev_attr = '.'.join((parent_dev.name, datum.attr))
+                except Exception as e:
+                    logger.debug('unable to resolve full device-attribute '
+                                 f'string: {e}')
+                    dev_attr = 'N/A'
+                arch_widget.add_signal(
+                    datum.pvname, dev_attr=dev_attr, update_curves=False
+                )
+                arch_widget.update_curves()
+            arch_widget.show()
+
+        menu.addSection("Open Archive Data viewer")
+        archive_viewer_all = menu.addAction("View all selected in "
+                                            "Archive Viewer")
+        archive_viewer_all.triggered.connect(open_arch_viewer)
 
         menu.addSection("Add all selected")
         add_without_action = menu.addAction("Add selected without comparison")
@@ -596,6 +619,48 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
             )
         return 'Comparison to unknown tool results'
     return 'Invalid comparison'
+
+
+def get_relevant_pvs(
+    attr: str,
+    config: Configuration
+) -> List[Tuple[str, str]]:
+    """
+    Get the pvs and corresponding attribute name for the provided comparison.
+
+    Parameters
+    ----------
+    attr : str
+        The attribute, pvname or other string identifier to compare to.
+        This can also be 'shared'
+    config : Configuration
+        Typically a DeviceConfiguration, PVConfiguration, or
+        ToolConfiguration that has the contextual information for
+        understanding attr.
+    Returns
+    -------
+    List[Tuple[str, str]]
+        A list of tuples (PV:NAME, device.attr.name) containing the
+        relevant pv information
+    """
+    if isinstance(config, PVConfiguration):
+        # we have raw PV's here, with no attrs
+        return [(pv, None) for pv in config.by_pv.keys()]
+    if isinstance(config, DeviceConfiguration):
+        pv_list = []
+        if attr == 'shared':
+            # Use all pvs in the config
+            attrs = config.by_attr.keys()
+        else:
+            attrs = list([attr])
+        for device_name in config.devices:
+            dev = util.get_happi_device_by_name(device_name)
+            for curr_attr in attrs:
+                pv = getattr(getattr(dev, curr_attr), 'pvname', None)
+                if pv:
+                    pv_list.append((pv, device_name + '.' + curr_attr))
+
+        return pv_list
 
 
 def cast_dataclass(data: Any, new_type: Type) -> Any:

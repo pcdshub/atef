@@ -139,7 +139,7 @@ class AtefItem(QTreeWidgetItem):
 
 class PageWidget(QWidget):
     """
-    Base class for widgets that coorespond to a tree node.
+    Base class for widgets that correspond to a tree node.
 
     Contains utilities for navigating and manipulating
     the tree and for loading data widgets into placeholders.
@@ -1510,6 +1510,8 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                     break
         desc = describe_comparison_context(attr=attr, config=config)
         self.name_desc_tags_widget.extra_text_label.setText(desc)
+        self.name_desc_tags_widget.extra_text_label.setToolTip(desc)
+        self.name_desc_tags_widget.init_viewer(attr, config)
 
     def setup_any_comparison(self) -> None:
         """

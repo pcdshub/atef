@@ -18,6 +18,7 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
 
 from atef.config import ConfigurationFile
 
+from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
 from .page import AtefItem, ConfigurationGroupPage, link_page
 
@@ -42,6 +43,7 @@ class Window(DesignerDisplay, QMainWindow):
     action_save_as: QAction
     action_print_dataclass: QAction
     action_print_serialized: QAction
+    action_open_archive_viewer: QAction
 
     def __init__(self, *args, show_welcome: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
@@ -52,6 +54,9 @@ class Window(DesignerDisplay, QMainWindow):
         self.action_save_as.triggered.connect(self.save_as)
         self.action_print_dataclass.triggered.connect(self.print_dataclass)
         self.action_print_serialized.triggered.connect(self.print_serialized)
+        self.action_open_archive_viewer.triggered.connect(
+            self.open_archive_viewer
+        )
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
 
@@ -205,6 +210,11 @@ class Window(DesignerDisplay, QMainWindow):
         The parameters are open as to accept inputs from any signal.
         """
         pprint(self.serialize_tree(self.get_current_tree()))
+
+    def open_archive_viewer(self, *args, **kwargs):
+        """ Open the archive viewer """
+        widget = get_archive_viewer()
+        widget.show()
 
 
 class Tree(DesignerDisplay, QWidget):
