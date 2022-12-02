@@ -5,11 +5,13 @@ import logging
 from itertools import zip_longest
 from typing import Any, Callable, ClassVar, List, Optional, Tuple, Type
 
-from qtpy import QtWidgets
-from qtpy.QtCore import QPoint, Qt
+import qtawesome as qta
+from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import QPoint, QPointF, QRectF, QSize, Qt
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtGui import QClipboard, QGuiApplication
-from qtpy.QtWidgets import QInputDialog, QLineEdit, QMenu, QWidget
+from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
+                        QPaintEvent, QPen)
+from qtpy.QtWidgets import QCheckBox, QInputDialog, QLineEdit, QMenu, QWidget
 
 from atef import util
 from atef.check import Comparison, Equals, Range
@@ -461,6 +463,126 @@ class BulkListWidget(StringListWithDialog):
             return
         new_pvs = [pv.strip() for pv in user_input.splitlines() if pv.strip()]
         self.edit_items(to_select, new_pvs)
+
+
+class Toggle(QCheckBox):
+    # shamelessly vendored from qtwidgets:
+    # github.com/pythonguis/python-qtwidgets/tree/master/qtwidgets/toggle
+    _transparent_pen = QPen(Qt.transparent)
+    _light_grey_pen = QPen(Qt.lightGray)
+
+    def __init__(
+        self,
+        parent=None,
+        bar_color=Qt.gray,
+        checked_color="#00B0FF",
+        handle_color=Qt.white,
+        checked_icon='msc.run-all',
+        unchecked_icon='fa5s.edit'
+    ):
+        super().__init__(parent)
+
+        # Save our properties on the object via self, so we can access them later
+        # in the paintEvent.
+        self.checked_color = checked_color
+        self.checked_icon = checked_icon
+        self.unchecked_icon = unchecked_icon
+        self._bar_brush = QBrush(bar_color)
+        self._bar_checked_brush = QBrush(QColor(checked_color).lighter())
+
+        self._handle_brush = QBrush(handle_color)
+        self._handle_checked_brush = QBrush(QColor(checked_color))
+
+        # Setup the rest of the widget.
+
+        self.setContentsMargins(0, 0, 0, 0)
+        self._handle_position = 0
+
+        self.stateChanged.connect(self.handle_state_change)
+
+    def sizeHint(self):
+        return QSize(58, 45)
+
+    def hitButton(self, pos: QPoint):
+        return self.contentsRect().contains(pos)
+
+    def paintEvent(self, e: QPaintEvent):
+
+        contRect = self.contentsRect()
+        handleRadius = round(0.24 * contRect.height())
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+
+        p.setPen(self._transparent_pen)
+        barRect = QRectF(
+            0, 0,
+            contRect.width() - handleRadius, 0.40 * contRect.height()
+        )
+        barRect.moveCenter(contRect.center())
+        rounding = barRect.height() / 2
+
+        # the handle will move along this line
+        trailLength = contRect.width() - 2 * handleRadius
+        xPos = contRect.x() + handleRadius + trailLength * self._handle_position
+        iconRad = 0.7 * handleRadius
+        # center of handle
+        icon_x = xPos - (1.3 * handleRadius) + iconRad
+
+        if self.isChecked():
+            p.setBrush(self._bar_checked_brush)
+            p.drawRoundedRect(barRect, rounding, rounding)
+            p.setBrush(self._handle_checked_brush)
+            p.drawEllipse(
+                QPointF(xPos, barRect.center().y()),
+                handleRadius, handleRadius
+            )
+            icon = qta.icon(self.checked_icon,
+                            color=QColor(self.checked_color).darker())
+            icon.paint(p, icon_x, round(barRect.center().y()) - iconRad,
+                       2 * iconRad, 2 * iconRad)
+
+        else:
+            p.setBrush(self._bar_brush)
+            p.drawRoundedRect(barRect, rounding, rounding)
+            p.setPen(self._light_grey_pen)
+            p.setBrush(self._handle_brush)
+            p.drawEllipse(
+                QPointF(xPos, barRect.center().y()),
+                handleRadius, handleRadius
+            )
+            icon = qta.icon(self.unchecked_icon)
+            icon.paint(p, icon_x, round(barRect.center().y()) - iconRad,
+                       2 * iconRad, 2 * iconRad)
+
+        p.end()
+
+    @QtCore.Slot(int)
+    def handle_state_change(self, value):
+        self._handle_position = 1 if value else 0
+
+    @QtCore.Property(float)
+    def handle_position(self):
+        return self._handle_position
+
+    @handle_position.setter
+    def handle_position(self, pos):
+        """change the property
+        we need to trigger QWidget.update() method, either by:
+            1- calling it here [ what we're doing ].
+            2- connecting the QPropertyAnimation.valueChanged() signal to it.
+        """
+        self._handle_position = pos
+        self.update()
+
+    @QtCore.Property(float)
+    def pulse_radius(self):
+        return self._pulse_radius
+
+    @pulse_radius.setter
+    def pulse_radius(self, pos):
+        self._pulse_radius = pos
+        self.update()
 
 
 def user_string_to_bool(text: str) -> bool:
