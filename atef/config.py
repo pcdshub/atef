@@ -354,7 +354,7 @@ class PreparedConfiguration:
     """
     #: The data cache to use for the preparation step.
     cache: DataCache = field(repr=False)
-    #: The data cache to use for the preparation step.
+    #: The hierarchical parent of this step.
     parent: Optional[PreparedGroup] = None
     #: The comparisons to be run on the given devices.
     comparisons: List[Union[PreparedSignalComparison, PreparedToolComparison]] = field(
@@ -1035,7 +1035,7 @@ class PreparedComparison:
         """
         Run the comparison.
 
-        To be immplemented in subclass.
+        To be implemented in subclass.
         """
         raise NotImplementedError()
 
