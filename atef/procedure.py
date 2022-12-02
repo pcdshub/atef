@@ -2,11 +2,47 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import json
 import pathlib
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import (Any, Dict, Generator, Literal, Optional, Sequence, Union,
+                    cast)
+
+import apischema
+import databroker
+import yaml
+from bluesky import RunEngine
+
+from atef.check import Result
+from atef.config import _summarize_result_severity
+from atef.enums import GroupResultMode, Severity
+from atef.type_hints import AnyPath
+from atef.yaml_support import init_yaml_support
 
 from . import serialization
+
+run_engine_singleton = None
+db_singleton = None
+
+
+def incomplete_result():
+    return Result(severity=Severity.warning, reason='step incomplete')
+
+
+def setup_temp_runengine():
+    global run_engine_singleton
+    global db_singleton
+    run_engine_singleton = RunEngine({})
+    db_singleton = databroker.Broker.named('temp')
+    run_engine_singleton.subscribe(db_singleton.insert)
+    return run_engine_singleton, db_singleton
+
+
+def cleanup_temp_runengine():
+    global run_engine_singleton
+    global db_singleton
+    del run_engine_singleton
+    del db_singleton
 
 
 @dataclasses.dataclass
@@ -18,24 +54,56 @@ class ProcedureStep:
     This is used as a base class for all valid procedure steps (and groups).
     """
     #: The title of the procedure
-    title: Optional[str]
+    title: Optional[str] = None
     #: A description of narrative explanation of setup steps, what is to happen, etc.
-    description: str
+    description: Optional[str] = None
+    #: The hierarchical parent of this step.
+    parent: Optional[Union[ProcedureGroup, ProcedureFile]] = None
+    #: result of running the step
+    result: Result = field(default_factory=incomplete_result)
+    #: confirmation by the user that result matches expectations
+    verify: bool = False
+
+    def _run(self) -> Result:
+        """ Run the comparison.  To be implemented in subclass. """
+        raise NotImplementedError()
+
+    def run(self) -> Result:
+        """ Run the step and return the result """
+        try:
+            result = self._run()
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=str(ex)
+            )
+
+        self.result = result
+        return result
+
+    def allow_verify(self) -> bool:
+        """
+        Whether or not the step can be verified.
+        To be further expanded or overloaded in subclass,
+        """
+        return self.result.severity == Severity.success
 
 
 @dataclass
 class DescriptionStep(ProcedureStep):
     """A simple title or descriptive step in the procedure."""
-    ...
+    def _run(self) -> Result:
+        """ Always a successful result, allowing verification """
+        return Result()
 
 
 @dataclass
 class CodeStep(ProcedureStep):
     """Run source code in a procedure."""
     #: The source code to execute.
-    source_code: str
+    source_code: str = ''
     #: Arguments to pass into the code.
-    arguments: Dict[Any, Any]
+    arguments: Dict[Any, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -54,7 +122,14 @@ class PlanOptions:
 @dataclass
 class PlanStep(ProcedureStep):
     """A procedure step comprised of one or more bluesky plans."""
-    plans: Sequence[PlanOptions]
+    plans: Sequence[PlanOptions] = field(default_factory=list)
+
+    def _run(self) -> Result:
+        """ Gather plan options and run the bluesky plan """
+        # get global run engine
+        # Construct plan (get devices, organize args/kwargs, run)
+
+        return super()._run()
 
 
 @dataclass
@@ -81,27 +156,115 @@ class DeviceConfiguration:
 class ConfigurationCheckStep(ProcedureStep):
     """Step which checks device configuration versus a given timestamp."""
     #: Device name to device configuration information.
-    devices: Dict[str, DeviceConfiguration]
+    devices: Dict[str, DeviceConfiguration] = field(default_factory=dict)
 
 
 @dataclass
 class TyphosDisplayStep(ProcedureStep):
     """A procedure step which opens one or more typhos displays."""
     #: Happi device name to display options.
-    devices: Dict[str, DisplayOptions]
+    devices: Dict[str, DisplayOptions] = field(default_factory=dict)
 
 
 @dataclass
 class PydmDisplayStep(ProcedureStep):
     """A procedure step which a opens a PyDM display."""
     #: The display path.
-    display: pathlib.Path
+    display: pathlib.Path = field(default_factory=pathlib.Path)
     #: Options for displaying.
-    options: DisplayOptions
+    options: DisplayOptions = field(default_factory=DisplayOptions)
 
 
 @dataclass
 class ProcedureGroup(ProcedureStep):
     """A group of procedure steps (or nested groups)."""
     #: Steps included in the procedure.
-    steps: Sequence[Union[ProcedureStep, ProcedureGroup]]
+    steps: Sequence[Union[ProcedureStep, ProcedureGroup]] = \
+        field(default_factory=list)
+
+    def walk_steps(self) -> Generator[AnyProcedure, None, None]:
+        for step in self.steps:
+            step = cast(AnyProcedure, step)
+            yield step
+            if isinstance(step, ProcedureGroup):
+                yield from step.walk_steps()
+
+    def run(self) -> Generator[Result]:
+        # run each step in this group, yield the step
+        # how to deal with confirmation?
+        results = []
+        for step in self.steps:
+            yield step
+            results.append(step.run())
+
+        result = _summarize_result_severity(GroupResultMode.all_, results)
+
+        self.result = result
+
+
+AnyProcedure = Union[
+    ProcedureGroup,
+    DescriptionStep,
+    TyphosDisplayStep,
+    PydmDisplayStep
+]
+
+
+@dataclass
+class ProcedureFile:
+    """
+    File comprised of several Procedure steps
+
+    Essentially identical to Configuration File.  Consider refactoring
+    if design/methods do not diverge
+    """
+    #: atef configuration file version information.
+    version: Literal[0] = field(default=0, metadata=apischema.metadata.required)
+    #: Top-level configuration group.
+    root: ProcedureGroup = field(default_factory=ProcedureGroup)
+
+    def walk_steps(self) -> Generator[AnyProcedure, None, None]:
+        yield self.root
+        yield from self.root.walk_steps()
+
+    @classmethod
+    def from_json(cls, filename: AnyPath) -> ProcedureFile:
+        """Load a configuration file from JSON."""
+        with open(filename) as fp:
+            serialized_config = json.load(fp)
+        return apischema.deserialize(cls, serialized_config)
+
+    @classmethod
+    def from_yaml(cls, filename: AnyPath) -> ProcedureFile:
+        """Load a configuration file from yaml."""
+        with open(filename) as fp:
+            serialized_config = yaml.safe_load(fp)
+        return apischema.deserialize(cls, serialized_config)
+
+    def to_json(self):
+        """Dump this configuration file to a JSON-compatible dictionary."""
+        return apischema.serialize(ProcedureFile, self, exclude_defaults=True)
+
+    def to_yaml(self):
+        """Dump this configuration file to yaml."""
+        init_yaml_support()
+        return yaml.dump(self.to_json())
+
+
+def run_procedure(
+    process: ProcedureFile,
+):
+    """
+    Run a procedure given a ProcedureFile.
+
+    Gross skeleton code I am organizing my thoughts
+    """
+    for step in process.walk_steps():
+        print(step)
+        # check that the step has been completed
+
+        # if verified
+        step.verify = True
+        step.result = Result()
+
+    return process
