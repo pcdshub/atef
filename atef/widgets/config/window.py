@@ -8,7 +8,7 @@ import logging
 import os
 import os.path
 from pprint import pprint
-from typing import Optional
+from typing import Optional, Union
 
 from apischema import deserialize, serialize
 from qtpy import QtWidgets
@@ -95,11 +95,11 @@ class Window(DesignerDisplay, QMainWindow):
             self.get_tab_name(filename),
         )
 
-    def get_current_tree(self) -> Tree:
+    def get_current_tree(self) -> Union[EditTree, RunTree]:
         """
         Return the widget of the current open tab.
         """
-        return self.tab_widget.currentWidget()
+        return self.tab_widget.currentWidget().get_tree()
 
     def new_file(self, *args, **kwargs):
         """
@@ -107,7 +107,8 @@ class Window(DesignerDisplay, QMainWindow):
 
         The parameters are open as to accept inputs from any signal.
         """
-        widget = Tree(config_file=ConfigurationFile())
+        # TODO add mode switch logic
+        widget = EditTree(config_file=ConfigurationFile())
         self.tab_widget.addTab(widget, self.get_tab_name())
 
     def open_file(self, *args, filename: Optional[str] = None, **kwargs):
@@ -133,9 +134,19 @@ class Window(DesignerDisplay, QMainWindow):
         with open(filename, 'r') as fd:
             serialized = json.load(fd)
         data = deserialize(ConfigurationFile, serialized)
-        widget = Tree(config_file=data, full_path=filename)
+
+        widget = DualTree(config_file=data, full_path=filename)
+
         self.tab_widget.addTab(widget, self.get_tab_name(filename))
-        self.tab_widget.setCurrentIndex(self.tab_widget.count()-1)
+        curr_idx = self.tab_widget.count() - 1
+        self.tab_widget.setCurrentIndex(curr_idx)
+        # set up edit-run toggle
+        tab_bar = self.tab_widget.tabBar()
+        # toggle = widget.toggle
+        toggle = QtWidgets.QCheckBox()
+        tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.RightSide, toggle)
+
+        toggle.stateChanged.connect(widget.switch_mode)
 
     def save(self, *args, **kwargs):
         """
@@ -183,7 +194,7 @@ class Window(DesignerDisplay, QMainWindow):
             self.set_current_tab_name(filename)
             current_tree.full_path = filename
 
-    def serialize_tree(self, tree: Tree) -> dict:
+    def serialize_tree(self, tree: EditTree) -> dict:
         """
         Return the serialized data from a Tree widget.
         """
@@ -217,7 +228,7 @@ class Window(DesignerDisplay, QMainWindow):
         widget.show()
 
 
-class Tree(DesignerDisplay, QWidget):
+class EditTree(DesignerDisplay, QWidget):
     """
     The main per-file widget as a "native" view into the file.
 
@@ -301,3 +312,91 @@ class Tree(DesignerDisplay, QWidget):
             self.splitter.addWidget(widget)
         widget.setVisible(True)
         self.last_selection = item
+
+
+class RunTree(EditTree):
+    """
+    A tree that holds a checkout process.  Based on current Tree.
+    """
+    # TODO: set up to use Procedure widgets instead of config ones
+    pass
+
+
+class DualTree(QWidget):
+    """
+    A widget that exposes one of two tree widgets depending on the mode
+    """
+
+    def __init__(
+        self,
+        *args,
+        config_file: ConfigurationFile,
+        full_path: str,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self.layout = QtWidgets.QHBoxLayout()
+        edit_tree = EditTree(parent=self, config_file=config_file, full_path=full_path)
+        self.layout.addWidget(edit_tree)
+        self.setLayout(self.layout)
+        self.trees = {'edit': edit_tree, 'run': None}
+        self.mode = 'edit'
+        self.run_config = None
+        self.show_widgets()
+
+    def get_tree(self, mode=None) -> Union[EditTree, RunTree]:
+        if mode:
+            return self.trees[mode]
+
+        if self.mode == 'run':
+            # generate new run configuration
+            if (self.trees['run'] is None) or self.trees['run'].config_file:
+                self.build_run_tree()
+
+        return self.trees[self.mode]
+
+    def switch_mode(self) -> None:
+        # TODO: can this switching be made more elegant?
+        if self.mode == 'edit':
+            self.mode = 'run'
+        else:
+            self.mode = 'edit'
+        self.show_widgets()
+
+    def show_widgets(self) -> None:
+        """ show active widget, hide others """
+        for widget in self.trees.values():
+            if getattr(widget, 'hide', False):
+                widget.hide()
+
+        # TODO: this logic is gross please refactor this
+        # Right now this only happens for the run tree
+        if self.trees[self.mode] is None:
+            self.build_run_tree()
+        self.trees[self.mode].show()
+
+    def build_run_tree(self) -> None:
+        # TODO: Figure out if old versdions get garbage collected via orphaning
+        # grab current edit config
+        self.run_config = self.trees['edit'].config_file
+
+        # Do nothing if run tree exists and config has not changed
+        if self.trees['run'] and (self.trees['run'].config_file == self.run_config):
+            return
+
+        # otherwise build new tree widget
+        # dummy widget for now
+        # spoof a different tree
+        full_path2 = \
+            '/cds/home/r/roberttk/devrepos/atef/atef/tests/configs/all_fields.json'
+        with open(full_path2, 'r') as fd:
+            ser = json.load(fd)
+        config_file2 = deserialize(ConfigurationFile, ser)
+        r_widget = EditTree(
+            parent=self,
+            config_file=config_file2,
+            full_path=full_path2
+        )
+
+        self.layout.addWidget(r_widget)
+        self.trees['run'] = r_widget
