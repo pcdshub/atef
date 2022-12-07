@@ -21,6 +21,7 @@ from atef.config import ConfigurationFile
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
 from .page import AtefItem, ConfigurationGroupPage, link_page
+from .utils import Toggle
 
 logger = logging.getLogger(__name__)
 
@@ -142,11 +143,9 @@ class Window(DesignerDisplay, QMainWindow):
         self.tab_widget.setCurrentIndex(curr_idx)
         # set up edit-run toggle
         tab_bar = self.tab_widget.tabBar()
-        # toggle = widget.toggle
-        toggle = QtWidgets.QCheckBox()
+        toggle = Toggle()
+        # toggle.stateChanged.connect(widget.switch_mode)
         tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.RightSide, toggle)
-
-        toggle.stateChanged.connect(widget.switch_mode)
 
     def save(self, *args, **kwargs):
         """

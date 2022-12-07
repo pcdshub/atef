@@ -7,7 +7,7 @@ from typing import Any, Callable, ClassVar, List, Optional, Tuple, Type
 
 import qtawesome as qta
 from qtpy import QtCore, QtWidgets
-from qtpy.QtCore import QPoint, QPointF, QRectF, QSize, Qt
+from qtpy.QtCore import QPoint, QPointF, QRectF, Qt
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
                         QPaintEvent, QPen)
@@ -473,15 +473,16 @@ class Toggle(QCheckBox):
 
     def __init__(
         self,
+        *args,
         parent=None,
         bar_color=Qt.gray,
         checked_color="#00B0FF",
         handle_color=Qt.white,
         checked_icon='msc.run-all',
-        unchecked_icon='fa5s.edit'
+        unchecked_icon='fa5s.edit',
+        **kwargs
     ):
-        super().__init__(parent)
-
+        super().__init__(*args, parent=parent, **kwargs)
         # Save our properties on the object via self, so we can access them later
         # in the paintEvent.
         self.checked_color = checked_color
@@ -500,14 +501,10 @@ class Toggle(QCheckBox):
 
         self.stateChanged.connect(self.handle_state_change)
 
-    def sizeHint(self):
-        return QSize(58, 45)
-
     def hitButton(self, pos: QPoint):
         return self.contentsRect().contains(pos)
 
     def paintEvent(self, e: QPaintEvent):
-
         contRect = self.contentsRect()
         handleRadius = round(0.24 * contRect.height())
 
@@ -573,15 +570,6 @@ class Toggle(QCheckBox):
             2- connecting the QPropertyAnimation.valueChanged() signal to it.
         """
         self._handle_position = pos
-        self.update()
-
-    @QtCore.Property(float)
-    def pulse_radius(self):
-        return self._pulse_radius
-
-    @pulse_radius.setter
-    def pulse_radius(self, pos):
-        self._pulse_radius = pos
         self.update()
 
 
