@@ -17,9 +17,9 @@ from qtpy.QtCore import Qt
 
 from atef.check import Result
 
-from ..procedure import (DescriptionStep, DisplayOptions, PlanOptions,
-                         PlanStep, ProcedureGroup, ProcedureStep,
-                         PydmDisplayStep, TyphosDisplayStep)
+from ...procedure import (DescriptionStep, DisplayOptions, PlanOptions,
+                          PlanStep, ProcedureGroup, ProcedureStep,
+                          PydmDisplayStep, TyphosDisplayStep)
 
 # TODO:  CodeStep, ConfigurationCheckStep,
 
@@ -213,7 +213,7 @@ class PlanStepWidget(StepWidgetBase, QtWidgets.QFrame):
         self.description_widget = _add_label(
             layout, self.description, object_name="step_description"
         )
-        from ..re_widgets import Model, QtRePlanEditor
+        from ...re_widgets import Model, QtRePlanEditor
         model = Model()
         model.run_engine.clear_connection_status()
         model.run_engine.manager_connecting_ops()
