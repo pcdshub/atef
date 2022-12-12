@@ -501,12 +501,15 @@ class Toggle(QCheckBox):
 
         self.stateChanged.connect(self.handle_state_change)
 
+    def sizeHint(self) -> QtCore.QSize:
+        return QtCore.QSize(40, 25)
+
     def hitButton(self, pos: QPoint):
         return self.contentsRect().contains(pos)
 
     def paintEvent(self, e: QPaintEvent):
         contRect = self.contentsRect()
-        handleRadius = round(0.24 * contRect.height())
+        handleRadius = round(0.45 * contRect.height())
 
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)

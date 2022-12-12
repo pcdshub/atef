@@ -8,7 +8,7 @@ import logging
 import os
 import os.path
 from pprint import pprint
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 from apischema import deserialize, serialize
 from qtpy import QtWidgets
@@ -16,11 +16,12 @@ from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
                             QTabWidget, QTreeWidget, QWidget)
 
-from atef.config import ConfigurationFile
+from atef.config import ConfigurationFile, ConfigurationGroup
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
 from .page import AtefItem, ConfigurationGroupPage, link_page
+from .run import make_run_page, walk_tree_items
 from .utils import Toggle
 
 logger = logging.getLogger(__name__)
@@ -143,9 +144,8 @@ class Window(DesignerDisplay, QMainWindow):
         self.tab_widget.setCurrentIndex(curr_idx)
         # set up edit-run toggle
         tab_bar = self.tab_widget.tabBar()
-        toggle = Toggle()
-        # toggle.stateChanged.connect(widget.switch_mode)
-        tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.RightSide, toggle)
+        widget.toggle.stateChanged.connect(widget.switch_mode)
+        tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.RightSide, widget.toggle)
 
     def save(self, *args, **kwargs):
         """
@@ -313,12 +313,45 @@ class EditTree(DesignerDisplay, QWidget):
         self.last_selection = item
 
 
+_edit_to_run_page: Dict[type, type] = {
+    ConfigurationGroup: ConfigurationGroupPage
+}
+
+
 class RunTree(EditTree):
     """
-    A tree that holds a checkout process.  Based on current Tree.
+    A tree that holds a checkout process.  Based on current EditTree.
     """
+    def __init__(
+        self,
+        *args,
+        config_file: ConfigurationFile,
+        full_path: Optional[str] = None,
+        **kwargs
+    ):
+        super().__init__(config_file=config_file, full_path=full_path)
+        self._swap_to_run_widgets()
+
     # TODO: set up to use Procedure widgets instead of config ones
-    pass
+    @classmethod
+    def from_edit_tree(cls, edit_tree: EditTree):
+        """Create a RunTree from an EditTree"""
+        # make a new widget with tree/widget connections
+
+        return cls(
+            config_file=edit_tree.config_file,
+            full_path=edit_tree.full_path
+        )
+
+    def _swap_to_run_widgets(self):
+        """ Swap out widgets for run widgets """
+        # replace widgets with run versions
+        for item in walk_tree_items(self.root_item):
+            if item.widget in _edit_to_run_page:
+                print('swap page with run')
+            else:
+                run_widget = make_run_page(item.widget)
+                link_page(item, run_widget)
 
 
 class DualTree(QWidget):
@@ -341,6 +374,7 @@ class DualTree(QWidget):
         self.trees = {'edit': edit_tree, 'run': None}
         self.mode = 'edit'
         self.run_config = None
+        self.toggle = Toggle()
         self.show_widgets()
 
     def get_tree(self, mode=None) -> Union[EditTree, RunTree]:
@@ -363,7 +397,7 @@ class DualTree(QWidget):
         self.show_widgets()
 
     def show_widgets(self) -> None:
-        """ show active widget, hide others """
+        """show active widget, hide others. (re)generate RunTree if needed"""
         for widget in self.trees.values():
             if getattr(widget, 'hide', False):
                 widget.hide()
@@ -380,22 +414,12 @@ class DualTree(QWidget):
         self.run_config = self.trees['edit'].config_file
 
         # Do nothing if run tree exists and config has not changed
-        if self.trees['run'] and (self.trees['run'].config_file == self.run_config):
+        if (self.trees['run'] and
+                (self.trees['run'].config_file == self.run_config)):
             return
 
         # otherwise build new tree widget
-        # dummy widget for now
-        # spoof a different tree
-        full_path2 = \
-            '/cds/home/r/roberttk/devrepos/atef/atef/tests/configs/all_fields.json'
-        with open(full_path2, 'r') as fd:
-            ser = json.load(fd)
-        config_file2 = deserialize(ConfigurationFile, ser)
-        r_widget = EditTree(
-            parent=self,
-            config_file=config_file2,
-            full_path=full_path2
-        )
+        r_widget = RunTree.from_edit_tree(self.trees['edit'])
 
         self.layout.addWidget(r_widget)
         self.trees['run'] = r_widget
