@@ -1410,3 +1410,23 @@ def get_result_from_comparison(
         )
 
     return item, item.result
+
+
+async def run_passive_step(
+    config: Union[PreparedComparison, PreparedConfiguration, PreparedFile]
+):
+    """ Runs a given check and returns the result. """
+    # Warn if will run all subcomparisons?
+    cache_fill_tasks = []
+    try:
+        cache_fill_tasks = await config.fill_cache()
+    except asyncio.CancelledError:
+        logger.error("Tests interrupted; no results available.")
+        return
+    try:
+        result = await config.compare()
+    except asyncio.CancelledError:
+        for task in cache_fill_tasks or []:
+            task.cancel()
+
+    return result

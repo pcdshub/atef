@@ -34,7 +34,7 @@
     </widget>
    </item>
    <item>
-    <spacer name="horiz_spacer_1">
+    <spacer name="status_verify_spacer">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
@@ -66,7 +66,7 @@
     </widget>
    </item>
    <item>
-    <spacer name="horizontalSpacer">
+    <spacer name="verify_run_spacer">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
@@ -92,7 +92,7 @@
     </widget>
    </item>
    <item>
-    <spacer name="horizontalSpacer_2">
+    <spacer name="run_next_spacer">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>

@@ -8,20 +8,23 @@ import logging
 import os
 import os.path
 from pprint import pprint
-from typing import Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from apischema import deserialize, serialize
+from apischema import ValidationError, deserialize, serialize
 from qtpy import QtWidgets
 from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
                             QTabWidget, QTreeWidget, QWidget)
 
-from atef.config import ConfigurationFile, ConfigurationGroup
+from atef.cache import DataCache
+from atef.config import ConfigurationFile, ConfigurationGroup, PreparedFile
+from atef.procedure import ProcedureFile
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
-from .page import AtefItem, ConfigurationGroupPage, link_page
-from .run import make_run_page, walk_tree_items
+from .page import (AtefItem, ConfigurationGroupPage, ProcedureGroupPage,
+                   link_page)
+from .run import RunPage, make_run_page
 from .utils import Toggle
 
 logger = logging.getLogger(__name__)
@@ -135,7 +138,17 @@ class Window(DesignerDisplay, QMainWindow):
             return
         with open(filename, 'r') as fd:
             serialized = json.load(fd)
-        data = deserialize(ConfigurationFile, serialized)
+
+        # TODO: Consider adding submenus for user to choose
+        try:
+            data = deserialize(ConfigurationFile, serialized)
+        except ValidationError:
+            logger.debug('failed to open as passive checkout')
+            try:
+                data = deserialize(ProcedureFile, serialized)
+            except ValidationError:
+                logger.error('failed to open file as either active'
+                             'or passive checkout')
 
         widget = DualTree(config_file=data, full_path=filename)
 
@@ -252,12 +265,16 @@ class EditTree(DesignerDisplay, QWidget):
     def __init__(
         self,
         *args,
-        config_file: ConfigurationFile,
+        config_file: Union[ConfigurationFile, ProcedureFile],
         full_path: Optional[str] = None,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.config_file = config_file
+        if isinstance(self.config_file, ConfigurationFile):
+            self.page_class = ConfigurationGroupPage
+        elif isinstance(self.config_file, ProcedureFile):
+            self.page_class = ProcedureGroupPage
         self.full_path = full_path
         self.last_selection = None
         self.built_widgets = set()
@@ -313,7 +330,8 @@ class EditTree(DesignerDisplay, QWidget):
         self.last_selection = item
 
 
-_edit_to_run_page: Dict[type, type] = {
+_edit_to_run_page: Dict[type, RunPage] = {
+    # temporary dummy page
     ConfigurationGroup: ConfigurationGroupPage
 }
 
@@ -330,6 +348,16 @@ class RunTree(EditTree):
         **kwargs
     ):
         super().__init__(config_file=config_file, full_path=full_path)
+        if isinstance(config_file, ConfigurationFile):
+            self.prepared_file = PreparedFile.from_config(config_file,
+                                                          cache=DataCache())
+        # - create PreparedFile to use (with cache etc)
+        # - make widget for each
+        #   - auto-generated widgets will need non-prepared classes
+
+        # if active check:
+        # - make widget for each
+
         self._swap_to_run_widgets()
 
     # TODO: set up to use Procedure widgets instead of config ones
@@ -343,15 +371,77 @@ class RunTree(EditTree):
             full_path=edit_tree.full_path
         )
 
-    def _swap_to_run_widgets(self):
-        """ Swap out widgets for run widgets """
+    def _swap_to_run_widgets(self) -> RunTree:
+        """
+        Swap out widgets for run widgets
+
+        If a run-specific version of the widget exists, return that.
+        Otherwise makes a read-only copy of the widget with run controls
+        """
+        item_config_list: List[Tuple[AtefItem, Any]] = []
+        config_list = []
+        prep_list = []
+        # gather (item, config) tuples for each widget represented
+        if isinstance(self.config_file, ConfigurationFile):
+            # generate prepared file to grab configs from
+            prepared_file = PreparedFile.from_config(file=self.config_file)
+
+            # map config to prepared version
+            for grp in prepared_file.walk_groups():
+                prep_list.append(grp)
+                config_list.append(grp.config)
+            for comp in prepared_file.walk_comparisons():
+                prep_list.append(comp)
+                config_list.append(comp.comparison)
+
+        # walk through tree
+        it = QtWidgets.QTreeWidgetItemIterator(self.tree_widget)
+        # this is not a pythonic iterator, make it into one
+
+        while it.value():
+            item: AtefItem = it.value()
+            prep_cfg = match_in_list_mapping(item.widget.data,
+                                             config_list,
+                                             prep_list)
+            if config_list and prep_list:
+                item_config_list.append((item, prep_cfg))
+            else:
+                # No prepared configs to worry about
+                item_config_list.append((item, item.widget.data))
+
+            it += 1
+
+        self.item_config_list = item_config_list
+
         # replace widgets with run versions
-        for item in walk_tree_items(self.root_item):
+        # start at the root of the config file
+        for item, cfg in item_config_list:
+            print(f'{item.widget}, {cfg}')
+            print('\n')
             if item.widget in _edit_to_run_page:
                 print('swap page with run')
-            else:
-                run_widget = make_run_page(item.widget)
+                run_widget_cls = _edit_to_run_page[type(item.widget)]
+                run_widget = run_widget_cls(config=cfg)
                 link_page(item, run_widget)
+            else:
+                run_widget = make_run_page(item.widget, cfg)
+                link_page(item, run_widget)
+
+            # link buttons with methods?
+            run_widget.run_check.setup_buttons()
+
+
+def match_in_list_mapping(value: Any, list1: List, list2: List):
+    """
+    If ``value`` exists in ``list1``, return the value from ``list2``
+    at the same index.
+
+    Return None otherwise
+    """
+    if value not in list1:
+        return None
+
+    return list2[list1.index(value)]
 
 
 class DualTree(QWidget):
@@ -409,7 +499,7 @@ class DualTree(QWidget):
         self.trees[self.mode].show()
 
     def build_run_tree(self) -> None:
-        # TODO: Figure out if old versdions get garbage collected via orphaning
+        # TODO: Figure out if old versions get garbage collected via orphaning
         # grab current edit config
         self.run_config = self.trees['edit'].config_file
 

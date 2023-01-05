@@ -1659,3 +1659,16 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         - Cleans up all the sub-nodes.
         """
         self.tree_item.takeChildren()
+
+
+class ProcedureGroupPage(ConfigurationGroupPage):
+    """
+    Top level page for Procedures (active checkout)
+
+    Is this needed?  Config-specific bits:
+    - ConfigGroupWidget @ init
+    - 608: ConfigGroupRowWidget @
+        - add_config_row
+        - move_config_row
+    """
+    pass

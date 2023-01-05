@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import datetime
 import json
@@ -13,8 +14,10 @@ import databroker
 import yaml
 from bluesky import RunEngine
 
+from atef.cache import DataCache
 from atef.check import Result
-from atef.config import _summarize_result_severity
+from atef.config import (ConfigurationFile, PreparedFile,
+                         _summarize_result_severity, run_passive_step)
 from atef.enums import GroupResultMode, Severity
 from atef.type_hints import AnyPath
 from atef.yaml_support import init_yaml_support
@@ -54,7 +57,7 @@ class ProcedureStep:
     This is used as a base class for all valid procedure steps (and groups).
     """
     #: The title of the procedure
-    title: Optional[str] = None
+    name: Optional[str] = None
     #: A description of narrative explanation of setup steps, what is to happen, etc.
     description: Optional[str] = None
     #: The hierarchical parent of this step.
@@ -176,6 +179,30 @@ class PydmDisplayStep(ProcedureStep):
 
 
 @dataclass
+class PassiveStep(ProcedureStep):
+    """A step that runs a passive checkout file"""
+    filepath: pathlib.Path = field(default_factory=pathlib.Path)
+
+    def _run(self) -> Result:
+        """ Load, prepare, and run the passive step """
+        if self.filepath.suffix == '.json':
+            config = ConfigurationFile.from_json(self.filepath)
+        else:
+            config = ConfigurationFile.from_yaml(self.filepath)
+
+        # prepare file
+        prepared_config = PreparedFile.from_config(file=config,
+                                                   cache=DataCache())
+
+        # run passive checkout.  Will need to set up asyncio loop
+        loop = asyncio.get_event_loop()
+        coroutine = run_passive_step(prepared_config)
+        result = loop.run_until_complete(coroutine)
+
+        return result
+
+
+@dataclass
 class ProcedureGroup(ProcedureStep):
     """A group of procedure steps (or nested groups)."""
     #: Steps included in the procedure.
@@ -189,17 +216,17 @@ class ProcedureGroup(ProcedureStep):
             if isinstance(step, ProcedureGroup):
                 yield from step.walk_steps()
 
-    def run(self) -> Generator[Result]:
+    def run(self) -> Result:
         # run each step in this group, yield the step
         # how to deal with confirmation?
         results = []
         for step in self.steps:
-            yield step
             results.append(step.run())
 
         result = _summarize_result_severity(GroupResultMode.all_, results)
 
         self.result = result
+        return result
 
 
 AnyProcedure = Union[
@@ -249,6 +276,9 @@ class ProcedureFile:
         """Dump this configuration file to yaml."""
         init_yaml_support()
         return yaml.dump(self.to_json())
+
+    def compare(self) -> Result:
+        return self.root.compare()
 
 
 def run_procedure(
