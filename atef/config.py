@@ -15,13 +15,17 @@ from ophyd.signal import ConnectionTimeoutError
 
 from . import serialization, tools, util
 from .cache import DataCache
-from .check import Comparison, Result
+from .check import Comparison, Result, incomplete
 from .enums import GroupResultMode, Severity
 from .exceptions import PreparedComparisonException
 from .type_hints import AnyPath
 from .yaml_support import init_yaml_support
 
 logger = logging.getLogger(__name__)
+
+
+def incomplete_result():
+    return incomplete
 
 
 @dataclass
@@ -363,7 +367,7 @@ class PreparedConfiguration:
     #: The comparisons that failed to be prepared.
     prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
     #: The result of all comparisons.
-    result: Result = field(default_factory=Result)
+    result: Result = field(default_factory=incomplete_result)
 
     @classmethod
     def from_config(
@@ -494,7 +498,7 @@ class PreparedGroup(PreparedConfiguration):
     #: The configs that failed to prepare.
     prepare_failures: List[FailedConfiguration] = field(default_factory=list)
     #: Result of all comparisons.
-    result: Result = field(default_factory=Result)
+    result: Result = field(default_factory=incomplete_result)
 
     def get_value_by_name(self, name: str) -> Any:
         """
@@ -628,7 +632,7 @@ class PreparedGroup(PreparedConfiguration):
             result = Result(
                 severity=severity
             )
-
+        print(results)
         self.result = result
         return result
 
@@ -1248,6 +1252,35 @@ class PreparedSignalComparison(PreparedComparison):
         """
         if cache is None:
             cache = DataCache()
+
+        # if isinstance(comparison, AnyComparison):
+        #     # AnyComparison's have comparisons that themselves may need to be
+        #      prep_comparison = PreparedSignalComparison.from_pvname(
+        #         pvname=pvname,
+        #         comparison=comparison.comparisons,
+        #         cache=cache
+        #     )
+        # elif isinstance(comparison, list) and (len(comparison) != 0):
+        #     # prevent infinite recursion here
+        #     print(2)
+        #     prepared_comparisons = []
+        #     prep_comparison = PreparedSignalComparison.from_pvname(
+        #         pvname=pvname,
+        #         comparison=prepared_comparisons,
+        #         cache=cache
+        #     )
+        #     for comp in comparison:
+        #         prepared_comparisons.append(
+        #             PreparedSignalComparison.from_pvname(
+        #                 pvname=pvname,
+        #                 comparison=comp,
+        #                 parent=prep_comparison,
+        #                 cache=cache
+        #             )
+        #         )
+
+        # else:
+        #     prep_comparison = comparison
 
         return cls(
             identifier=pvname,

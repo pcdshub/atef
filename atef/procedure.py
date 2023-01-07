@@ -15,7 +15,7 @@ import yaml
 from bluesky import RunEngine
 
 from atef.cache import DataCache
-from atef.check import Result
+from atef.check import Result, incomplete
 from atef.config import (ConfigurationFile, PreparedFile,
                          _summarize_result_severity, run_passive_step)
 from atef.enums import GroupResultMode, Severity
@@ -29,7 +29,7 @@ db_singleton = None
 
 
 def incomplete_result():
-    return Result(severity=Severity.warning, reason='step incomplete')
+    return incomplete
 
 
 def setup_temp_runengine():

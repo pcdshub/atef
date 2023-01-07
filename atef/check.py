@@ -63,6 +63,9 @@ def _raise_for_severity(severity: Severity, reason: str):
 
 success = Result()
 
+incomplete = Result(severity=Severity.warning,
+                    reason='step incomplete')
+
 
 @dataclass
 class Value:
