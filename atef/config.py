@@ -1199,7 +1199,7 @@ class PreparedSignalComparison(PreparedComparison):
         PreparedSignalComparison
         """
         full_attr = f"{device.name}.{attr}"
-        logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
+        logger.debug("Checking %s with comparison %s", full_attr, comparison)
         if cache is None:
             cache = DataCache()
 
