@@ -1021,7 +1021,7 @@ class PreparedComparison:
     #: The hierarhical parent of this comparison.
     parent: Optional[PreparedGroup] = field(default=None, repr=False)
     #: The last result of the comparison, if run.
-    result: Optional[Result] = None
+    result: Result = field(default_factory=incomplete_result)
 
     async def get_data_async(self) -> Any:
         """
