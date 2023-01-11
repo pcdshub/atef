@@ -5,7 +5,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
-                    Tuple, Union, cast)
+                    Tuple, Union, cast, get_args)
 
 import apischema
 import happi
@@ -606,9 +606,10 @@ class PreparedGroup(PreparedConfiguration):
     ) -> Generator[PreparedGroup, None, None]:
         """Walk through the prepared groups."""
         for config in self.configs:
-            if isinstance(config, PreparedGroup):
+            if isinstance(config, get_args(AnyPreparedConfiguration)):
                 yield config
-                yield from config.walk_groups()
+                if isinstance(config, PreparedGroup):
+                    yield from config.walk_groups()
 
     def walk_comparisons(self) -> Generator[PreparedComparison, None, None]:
         """Walk through the prepared comparisons."""
