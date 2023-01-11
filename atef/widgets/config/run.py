@@ -1,12 +1,17 @@
 """ helpers for run mode """
 
+import asyncio
 import logging
-from typing import Generator, Union
+from typing import Generator, List, Union
 
+from qtpy import QtCore
 from qtpy.QtWidgets import (QLabel, QPushButton, QSpacerItem, QStyle,
                             QToolButton, QWidget)
 
-from atef.config import Configuration, ConfigurationFile, PreparedFile
+from atef import util
+from atef.check import Result
+from atef.config import ConfigurationFile, PreparedComparison
+from atef.enums import Severity
 from atef.procedure import ProcedureFile, ProcedureStep
 from atef.widgets.config.page import AtefItem, PageWidget
 from atef.widgets.core import DesignerDisplay
@@ -24,38 +29,6 @@ def walk_tree_items(item: AtefItem) -> Generator[AtefItem, None, None]:
 FileType = Union[ProcedureFile, ConfigurationFile]
 
 
-def walk_config_tree(
-    config: FileType, sub_name=None
-) -> Generator[Union[ProcedureStep, Configuration], None, None]:
-    # Starting case: file dataclasses
-    if not sub_name:
-        if isinstance(config, (ConfigurationFile, PreparedFile)):
-            sub_name = 'configs'
-        elif isinstance(config, ProcedureFile):
-            sub_name = 'steps'
-        else:
-            raise TypeError(f'config type ({type(config)}) is not supported')
-        print('initial file')
-        yield config
-        yield from walk_config_tree(config.root, sub_name=sub_name)
-
-    # Standard case, steps and substeps
-    else:
-        yield config
-        for sub_config in getattr(config, sub_name, []):
-            yield from walk_config_tree(sub_config, sub_name=sub_name)
-        for attr_cfg_list in getattr(config, 'by_attr', {}).values():
-            for attr_cfg in attr_cfg_list:
-                yield from walk_config_tree(attr_cfg, sub_name=sub_name)
-        for attr_cfg_list in getattr(config, 'by_pv', {}).values():
-            for attr_cfg in attr_cfg_list:
-                yield from walk_config_tree(attr_cfg, sub_name=sub_name)
-        for attr_cfg in getattr(config, 'comparisons', []):
-            yield from walk_config_tree(attr_cfg, sub_name=sub_name)
-        for shared_cfg in getattr(config, 'shared', []):
-            yield from walk_config_tree(shared_cfg, sub_name=sub_name)
-
-
 def run_active_step(config):  # takes procedure steps and groups
     """
     Runs a given step and returns a result.
@@ -67,7 +40,10 @@ def run_active_step(config):  # takes procedure steps and groups
     return result
 
 
-def make_run_page(widget: QWidget, config) -> QWidget:
+def make_run_page(
+    widget: QWidget,
+    configs: List[Union[PreparedComparison, ProcedureStep]]
+) -> QWidget:
     """
     Make a run version of the requested widget.
 
@@ -75,10 +51,10 @@ def make_run_page(widget: QWidget, config) -> QWidget:
 
     widget: widget to modify
 
-    config: should be a Configuration or Proccess dataclass that
+    configs: should be a Configuration or Proccess dataclass that
     can hold a result
     """
-    check_widget = RunCheck()
+    check_widget = RunCheck(configs=configs)
     # currently assumes vertical layout.
     # Taking old widgets and re-doing layout is difficult.
 
@@ -95,6 +71,19 @@ def make_run_page(widget: QWidget, config) -> QWidget:
     return widget
 
 
+def combine_results(results: List[Result]) -> Result:
+    """
+    Combines results into a single result.
+
+    Takes the highest severity, and currently all the reasons
+    """
+
+    severity = util.get_maximum_severity([r.severity for r in results])
+    reason = str([r.reason for r in results]) or ''
+
+    return Result(severity=severity, reason=reason)
+
+
 class RunCheck(DesignerDisplay, QWidget):
     """
     Widget to be added to run widgets
@@ -102,6 +91,8 @@ class RunCheck(DesignerDisplay, QWidget):
     Connections: (to establish)
     - next button
     - verify button to pop-out and record
+
+    Parent widget must be a PageWidget
     """
     filename = 'run_check.ui'
 
@@ -118,15 +109,18 @@ class RunCheck(DesignerDisplay, QWidget):
     complete_icon = QStyle.SP_DialogApplyButton
     fail_icon = QStyle.SP_DialogCancelButton
 
-    def __init__(self, *args, config=None, **kwargs):
+    def __init__(self, *args, configs=None, **kwargs):
         super().__init__(*args, **kwargs)
         icon = self.style().standardIcon(self.unknown_icon)
         self.status_label.setPixmap(icon.pixmap(25, 25))
+        self.configs = configs
 
-        if config:
-            self.setup_buttons(config=config)
+        if configs:
+            self.setup_buttons(configs=configs)
+            # initialize tooltip
+            self.update_status_label_tooltip()
 
-    def setup_buttons(self, config=None, prev_widget=None):
+    def setup_buttons(self, configs, next_widget: AtefItem = None) -> None:
         """
         Wire up buttons to the provided config dataclass.
         Run results and verification information will be saved to the
@@ -139,7 +133,86 @@ class RunCheck(DesignerDisplay, QWidget):
         remove button and spacer.
         Link Status to result of Run procedure
         """
-        pass
+        self._make_run_slot(configs)
+        if next_widget:
+            self.setup_next_button(next_widget)
+
+    def infer_step_type(self, config: Union[PreparedComparison, ProcedureStep]) -> str:
+        if hasattr(config, 'compare'):
+            return 'passive'
+        elif hasattr(config, 'run'):
+            return 'active'
+
+        # TODO: Uncomment this when we've fixed up the comparison walking...
+        # raise TypeError(f'incompatible type ({type(config)}), '
+        #                 'cannot infer active or passive')
+
+    def _make_run_slot(self, configs) -> None:
+
+        def run_slot():
+            """ Slot that runs each step in the config list """
+            print('running step')
+            for cfg in configs:
+                config_type = self.infer_step_type(cfg)
+                if config_type == 'active':
+                    cfg.run()
+                elif config_type == 'passive':
+                    asyncio.run(cfg.compare())
+                else:
+                    raise TypeError('incompatible type found: '
+                                    f'{config_type}, {cfg}')
+
+                print(cfg.result)
+                self.update_status()
+
+        self.run_button.clicked.connect(run_slot)
+
+    def update_status(self) -> None:
+        if not self.configs:
+            logger.warning('No config associated with this step')
+            return
+        combined_result = combine_results(self.results)
+
+        if combined_result.severity == Severity.success:
+            icon = self.style().standardIcon(self.complete_icon)
+        elif combined_result.severity in (Severity.internal_error, Severity.error):
+            icon = self.style().standardIcon(self.fail_icon)
+        else:
+            icon = self.style().standardIcon(self.unknown_icon)
+
+        self.status_label.setPixmap(icon.pixmap(25, 25))
+        self.update_status_label_tooltip()
+
+    def update_status_label_tooltip(self) -> None:
+        # TODO: replace with something more spiffy.
+        # Icons?  Concise result output?
+        tt = ''
+        for r in self.results:
+            tt += str(r)
+            tt += '\n'
+
+        self.status_label.setToolTip(tt[:-2])
+
+    def event(self, event: QtCore.QEvent) -> bool:
+        # Catch tooltip events to update status tooltip
+        if event.type() == QtCore.QEvent.ToolTip:
+            self.update_status_label_tooltip()
+            print('setToolTip')
+        return super().event(event)
+
+    @property
+    def results(self) -> List[Result]:
+        return [c.result for c in self.configs]
+
+    def setup_next_button(self, next_item) -> None:
+        print(f'setup_next_button {next_item}')
+        page = self.parent()
+
+        def inner_navigate(*args, **kwargs):
+            print(f'nav to {next_item}')
+            page.navigate_to(next_item)
+
+        self.next_button.clicked.connect(inner_navigate)
 
 
 class RunPage(PageWidget):

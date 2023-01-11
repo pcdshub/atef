@@ -351,12 +351,6 @@ class RunTree(EditTree):
         if isinstance(config_file, ConfigurationFile):
             self.prepared_file = PreparedFile.from_config(config_file,
                                                           cache=DataCache())
-        # - create PreparedFile to use (with cache etc)
-        # - make widget for each
-        #   - auto-generated widgets will need non-prepared classes
-
-        # if active check:
-        # - make widget for each
 
         self._swap_to_run_widgets()
 
@@ -378,36 +372,25 @@ class RunTree(EditTree):
         If a run-specific version of the widget exists, return that.
         Otherwise makes a read-only copy of the widget with run controls
         """
-        item_config_list: List[Tuple[AtefItem, Any]] = []
-        config_list = []
-        prep_list = []
-        # gather (item, config) tuples for each widget represented
         if isinstance(self.config_file, ConfigurationFile):
             # generate prepared file to grab configs from
             prepared_file = PreparedFile.from_config(file=self.config_file)
+        else:
+            # add case for prepared procedure
+            pass
 
-            # map config to prepared version
-            for grp in prepared_file.walk_groups():
-                prep_list.append(grp)
-                config_list.append(grp.config)
-            for comp in prepared_file.walk_comparisons():
-                prep_list.append(comp)
-                config_list.append(comp.comparison)
-
-        # walk through tree
+        # walk through tree items, make an analogous widget for each
+        # in edit tree
         it = QtWidgets.QTreeWidgetItemIterator(self.tree_widget)
-        # this is not a pythonic iterator, make it into one
+        # this is not a pythonic iterator, treat it differently
 
+        # gather sets of item(with widget), and a list of configs/comparisons
+        item_config_list: List[Tuple[AtefItem, Any]] = []
         while it.value():
             item: AtefItem = it.value()
-            prep_cfg = match_in_list_mapping(item.widget.data,
-                                             config_list,
-                                             prep_list)
-            if config_list and prep_list:
-                item_config_list.append((item, prep_cfg))
-            else:
-                # No prepared configs to worry about
-                item_config_list.append((item, item.widget.data))
+            # for each item, grab the relevant Configurations or Comparisons
+            c_list = get_relevant_configs_comps(prepared_file, item.widget.data)
+            item_config_list.append((item, c_list))
 
             it += 1
 
@@ -415,33 +398,42 @@ class RunTree(EditTree):
 
         # replace widgets with run versions
         # start at the root of the config file
-        for item, cfg in item_config_list:
-            print(f'{item.widget}, {cfg}')
-            print('\n')
+        ct = 0
+        prev_widget = None
+        for item, cfgs in item_config_list:
             if item.widget in _edit_to_run_page:
                 print('swap page with run')
                 run_widget_cls = _edit_to_run_page[type(item.widget)]
-                run_widget = run_widget_cls(config=cfg)
+                run_widget = run_widget_cls(configs=cfgs)
                 link_page(item, run_widget)
             else:
-                run_widget = make_run_page(item.widget, cfg)
+                run_widget = make_run_page(item.widget, cfgs)
                 link_page(item, run_widget)
 
-            # link buttons with methods?
-            run_widget.run_check.setup_buttons()
+            if prev_widget:
+                prev_widget.run_check.setup_next_button(item)
 
+            prev_widget = run_widget
+            ct += 1
 
-def match_in_list_mapping(value: Any, list1: List, list2: List):
-    """
-    If ``value`` exists in ``list1``, return the value from ``list2``
-    at the same index.
+            # update all statuses every time a step is run
+            run_button: QtWidgets.QPushButton = run_widget.run_check.run_button
+            run_button.clicked.connect(self.update_statuses)
 
-    Return None otherwise
-    """
-    if value not in list1:
-        return None
+        print(ct)
 
-    return list2[list1.index(value)]
+    def update_statuses(self) -> None:
+        """ update every status icon based on stored config result """
+        # walk through tree
+        it = QtWidgets.QTreeWidgetItemIterator(self.tree_widget)
+        while it.value():
+            item: AtefItem = it.value()
+            try:
+                item.widget.run_check.update_status()
+            except AttributeError as ex:
+                logger.debug(f'Run Check widget not properly setup: {ex}')
+
+            it += 1
 
 
 class DualTree(QWidget):
@@ -513,3 +505,23 @@ class DualTree(QWidget):
 
         self.layout.addWidget(r_widget)
         self.trees['run'] = r_widget
+
+
+def get_relevant_configs_comps(prepared_file: PreparedFile, original_c):
+    """
+    For passive checkout files only
+
+    Gather all the PreparedConfiguration or PreparedComparison dataclasses
+    that correspond to the original comparison or config.
+    """
+    matched_c = []
+
+    for config in prepared_file.walk_groups():
+        if config.config == original_c:
+            matched_c.append(config)
+
+    for comp in prepared_file.walk_comparisons():
+        if comp.comparison == original_c:
+            matched_c.append(comp)
+
+    return matched_c
