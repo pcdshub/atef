@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import os.path
+from copy import deepcopy
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -455,7 +456,10 @@ class DualTree(QWidget):
         self.setLayout(self.layout)
         self.trees = {'edit': edit_tree, 'run': None}
         self.mode = 'edit'
-        self.run_config = None
+        self.last_edit_config = deepcopy(serialize(type(self.trees['edit'].config_file),
+                                         self.trees['edit'].config_file))
+        self._orig_config = deepcopy(self.last_edit_config)
+
         self.toggle = Toggle()
         self.show_widgets()
 
@@ -465,7 +469,7 @@ class DualTree(QWidget):
 
         if self.mode == 'run':
             # generate new run configuration
-            if (self.trees['run'] is None) or self.trees['run'].config_file:
+            if (self.trees['run'] is None):
                 self.build_run_tree()
 
         return self.trees[self.mode]
@@ -480,27 +484,44 @@ class DualTree(QWidget):
 
     def show_widgets(self) -> None:
         """show active widget, hide others. (re)generate RunTree if needed"""
-        for widget in self.trees.values():
-            if getattr(widget, 'hide', False):
-                widget.hide()
-
         # TODO: this logic is gross please refactor this
         # Right now this only happens for the run tree
-        if self.trees[self.mode] is None:
-            self.build_run_tree()
+
+        # If run_tree requested check if there are changes
+        # Do nothing if run tree exists and config has not changed
+        update_run = False
+        if self.mode == 'run':
+            print('run requested')
+            current_edit_config = deepcopy(serialize(type(self.trees['edit'].config_file),
+                                           self.trees['edit'].config_file))
+
+            if self.trees['run'] is None:
+                update_run = True
+            elif not (current_edit_config == self.last_edit_config):
+                # run tree found, and edit configs are different
+                print('change found')
+                # remember last edit config
+                self.last_edit_config = deepcopy(current_edit_config)
+                update_run = True
+
+            if update_run:
+                self.build_run_tree()
+
+        for widget in self.trees.values():
+            if hasattr(widget, 'hide'):
+                widget.hide()
         self.trees[self.mode].show()
 
     def build_run_tree(self) -> None:
         # TODO: Figure out if old versions get garbage collected via orphaning
-        # grab current edit config
-        self.run_config = self.trees['edit'].config_file
-
-        # Do nothing if run tree exists and config has not changed
-        if (self.trees['run'] and
-                (self.trees['run'].config_file == self.run_config)):
-            return
-
         # otherwise build new tree widget
+        if self.trees['run']:
+            print('destroying old rwidget')
+            old_r_widget = self.trees['run']
+            old_r_widget.setParent(None)
+            old_r_widget.deleteLater()
+            self.trees['run'] = None
+
         r_widget = RunTree.from_edit_tree(self.trees['edit'])
 
         self.layout.addWidget(r_widget)
