@@ -5,12 +5,13 @@ import logging
 from typing import Generator, List, Union
 
 from qtpy import QtCore
-from qtpy.QtWidgets import (QLabel, QPushButton, QSpacerItem, QStyle,
+from qtpy.QtWidgets import (QLabel, QLayout, QPushButton, QSpacerItem, QStyle,
                             QToolButton, QWidget)
 
 from atef import util
 from atef.check import Result
-from atef.config import ConfigurationFile, PreparedComparison
+from atef.config import (AnyPreparedConfiguration, ConfigurationFile,
+                         PreparedComparison)
 from atef.enums import Severity
 from atef.procedure import ProcedureFile, ProcedureStep
 from atef.widgets.config.page import AtefItem, PageWidget
@@ -42,32 +43,54 @@ def run_active_step(config):  # takes procedure steps and groups
 
 def make_run_page(
     widget: QWidget,
-    configs: List[Union[PreparedComparison, ProcedureStep]]
+    configs: List[Union[PreparedComparison, ProcedureStep,
+                        AnyPreparedConfiguration]]
 ) -> QWidget:
     """
-    Make a run version of the requested widget.
+    Disables all the widgets in ``widget`` and adds the RunCheck widget.
+    RunCheck widget holds the functionality needed to execute the
+    comparison or process
 
-    Add buttons to existing widget to ensure methods pass through
+    Add buttons to existing widget to ensure existing navigation methods
+    pass through
 
-    widget: widget to modify
+    Parameters
+    ----------
+    widget : QWidget
+        widget to f
+    configs : List[Union[PreparedComparison,
+                         ProcedureStep,
+                         AnyPreparedConfiguration]]
+        A list of atef dataclasses that can each hold a Result.
 
-    configs: should be a Configuration or Proccess dataclass that
-    can hold a result
+    Returns
+    -------
+    QWidget
+        The run version of ``widget``
     """
-    check_widget = RunCheck(configs=configs)
+    # TODO: consider options for different widget layouts
     # currently assumes vertical layout.
-    # Taking old widgets and re-doing layout is difficult.
 
     # make existing widgets read-only
-    for idx in range(widget.layout().count()):
-        wid = widget.layout().itemAt(idx).widget()
-        if wid:
-            wid.setEnabled(False)
+    disable_widget(widget)
+    # add RunCheck to end of layout
+    check_widget = RunCheck(configs=configs)
     widget.layout().addWidget(check_widget)
     widget.run_check = check_widget
 
-    # TODO: options for different widget layouts
-    # TODO: link config page to
+    return widget
+
+
+def disable_widget(widget: QWidget) -> QWidget:
+    """ Disable widget, recurse through layouts """
+    for idx in range(widget.layout().count()):
+        layout_item = widget.layout().itemAt(idx)
+        if isinstance(layout_item, QLayout):
+            disable_widget(layout_item)
+        else:
+            wid = layout_item.widget()
+            if wid:
+                wid.setEnabled(False)
     return widget
 
 
@@ -162,7 +185,6 @@ class RunCheck(DesignerDisplay, QWidget):
                     raise TypeError('incompatible type found: '
                                     f'{config_type}, {cfg}')
 
-                print(cfg.result)
                 self.update_status()
 
         self.run_button.clicked.connect(run_slot)
@@ -205,7 +227,6 @@ class RunCheck(DesignerDisplay, QWidget):
         return [c.result for c in self.configs]
 
     def setup_next_button(self, next_item) -> None:
-        print(f'setup_next_button {next_item}')
         page = self.parent()
 
         def inner_navigate(*args, **kwargs):
