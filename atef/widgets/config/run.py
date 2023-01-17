@@ -160,6 +160,8 @@ class RunCheck(DesignerDisplay, QWidget):
         if next_widget:
             self.setup_next_button(next_widget)
 
+        self.setup_verify_button()
+
     def infer_step_type(self, config: Union[PreparedComparison, ProcedureStep]) -> str:
         if hasattr(config, 'compare'):
             return 'passive'
@@ -219,7 +221,6 @@ class RunCheck(DesignerDisplay, QWidget):
         # Catch tooltip events to update status tooltip
         if event.type() == QtCore.QEvent.ToolTip:
             self.update_status_label_tooltip()
-            print('setToolTip')
         return super().event(event)
 
     @property
@@ -230,10 +231,27 @@ class RunCheck(DesignerDisplay, QWidget):
         page = self.parent()
 
         def inner_navigate(*args, **kwargs):
-            print(f'nav to {next_item}')
             page.navigate_to(next_item)
 
         self.next_button.clicked.connect(inner_navigate)
+
+    def setup_verify_button(self) -> None:
+        """
+        Verify status button.
+
+        If passive checkout, remove button and spacer
+        If active checkout, read verify options and expose
+        """
+        step_types = {self.infer_step_type(step) for step in self.configs}
+        if len(step_types) > 1:
+            logger.debug('Multiple config types found, disabling verify')
+            return
+        elif 'passive' in step_types:
+            self.verify_button.hide()
+            self.layout().itemAt(3).changeSize(0, 0)
+        else:
+            # TODO: verify functionality for active checkouts
+            return
 
 
 class RunPage(PageWidget):
