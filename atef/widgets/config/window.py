@@ -50,6 +50,7 @@ class Window(DesignerDisplay, QMainWindow):
     action_print_dataclass: QAction
     action_print_serialized: QAction
     action_open_archive_viewer: QAction
+    action_print_report: QAction
 
     def __init__(self, *args, show_welcome: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
@@ -63,6 +64,7 @@ class Window(DesignerDisplay, QMainWindow):
         self.action_open_archive_viewer.triggered.connect(
             self.open_archive_viewer
         )
+        self.action_print_report.triggered.connect(self.print_report)
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
 
@@ -240,6 +242,14 @@ class Window(DesignerDisplay, QMainWindow):
         widget = get_archive_viewer()
         widget.show()
 
+    def print_report(self, *args, **kwargs):
+        """ Open save dialog for report output """
+        filename, _ = QFileDialog.getSaveFileName(
+            parent=self,
+            caption='Print report to:',
+            filter='PDF Files (*.pdf)',
+        )
+
 
 class EditTree(DesignerDisplay, QWidget):
     """
@@ -341,6 +351,10 @@ class RunTree(EditTree):
     """
     A tree that holds a checkout process.  Based on current EditTree.
     """
+    filename = 'run_config_tree.ui'
+
+    print_report_button: QtWidgets.QPushButton
+
     def __init__(
         self,
         *args,
@@ -354,6 +368,7 @@ class RunTree(EditTree):
                                                           cache=DataCache())
 
         self._swap_to_run_widgets()
+        self.print_report_button.clicked.connect(self.print_report)
 
     # TODO: set up to use Procedure widgets instead of config ones
     @classmethod
@@ -436,6 +451,14 @@ class RunTree(EditTree):
 
             it += 1
 
+    def print_report(self, *args, **kwargs):
+        """ setup button to print the report """
+        filename, _ = QFileDialog.getSaveFileName(
+            parent=self,
+            caption='Print report to:',
+            filter='PDF Files (*.pdf)',
+        )
+
 
 class DualTree(QWidget):
     """
@@ -492,8 +515,10 @@ class DualTree(QWidget):
         update_run = False
         if self.mode == 'run':
             print('run requested')
-            current_edit_config = deepcopy(serialize(type(self.trees['edit'].config_file),
-                                           self.trees['edit'].config_file))
+            current_edit_config = deepcopy(
+                serialize(type(self.trees['edit'].config_file),
+                          self.trees['edit'].config_file)
+            )
 
             if self.trees['run'] is None:
                 update_run = True

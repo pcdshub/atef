@@ -52,6 +52,7 @@
      <string>Utilities</string>
     </property>
     <addaction name="action_open_archive_viewer"/>
+    <addaction name="action_print_report"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDebug"/>
@@ -96,6 +97,11 @@
   <action name="action_open_archive_viewer">
    <property name="text">
     <string>Open Archive Viewer</string>
+   </property>
+  </action>
+  <action name="action_print_report">
+   <property name="text">
+    <string>Print Report</string>
    </property>
   </action>
  </widget>
