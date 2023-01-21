@@ -17,9 +17,11 @@ from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
                             QTabWidget, QTreeWidget, QWidget)
 
+import atef
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, ConfigurationGroup, PreparedFile
 from atef.procedure import ProcedureFile
+from atef.report import AtefReport
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
@@ -244,11 +246,11 @@ class Window(DesignerDisplay, QMainWindow):
 
     def print_report(self, *args, **kwargs):
         """ Open save dialog for report output """
-        filename, _ = QFileDialog.getSaveFileName(
-            parent=self,
-            caption='Print report to:',
-            filter='PDF Files (*.pdf)',
-        )
+        # get RunTree
+        run_tree: RunTree = self.tab_widget.currentWidget().get_tree(mode='run')
+        print(self.tab_widget.currentWidget())
+
+        run_tree.print_report()
 
 
 class EditTree(DesignerDisplay, QWidget):
@@ -459,6 +461,16 @@ class RunTree(EditTree):
             filter='PDF Files (*.pdf)',
         )
 
+        if not filename:
+            # Exit clause
+            return
+        if not filename.endswith('.pdf'):
+            filename += '.pdf'
+
+        doc = AtefReport(filename, config=self.config_file)
+        doc.set_info(author='atef', version=str(atef.__version__))
+        doc.create_report()
+
 
 class DualTree(QWidget):
     """
@@ -487,15 +499,18 @@ class DualTree(QWidget):
         self.show_widgets()
 
     def get_tree(self, mode=None) -> Union[EditTree, RunTree]:
-        if mode:
-            return self.trees[mode]
+        print(f'get_tree: {mode}')
+        if mode is None:
+            print('found None')
+            return self.trees[self.mode]
 
-        if self.mode == 'run':
+        if mode == 'run':
+            print('mode is run')
             # generate new run configuration
             if (self.trees['run'] is None):
                 self.build_run_tree()
 
-        return self.trees[self.mode]
+        return self.trees[mode]
 
     def switch_mode(self) -> None:
         # TODO: can this switching be made more elegant?
@@ -514,7 +529,6 @@ class DualTree(QWidget):
         # Do nothing if run tree exists and config has not changed
         update_run = False
         if self.mode == 'run':
-            print('run requested')
             current_edit_config = deepcopy(
                 serialize(type(self.trees['edit'].config_file),
                           self.trees['edit'].config_file)
@@ -541,14 +555,13 @@ class DualTree(QWidget):
         # TODO: Figure out if old versions get garbage collected via orphaning
         # otherwise build new tree widget
         if self.trees['run']:
-            print('destroying old rwidget')
             old_r_widget = self.trees['run']
             old_r_widget.setParent(None)
             old_r_widget.deleteLater()
             self.trees['run'] = None
 
         r_widget = RunTree.from_edit_tree(self.trees['edit'])
-
+        r_widget.hide()
         self.layout.addWidget(r_widget)
         self.trees['run'] = r_widget
 
