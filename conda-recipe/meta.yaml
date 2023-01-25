@@ -31,6 +31,7 @@ requirements:
     - pyyaml
     - qtpy
     - pyqt
+    - reportlab
     - rich
     - typhos
     - typing-extensions  # [py<38]
