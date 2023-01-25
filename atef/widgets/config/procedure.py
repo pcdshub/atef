@@ -19,7 +19,8 @@ from atef.check import Result
 
 from ...procedure import (DescriptionStep, DisplayOptions, PlanOptions,
                           PlanStep, ProcedureGroup, ProcedureStep,
-                          PydmDisplayStep, TyphosDisplayStep)
+                          PydmDisplayStep, TyphosDisplayStep,
+                          incomplete_result)
 
 # TODO:  CodeStep, ConfigurationCheckStep,
 
@@ -77,20 +78,20 @@ class StepWidgetBase(QtWidgets.QWidget):
 
     def __init__(
         self,
-        title: Optional[str] = None,
+        name: Optional[str] = None,
         description: str = "",
         verify: bool = False,
-        result: Result = Result(),
+        result: Result = incomplete_result(),
         *,
         parent: Optional[QtWidgets.QWidget] = None,
         **kwargs
     ):
         super().__init__(parent=parent)
-        self._title = title
+        self._title = name
         self._description = description
         self.title_widget = None
         self.description_widget = None
-        self.setWindowTitle(title or "Step")
+        self.setWindowTitle(name or "Step")
         self.setObjectName(self.windowTitle().replace(" ", "_"))
         self._setup_ui(**kwargs)
         self.updateGeometry()
