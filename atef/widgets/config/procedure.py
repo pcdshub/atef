@@ -351,9 +351,9 @@ class ProcedureGroupWidget(StepWidgetBase, QtWidgets.QFrame):
                 widget = procedure_step_to_widget(step)
             except Exception as ex:
                 widget = DescriptionStepWidget(
-                    title=step.title,
+                    name=step.name,
                     description=(
-                        f"atef error: failed to load step {step.title!r} "
+                        f"atef error: failed to load step {step.name!r} "
                         f"({type(step).__name__}) due to:<br/>\n"
                         f"<strong>{ex.__class__.__name__}</strong>: {ex}"
                     )
