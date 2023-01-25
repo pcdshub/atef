@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Generator, List, Optional, Tuple, Union
 
 from reportlab import platypus
-from reportlab.lib import colors, pagesizes, units
+from reportlab.lib import colors, enums, pagesizes, units
 from reportlab.lib.styles import ParagraphStyle as PS
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
@@ -30,7 +30,7 @@ from atef.enums import Severity
 
 h1 = PS(name='Heading1', fontSize=16, leading=20)
 
-h2 = PS(name='Heading2', fontSize=12, leading=13, leftIndent=5)
+h2 = PS(name='Heading2', fontSize=14, leading=17)
 
 l0 = PS(name='list0', fontSize=12, leading=15, leftIndent=0,
         rightIndent=0, spaceBefore=12, spaceAfter=0)
@@ -88,12 +88,16 @@ class AtefReport(BaseDocTemplate):
 
         self.config = config
         self.author = author
-        self.version = version
-        self.header_center_text = 'Atef File Name'
-        self.footer_center_text = 'footer center text'
+        self.version = version or self.config.file.version
+        self.header_center_text = self.config.root.config.name
+        self.footer_center_text = 'Passive Checkout Report'
+        self.approval_slots = 1
 
     def afterFlowable(self, flowable: Flowable) -> None:
-        """ Registers TOC entries. """
+        """
+        Registers TOC entries. Automatically notifies TOC if the style
+        name is recognized
+        """
         if flowable.__class__.__name__ == 'Paragraph':
             text = flowable.getPlainText()
             style = flowable.style.name
@@ -119,7 +123,7 @@ class AtefReport(BaseDocTemplate):
         self.build_footer(canvas)
 
     def build_header(self, canvas: Canvas) -> None:
-        """ Build header table """
+        """ Populate and build header table """
         canvas.saveState()
 
         header_table_data = [
@@ -133,13 +137,14 @@ class AtefReport(BaseDocTemplate):
             colWidths=[4*cm, 9.5*cm, 1.6*cm, 2.4*cm],
             rowHeights=[0.66*cm, 0.66*cm, 0.66*cm],
             style=[
-                ('GRID', (0, 0), (1, 2), 1, colors.black),
+                ('GRID', (0, 0), (1, 2), 1, colors.grey),
                 ('ALIGN', (0, 0), (0, 3), 'CENTER'),
                 ('VALIGN', (0, 0), (3, 2), 'MIDDLE'),
                 ('ALIGN', (2, 0), (3, 2), 'RIGHT'),
                 ('SPAN', (0, 0), (0, 2)),
                 ('SPAN', (1, 0), (1, 2)),
-                ('BOX', (2, 0), (-1, -1), 1, colors.black),
+                ('BOX', (2, 0), (-1, -1), 1, colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.grey)
             ]
         )
 
@@ -152,6 +157,7 @@ class AtefReport(BaseDocTemplate):
         canvas.restoreState()
 
     def build_footer(self, canvas: Canvas) -> None:
+        """ Populate and build footer table """
         canvas.saveState()
         footer_caption = self.footer_center_text
         page_num = f'Page: {canvas.getPageNumber()}'
@@ -163,10 +169,11 @@ class AtefReport(BaseDocTemplate):
             colWidths=[4*cm, 9.5*cm, 4*cm],
             rowHeights=[1*cm],
             style=[
-                ('GRID', (0, 0), (2, 0), 1, colors.black),
+                ('GRID', (0, 0), (2, 0), 1, colors.grey),
                 ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
                 ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
                 ('ALIGN', (0, 0), (3, 0), 'CENTER'),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.grey)
             ]
         )
 
@@ -177,26 +184,49 @@ class AtefReport(BaseDocTemplate):
     def set_info(
         self,
         author: Optional[str] = None,
-        version: Optional[str] = None
+        version: Optional[str] = None,
+        header_text: Optional[str] = None,
+        footer_text: Optional[str] = None,
+        approval_slots: Optional[int] = None
     ) -> None:
+        """ Ovderride or set default information used in the report """
         if author:
             self.author = author
         if version:
             self.verion = version
+        if header_text:
+            self.header_center_text = header_text
+        if footer_text:
+            self.footer_center_text = footer_text
+        if approval_slots:
+            self.approval_slots = approval_slots
 
     def build_cover_page(self, story: List[Flowable]) -> None:
+        """
+        Build the cover page and set up table of contents
+
+        Parameters
+        ----------
+        story : List[Flowable]
+            a list of components used to render the report.  New items
+            are appended to this directly
+        """
         toc = TableOfContents(dotsMinLevel=0)
         # For conciseness we use the same styles for headings and TOC entries
-        toc.levelStyles = [h1, h2]
+        toc.levelStyles = [PS('toc1', fontSize=12), PS('toc2', fontSize=10)]
+        cover_style = PS('cover_title', fontSize=20, leading=22,
+                         alignment=enums.TA_CENTER)
         story.append(platypus.NextPageTemplate('cover'))
-        story.append(Paragraph('Checkout Report',
-                               PS('cover_title', fontSize=20, leading=22)))
-        # story.append(self.LOGO)
+        story.append(Paragraph('Checkout Report', cover_style))
+        story.append(platypus.Spacer(width=0, height=.5*cm))
+        story.append(self.LOGO)
+        story.append(platypus.Spacer(width=0, height=.5*cm))
         story.append(Paragraph('Document Approval', l0))
         table_data = [
             ['Name:', 'Role:', 'Signature:', 'Date Approved:'],
-            ['', '', '', '']
         ]
+        for _ in range(self.approval_slots):
+            table_data.append(['', '', '', ''])
         # Key, start(C,R), end(C,R), Setting
         approval_table = platypus.Table(
             table_data,
@@ -209,15 +239,16 @@ class AtefReport(BaseDocTemplate):
                 ('ALIGN', (0, 0), (3, 0), 'CENTER'),
             ]
         )
-        story.append(approval_table)
+        if self.approval_slots > 0:
+            story.append(approval_table)
         story.append(platypus.NextPageTemplate('normal'))
         story.append(platypus.PageBreak())
-        story.append(Paragraph('Table of Contents',
-                               PS('cover_title', fontSize=20, leading=22)))
+        story.append(Paragraph('Table of Contents', cover_style))
         story.append(toc)
         story.append(platypus.PageBreak())
 
     def build_linked_header(self, text: str, style: PS) -> Paragraph:
+        """ Create a unique bookmark name and add it to the header """
         mark_name = (text+style.name).encode('utf-8')
         bookmark_name = hashlib.sha1(mark_name).hexdigest()
         header = Paragraph(text + f'<a name="{bookmark_name}"/>', style)
@@ -233,22 +264,36 @@ class PassiveAtefReport(AtefReport):
     """
     Report for Passive Checkouts.  Assumes specific PreparedFile structure
     """
+    __doc__ = __doc__ + AtefReport.__doc__
+
     def create_report(self):
-        """ Use the stored config and create the report """
+        """
+        Top-level method for creating the final report.
+        Use the stored config and calls various helpers
+        """
         # Build story as a list of Flowable objects
         story = []
+        # Cover page
         self.build_cover_page(story)
+        # Results summary page
         self.build_summary(story)
+        # Individual config / comparison pages
         for c, _ in self.walk_config_file(self.config.root):
             self.build_config_page(story, c)
-
-        story.append(Paragraph('Last heading', h1))
 
         # must build several times to place items then gather info for ToC
         self.multiBuild(story)
 
     def build_summary(self, story: List[Flowable]):
-        """ Build summary table for checkout """
+        """
+        Build summary table for checkout
+
+        Parameters
+        ----------
+        story : List[Flowable]
+            a list of components used to render the report.  New items
+            are appended to this directly
+        """
         story.append(self.build_linked_header('Checkout Summary', h1))
         story.append(platypus.Spacer(width=0, height=.5*cm))
         # table with results
@@ -258,6 +303,7 @@ class PassiveAtefReport(AtefReport):
                  ('ALIGN', (0, 0), (1, 0), 'CENTER'),
                  ('BOX', (0, 0), (-1, -1), 1, colors.black),
                  ('BOX', (0, 0), (0, -1), 1, colors.black)]
+
         for i in range(len(lines)):
             # content
             item, level = lines[i]
@@ -289,13 +335,28 @@ class PassiveAtefReport(AtefReport):
 
     def walk_config_file(
         self,
-        config,
+        config: Union[PreparedFile, PreparedConfiguration, PreparedComparison],
         level: int = 0
     ) -> Generator[Tuple[Any, int], None, None]:
-        """ Start with top-level group, not PreparedFile"""
-        yield config, level
+        """
+        Yields each config and comparison and its depth
+        Performs a recursive depth-first search
 
-        if isinstance(config, PreparedConfiguration):
+        Parameters
+        ----------
+        config : Union[PreparedFile, PreparedConfiguration, PreparedComparison]
+            the configuration or comparison to walk
+        level : int, optional
+            the current recursion depth, by default 0
+
+        Yields
+        ------
+        Generator[Tuple[Any, int], None, None]
+        """
+        yield config, level
+        if isinstance(config, PreparedFile):
+            yield from self.walk_config_file(config.root, level=level+1)
+        elif isinstance(config, PreparedConfiguration):
             if hasattr(config, 'configs'):
                 for conf in config.configs:
                     yield from self.walk_config_file(conf, level=level+1)
@@ -304,6 +365,20 @@ class PassiveAtefReport(AtefReport):
                     yield from self.walk_config_file(comp, level=level+1)
 
     def get_result_text(self, result: Result) -> Paragraph:
+        """
+        Reads a Result and returns a formatted Paragraph instance
+        suitable for insertion into a story or platypus.Table
+
+        Parameters
+        ----------
+        result : Result
+            The result of a comparsion or group of comparisons
+
+        Returns
+        -------
+        Paragraph
+            A formatted, Flowable text object to be inserted into a story
+        """
         severity = result.severity
         result_colors = {
             Severity.error: 'red',
@@ -316,22 +391,31 @@ class PassiveAtefReport(AtefReport):
                 f'<b>{severity.name}</b>: {result.reason or "-"}</font>')
         return Paragraph(text)
 
-    def build_config_page(self, story: List[Flowable], config) -> None:
-        """ Build a config/comparison page.  Dispatches to helpers """
+    def build_config_page(
+        self,
+        story: List[Flowable],
+        config: Union[PreparedConfiguration, PreparedComparison]
+    ) -> None:
+        """
+        Build a config/comparison page.  Comprised of:
+        - a basic header and overall result
+        - Table of settings for this comparison or config
+        - Table of observed data (if applicable / accessible)
+
+        Parameters
+        ----------
+        story : List[Flowable]
+            a list of components used to render the report.  New items
+            are appended to this directly
+        config : Union[PreparedConfiguration, PreparedComparison]
+            the configuration or comparison dataclass
+        """
         # section title and hyperlink
         desc = getattr(config, 'description', None)
         if desc:
             story.append(Paragraph(f'{getattr}'), PS('body'))
 
-        # render individual results
-        self.build_settings_results(story, config)
-
-        # end of section
-        story.append(platypus.PageBreak())
-
-    def build_settings_results(self, story: List[Flowable], config):
-        """ Table with settings and results of sub-comparisons """
-
+        # Settings (and maybe data) table
         if isinstance(config, (PreparedGroup, PreparedDeviceConfiguration,
                       PreparedPVConfiguration, PreparedToolConfiguration)):
             self.build_default_page(story, config, kind='config')
@@ -344,16 +428,37 @@ class PassiveAtefReport(AtefReport):
             story.append(header)
             story.append(Paragraph('page format not found'))
 
+        # end of section
+        story.append(platypus.PageBreak())
+
     def build_default_page(
         self,
         story: List[Flowable],
-        config: PreparedConfiguration,
+        config: Union[PreparedConfiguration, PreparedComparison],
         kind: str
     ) -> None:
+        """
+        Builds a general purpose page, containing info from the dataclass
+
+        Parameters
+        ----------
+        story : List[Flowable]
+            a list of components used to render the report.  New items
+            are appended to this directly
+        config : Union[PreparedConfiguration, PreparedComparison]
+            the configuration or comparison dataclass
+        kind : str
+            a flag notifying this method of which type of page to build.
+            either 'config' or 'comparison
+        """
         # Header bit
         setting_config = getattr(config, kind)
         header_text = setting_config.name
-        story.append(self.build_linked_header(header_text, h1))
+        if kind == 'config':
+            style = h1
+        elif kind == 'comparison':
+            style = h2
+        story.append(self.build_linked_header(header_text, style))
         story.append(Paragraph(setting_config.description))
         result = getattr(config, 'result', None)
         if result:
@@ -392,10 +497,21 @@ class PassiveAtefReport(AtefReport):
         story: List[Flowable],
         config: PreparedComparison
     ) -> None:
-        story.append(Paragraph('Observed Data'))
-        # use cached value.  If there is no value there it will
-        # try to access...
-        observed_value = config.data or 'N/A'
+        """
+        Builds a table describing the data observed at the time the
+        checkout was run
+
+        Parameters
+        ----------
+        story : List[Flowable]
+            a list of components used to render the report.  New items
+            appended to this directly
+        config : PreparedComparison
+            dataclass that can hold a DataCache instance
+        """
+        story.append(Paragraph('Observed Data', l0))
+        # use cached value.
+        observed_value = getattr(config, 'data', 'N/A')
         try:
             timestamp = datetime.fromtimestamp(config.signal.timestamp).ctime()
             source = config.signal.name
