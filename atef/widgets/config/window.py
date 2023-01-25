@@ -21,7 +21,7 @@ import atef
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, ConfigurationGroup, PreparedFile
 from atef.procedure import ProcedureFile
-from atef.report import AtefReport
+from atef.report import PassiveAtefReport
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
@@ -467,7 +467,7 @@ class RunTree(EditTree):
         if not filename.endswith('.pdf'):
             filename += '.pdf'
 
-        doc = AtefReport(filename, config=self.config_file)
+        doc = PassiveAtefReport(filename, config=self.config_file)
         doc.set_info(author='atef', version=str(atef.__version__))
         doc.create_report()
 

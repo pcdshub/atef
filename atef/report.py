@@ -3,13 +3,15 @@ Report rendering framework
 """
 
 import hashlib
-import html
+from dataclasses import fields
+from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Generator, List, Optional, Tuple, Union
 
 from reportlab import platypus
 from reportlab.lib import colors, pagesizes, units
 from reportlab.lib.styles import ParagraphStyle as PS
+from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus.doctemplate import BaseDocTemplate, PageTemplate
@@ -18,14 +20,22 @@ from reportlab.platypus.frames import Frame
 from reportlab.platypus.paragraph import Paragraph
 from reportlab.platypus.tableofcontents import TableOfContents
 
-from atef.config import PreparedFile
+from atef.check import Result
+from atef.config import (PreparedComparison, PreparedConfiguration,
+                         PreparedDeviceConfiguration, PreparedFile,
+                         PreparedGroup, PreparedPVConfiguration,
+                         PreparedSignalComparison, PreparedToolComparison,
+                         PreparedToolConfiguration)
+from atef.enums import Severity
 
-h1 = PS(name='Heading1', fontSize=14, leading=16)
+h1 = PS(name='Heading1', fontSize=16, leading=20)
 
-h2 = PS(name='Heading2', fontSize=12, leading=14, leftIndent=5)
+h2 = PS(name='Heading2', fontSize=12, leading=13, leftIndent=5)
 
 l0 = PS(name='list0', fontSize=12, leading=15, leftIndent=0,
         rightIndent=0, spaceBefore=12, spaceAfter=0)
+
+styles = getSampleStyleSheet()
 
 
 class AtefReport(BaseDocTemplate):
@@ -114,7 +124,7 @@ class AtefReport(BaseDocTemplate):
 
         header_table_data = [
             ['', self.header_center_text, 'Author:', f"{self.author}"],
-            ['', '', 'Date:', '11.22.3333'],
+            ['', '', 'Date:', str(datetime.today().date())],
             ['', '', 'Version:', f'{self.version}']
         ]
 
@@ -175,13 +185,13 @@ class AtefReport(BaseDocTemplate):
             self.verion = version
 
     def build_cover_page(self, story: List[Flowable]) -> None:
-        toc = TableOfContents()
+        toc = TableOfContents(dotsMinLevel=0)
         # For conciseness we use the same styles for headings and TOC entries
         toc.levelStyles = [h1, h2]
         story.append(platypus.NextPageTemplate('cover'))
         story.append(Paragraph('Checkout Report',
                                PS('cover_title', fontSize=20, leading=22)))
-        story.append(self.LOGO)
+        # story.append(self.LOGO)
         story.append(Paragraph('Document Approval', l0))
         table_data = [
             ['Name:', 'Role:', 'Signature:', 'Date Approved:'],
@@ -214,32 +224,190 @@ class AtefReport(BaseDocTemplate):
         header._bookmark_name = bookmark_name
         return header
 
-    def build_results(self, config):
-        """ tree view """
-        return Paragraph('placeholder', l0)
+    def create_report(self) -> None:
+        """ Build the final report. """
+        raise NotImplementedError()
 
-    def build_config_page(self, story: List[Flowable], config) -> None:
-        """ Page Logic goes HERE.  To be expanded and made much more complex """
 
-        config_type = html.escape(str(type(config).__name__))
-        header = self.build_linked_header(config_type, h1)
-        story.append(header)
-
-        results = self.build_results(config)
-        story.append(results)
-        story.append(Paragraph('Text in first heading', PS('body')))
-
-        story.append(platypus.PageBreak())
-
+class PassiveAtefReport(AtefReport):
+    """
+    Report for Passive Checkouts.  Assumes specific PreparedFile structure
+    """
     def create_report(self):
         """ Use the stored config and create the report """
         # Build story as a list of Flowable objects
         story = []
         self.build_cover_page(story)
-        for c in self.config.root.configs:
+        self.build_summary(story)
+        for c, _ in self.walk_config_file(self.config.root):
             self.build_config_page(story, c)
 
         story.append(Paragraph('Last heading', h1))
 
         # must build several times to place items then gather info for ToC
         self.multiBuild(story)
+
+    def build_summary(self, story: List[Flowable]):
+        """ Build summary table for checkout """
+        story.append(self.build_linked_header('Checkout Summary', h1))
+        story.append(platypus.Spacer(width=0, height=.5*cm))
+        # table with results
+        lines = list(self.walk_config_file(self.config.root))
+        table_data = [['Step Name', 'Result']]
+        style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                 ('ALIGN', (0, 0), (1, 0), 'CENTER'),
+                 ('BOX', (0, 0), (-1, -1), 1, colors.black),
+                 ('BOX', (0, 0), (0, -1), 1, colors.black)]
+        for i in range(len(lines)):
+            # content
+            item, level = lines[i]
+            prefix = '    ' * level
+            if isinstance(item, PreparedConfiguration):
+                name = item.config.name
+            elif isinstance(item, PreparedComparison):
+                name = item.comparison.name
+            name = name or type(item).__name__
+            table_data.append(
+                [
+                    prefix + f'{name}',
+                    self.get_result_text(item.result)
+                ]
+            )
+
+            # style
+            if isinstance(item, PreparedConfiguration):
+                style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.black])
+            else:
+                style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.lightgrey])
+
+        table = platypus.Table(
+            table_data, style=style
+        )
+
+        story.append(table)
+        story.append(platypus.PageBreak())
+
+    def walk_config_file(
+        self,
+        config,
+        level: int = 0
+    ) -> Generator[Tuple[Any, int], None, None]:
+        """ Start with top-level group, not PreparedFile"""
+        yield config, level
+
+        if isinstance(config, PreparedConfiguration):
+            if hasattr(config, 'configs'):
+                for conf in config.configs:
+                    yield from self.walk_config_file(conf, level=level+1)
+            if hasattr(config, 'comparisons'):
+                for comp in config.comparisons:
+                    yield from self.walk_config_file(comp, level=level+1)
+
+    def get_result_text(self, result: Result) -> Paragraph:
+        severity = result.severity
+        result_colors = {
+            Severity.error: 'red',
+            Severity.internal_error: 'yellow',
+            Severity.success: 'green',
+            Severity.warning: 'orange'
+        }
+
+        text = (f'<font color={result_colors[severity]}>'
+                f'<b>{severity.name}</b>: {result.reason or "-"}</font>')
+        return Paragraph(text)
+
+    def build_config_page(self, story: List[Flowable], config) -> None:
+        """ Build a config/comparison page.  Dispatches to helpers """
+        # section title and hyperlink
+        desc = getattr(config, 'description', None)
+        if desc:
+            story.append(Paragraph(f'{getattr}'), PS('body'))
+
+        # render individual results
+        self.build_settings_results(story, config)
+
+        # end of section
+        story.append(platypus.PageBreak())
+
+    def build_settings_results(self, story: List[Flowable], config):
+        """ Table with settings and results of sub-comparisons """
+
+        if isinstance(config, (PreparedGroup, PreparedDeviceConfiguration,
+                      PreparedPVConfiguration, PreparedToolConfiguration)):
+            self.build_default_page(story, config, kind='config')
+        elif isinstance(config, (PreparedSignalComparison, PreparedToolComparison)):
+            self.build_default_page(story, config, kind='comparison')
+            self.build_data_table(story, config)
+        else:
+            config_type = str(type(config).__name__)
+            header = self.build_linked_header(config_type, h1)
+            story.append(header)
+            story.append(Paragraph('page format not found'))
+
+    def build_default_page(
+        self,
+        story: List[Flowable],
+        config: PreparedConfiguration,
+        kind: str
+    ) -> None:
+        # Header bit
+        setting_config = getattr(config, kind)
+        header_text = setting_config.name
+        story.append(self.build_linked_header(header_text, h1))
+        story.append(Paragraph(setting_config.description))
+        result = getattr(config, 'result', None)
+        if result:
+            story.append(self.get_result_text(result))
+        # settings table
+        story.append(Paragraph('Settings', l0))
+        settings_data = []
+        for field in fields(setting_config):
+            if field.name not in ['name', 'description', 'by_pv',
+                                  'by_attr', 'shared', 'configs']:
+                settings_data.append(
+                    [field.name,
+                     Paragraph(str(getattr(setting_config, field.name)),
+                               styles['BodyText'])]
+                )
+        settings_table = platypus.Table(
+            settings_data,
+            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+        )
+        story.append(settings_table)
+        # results table
+        results_data = []
+        for comp in getattr(config, 'comparisons', []):
+            results_data.append([f'{comp.comparison.name} - {comp.identifier}',
+                                 self.get_result_text(comp.result)])
+        if results_data:
+            story.append(Paragraph('Results', l0))
+            results_table = platypus.Table(
+                results_data,
+                style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+            )
+            story.append(results_table)
+
+    def build_data_table(
+        self,
+        story: List[Flowable],
+        config: PreparedComparison
+    ) -> None:
+        story.append(Paragraph('Observed Data'))
+        # use cached value.  If there is no value there it will
+        # try to access...
+        observed_value = config.data or 'N/A'
+        try:
+            timestamp = datetime.fromtimestamp(config.signal.timestamp).ctime()
+            source = config.signal.name
+        except AttributeError:
+            timestamp = 'unknown'
+            source = 'undefined'
+        observed_data = [['Observed Value', 'Timestamp', 'Source'],
+                         [observed_value, timestamp, source]]
+
+        observed_table = platypus.Table(
+            observed_data,
+            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+        )
+
+        story.append(observed_table)
