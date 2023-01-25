@@ -437,13 +437,12 @@ async def check_and_log(
             return
 
     try:
-        result = await prepared_file.compare()
+        await prepared_file.compare()
     except asyncio.CancelledError:
         console.print("Tests interrupted; showing partial results.")
         for task in cache_fill_tasks or []:
             task.cancel()
 
-    print(result)
     root_tree = rich.tree.Tree(str(filename))
     tree = group_to_rich_tree(prepared_file.root, verbosity=verbosity)
     root_tree.add(tree)

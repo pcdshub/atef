@@ -633,7 +633,6 @@ class PreparedGroup(PreparedConfiguration):
             result = Result(
                 severity=severity
             )
-        print(results)
         self.result = result
         return result
 
@@ -1253,35 +1252,6 @@ class PreparedSignalComparison(PreparedComparison):
         """
         if cache is None:
             cache = DataCache()
-
-        # if isinstance(comparison, AnyComparison):
-        #     # AnyComparison's have comparisons that themselves may need to be
-        #      prep_comparison = PreparedSignalComparison.from_pvname(
-        #         pvname=pvname,
-        #         comparison=comparison.comparisons,
-        #         cache=cache
-        #     )
-        # elif isinstance(comparison, list) and (len(comparison) != 0):
-        #     # prevent infinite recursion here
-        #     print(2)
-        #     prepared_comparisons = []
-        #     prep_comparison = PreparedSignalComparison.from_pvname(
-        #         pvname=pvname,
-        #         comparison=prepared_comparisons,
-        #         cache=cache
-        #     )
-        #     for comp in comparison:
-        #         prepared_comparisons.append(
-        #             PreparedSignalComparison.from_pvname(
-        #                 pvname=pvname,
-        #                 comparison=comp,
-        #                 parent=prep_comparison,
-        #                 cache=cache
-        #             )
-        #         )
-
-        # else:
-        #     prep_comparison = comparison
 
         return cls(
             identifier=pvname,

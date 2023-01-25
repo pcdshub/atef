@@ -443,7 +443,6 @@ class AnyComparison(Comparison):
         return f"any of:\n{comparisons}"
 
     def _compare(self, value: PrimitiveType) -> bool:
-        print(f'anyComp: {value}')
         return any(
             comparison._compare(value)
             for comparison in self.comparisons
