@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from itertools import zip_longest
-from typing import Any, Callable, ClassVar, List, Optional, Tuple, Type
+from typing import Any, Callable, ClassVar
 
 import qtawesome as qta
 from qtpy import QtCore, QtWidgets
@@ -112,7 +112,7 @@ class StringListWithDialog(DesignerDisplay, QWidget):
 
         self.list_strings.addItem(QtWidgets.QListWidgetItem(item))
 
-    def add_items(self, items: List[str]) -> None:
+    def add_items(self, items: list[str]) -> None:
         """
         Add one or more strings to the QListWidget and the bridge.
 
@@ -125,7 +125,7 @@ class StringListWithDialog(DesignerDisplay, QWidget):
             self._add_item(item)
 
     @property
-    def selected_items_text(self) -> List[str]:
+    def selected_items_text(self) -> list[str]:
         """
         The text of item(s) currently selected in the QListWidget.
 
@@ -156,7 +156,7 @@ class StringListWithDialog(DesignerDisplay, QWidget):
                 self.list_strings.takeItem(row)
                 return
 
-    def remove_items(self, items: List[str]) -> None:
+    def remove_items(self, items: list[str]) -> None:
         """
         Remove items from the QListWidget and the bridge.
 
@@ -195,7 +195,7 @@ class StringListWithDialog(DesignerDisplay, QWidget):
                 self.list_strings.item(row).setText(new)
                 return
 
-    def edit_items(self, old_items: List[str], new_items: List[str]) -> None:
+    def edit_items(self, old_items: list[str], new_items: list[str]) -> None:
         """
         Best-effort edit of items in place in the QListWidget and the bridge.
 
@@ -258,14 +258,14 @@ class DeviceListWidget(StringListWithDialog):
     Device list widget, with ``HappiSearchWidget`` for adding new devices.
     """
 
-    _search_widget: Optional[HappiDeviceComponentWidget] = None
+    _search_widget: HappiDeviceComponentWidget | None = None
 
     def _setup_ui(self) -> None:
         super()._setup_ui()
         self.item_add_request.connect(self._open_device_chooser)
         self.item_edit_request.connect(self._open_device_chooser)
 
-    def _open_device_chooser(self, to_select: Optional[List[str]] = None) -> None:
+    def _open_device_chooser(self, to_select: list[str] | None = None) -> None:
         """
         Hook: User requested adding/editing an existing device.
 
@@ -293,14 +293,14 @@ class ComponentListWidget(StringListWithDialog):
     Component list widget using a ``HappiDeviceComponentWidget``.
     """
 
-    _search_widget: Optional[HappiDeviceComponentWidget] = None
+    _search_widget: HappiDeviceComponentWidget | None = None
     suggest_comparison: QSignal = QSignal(Comparison)
-    get_device_list: Optional[Callable[[], List[str]]]
+    get_device_list: Callable[[], list[str]] | None
 
     def __init__(
         self,
         data_list: QDataclassList,
-        get_device_list: Optional[Callable[[], List[str]]] = None,
+        get_device_list: Callable[[], list[str]] | None = None,
         allow_duplicates: bool = False,
         **kwargs,
     ):
@@ -312,7 +312,7 @@ class ComponentListWidget(StringListWithDialog):
         self.item_add_request.connect(self._open_component_chooser)
         self.item_edit_request.connect(self._open_component_chooser)
 
-    def _open_component_chooser(self, to_select: Optional[List[str]] = None) -> None:
+    def _open_component_chooser(self, to_select: list[str] | None = None) -> None:
         """
         Hook: User requested adding/editing a component.
 
@@ -344,7 +344,7 @@ class ComponentListWidget(StringListWithDialog):
                 util.regex_for_devices(device_list)
             )
 
-    def _attr_menu_helper(self, data: List[OphydAttributeData]) -> QtWidgets.QMenu:
+    def _attr_menu_helper(self, data: list[OphydAttributeData]) -> QtWidgets.QMenu:
         menu = QtWidgets.QMenu()
 
         summary = OphydAttributeDataSummary.from_attr_data(*data)
@@ -436,7 +436,7 @@ class BulkListWidget(StringListWithDialog):
         self.item_add_request.connect(self._open_multiline)
         self.item_edit_request.connect(self._open_multiline)
 
-    def _open_multiline(self, to_select: Optional[List[str]] = None) -> None:
+    def _open_multiline(self, to_select: list[str] | None = None) -> None:
         """
         User requested adding new strings or editing existing ones.
 
@@ -737,7 +737,7 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
 def get_relevant_pvs(
     attr: str,
     config: Configuration
-) -> List[Tuple[str, str]]:
+) -> list[tuple[str, str]]:
     """
     Get the pvs and corresponding attribute name for the provided comparison.
 
@@ -776,7 +776,7 @@ def get_relevant_pvs(
         return pv_list
 
 
-def cast_dataclass(data: Any, new_type: Type) -> Any:
+def cast_dataclass(data: Any, new_type: type) -> Any:
     """
     Convert one dataclass to another, keeping values in any same-named fields.
 
@@ -793,7 +793,7 @@ def cast_dataclass(data: Any, new_type: Type) -> Any:
         The new dataclass instance.
     """
     new_fields = dataclasses.fields(new_type)
-    field_names = set(field.name for field in new_fields)
+    field_names = {field.name for field in new_fields}
     new_kwargs = {
         key: value for key, value in dataclasses.asdict(data).items()
         if key in field_names

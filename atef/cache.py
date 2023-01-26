@@ -6,8 +6,7 @@ import dataclasses
 import logging
 import typing
 from dataclasses import dataclass, field
-from typing import (Any, Dict, Hashable, Iterable, Mapping, Optional, Type,
-                    TypeVar, cast)
+from typing import Any, Hashable, Iterable, Mapping, TypeVar, cast
 
 import ophyd
 
@@ -21,7 +20,7 @@ _CacheSignalType = TypeVar("_CacheSignalType", bound=ophyd.Signal)
 
 
 logger = logging.getLogger(__name__)
-_signal_cache: Optional[_SignalCache[ophyd.EpicsSignalRO]] = None
+_signal_cache: _SignalCache[ophyd.EpicsSignalRO] | None = None
 
 
 def get_signal_cache() -> _SignalCache[ophyd.EpicsSignalRO]:
@@ -34,8 +33,8 @@ def get_signal_cache() -> _SignalCache[ophyd.EpicsSignalRO]:
 
 @dataclass
 class _SignalCache(Mapping[str, _CacheSignalType]):
-    signal_type_cls: Type[ophyd.EpicsSignalRO]
-    pv_to_signal: Dict[str, _CacheSignalType] = field(default_factory=dict)
+    signal_type_cls: type[ophyd.EpicsSignalRO]
+    pv_to_signal: dict[str, _CacheSignalType] = field(default_factory=dict)
 
     def __getitem__(self, pv: str) -> _CacheSignalType:
         """Get a PV from the cache."""
@@ -67,15 +66,15 @@ class _SignalCache(Mapping[str, _CacheSignalType]):
 
 @dataclass(frozen=True, eq=True)
 class DataKey:
-    period: Optional[Number] = None
+    period: Number | None = None
     method: ReduceMethod = ReduceMethod.average
     string: bool = False
 
 
 @dataclass(frozen=True, eq=True)
 class ToolKey:
-    tool_cls: Type[tools.Tool]
-    settings: Optional[Hashable]
+    tool_cls: type[tools.Tool]
+    settings: Hashable | None
 
     @classmethod
     def from_tool(cls, tool: tools.Tool) -> ToolKey:
@@ -114,11 +113,11 @@ def _freeze(data):
 
 @dataclass
 class DataCache:
-    signal_data: Dict[ophyd.Signal, Dict[DataKey, Any]] = field(default_factory=dict)
+    signal_data: dict[ophyd.Signal, dict[DataKey, Any]] = field(default_factory=dict)
     signals: _SignalCache[ophyd.EpicsSignalRO] = field(
         default_factory=get_signal_cache
     )
-    tool_data: Dict[ToolKey, Any] = field(
+    tool_data: dict[ToolKey, Any] = field(
         default_factory=dict
     )
 
@@ -131,11 +130,11 @@ class DataCache:
     async def get_pv_data(
         self,
         pv: str,
-        reduce_period: Optional[Number] = None,
+        reduce_period: Number | None = None,
         reduce_method: ReduceMethod = ReduceMethod.average,
         string: bool = False,
-        executor: Optional[concurrent.futures.Executor] = None,
-    ) -> Optional[Any]:
+        executor: concurrent.futures.Executor | None = None,
+    ) -> Any | None:
         """
         Get EPICS PV data with the provided data reduction settings.
 
@@ -175,11 +174,11 @@ class DataCache:
     async def get_signal_data(
         self,
         signal: ophyd.Signal,
-        reduce_period: Optional[Number] = None,
+        reduce_period: Number | None = None,
         reduce_method: ReduceMethod = ReduceMethod.average,
         string: bool = False,
-        executor: Optional[concurrent.futures.Executor] = None,
-    ) -> Optional[Any]:
+        executor: concurrent.futures.Executor | None = None,
+    ) -> Any | None:
         """
         Get signal data with the provided data reduction settings.
 
@@ -226,7 +225,7 @@ class DataCache:
         self,
         signal: ophyd.Signal,
         key: DataKey,
-        executor: Optional[concurrent.futures.Executor] = None,
+        executor: concurrent.futures.Executor | None = None,
     ) -> Any:
         """
         Update the signal data cache given the signal and the reduction key.
@@ -266,7 +265,7 @@ class DataCache:
     async def get_tool_data(
         self,
         tool: tools.Tool,
-    ) -> Optional[Any]:
+    ) -> Any | None:
         """
         Get tool data.
 
@@ -311,7 +310,7 @@ class DataCache:
         self,
         tool: tools.Tool,
         key: ToolKey,
-        executor: Optional[concurrent.futures.Executor] = None,
+        executor: concurrent.futures.Executor | None = None,
     ) -> Any:
         """
         Update the tool cache given the signal and the reduction key.

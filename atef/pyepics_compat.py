@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, ClassVar, Literal, Union
 
 from ophyd._dispatch import EventDispatcher, wrap_callback
 from ophyd.signal import EpicsSignalBase
@@ -54,22 +54,22 @@ class PyepicsPvCompatibility:
     Aiming for a reasonable method and attribute compatibility, though not
     everything will be perfect.
     """
-    _args: Dict[str, Any]
+    _args: dict[str, Any]
     _dispatcher: EventDispatcher
     _reference_count: int  # used externally by EpicsSignal, ew
     _referrer: EpicsSignalBase
-    _user_max_count: Optional[int]
-    access_callbacks: List[PyepicsAccessCallback]
+    _user_max_count: int | None
+    access_callbacks: list[PyepicsAccessCallback]
     as_string: bool
-    auto_monitor: Optional[Union[int, bool]]
-    callbacks: Dict[int, Tuple[PyepicsMonitorCallback, dict]]
+    auto_monitor: int | bool | None
+    callbacks: dict[int, tuple[PyepicsMonitorCallback, dict]]
     connected: bool
-    connection_callbacks: List[PyepicsConnectionCallback]
+    connection_callbacks: list[PyepicsConnectionCallback]
     connection_timeout: float
     form: str = PyepicsForm
     pvname: str
     verbose: bool
-    _fields: ClassVar[Tuple[str, ...]] = (
+    _fields: ClassVar[tuple[str, ...]] = (
         'access',
         'char_value',
         'chid',
@@ -106,17 +106,19 @@ class PyepicsPvCompatibility:
     def __init__(
         self,
         pvname: str,
-        callback: Optional[
-            Union[PyepicsMonitorCallback, List[PyepicsMonitorCallback],
-                  Tuple[PyepicsMonitorCallback, ...]]
-            ] = None,
+        callback: None
+        | (
+            PyepicsMonitorCallback
+            | list[PyepicsMonitorCallback]
+            | tuple[PyepicsMonitorCallback, ...]
+        ) = None,
         form: PyepicsForm = "time",
         verbose: bool = False,
-        auto_monitor: Optional[Union[int, bool]] = None,
-        count: Optional[int] = None,
-        connection_callback: Optional[PyepicsConnectionCallback] = None,
-        connection_timeout: Optional[float] = None,
-        access_callback: Optional[PyepicsAccessCallback] = None,
+        auto_monitor: int | bool | None = None,
+        count: int | None = None,
+        connection_callback: PyepicsConnectionCallback | None = None,
+        connection_timeout: float | None = None,
+        access_callback: PyepicsAccessCallback | None = None,
         *,
         dispatcher: EventDispatcher,
         referrer: EpicsSignalBase,
@@ -252,8 +254,8 @@ class PyepicsPvCompatibility:
         wait: bool = False,
         timeout: float = 30.0,
         use_complete: bool = False,
-        callback: Optional[PyepicsPutCallback] = None,
-        callback_data: Optional[Any] = None,
+        callback: PyepicsPutCallback | None = None,
+        callback_data: Any | None = None,
     ):
         if not callback:
             return

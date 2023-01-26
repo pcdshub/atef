@@ -6,8 +6,7 @@ Serialization helpers for apischema.
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 from types import new_class
-from typing import (Any, Dict, Generic, List, Tuple, TypeVar, get_origin,
-                    get_type_hints)
+from typing import Any, Generic, TypeVar, get_origin, get_type_hints
 
 from apischema import deserializer, serializer, type_name
 from apischema.conversions import Conversion
@@ -16,7 +15,7 @@ from apischema.objects import object_deserialization
 from apischema.tagged_unions import Tagged, TaggedUnion, get_tagged
 from apischema.utils import to_pascal_case
 
-_alternative_constructors: Dict[type, List[Callable]] = defaultdict(list)
+_alternative_constructors: dict[type, list[Callable]] = defaultdict(list)
 Func = TypeVar("Func", bound=Callable)
 
 
@@ -55,7 +54,7 @@ def as_tagged_union(cls: Cls) -> Cls:
     `_get_generic_name_factory`.
     """
     params = tuple(getattr(cls, "__parameters__", ()))
-    tagged_union_bases: Tuple[type, ...] = (TaggedUnion,)
+    tagged_union_bases: tuple[type, ...] = (TaggedUnion,)
 
     # Generic handling is here:
     if params:

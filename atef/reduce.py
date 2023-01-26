@@ -3,7 +3,7 @@ from __future__ import annotations
 import concurrent.futures
 import enum
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, Sequence
+from typing import Any, Protocol, Sequence
 
 import numpy as np
 import ophyd
@@ -70,7 +70,7 @@ class ReduceMethod(str, enum.Enum):
 
 @dataclass(frozen=True, eq=True)
 class ReductionKey:
-    period: Optional[Number]
+    period: Number | None
     method: ReduceMethod
 
     def get_data_for_signal(self, signal: ophyd.Signal, string: bool = False) -> Any:
@@ -105,7 +105,7 @@ class ReductionKey:
         signal: ophyd.Signal,
         string: bool = False,
         *,
-        executor: Optional[concurrent.futures.Executor] = None
+        executor: concurrent.futures.Executor | None = None
     ) -> Any:
         """
         Get data for the given signal, according to the string and data
@@ -140,7 +140,7 @@ class ReductionKey:
 
 def get_data_for_signal(
     signal: ophyd.Signal,
-    reduce_period: Optional[Number] = None,
+    reduce_period: Number | None = None,
     reduce_method: ReduceMethod = ReduceMethod.average,
     string: bool = False,
 ) -> Any:
@@ -185,11 +185,11 @@ def get_data_for_signal(
 
 async def get_data_for_signal_async(
     signal: ophyd.Signal,
-    reduce_period: Optional[Number] = None,
+    reduce_period: Number | None = None,
     reduce_method: ReduceMethod = ReduceMethod.average,
     string: bool = False,
     *,
-    executor: Optional[concurrent.futures.Executor] = None
+    executor: concurrent.futures.Executor | None = None
 ) -> Any:
     """
     Get data for the given signal, according to the string and data

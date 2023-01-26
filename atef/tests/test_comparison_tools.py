@@ -1,6 +1,6 @@
 import sys
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from typing import Any, ClassVar, Optional
 
 import apischema
 import pytest
@@ -13,10 +13,10 @@ from ..config import Comparison, PreparedToolConfiguration, ToolConfiguration
 
 async def check_tool(
     tool: tools.Tool,
-    by_attr: Dict[str, List[Comparison]],
-    shared: Optional[List[Comparison]] = None,
+    by_attr: dict[str, list[Comparison]],
+    shared: Optional[list[Comparison]] = None,
     cache: Optional[DataCache] = None,
-) -> Tuple[Severity, List[Result]]:
+) -> tuple[Severity, list[Result]]:
     """
     Convenience function for checking a tool without creating any configuration
     instances.

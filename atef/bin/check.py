@@ -9,7 +9,7 @@ import enum
 import itertools
 import logging
 import pathlib
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Sequence
 
 import happi
 import rich
@@ -38,7 +38,7 @@ class VerbositySetting(enum.Flag):
 
     @classmethod
     def from_kwargs(
-        cls, start: Optional[VerbositySetting] = None, **kwargs
+        cls, start: VerbositySetting | None = None, **kwargs
     ) -> VerbositySetting:
         """
         Get a VerbositySetting from the provided kwargs.
@@ -149,8 +149,8 @@ default_severity_to_log_level = {
 
 
 def get_result_from_comparison(
-    item: Union[PreparedComparison, Exception, FailedConfiguration, None]
-) -> Tuple[Optional[PreparedComparison], Result]:
+    item: PreparedComparison | Exception | FailedConfiguration | None
+) -> tuple[PreparedComparison | None, Result]:
     """
     Get a Result, if available, from the provided arguments.
 
@@ -190,9 +190,9 @@ def get_result_from_comparison(
 
 
 def get_comparison_text_for_tree(
-    item: Union[PreparedComparison, Exception],
+    item: PreparedComparison | Exception,
     *,
-    severity_to_rich: Optional[Dict[Severity, str]] = None,
+    severity_to_rich: dict[Severity, str] | None = None,
     verbosity: VerbositySetting = VerbositySetting.default,
 ) -> str:
     """
@@ -237,7 +237,7 @@ def get_comparison_text_for_tree(
 
 
 def get_name_for_tree(
-    obj: Union[Comparison, AnyConfiguration],
+    obj: Comparison | AnyConfiguration,
     verbosity: VerbositySetting
 ) -> str:
     """
@@ -267,7 +267,7 @@ def get_name_for_tree(
 def get_tree_heading(
     obj: AnyPreparedConfiguration,
     verbosity: VerbositySetting,
-    severity_to_rich: Dict[Severity, str],
+    severity_to_rich: dict[Severity, str],
 ) -> str:
     """
     Get severity, name, and description (per verbosity settings) for a tree.
@@ -297,7 +297,7 @@ def get_tree_heading(
 
 
 def should_show_in_tree(
-    item: Union[PreparedComparison, Exception, FailedConfiguration, None],
+    item: PreparedComparison | Exception | FailedConfiguration | None,
     verbosity: VerbositySetting = VerbositySetting.default
 ) -> bool:
     """
@@ -328,7 +328,7 @@ def should_show_in_tree(
 def group_to_rich_tree(
     group: PreparedGroup,
     verbosity: VerbositySetting = VerbositySetting.default,
-    severity_to_rich: Optional[Dict[Severity, str]] = None,
+    severity_to_rich: dict[Severity, str] | None = None,
 ) -> rich.tree.Tree:
     """
     Convert a `PreparedGroup` into a `rich.tree.Tree`.
@@ -395,11 +395,11 @@ async def check_and_log(
     config: ConfigurationFile,
     console: rich.console.Console,
     verbosity: VerbositySetting = VerbositySetting.default,
-    client: Optional[happi.Client] = None,
-    name_filter: Optional[Sequence[str]] = None,
+    client: happi.Client | None = None,
+    name_filter: Sequence[str] | None = None,
     parallel: bool = True,
-    cache: Optional[DataCache] = None,
-    filename: Optional[str] = None,
+    cache: DataCache | None = None,
+    filename: str | None = None,
 ):
     """
     Check a configuration and log the results.
@@ -455,11 +455,11 @@ async def check_and_log(
 
 async def main(
     filename: str,
-    name_filter: Optional[Sequence[str]] = None,
+    name_filter: Sequence[str] | None = None,
     parallel: bool = False,
     *,
     cleanup: bool = True,
-    signal_cache: Optional[_SignalCache] = None,
+    signal_cache: _SignalCache | None = None,
     show_severity_emoji: bool = True,
     show_severity_description: bool = True,
     show_config_description: bool = False,
