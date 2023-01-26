@@ -193,8 +193,8 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
         dest = str(tmp_path / filename)
         window.open_file(filename=source)
         window.save_as(filename=dest)
-        with open(source) as fd:
+        with open(source, 'r') as fd:
             source_lines = fd.readlines()
-        with open(dest) as fd:
+        with open(dest, 'r') as fd:
             dest_lines = fd.readlines()
         assert source_lines == dest_lines

@@ -8,7 +8,7 @@ import enum
 import logging
 import threading
 import time
-from typing import Any, Callable, ClassVar
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
 import ophyd
@@ -25,18 +25,18 @@ logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class OphydAttributeDataSummary:
-    minimum: Any | None = None
-    maximum: Any | None = None
-    average: Any | None = None
+    minimum: Optional[Any] = None
+    maximum: Optional[Any] = None
+    average: Optional[Any] = None
 
     @classmethod
     def from_attr_data(cls, *items: OphydAttributeData) -> OphydAttributeDataSummary:
         try:
-            values = {
+            values = set(
                 item.readback
                 for item in items
                 if item.readback is not None
-            }
+            )
         except TypeError:
             # Unhashable readback values
             values = set()
@@ -44,7 +44,7 @@ class OphydAttributeDataSummary:
         if not values:
             return OphydAttributeDataSummary()
 
-        def ignore_type_errors(func: Callable) -> Any | None:
+        def ignore_type_errors(func: Callable) -> Optional[Any]:
             try:
                 return func(values)
             except Exception:
@@ -66,13 +66,13 @@ class OphydAttributeDataSummary:
 @dataclasses.dataclass
 class OphydAttributeData:
     attr: str
-    description: dict[str, Any]
-    docstring: str | None
+    description: Dict[str, Any]
+    docstring: Optional[str]
     pvname: str
     read_only: bool
     readback: Any
     setpoint: Any
-    units: str | None
+    units: Optional[str]
     signal: ophyd.Signal
 
     @classmethod
@@ -96,7 +96,7 @@ class OphydAttributeData:
         )
 
     @classmethod
-    def from_device(cls, device: ophyd.Device) -> dict[str, OphydAttributeData]:
+    def from_device(cls, device: ophyd.Device) -> Dict[str, OphydAttributeData]:
         """Create a data dictionary for a given device."""
         data = {
             attr: cls.from_device_attribute(device, attr)
@@ -154,17 +154,17 @@ class _DevicePollThread(QtCore.QThread):
     data_changed: ClassVar[QtCore.Signal] = QtCore.Signal(str)
     running: bool
     device: ophyd.Device
-    data: dict[str, OphydAttributeData]
+    data: Dict[str, OphydAttributeData]
     poll_rate: float
-    _attrs: set[str]
+    _attrs: Set[str]
 
     def __init__(
         self,
         device: ophyd.Device,
         poll_rate: float,
-        data: dict[str, OphydAttributeData],
+        data: Dict[str, OphydAttributeData],
         *,
-        parent: QtWidgets.QWidget | None = None
+        parent: Optional[QtWidgets.QWidget] = None
     ):
         super().__init__(parent=parent)
         self.device = device
@@ -177,7 +177,7 @@ class _DevicePollThread(QtCore.QThread):
         """Stop the polling thread."""
         self.running = False
 
-    def _instantiate_device(self) -> set[str]:
+    def _instantiate_device(self) -> Set[str]:
         """Instantiate the device and return the attrs to pay attention to."""
         attrs = set(self.data)
         # Instantiate all signals first
@@ -240,7 +240,7 @@ class _DevicePollThread(QtCore.QThread):
             self._attrs.remove(attr)
             return
 
-        new_data: dict[str, Any] = {}
+        new_data: Dict[str, Any] = {}
         new_data["units"] = data.description.get("units", "") or ""
         if readback is not None:
             new_data["readback"] = readback
@@ -311,12 +311,12 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         The parent widget.
     """
 
-    _data: dict[str, OphydAttributeData]
-    _poll_thread: _DevicePollThread | None
+    _data: Dict[str, OphydAttributeData]
+    _poll_thread: Optional[_DevicePollThread]
     _polling: bool
-    _row_to_data: dict[int, OphydAttributeData]
+    _row_to_data: Dict[int, OphydAttributeData]
     device: ophyd.Device
-    horizontal_header: list[str]
+    horizontal_header: List[str]
     read_only: bool
     data_updates_started: ClassVar[QtCore.Signal] = QtCore.Signal()
     data_updates_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
@@ -326,7 +326,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         device: ophyd.Device,
         *,
         poll_rate: float = 1.0,
-        parent: QtWidgets.QWidget | None = None,
+        parent: Optional[QtWidgets.QWidget] = None,
         read_only: bool = True,
         **kwargs
     ):
@@ -412,7 +412,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
                 self.createIndex(row, DeviceColumn.pvname),
             )
 
-    def get_data_for_row(self, row: int) -> OphydAttributeData | None:
+    def get_data_for_row(self, row: int) -> Optional[OphydAttributeData]:
         """Get the OphydAttributeData for the provided row."""
         try:
             return self._row_to_data[row]
@@ -437,7 +437,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
 
     def headerData(
         self, section: int, orientation: Qt.Orientation, role=Qt.DisplayRole
-    ) -> str | None:
+    ) -> Optional[str]:
         """Qt hook: header information."""
         if role == Qt.DisplayRole and orientation == Qt.Horizontal:
             return self.horizontal_header[section]
@@ -478,7 +478,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
                 return flags | Qt.ItemIsEnabled | Qt.ItemIsEditable
         return flags
 
-    def data(self, index: QtCore.QModelIndex, role: int) -> str | None:
+    def data(self, index: QtCore.QModelIndex, role: int) -> Optional[str]:
         """Qt hook: get data for the provided index and role."""
         row = index.row()
         column = index.column()
@@ -518,11 +518,11 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
 
         return None
 
-    def columnCount(self, index: QtCore.QModelIndex | None = None) -> int:
+    def columnCount(self, index: Optional[QtCore.QModelIndex] = None) -> int:
         """Qt hook: column count for the given index."""
         return DeviceColumn.total_columns
 
-    def rowCount(self, index: QtCore.QModelIndex | None = None) -> int:
+    def rowCount(self, index: Optional[QtCore.QModelIndex] = None) -> int:
         """Qt hook: row count for the given index."""
         if not self._row_to_data:
             return 0
@@ -556,8 +556,8 @@ class OphydDeviceTableView(QtWidgets.QTableView):
 
     def __init__(
         self,
-        parent: QtWidgets.QWidget | None = None,
-        device: ophyd.Device | None = None,
+        parent: Optional[QtWidgets.QWidget] = None,
+        device: Optional[ophyd.Device] = None,
     ):
         super().__init__(parent=parent)
         self.proxy_model = QtCore.QSortFilterProxyModel()
@@ -640,7 +640,7 @@ class OphydDeviceTableView(QtWidgets.QTableView):
 
     def get_data_from_proxy_index(
         self, index: QtCore.QModelIndex
-    ) -> OphydAttributeData | None:
+    ) -> Optional[OphydAttributeData]:
         """Proxy model index -> source model index -> OphydAttributeData."""
         model = self.current_model
         if model is None:
@@ -649,7 +649,7 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         return model.get_data_for_row(self.proxy_model.mapToSource(index).row())
 
     @property
-    def current_model(self) -> PolledDeviceModel | None:
+    def current_model(self) -> Optional[PolledDeviceModel]:
         """The current device model."""
         try:
             return self.models[self._device]
@@ -657,12 +657,12 @@ class OphydDeviceTableView(QtWidgets.QTableView):
             return None
 
     @property
-    def device(self) -> ophyd.Device | None:
+    def device(self) -> Optional[ophyd.Device]:
         """The currently-configured ophyd Device."""
         return self._device
 
     @device.setter
-    def device(self, device: ophyd.Device | None):
+    def device(self, device: Optional[ophyd.Device]):
         if device is self._device:
             return
 
@@ -692,7 +692,7 @@ class OphydDeviceTableView(QtWidgets.QTableView):
             model.start()
 
     @property
-    def selected_attribute_data(self) -> list[OphydAttributeData]:
+    def selected_attribute_data(self) -> List[OphydAttributeData]:
         """The OphydAttributeData items that correspond to the selection."""
         unique_indexes = {ind.row(): ind for ind in self.selectedIndexes()}
         data = [
@@ -702,7 +702,7 @@ class OphydDeviceTableView(QtWidgets.QTableView):
         return [datum for datum in data if datum is not None]
 
 
-CustomMenuHelper = Callable[[list[OphydAttributeData]], QtWidgets.QMenu]
+CustomMenuHelper = Callable[[List[OphydAttributeData]], QtWidgets.QMenu]
 
 
 class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
@@ -728,8 +728,8 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
         list  # List[OphydAttributeData]
     )
 
-    _custom_menu: QtWidgets.QMenu | None
-    custom_menu_helper: CustomMenuHelper | None
+    _custom_menu: Optional[QtWidgets.QMenu]
+    custom_menu_helper: Optional[CustomMenuHelper]
     label_filter: QtWidgets.QLabel
     edit_filter: QtWidgets.QLineEdit
     device_table_view: OphydDeviceTableView
@@ -739,9 +739,9 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
 
     def __init__(
         self,
-        parent: QtWidgets.QWidget | None = None,
-        custom_menu_helper: CustomMenuHelper | None = None,
-        device: ophyd.Device | None = None
+        parent: Optional[QtWidgets.QWidget] = None,
+        custom_menu_helper: Optional[CustomMenuHelper] = None,
+        device: Optional[ophyd.Device] = None
     ):
         super().__init__(parent=parent)
 
@@ -836,12 +836,12 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
         self.closed.emit()
 
     @property
-    def device(self) -> ophyd.Device | None:
+    def device(self) -> Optional[ophyd.Device]:
         """The currently-configured ophyd Device."""
         return self.device_table_view.device
 
     @device.setter
-    def device(self, device: ophyd.Device | None):
+    def device(self, device: Optional[ophyd.Device]):
         self.device_table_view.device = device
         if device is not None:
             self.setWindowTitle(device.name)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing
+from typing import Optional
 
 from .enums import Severity
 
@@ -57,23 +58,23 @@ class PreparedComparisonException(Exception):
     #: The identifier used for the comparison.
     identifier: str
     #: The relevant configuration
-    config: AnyConfiguration | None
+    config: Optional[AnyConfiguration]
     #: The parent container of the comparison that failed to prepare.
-    prepared: PreparedConfiguration | None = None
+    prepared: Optional[PreparedConfiguration] = None
     #: The comparison related to the exception, if applicable.
-    comparison: Comparison | None
+    comparison: Optional[Comparison]
     #: The name of the associated configuration.
-    name: str | None = None
+    name: Optional[str] = None
 
     def __init__(
         self,
         exception: Exception,
         identifier: str,
-        message: str | None = None,
-        config: AnyConfiguration | None = None,
-        prepared: PreparedConfiguration | None = None,
-        comparison: Comparison | None = None,
-        name: str | None = None,
+        message: Optional[str] = None,
+        config: Optional[AnyConfiguration] = None,
+        prepared: Optional[PreparedConfiguration] = None,
+        comparison: Optional[Comparison] = None,
+        name: Optional[str] = None,
     ):
         if message is None:
             message = str(exception)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Literal, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import apischema
 
@@ -11,7 +11,7 @@ Number = Union[float, int]
 
 @dataclass
 class DashboardTimePicker:
-    refresh_intervals: list[str] = field(
+    refresh_intervals: List[str] = field(
         default_factory=lambda: [
             "5s",
             "10s",
@@ -25,7 +25,7 @@ class DashboardTimePicker:
             "1d",
         ]
     )
-    timeOptions: list[str] = field(
+    timeOptions: List[str] = field(
         default_factory=lambda: [
             "5m",
             "15m",
@@ -55,8 +55,8 @@ class DashboardLink:
 @dataclass
 class ThresholdStep:
     color: str
-    index: int | None = None
-    value: float | None = None
+    index: Optional[int] = None
+    value: Optional[float] = None
     line: bool = True
     op: str = "gt"
     yaxis: str = "left"
@@ -64,9 +64,9 @@ class ThresholdStep:
 
 @dataclass
 class Threshold:
-    color: str | None = None
-    state: str | None = None
-    value: Number | None = None
+    color: Optional[str] = None
+    state: Optional[str] = None
+    value: Optional[Number] = None
 
 
 class ThresholdsMode(str, Enum):
@@ -78,7 +78,7 @@ class ThresholdsMode(str, Enum):
 @dataclass
 class ThresholdsConfig:
     mode: ThresholdsMode
-    steps: list[Threshold] | None = field(default_factory=list)
+    steps: Optional[List[Threshold]] = field(default_factory=list)
 
 
 class FieldColorSeriesByMode(str, Enum):
@@ -103,48 +103,48 @@ class NullValueMode(str, Enum):
 
 @dataclass
 class FieldColor:
-    fixedColor: str | None = None
-    mode: FieldColorModeId | str = ""
-    seriesBy: FieldColorSeriesByMode | None = None
+    fixedColor: Optional[str] = None
+    mode: Union[FieldColorModeId, str] = ""
+    seriesBy: Optional[FieldColorSeriesByMode] = None
 
 
 @dataclass
 class FieldConfigSettings:
-    color: FieldColor | None = None
-    custom: Any | None = None
-    decimals: int | None = None
-    description: str | None = None
+    color: Optional[FieldColor] = None
+    custom: Optional[Any] = None
+    decimals: Optional[int] = None
+    description: Optional[str] = None
     #: The display value for this field. This supports template variables blank
     #: is auto
-    displayName: str | None = None
+    displayName: Optional[str] = None
     #: This can be used by data sources that return and explicit naming
     #: structure for values and labels When this property is configured, this
     #: value is used rather than the default naming strategy.
-    displayNameFromDS: str | None = None
+    displayNameFromDS: Optional[str] = None
     #: True if data source field supports ad-hoc filters
-    filterable: bool | None = False
+    filterable: Optional[bool] = False
     # links: List[DataLink] = field(default_factory=list)
-    links: list[dict] | None = field(default_factory=list)
+    links: Optional[List[dict]] = field(default_factory=list)
     # mappings: List[ValueMapping]  = field(default_factory=list)
-    mappings: list[dict] | None = field(default_factory=list)
-    max: Number | None = None
-    min: Number | None = None
-    noValue: str | None = None
-    nullValueMode: NullValueMode | None = None
+    mappings: Optional[List[dict]] = field(default_factory=list)
+    max: Optional[Number] = None
+    min: Optional[Number] = None
+    noValue: Optional[str] = None
+    nullValueMode: Optional[NullValueMode] = None
     #: An explict path to the field in the datasource. When the frame meta
     #: includes a path, This will default to `${frame.meta.path}/${field.name}
     #: When defined, this value can be used as an identifier within the datasource
     #: scope, and may be used to update the results
-    path: str | None = None
-    thresholds: ThresholdsConfig | None = None
-    unit: str | None = None
-    writeable: bool | None = False
+    path: Optional[str] = None
+    thresholds: Optional[ThresholdsConfig] = None
+    unit: Optional[str] = None
+    writeable: Optional[bool] = False
 
 
 @dataclass
 class FieldConfig:
-    overrides: list[dict] | None = field(default_factory=list)  # ?
-    defaults: FieldConfigSettings | None = None
+    overrides: Optional[List[dict]] = field(default_factory=list)  # ?
+    defaults: Optional[FieldConfigSettings] = None
 
 
 @dataclass
@@ -163,11 +163,11 @@ class Panel:
     pluginVersion: str = ""
     title: str = ""
     description: str = ""
-    targets: list[AnyPanelTarget] = field(default_factory=list)
-    links: list[DashboardLink] = field(default_factory=list)
+    targets: List[AnyPanelTarget] = field(default_factory=list)
+    links: List[DashboardLink] = field(default_factory=list)
 
     @property
-    def targets_by_id(self) -> dict[str, AnyPanelTarget]:
+    def targets_by_id(self) -> Dict[str, AnyPanelTarget]:
         """Targets by their reference ID."""
         return {
             target.refId: target
@@ -179,12 +179,12 @@ class Panel:
 class RowPanel(Panel):
     type: Literal["row"] = "row"
 
-    panels: list[AnyPanel] = field(default_factory=list)
+    panels: List[AnyPanel] = field(default_factory=list)
 
 
 @dataclass
 class ReduceOptions:
-    calcs: list[str] = field(default_factory=list)
+    calcs: List[str] = field(default_factory=list)
     fields: str = ""
     values: bool = False
 
@@ -203,7 +203,7 @@ class EpicsArchiverFunction:
 class EpicsArchiverPanelTarget(PanelTarget):
     alias: str = ""
     aliasPattern: str = ""
-    functions: list[EpicsArchiverFunction] = field(default_factory=list)
+    functions: List[EpicsArchiverFunction] = field(default_factory=list)
     hide: bool = False
     operator: str = ""
     refId: str = "A"
@@ -230,7 +230,7 @@ class BarGaugeOptions:
 class BarGaugePanel(Panel):
     type: Literal["bargauge"] = "bargauge"
 
-    fieldConfig: FieldConfig | None = field(default_factory=FieldConfig)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: BarGaugeOptions = field(default_factory=BarGaugeOptions)
 
 
@@ -238,7 +238,7 @@ class BarGaugePanel(Panel):
 class GaugePanel(Panel):
     type: Literal["gauge"] = "gauge"
 
-    fieldConfig: FieldConfig | None = field(default_factory=FieldConfig)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: dict = field(default_factory=dict)
 
 
@@ -249,10 +249,10 @@ class StatPanelOptions:
     justifyMode: str = "center"
     orientation: str = "auto"
     reduceOptions: ReduceOptions = field(default_factory=ReduceOptions)
-    calcs: list[str] = field(default_factory=list)
+    calcs: List[str] = field(default_factory=list)
     fields: str = ""
     values: bool = False
-    text: dict = field(default_factory=dict)  # TODO
+    text: Dict = field(default_factory=dict)  # TODO
     textMode: str = "auto"
 
 
@@ -260,7 +260,7 @@ class StatPanelOptions:
 class StatPanel(Panel):
     type: Literal["stat"] = "stat"
 
-    fieldConfig: FieldConfig | None = field(default_factory=FieldConfig)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: StatPanelOptions = field(default_factory=StatPanelOptions)
 
 
@@ -306,7 +306,7 @@ class GraphLegend:
 class GraphPanel(Panel):
     type: Literal["graph"] = "graph"
 
-    fieldConfig: FieldConfig | None = field(default_factory=FieldConfig)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: GraphPanelOptions = field(default_factory=GraphPanelOptions)
     aliasColors: dict = field(default_factory=dict)
     bars: bool = False
@@ -333,7 +333,7 @@ class GraphPanel(Panel):
     title: str = "MR1L0 Pitch"
     tooltip: GraphTooltip = field(default_factory=GraphTooltip)
     xaxis: GraphAxis = field(default_factory=GraphAxis)
-    yaxes: list[GraphAxis] = field(default_factory=list)
+    yaxes: List[GraphAxis] = field(default_factory=list)
     yaxis: GraphYAxisSettings = field(default_factory=GraphYAxisSettings)
 
 
@@ -341,7 +341,7 @@ class GraphPanel(Panel):
 class TimeSeriesPanel(Panel):
     type: Literal["timeseries"] = "timeseries"
 
-    fieldConfig: FieldConfig | None = field(default_factory=FieldConfig)
+    fieldConfig: Optional[FieldConfig] = field(default_factory=FieldConfig)
     options: dict = field(default_factory=dict)
 
 
@@ -359,7 +359,7 @@ AnyPanel = Union[
 class DashboardAnnotationTarget:
     limit: int = 100
     matchAny: bool = False
-    tags: list[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
     type: str = "dashboard"
 
 
@@ -382,7 +382,7 @@ class DashboardRow:
 
 @dataclass
 class DashboardAnnotations:
-    list: list[DashboardAnnotation] = field(default_factory=list)
+    list: List[DashboardAnnotation] = field(default_factory=list)
 
 
 @dataclass
@@ -392,7 +392,7 @@ class DashboardTemplating:
 
 @dataclass
 class DashboardTemplatings:
-    list: list[DashboardTemplating] = field(default_factory=list)
+    list: List[DashboardTemplating] = field(default_factory=list)
 
 
 @dataclass
@@ -404,27 +404,27 @@ class DashboardTime:
 @dataclass
 class Dashboard:
     annotations: DashboardAnnotations = field(default_factory=DashboardAnnotations)
-    description: str | None = ""
-    editable: bool | None = True
+    description: Optional[str] = ""
+    editable: Optional[bool] = True
     fiscalYearStartMonth: int = 0
     graphTooltip: int = 0
-    hideControls: bool | None = False
+    hideControls: Optional[bool] = False
     id: int = 0
-    inputs: list[DashboardInput] = field(default_factory=list)
-    links: list[DashboardLink] = field(default_factory=list)
+    inputs: List[DashboardInput] = field(default_factory=list)
+    links: List[DashboardLink] = field(default_factory=list)
     liveNow: bool = False
-    panels: list[AnyPanel] = field(default_factory=list)
+    panels: List[AnyPanel] = field(default_factory=list)
     refresh: str = "10s"
-    rows: list[DashboardRow] = field(default_factory=list)
+    rows: List[DashboardRow] = field(default_factory=list)
     schemaVersion: int = 34
     sharedCrosshair: bool = False
     style: str = "dark"
-    tags: list[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
     templating: DashboardTemplatings = field(default_factory=DashboardTemplatings)
     time: DashboardTime = field(default_factory=DashboardTime)
     timepicker: DashboardTimePicker = field(default_factory=DashboardTimePicker)
     timezone: str = "utc"
     title: str = ""
-    uid: str | None = None
+    uid: Optional[str] = None
     version: int = 0
     weekStart: str = ""

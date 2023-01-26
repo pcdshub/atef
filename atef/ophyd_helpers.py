@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 import logging
 import time
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import ophyd
 from ophyd.ophydobj import OphydObject
@@ -192,7 +192,7 @@ def _acquire(signal: ophyd.Signal):
         data.extend([start_value, signal.get()])
 
 
-def acquire_blocking(signal: ophyd.Signal, duration: Number) -> list[PrimitiveType]:
+def acquire_blocking(signal: ophyd.Signal, duration: Number) -> List[PrimitiveType]:
     """
     Subscribe to signal, acquire data for ``duration`` seconds.
 
@@ -214,7 +214,7 @@ def acquire_blocking(signal: ophyd.Signal, duration: Number) -> list[PrimitiveTy
     return data
 
 
-async def acquire_async(signal: ophyd.Signal, duration: Number) -> list[PrimitiveType]:
+async def acquire_async(signal: ophyd.Signal, duration: Number) -> List[PrimitiveType]:
     """
     Subscribe to signal, acquire data for ``duration`` seconds.
 

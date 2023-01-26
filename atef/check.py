@@ -3,7 +3,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Generator, Iterable, Sequence
+from typing import Any, Generator, Iterable, List, Optional, Sequence
 
 import numpy as np
 import ophyd
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class Result:
     severity: Severity = Severity.success
-    reason: str | None = None
+    reason: Optional[str] = None
 
     @classmethod
     def from_exception(cls, error: Exception) -> Result:
@@ -75,9 +75,9 @@ class Value:
     #: A description of what the value represents.
     description: str = ""
     #: Relative tolerance value.
-    rtol: Number | None = None
+    rtol: Optional[Number] = None
     #: Absolute tolerance value.
-    atol: Number | None = None
+    atol: Optional[Number] = None
     #: Severity to set on a match (if applicable).
     severity: Severity = Severity.success
 
@@ -164,10 +164,10 @@ class Comparison:
     serialized dictionary (and JSON object).
     """
     # Short name to use in the UI
-    name: str | None = None
+    name: Optional[str] = None
 
     #: Description tied to this comparison.
-    description: str | None = None
+    description: Optional[str] = None
 
     #: Invert the comparison's result.  Normally, a valid comparison - that is,
     #: one that evaluates to True - is considered successful.  When `invert` is
@@ -176,14 +176,14 @@ class Comparison:
 
     #: Period over which the comparison will occur, where multiple samples
     #: may be acquired prior to a result being available.
-    reduce_period: Number | None = None
+    reduce_period: Optional[Number] = None
 
     #: Reduce collected samples by this reduce method.
     reduce_method: reduce.ReduceMethod = reduce.ReduceMethod.average
 
     #: If applicable, request and compare string values rather than the default
     #: specified.
-    string: bool | None = None
+    string: Optional[bool] = None
 
     #: If the comparison fails, use this result severity.
     severity_on_failure: Severity = Severity.error
@@ -192,7 +192,7 @@ class Comparison:
     #: result severity.
     if_disconnected: Severity = Severity.error
 
-    def __call__(self, value: Any) -> Result | None:
+    def __call__(self, value: Any) -> Optional[Result]:
         """Run the comparison against ``value``."""
         return self.compare(value)
 
@@ -221,7 +221,7 @@ class Comparison:
                 f"({ex.__class__.__name__}: {ex})"
             )
 
-    def compare(self, value: Any, identifier: str | None = None) -> Result:
+    def compare(self, value: Any, identifier: Optional[str] = None) -> Result:
         """
         Compare the provided value using the comparator's settings.
 
@@ -308,7 +308,7 @@ class Comparison:
         self,
         signal: ophyd.Signal,
         *,
-        executor: concurrent.futures.Executor | None = None
+        executor: Optional[concurrent.futures.Executor] = None
     ) -> Any:
         """
         Get data for the given signal, according to the string and data
@@ -344,8 +344,8 @@ class Comparison:
 @dataclass
 class Equals(Comparison):
     value: PrimitiveType = 0.0
-    rtol: Number | None = None
-    atol: Number | None = None
+    rtol: Optional[Number] = None
+    atol: Optional[Number] = None
 
     @property
     def _value(self) -> Value:
@@ -369,8 +369,8 @@ class Equals(Comparison):
 class NotEquals(Comparison):
     # Less confusing shortcut for `Equals(..., invert=True)`
     value: PrimitiveType = 0
-    rtol: Number | None = None
-    atol: Number | None = None
+    rtol: Optional[Number] = None
+    atol: Optional[Number] = None
 
     @property
     def _value(self) -> Value:
@@ -418,7 +418,7 @@ class ValueSet(Comparison):
 @dataclass
 class AnyValue(Comparison):
     """Comparison passes if the value is in the ``values`` list."""
-    values: list[PrimitiveType] = field(default_factory=list)
+    values: List[PrimitiveType] = field(default_factory=list)
 
     def describe(self) -> str:
         """Describe the comparison in words."""
@@ -432,7 +432,7 @@ class AnyValue(Comparison):
 @dataclass
 class AnyComparison(Comparison):
     """Comparison passes if the value matches *any* comparison."""
-    comparisons: list[Comparison] = field(default_factory=list)
+    comparisons: List[Comparison] = field(default_factory=list)
 
     def describe(self) -> str:
         """Describe the comparison in words."""
@@ -530,9 +530,9 @@ class Range(Comparison):
     #: The high end of the range, which must be >= low.
     high: Number = 0
     #: The low end of the warning range, which must be <= warn_high.
-    warn_low: Number | None = None
+    warn_low: Optional[Number] = None
     #: The high end of the warning range, which must be >= warn_low.
-    warn_high: Number | None = None
+    warn_high: Optional[Number] = None
     #: Should the low and high values be included in the range?
     inclusive: bool = True
 

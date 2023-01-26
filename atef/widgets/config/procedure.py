@@ -4,7 +4,8 @@ import dataclasses
 import logging
 import pathlib
 import pprint
-from typing import Generator, Sequence, TypeVar
+from typing import (Dict, Generator, List, Optional, Sequence, Type, TypeVar,
+                    Union)
 
 import pydm
 import pydm.display
@@ -57,7 +58,7 @@ DEFAULT_STYLESHEET = """
 
 
 def _create_vbox_layout(
-    widget: QtWidgets.QWidget | None = None, alignment: Qt.Alignment = Qt.AlignTop
+    widget: Optional[QtWidgets.QWidget] = None, alignment: Qt.Alignment = Qt.AlignTop
 ) -> QtWidgets.QVBoxLayout:
     if widget is not None:
         layout = QtWidgets.QVBoxLayout(widget)
@@ -72,17 +73,17 @@ class StepWidgetBase(QtWidgets.QWidget):
     Base class for all procedure step widgets.
     """
 
-    title_widget: QtWidgets.QLabel | None
-    description_widget: QtWidgets.QLabel | None
+    title_widget: Optional[QtWidgets.QLabel]
+    description_widget: Optional[QtWidgets.QLabel]
 
     def __init__(
         self,
-        name: str | None = None,
+        name: Optional[str] = None,
         description: str = "",
         verify: bool = False,
         result: Result = incomplete_result(),
         *,
-        parent: QtWidgets.QWidget | None = None,
+        parent: Optional[QtWidgets.QWidget] = None,
         **kwargs
     ):
         super().__init__(parent=parent)
@@ -117,13 +118,13 @@ class StepWidgetBase(QtWidgets.QWidget):
         self._description = str(value)
 
     @classmethod
-    def from_settings(cls: type[T], settings: ProcedureStep, **kwargs) -> T:
+    def from_settings(cls: Type[T], settings: ProcedureStep, **kwargs) -> T:
         return cls(**vars(settings), **kwargs)
 
 
 def _add_label(
-    layout: QtWidgets.QLayout, text: str | None, object_name: str | None = None
-) -> QtWidgets.QLabel | None:
+    layout: QtWidgets.QLayout, text: Optional[str], object_name: Optional[str] = None
+) -> Optional[QtWidgets.QLabel]:
     """
     Create a QLabel with the given text and object name in the given layout.
 
@@ -156,8 +157,8 @@ class PydmDisplayStepWidget(StepWidgetBase, QtWidgets.QFrame):
     """A procedure step which a opens or embeds a PyDM display."""
 
     display_path: pathlib.Path
-    display_widget: QtWidgets.QWidget | None
-    toggle_button: QtWidgets.QToolButton | None
+    display_widget: Optional[QtWidgets.QWidget]
+    toggle_button: Optional[QtWidgets.QToolButton]
 
     def _setup_ui(self, display: pathlib.Path, options: DisplayOptions):
         layout = _create_vbox_layout(self)
@@ -225,7 +226,7 @@ class PlanStepWidget(StepWidgetBase, QtWidgets.QFrame):
 class TyphosDisplayStepWidget(StepWidgetBase, QtWidgets.QFrame):
     """A procedure step which opens one or more typhos displays."""
 
-    def _setup_ui(self, devices: dict[str, DisplayOptions]):
+    def _setup_ui(self, devices: Dict[str, DisplayOptions]):
         layout = _create_vbox_layout(self)
         self.title_widget = _add_label(layout, self.title, object_name="step_title")
         self.description_widget = _add_label(
@@ -276,7 +277,7 @@ class ExpandableFrame(QtWidgets.QFrame):
     _button_text: str
     _size_hint: QtCore.QSize
 
-    def __init__(self, text: str = "", parent: QtWidgets.QWidget | None = None):
+    def __init__(self, text: str = "", parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
 
         self._button_text = text
@@ -338,10 +339,10 @@ class ExpandableFrame(QtWidgets.QFrame):
 class ProcedureGroupWidget(StepWidgetBase, QtWidgets.QFrame):
     """A group of procedure steps (or nested groups)."""
 
-    _steps: list[ProcedureStep | ProcedureGroup]
-    _step_widgets: list[ProcedureGroupWidget | StepWidgetBase]
+    _steps: List[Union[ProcedureStep, ProcedureGroup]]
+    _step_widgets: List[Union[ProcedureGroupWidget, StepWidgetBase]]
 
-    def _setup_ui(self, steps: Sequence[ProcedureStep | ProcedureGroup]):
+    def _setup_ui(self, steps: Sequence[Union[ProcedureStep, ProcedureGroup]]):
         self._steps = list(steps)
         self._step_widgets = []
 
@@ -404,9 +405,9 @@ class AtefProcedure(QtWidgets.QFrame):
     Contains a scroll area with one or more procedures embedded.
     """
 
-    procedures: list[ProcedureStep]
+    procedures: List[ProcedureStep]
 
-    def __init__(self, parent: QtWidgets.QWidget | None = None):
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
 
         self.procedures = []

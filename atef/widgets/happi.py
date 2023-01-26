@@ -5,7 +5,7 @@ Widget classes designed for atef-to-happi interaction.
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Dict, List, Optional, Union, cast
 
 import happi
 import ophyd
@@ -48,10 +48,10 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
     happi_items_selected: ClassVar[QtCore.Signal] = QtCore.Signal(list)  # List[str]
     happi_items_chosen: ClassVar[QtCore.Signal] = QtCore.Signal(list)  # List[str]
 
-    _client: happi.client.Client | None
-    _last_selected: list[str]
-    _search_thread: ThreadWorker | None
-    _tree_view_expanded: list[QtCore.QModelIndex] | None
+    _client: Optional[happi.client.Client]
+    _last_selected: List[str]
+    _search_thread: Optional[ThreadWorker]
+    _tree_view_expanded: Optional[List[QtCore.QModelIndex]]
     _tree_current_category: str
     _tree_updated: bool
     button_choose: QtWidgets.QPushButton
@@ -69,9 +69,9 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
 
     def __init__(
         self,
-        parent: QWidget | None = None,
+        parent: Optional[QWidget] = None,
         *,
-        client: happi.Client | None = None,
+        client: Optional[happi.Client] = None,
     ):
         super().__init__(parent=parent)
         self._client = None
@@ -89,7 +89,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self._setup_tree_view()
         self._setup_list_view()
 
-        def record_selected_items(items: list[str]):
+        def record_selected_items(items: List[str]):
             self._last_selected = items
 
         self.happi_items_selected.connect(record_selected_items)
@@ -159,7 +159,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.edit_filter.textEdited.connect(self._update_filter)
         view.proxy_model.setRecursiveFilteringEnabled(True)
 
-    def _update_filter(self, text: str | None = None) -> None:
+    def _update_filter(self, text: Optional[str] = None) -> None:
         """Update the list/tree view filters based on the ``edit_filter`` text."""
         if text is None:
             text = self.edit_filter.text()
@@ -221,7 +221,7 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self.menu.exec_(self.happi_list_view.mapToGlobal(pos))
 
     @property
-    def selected_device_widget(self) -> HappiDeviceListView | HappiDeviceTreeView:
+    def selected_device_widget(self) -> Union[HappiDeviceListView, HappiDeviceTreeView]:
         """The selected device widget - either the list or tree view."""
         if self.radio_by_name.isChecked():
             return self.happi_list_view
@@ -284,18 +284,18 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
         self._search_thread.start()
 
     @property
-    def client(self) -> happi.Client | None:
+    def client(self) -> Optional[happi.Client]:
         """The client to use for search."""
         return self._client
 
     @client.setter
-    def client(self, client: happi.Client | None):
+    def client(self, client: Optional[happi.Client]):
         self._client = client
         self.happi_tree_view.client = client
         self.happi_list_view.client = client
         self.refresh_happi()
 
-    def search_results_by_key(self, key: str) -> dict[str, happi.SearchResult]:
+    def search_results_by_key(self, key: str) -> Dict[str, happi.SearchResult]:
         """Cached happi item search results by the provided key."""
 
         def get_entries():
@@ -333,21 +333,21 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
     filename: ClassVar[str] = 'happi_metadata_view.ui'
     updated_metadata: ClassVar[QtCore.Signal] = QtCore.Signal(str, object)
 
-    _client: happi.client.Client | None
-    _item_name: str | None
-    item: happi.HappiItem | None
+    _client: Optional[happi.client.Client]
+    _item_name: Optional[str]
+    item: Optional[happi.HappiItem]
     label_title: QtWidgets.QLabel
     model: QtGui.QStandardItemModel
     proxy_model: QtCore.QSortFilterProxyModel
     table_view: QtWidgets.QTableView
-    _metadata: dict[str, Any]
+    _metadata: Dict[str, Any]
 
     def __init__(
         self,
-        parent: QWidget | None = None,
+        parent: Optional[QWidget] = None,
         *,
-        client: happi.Client | None = None,
-        item_name: str | None = None,
+        client: Optional[happi.Client] = None,
+        item_name: Optional[str] = None,
     ):
         super().__init__(parent=parent)
         self._client = None
@@ -425,32 +425,32 @@ class HappiItemMetadataView(DesignerDisplay, QtWidgets.QWidget):
             self.model.appendRow([key_item, value_item])
 
     @property
-    def client(self) -> happi.Client | None:
+    def client(self) -> Optional[happi.Client]:
         """The client to use for search."""
         return self._client
 
     @client.setter
-    def client(self, client: happi.Client | None):
+    def client(self, client: Optional[happi.Client]):
         self._client = client
         self._update_metadata()
 
     @property
-    def item_name(self) -> str | None:
+    def item_name(self) -> Optional[str]:
         """The item name to search for metadata."""
         return self._item_name
 
     @item_name.setter
-    def item_name(self, item_name: str | None):
+    def item_name(self, item_name: Optional[str]):
         self._item_name = item_name
         self._update_metadata()
 
     @property
-    def metadata(self) -> dict[str, Any]:
+    def metadata(self) -> Dict[str, Any]:
         """The current happi item metadata, as a dictionary."""
         return dict(self._metadata)
 
     @metadata.setter
-    def metadata(self, md: dict[str, Any]) -> None:
+    def metadata(self, md: Dict[str, Any]) -> None:
         """The current happi item metadata, as a dictionary."""
         self._got_metadata(md)
 
@@ -483,17 +483,17 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
     item_search_widget: HappiSearchWidget
     device_widget: OphydDeviceTableWidget
     metadata_widget: HappiItemMetadataView
-    _client: happi.client.Client | None
-    _device_worker: ThreadWorker | None
-    _device_cache: dict[str, ophyd.Device]
+    _client: Optional[happi.client.Client]
+    _device_worker: Optional[ThreadWorker]
+    _device_cache: Dict[str, ophyd.Device]
     components_tab: QtWidgets.QWidget
     device_tab_widget: QtWidgets.QTabWidget
     metadata_tab: QtWidgets.QWidget
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        client: happi.Client | None = None,
+        parent: Optional[QWidget] = None,
+        client: Optional[happi.Client] = None,
         show_device_components: bool = True,
     ):
         super().__init__(parent=parent)
@@ -511,13 +511,13 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
             self.setWindowTitle("Happi Item Search with Metadata")
 
     @QtCore.Slot(list)
-    def _new_item_selection(self, items: list[str]) -> None:
+    def _new_item_selection(self, items: List[str]) -> None:
         """New item selected from the happi search."""
         client = self.client
         if client is None or not items:
             return
 
-        def get_device() -> ophyd.Device | None:
+        def get_device() -> Optional[ophyd.Device]:
             """This happens in a QThread."""
             if client is None:  # static check fail
                 return None
@@ -534,7 +534,7 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
             logger.error("Failed to instantiate device %s: %s", item, ex)
             logger.debug("Failed to instantiate device %s: %s", item, ex, exc_info=ex)
 
-        def set_device(device: ophyd.Device | None = None):
+        def set_device(device: Optional[ophyd.Device] = None):
             """Handler for when ``get_device`` succeeds in the background thread."""
             # Any GUI-related handling should happen here.
             self.device_widget.device = device
@@ -569,12 +569,12 @@ class HappiDeviceComponentWidget(DesignerDisplay, QWidget):
         worker.start()
 
     @property
-    def client(self) -> happi.Client | None:
+    def client(self) -> Optional[happi.Client]:
         """The client to use for search."""
         return self._client
 
     @client.setter
-    def client(self, client: happi.Client | None):
+    def client(self, client: Optional[happi.Client]):
         self._client = client
         self.item_search_widget.client = client
         self.metadata_widget.client = client

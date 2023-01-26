@@ -6,7 +6,7 @@ import shutil
 import sys
 import typing
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Mapping, Sequence, TypeVar
+from typing import Any, ClassVar, Dict, List, Mapping, Sequence, TypeVar, Union
 
 from . import serialization
 from .check import Result, Severity
@@ -29,17 +29,17 @@ class PingResult(ToolResult):
     The result dictionary of the 'ping' tool.
     """
     #: Host(s) that are alive
-    alive: list[str] = field(default_factory=list)
+    alive: List[str] = field(default_factory=list)
     #: Number of hosts that are alive.
     num_alive: int = 0
 
     #: Host(s) that are unresponsvie
-    unresponsive: list[str] = field(default_factory=list)
+    unresponsive: List[str] = field(default_factory=list)
     #: Number of hosts that are unresponsive.
     num_unresponsive: int = 0
 
     #: Host name to time taken.
-    times: dict[str, float] = field(default_factory=dict)
+    times: Dict[str, float] = field(default_factory=dict)
     #: Minimum time in seconds from ``times``.
     min_time: float = 0.0
     #: Maximum time in seconds from ``times``.
@@ -51,7 +51,7 @@ class PingResult(ToolResult):
     def add_host_result(
         self,
         host: str,
-        result: PingResult | Exception,
+        result: Union[PingResult, Exception],
         *,
         failure_time: float = 100.0
     ) -> None:
@@ -246,7 +246,7 @@ class Ping(Tool):
     Tool for pinging one or more hosts and summarizing the results.
     """
     #: The hosts to ping.
-    hosts: list[str] = field(default_factory=list)
+    hosts: List[str] = field(default_factory=list)
     #: The number of ping attempts to make per host.
     count: int = 3
     #: The assumed output encoding of the 'ping' command.
@@ -310,7 +310,7 @@ class Ping(Tool):
         if not self.hosts:
             return result
 
-        ping_by_host: dict[str, Exception | PingResult] = {}
+        ping_by_host: Dict[str, Union[Exception, PingResult]] = {}
 
         async def _ping(host: str) -> None:
             try:

@@ -10,7 +10,7 @@ import json
 import logging
 import pathlib
 from dataclasses import dataclass, field
-from typing import Union, cast
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 import apischema
 import yaml
@@ -32,11 +32,11 @@ class IdentifierAndComparison:
     """
 
     #: An optional identifier for this set.
-    name: str | None = None
+    name: Optional[str] = None
     #: PV name, attribute name, or test-specific identifier.
-    ids: list[str] = field(default_factory=list)
+    ids: List[str] = field(default_factory=list)
     #: The comparisons to perform for *each* of the ids.
-    comparisons: list[Comparison] = field(default_factory=list)
+    comparisons: List[Comparison] = field(default_factory=list)
 
 
 @dataclass
@@ -51,13 +51,13 @@ class Configuration:
     """
 
     #: Name tied to this configuration.
-    name: str | None = None
+    name: Optional[str] = None
     #: Description tied to this configuration.
-    description: str | None = None
+    description: Optional[str] = None
     #: Tags tied to this configuration.
-    tags: list[str] | None = None
+    tags: Optional[List[str]] = None
     #: Comparison checklist for this configuration.
-    checklist: list[IdentifierAndComparison] = field(default_factory=list)
+    checklist: List[IdentifierAndComparison] = field(default_factory=list)
 
 
 @dataclass
@@ -74,7 +74,7 @@ class DeviceConfiguration(Configuration):
     """
 
     #: Happi device names which give meaning to self.checklist[].ids.
-    devices: list[str] = field(default_factory=list)
+    devices: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -116,7 +116,7 @@ PathItem = Union[
 @dataclass
 class PrototypeConfigurationFile:
     #: configs: PVConfiguration, DeviceConfiguration, or ToolConfiguration.
-    configs: list[Configuration]
+    configs: List[Configuration]
 
     @classmethod
     def from_file(cls, filename: AnyPath) -> PrototypeConfigurationFile:
@@ -142,8 +142,8 @@ class PrototypeConfigurationFile:
 
 
 def _split_shared_checklist(
-    checklist: list[IdentifierAndComparison],
-) -> tuple[list[Comparison], dict[str, list[Comparison]]]:
+    checklist: List[IdentifierAndComparison],
+) -> Tuple[List[Comparison], Dict[str, List[Comparison]]]:
     """
     Split a prototype "checklist", consisting of pairs of identifiers and
     comparisons into the new format of "shared" and "per-identifier" (i.e.,

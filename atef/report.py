@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Generator, Optional, Union
+from typing import Any, Generator, List, Optional, Tuple, Union
 
 from reportlab import platypus
 from reportlab.lib import colors, enums, pagesizes, units
@@ -201,7 +201,7 @@ class AtefReport(BaseDocTemplate):
         if approval_slots:
             self.approval_slots = approval_slots
 
-    def build_cover_page(self, story: list[Flowable]) -> None:
+    def build_cover_page(self, story: List[Flowable]) -> None:
         """
         Build the cover page and set up table of contents
 
@@ -284,7 +284,7 @@ class PassiveAtefReport(AtefReport):
         # must build several times to place items then gather info for ToC
         self.multiBuild(story)
 
-    def build_summary(self, story: list[Flowable]):
+    def build_summary(self, story: List[Flowable]):
         """
         Build summary table for checkout
 
@@ -337,7 +337,7 @@ class PassiveAtefReport(AtefReport):
         self,
         config: Union[PreparedFile, PreparedConfiguration, PreparedComparison],
         level: int = 0
-    ) -> Generator[tuple[Any, int], None, None]:
+    ) -> Generator[Tuple[Any, int], None, None]:
         """
         Yields each config and comparison and its depth
         Performs a recursive depth-first search
@@ -393,7 +393,7 @@ class PassiveAtefReport(AtefReport):
 
     def build_config_page(
         self,
-        story: list[Flowable],
+        story: List[Flowable],
         config: Union[PreparedConfiguration, PreparedComparison]
     ) -> None:
         """
@@ -433,7 +433,7 @@ class PassiveAtefReport(AtefReport):
 
     def build_default_page(
         self,
-        story: list[Flowable],
+        story: List[Flowable],
         config: Union[PreparedConfiguration, PreparedComparison],
         kind: str
     ) -> None:
@@ -494,7 +494,7 @@ class PassiveAtefReport(AtefReport):
 
     def build_data_table(
         self,
-        story: list[Flowable],
+        story: List[Flowable],
         config: PreparedComparison
     ) -> None:
         """

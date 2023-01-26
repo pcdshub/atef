@@ -4,7 +4,8 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Generator, Literal, Sequence, Union, cast, get_args
+from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
+                    Tuple, Union, cast, get_args)
 
 import apischema
 import happi
@@ -39,11 +40,11 @@ class Configuration:
     """
 
     #: Name tied to this configuration.
-    name: str | None = None
+    name: Optional[str] = None
     #: Description tied to this configuration.
-    description: str | None = None
+    description: Optional[str] = None
     #: Tags tied to this configuration.
-    tags: list[str] | None = None
+    tags: Optional[List[str]] = None
 
 
 @dataclass
@@ -52,9 +53,9 @@ class ConfigurationGroup(Configuration):
     Configuration group.
     """
     #: Configurations underneath this group.
-    configs: list[Configuration] = field(default_factory=list)
+    configs: List[Configuration] = field(default_factory=list)
     #: Values that can be reused in comparisons underneath this group.
-    values: dict[str, Any] = field(default_factory=dict)
+    values: Dict[str, Any] = field(default_factory=dict)
     #: Result mode.
     mode: GroupResultMode = GroupResultMode.all_
 
@@ -82,11 +83,11 @@ class DeviceConfiguration(Configuration):
     ``.a`` component).
     """
     #: The device names.
-    devices: list[str] = field(default_factory=list)
+    devices: List[str] = field(default_factory=list)
     #: Device attribute name to comparison list.
-    by_attr: dict[str, list[Comparison]] = field(default_factory=dict)
+    by_attr: Dict[str, List[Comparison]] = field(default_factory=dict)
     #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
-    shared: list[Comparison] = field(default_factory=list)
+    shared: List[Comparison] = field(default_factory=list)
 
 
 @dataclass
@@ -95,9 +96,9 @@ class PVConfiguration(Configuration):
     A configuration that is built to check live EPICS PVs.
     """
     #: PV name to comparison list.
-    by_pv: dict[str, list[Comparison]] = field(default_factory=dict)
+    by_pv: Dict[str, List[Comparison]] = field(default_factory=dict)
     #: Comparisons to be run on *all* PVs in the `by_pv` dictionary.
-    shared: list[Comparison] = field(default_factory=list)
+    shared: List[Comparison] = field(default_factory=list)
 
 
 @dataclass
@@ -112,9 +113,9 @@ class ToolConfiguration(Configuration):
     #: here.
     tool: tools.Tool = field(default_factory=tools.Ping)
     #: Result attribute name to comparison list.
-    by_attr: dict[str, list[Comparison]] = field(default_factory=dict)
+    by_attr: Dict[str, List[Comparison]] = field(default_factory=dict)
     #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
-    shared: list[Comparison] = field(default_factory=list)
+    shared: List[Comparison] = field(default_factory=list)
 
 
 AnyConfiguration = Union[
@@ -213,8 +214,8 @@ class PreparedFile:
         cls,
         file: ConfigurationFile,
         *,
-        client: happi.Client | None = None,
-        cache: DataCache | None = None,
+        client: Optional[happi.Client] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedFile:
         """
         Prepare a ConfigurationFile for running.
@@ -257,7 +258,7 @@ class PreparedFile:
         prepared_root.parent = prepared_file
         return prepared_file
 
-    async def fill_cache(self, parallel: bool = True) -> list[asyncio.Task] | None:
+    async def fill_cache(self, parallel: bool = True) -> Optional[List[asyncio.Task]]:
         """
         Fill the DataCache.
 
@@ -306,18 +307,18 @@ class FailedConfiguration:
     A Configuration that failed to be prepared for running.
     """
     #: The data cache to use for the preparation step.
-    parent: PreparedGroup | None
+    parent: Optional[PreparedGroup]
     #: Configuration instance.
     config: AnyConfiguration
     #: The result with a severity.
     result: Result
     #: Exception that was caught, if available.
-    exception: Exception | None = None
+    exception: Optional[Exception] = None
 
 
 def _summarize_result_severity(
     mode: GroupResultMode,
-    results: list[Result | Exception | None]
+    results: List[Union[Result, Exception, None]]
 ) -> Severity:
     """
     Summarize all results based on the configured mode.
@@ -358,13 +359,13 @@ class PreparedConfiguration:
     #: The data cache to use for the preparation step.
     cache: DataCache = field(repr=False)
     #: The hierarchical parent of this step.
-    parent: PreparedGroup | None = None
+    parent: Optional[PreparedGroup] = None
     #: The comparisons to be run on the given devices.
-    comparisons: list[PreparedSignalComparison | PreparedToolComparison] = field(
+    comparisons: List[Union[PreparedSignalComparison, PreparedToolComparison]] = field(
         default_factory=list
     )
     #: The comparisons that failed to be prepared.
-    prepare_failures: list[PreparedComparisonException] = field(default_factory=list)
+    prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
     #: The result of all comparisons.
     result: Result = field(default_factory=incomplete_result)
 
@@ -372,17 +373,17 @@ class PreparedConfiguration:
     def from_config(
         cls,
         config: AnyConfiguration,
-        parent: PreparedGroup | None = None,
+        parent: Optional[PreparedGroup] = None,
         *,
-        client: happi.Client | None = None,
-        cache: DataCache | None = None,
-    ) -> (
-        PreparedPVConfiguration |
-        PreparedDeviceConfiguration |
-        PreparedToolConfiguration |
-        PreparedGroup |
-        FailedConfiguration
-    ):
+        client: Optional[happi.Client] = None,
+        cache: Optional[DataCache] = None,
+    ) -> Union[
+        PreparedPVConfiguration,
+        PreparedDeviceConfiguration,
+        PreparedToolConfiguration,
+        PreparedGroup,
+        FailedConfiguration,
+    ]:
         """
         Prepare a Configuration for running.
 
@@ -491,11 +492,11 @@ class PreparedGroup(PreparedConfiguration):
     config: ConfigurationGroup = field(default_factory=ConfigurationGroup)
     #: The hierarhical parent of this group.  If this is the root group,
     #: 'parent' may be a PreparedFile.
-    parent: PreparedGroup | PreparedFile | None = field(default=None, repr=False)
+    parent: Optional[Union[PreparedGroup, PreparedFile]] = field(default=None, repr=False)
     #: The configs defined in the group.
-    configs: list[AnyPreparedConfiguration] = field(default_factory=list)
+    configs: List[AnyPreparedConfiguration] = field(default_factory=list)
     #: The configs that failed to prepare.
-    prepare_failures: list[FailedConfiguration] = field(default_factory=list)
+    prepare_failures: List[FailedConfiguration] = field(default_factory=list)
     #: Result of all comparisons.
     result: Result = field(default_factory=incomplete_result)
 
@@ -529,10 +530,10 @@ class PreparedGroup(PreparedConfiguration):
     def from_config(
         cls,
         group: ConfigurationGroup,
-        parent: PreparedGroup | PreparedFile | None = None,
+        parent: Optional[Union[PreparedGroup, PreparedFile]] = None,
         *,
-        client: happi.Client | None = None,
-        cache: DataCache | None = None,
+        client: Optional[happi.Client] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedGroup:
         """
         Prepare a ConfigurationGroup for running.
@@ -586,7 +587,7 @@ class PreparedGroup(PreparedConfiguration):
         return prepared
 
     @property
-    def subgroups(self) -> list[PreparedGroup]:
+    def subgroups(self) -> List[PreparedGroup]:
         """
         Direct descendent subgroups in this group.
 
@@ -641,21 +642,21 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
     #: The configuration settings.
     config: DeviceConfiguration = field(default_factory=DeviceConfiguration)
     #: The device the comparisons apply to.
-    devices: list[ophyd.Device] = field(default_factory=list)
+    devices: List[ophyd.Device] = field(default_factory=list)
     #: The comparisons to be run on the given devices.
-    comparisons: list[PreparedSignalComparison] = field(default_factory=list)
+    comparisons: List[PreparedSignalComparison] = field(default_factory=list)
     #: The comparisons that failed to be prepared.
-    prepare_failures: list[PreparedComparisonException] = field(default_factory=list)
+    prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
 
     @classmethod
     def from_device(
         cls,
-        device: ophyd.Device | Sequence[ophyd.Device],
-        by_attr: dict[str, list[Comparison]],
-        shared: list[Comparison] | None = None,
-        parent: PreparedGroup | None = None,
-        cache: DataCache | None = None,
-        client: happi.Client | None = None,
+        device: Union[ophyd.Device, Sequence[ophyd.Device]],
+        by_attr: Dict[str, List[Comparison]],
+        shared: Optional[List[Comparison]] = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
+        client: Optional[happi.Client] = None,
     ) -> PreparedDeviceConfiguration:
         """
         Create a PreparedDeviceConfiguration given a device and some checks.
@@ -703,10 +704,10 @@ class PreparedDeviceConfiguration(PreparedConfiguration):
     def from_config(
         cls,
         config: DeviceConfiguration,
-        client: happi.Client | None = None,
-        parent: PreparedGroup | None = None,
-        cache: DataCache | None = None,
-        additional_devices: list[ophyd.Device] | None = None,
+        client: Optional[happi.Client] = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
+        additional_devices: Optional[List[ophyd.Device]] = None,
     ) -> PreparedDeviceConfiguration:
         """
         Prepare a DeviceConfiguration for running comparisons.
@@ -791,17 +792,17 @@ class PreparedPVConfiguration(PreparedConfiguration):
     #: The configuration settings.
     config: PVConfiguration = field(default_factory=PVConfiguration)
     #: The comparisons to be run on the given devices.
-    comparisons: list[PreparedSignalComparison] = field(default_factory=list)
+    comparisons: List[PreparedSignalComparison] = field(default_factory=list)
     #: The comparisons to be run on the given devices.
-    prepare_failures: list[PreparedComparisonException] = field(default_factory=list)
+    prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
 
     @classmethod
     def from_pvs(
         cls,
-        by_pv: dict[str, list[Comparison]],
-        shared: list[Comparison] | None = None,
-        parent: PreparedGroup | None = None,
-        cache: DataCache | None = None,
+        by_pv: Dict[str, List[Comparison]],
+        shared: Optional[List[Comparison]] = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedPVConfiguration:
         """
         Ready a set of PV checks without requiring an existing PVConfiguration.
@@ -837,8 +838,8 @@ class PreparedPVConfiguration(PreparedConfiguration):
     def from_config(
         cls,
         config: PVConfiguration,
-        parent: PreparedGroup | None = None,
-        cache: DataCache | None = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedPVConfiguration:
         """
         Prepare a PVConfiguration for running.
@@ -897,18 +898,18 @@ class PreparedToolConfiguration(PreparedConfiguration):
     #: The configuration settings.
     config: ToolConfiguration = field(default_factory=ToolConfiguration)
     #: The comparisons to be run on the given devices.
-    comparisons: list[PreparedSignalComparison] = field(default_factory=list)
+    comparisons: List[PreparedSignalComparison] = field(default_factory=list)
     #: The comparisons that failed to be prepared.
-    prepare_failures: list[PreparedComparisonException] = field(default_factory=list)
+    prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
 
     @classmethod
     def from_tool(
         cls,
         tool: tools.Tool,
-        by_attr: dict[str, list[Comparison]],
-        shared: list[Comparison] | None = None,
-        parent: PreparedGroup | None = None,
-        cache: DataCache | None = None,
+        by_attr: Dict[str, List[Comparison]],
+        shared: Optional[List[Comparison]] = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedToolConfiguration:
         """
         Prepare a Tool for running tests without an associated configuration.
@@ -947,8 +948,8 @@ class PreparedToolConfiguration(PreparedConfiguration):
     def from_config(
         cls,
         config: ToolConfiguration,
-        parent: PreparedGroup | None = None,
-        cache: DataCache | None = None,
+        parent: Optional[PreparedGroup] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedToolConfiguration:
         """
         Prepare a ToolConfiguration for running.
@@ -1015,9 +1016,9 @@ class PreparedComparison:
     #: The comparison itself.
     comparison: Comparison = field(default_factory=Comparison)
     #: The name of the associated configuration.
-    name: str | None = None
+    name: Optional[str] = None
     #: The hierarhical parent of this comparison.
-    parent: PreparedGroup | None = field(default=None, repr=False)
+    parent: Optional[PreparedGroup] = field(default=None, repr=False)
     #: The last result of the comparison, if run.
     result: Result = field(default_factory=incomplete_result)
 
@@ -1105,15 +1106,15 @@ class PreparedSignalComparison(PreparedComparison):
         - Including data reduction settings
     """
     #: The hierarhical parent of this comparison.
-    parent: None | (
-        PreparedDeviceConfiguration | PreparedPVConfiguration
-    ) = field(default=None, repr=False)
+    parent: Optional[
+        Union[PreparedDeviceConfiguration, PreparedPVConfiguration]
+    ] = field(default=None, repr=False)
     #: The device the comparison applies to, if applicable.
-    device: ophyd.Device | None = None
+    device: Optional[ophyd.Device] = None
     #: The signal the comparison is to be run on.
-    signal: ophyd.Signal | None = None
+    signal: Optional[ophyd.Signal] = None
     #: The value from the signal the comparison is to be run on.
-    data: Any | None = None
+    data: Optional[Any] = None
 
     async def get_data_async(self) -> Any:
         """
@@ -1170,9 +1171,9 @@ class PreparedSignalComparison(PreparedComparison):
         device: ophyd.Device,
         attr: str,
         comparison: Comparison,
-        name: str | None = None,
-        parent: PreparedDeviceConfiguration | None = None,
-        cache: DataCache | None = None,
+        name: Optional[str] = None,
+        parent: Optional[PreparedDeviceConfiguration] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedSignalComparison:
         """
         Create one PreparedComparison from a device, attribute, and comparison.
@@ -1224,9 +1225,9 @@ class PreparedSignalComparison(PreparedComparison):
         cls,
         pvname: str,
         comparison: Comparison,
-        name: str | None = None,
-        parent: PreparedPVConfiguration | None = None,
-        cache: DataCache | None = None,
+        name: Optional[str] = None,
+        parent: Optional[PreparedPVConfiguration] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedSignalComparison:
         """
         Create one PreparedComparison from a PV name and comparison.
@@ -1322,9 +1323,9 @@ class PreparedToolComparison(PreparedComparison):
         tool: tools.Tool,
         result_key: str,
         comparison: Comparison,
-        name: str | None = None,
-        parent: PreparedToolConfiguration | None = None,
-        cache: DataCache | None = None,
+        name: Optional[str] = None,
+        parent: Optional[PreparedToolConfiguration] = None,
+        cache: Optional[DataCache] = None,
     ) -> PreparedToolComparison:
         """
         Prepare a tool-based comparison for execution.
@@ -1368,7 +1369,7 @@ AnyPreparedConfiguration = Union[
     PreparedToolConfiguration
 ]
 
-_class_to_prepared: dict[type, type] = {
+_class_to_prepared: Dict[type, type] = {
     ConfigurationFile: PreparedFile,
     ConfigurationGroup: PreparedGroup,
     ToolConfiguration: PreparedToolConfiguration,
@@ -1378,8 +1379,8 @@ _class_to_prepared: dict[type, type] = {
 
 
 def get_result_from_comparison(
-    item: PreparedComparison | Exception | None
-) -> tuple[PreparedComparison | None, Result]:
+    item: Union[PreparedComparison, Exception, None]
+) -> Tuple[Optional[PreparedComparison], Result]:
     """
     Get a Result, if available, from the provided arguments.
 
@@ -1416,7 +1417,7 @@ def get_result_from_comparison(
 
 
 async def run_passive_step(
-    config: PreparedComparison | PreparedConfiguration | PreparedFile
+    config: Union[PreparedComparison, PreparedConfiguration, PreparedFile]
 ):
     """ Runs a given check and returns the result. """
     # Warn if will run all subcomparisons?

@@ -1,7 +1,7 @@
 import contextlib
 import datetime
 import pathlib
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import pydm
 import pydm.exception
@@ -27,12 +27,12 @@ class MockEpicsArch:
         If provided, PVs not in the database will be assigned this value.
     """
 
-    database: dict[str, ArchivedValue]
+    database: Dict[str, ArchivedValue]
     default_value: Optional[ArchivedValue]
 
     def __init__(
         self,
-        database: dict[str, ArchivedValue],
+        database: Dict[str, ArchivedValue],
         default_value: Optional[ArchivedValue] = None,
     ):
         self.database = database
@@ -40,7 +40,7 @@ class MockEpicsArch:
 
     def get_snapshot(
         self, *pvnames: str, at: datetime.datetime
-    ) -> dict[str, dict[str, Any]]:
+    ) -> Dict[str, Dict[str, Any]]:
         result = {}
         for pv in pvnames:
             value = self.database.get(pv, self.default_value)

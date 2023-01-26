@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Generator, Union
+from typing import Generator, List, Union
 
 from qtpy import QtCore
 from qtpy.QtWidgets import (QLabel, QLayout, QPushButton, QSpacerItem, QStyle,
@@ -43,7 +43,7 @@ def run_active_step(config):  # takes procedure steps and groups
 
 def make_run_page(
     widget: QWidget,
-    configs: list[Union[PreparedComparison, ProcedureStep,
+    configs: List[Union[PreparedComparison, ProcedureStep,
                         AnyPreparedConfiguration]]
 ) -> QWidget:
     """
@@ -94,7 +94,7 @@ def disable_widget(widget: QWidget) -> QWidget:
     return widget
 
 
-def combine_results(results: list[Result]) -> Result:
+def combine_results(results: List[Result]) -> Result:
     """
     Combines results into a single result.
 
@@ -224,7 +224,7 @@ class RunCheck(DesignerDisplay, QWidget):
         return super().event(event)
 
     @property
-    def results(self) -> list[Result]:
+    def results(self) -> List[Result]:
         return [c.result for c in self.configs]
 
     def setup_next_button(self, next_item) -> None:

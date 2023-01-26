@@ -6,7 +6,8 @@ import datetime
 import json
 import pathlib
 from dataclasses import dataclass, field
-from typing import Any, Generator, Literal, Sequence, Union, cast
+from typing import (Any, Dict, Generator, Literal, Optional, Sequence, Union,
+                    cast)
 
 import apischema
 import databroker
@@ -56,11 +57,11 @@ class ProcedureStep:
     This is used as a base class for all valid procedure steps (and groups).
     """
     #: The title of the procedure
-    name: str | None = None
+    name: Optional[str] = None
     #: A description of narrative explanation of setup steps, what is to happen, etc.
-    description: str | None = None
+    description: Optional[str] = None
     #: The hierarchical parent of this step.
-    parent: ProcedureGroup | ProcedureFile | None = None
+    parent: Optional[Union[ProcedureGroup, ProcedureFile]] = None
     #: result of running the step
     result: Result = field(default_factory=incomplete_result)
     #: confirmation by the user that result matches expectations
@@ -105,7 +106,7 @@ class CodeStep(ProcedureStep):
     #: The source code to execute.
     source_code: str = ''
     #: Arguments to pass into the code.
-    arguments: dict[Any, Any] = field(default_factory=dict)
+    arguments: Dict[Any, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -116,9 +117,9 @@ class PlanOptions:
     #: Plan arguments dictionary - argument name to value.
     args: Sequence[Any]
     #: Plan keyword  arguments dictionary - argument name to value.
-    kwargs: dict[Any, Any]
+    kwargs: Dict[Any, Any]
     #: Arguments which should not be configurable.
-    fixed_arguments: Sequence[str] | None
+    fixed_arguments: Optional[Sequence[str]]
 
 
 @dataclass
@@ -138,7 +139,7 @@ class PlanStep(ProcedureStep):
 class DisplayOptions:
     """Options for a typhos or PyDM display."""
     #: Macros for the display.
-    macros: dict[str, str] = field(default_factory=dict)
+    macros: Dict[str, str] = field(default_factory=dict)
     #: The template name or screen display path.
     template: str = "embedded_screen"
     #: Embed the display in the procedure? (or pop it out)
@@ -149,23 +150,23 @@ class DisplayOptions:
 class DeviceConfiguration:
     """Device configuration for comparison."""
     #: The timestamp this configuration is associated with.
-    archiver_timestamp: datetime.datetime | None
+    archiver_timestamp: Optional[datetime.datetime]
     #: The device dotted attribute name to value.
-    values: dict[str, Any]
+    values: Dict[str, Any]
 
 
 @dataclass
 class ConfigurationCheckStep(ProcedureStep):
     """Step which checks device configuration versus a given timestamp."""
     #: Device name to device configuration information.
-    devices: dict[str, DeviceConfiguration] = field(default_factory=dict)
+    devices: Dict[str, DeviceConfiguration] = field(default_factory=dict)
 
 
 @dataclass
 class TyphosDisplayStep(ProcedureStep):
     """A procedure step which opens one or more typhos displays."""
     #: Happi device name to display options.
-    devices: dict[str, DisplayOptions] = field(default_factory=dict)
+    devices: Dict[str, DisplayOptions] = field(default_factory=dict)
 
 
 @dataclass
@@ -205,7 +206,7 @@ class PassiveStep(ProcedureStep):
 class ProcedureGroup(ProcedureStep):
     """A group of procedure steps (or nested groups)."""
     #: Steps included in the procedure.
-    steps: Sequence[ProcedureStep | ProcedureGroup] = \
+    steps: Sequence[Union[ProcedureStep, ProcedureGroup]] = \
         field(default_factory=list)
 
     def walk_steps(self) -> Generator[AnyProcedure, None, None]:

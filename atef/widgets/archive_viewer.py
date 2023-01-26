@@ -11,7 +11,7 @@ import logging
 import os
 import re
 import urllib
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Dict, List, Optional
 
 from archapp.interactive import EpicsArchive
 from pydm.widgets.archiver_time_plot import PyDMArchiverTimePlot
@@ -52,7 +52,7 @@ def get_archive_viewer() -> ArchiverViewerWidget:
     return archive_viewer_singleton
 
 
-def get_reachable_url(urls: list[str]) -> str:
+def get_reachable_url(urls: List[str]) -> str:
     """
     Get valid archiver URLS from the urls
     Looks only for an response code below 400, as a proxy ping test.
@@ -120,8 +120,8 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
     def __init__(
         self,
-        parent: QtWidgets.QWidget | None = None,
-        pvs: list[str] = []
+        parent: Optional[QtWidgets.QWidget] = None,
+        pvs: List[str] = []
     ) -> None:
         super().__init__(parent=parent)
 
@@ -291,7 +291,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
     def add_signal(
         self,
         pv: str,
-        dev_attr: str | None = None,
+        dev_attr: Optional[str] = None,
         update_curves: bool = True
     ) -> None:
         """
@@ -324,8 +324,8 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             self.update_curves()
             self.input_field.clear()
 
-    @functools.lru_cache
-    def get_pv_data_snippet(self, pv: str) -> dict[str, Any]:
+    @functools.lru_cache()
+    def get_pv_data_snippet(self, pv: str) -> Dict[str, Any]:
         """
         Queries archapp.EpicsArchive for a small amount of data for use
         in verifying the PV
@@ -352,7 +352,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 class PVModel(QtCore.QAbstractTableModel):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.pvs: list[list[str, dict]] = []
+        self.pvs: List[List[str, dict]] = []
         self.headers = ['PV Name', 'component', 'color', 'symbol',
                         'lineStyle', 'lineWidth', 'remove']
 
@@ -520,7 +520,7 @@ class PVModel(QtCore.QAbstractTableModel):
         )
         self.endInsertRows()
 
-    def add_signal(self, pv: str, dev_attr: str | None = None) -> bool:
+    def add_signal(self, pv: str, dev_attr: Optional[str] = None) -> bool:
         """
         Add a signal to the widget.
 
@@ -580,7 +580,7 @@ class EnumDelegate(QtWidgets.QStyledItemDelegate):
     Delegate for selecting from a list of options.  Takes a dictionary
     at init that maps option names to their values.
     """
-    def __init__(self, *args, enums: dict[str, Any], **kwargs) -> None:
+    def __init__(self, *args, enums: Dict[str, Any], **kwargs) -> None:
         self.enums = enums
         self.enums_inv = {value: key for key, value in self.enums.items()}
         super().__init__(*args, **kwargs)

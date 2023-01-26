@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 import apischema
 import ophyd
@@ -16,10 +16,10 @@ from ..exceptions import PreparedComparisonException
 
 async def check_device(
     device: ophyd.Device,
-    by_attr: dict[str, list[Comparison]],
-    shared: Optional[list[Comparison]] = None,
+    by_attr: Dict[str, List[Comparison]],
+    shared: Optional[List[Comparison]] = None,
     cache: Optional[cache.DataCache] = None,
-) -> tuple[Severity, list[Result]]:
+) -> Tuple[Severity, List[Result]]:
     """
     Convenience function for checking an ophyd Device without creating any
     configuration instances.
@@ -59,10 +59,10 @@ async def check_device(
 
 
 async def check_pvs(
-    by_pv: dict[str, list[Comparison]],
-    shared: Optional[list[Comparison]] = None,
+    by_pv: Dict[str, List[Comparison]],
+    shared: Optional[List[Comparison]] = None,
     cache: Optional[cache.DataCache] = None,
-) -> tuple[Severity, list[Result]]:
+) -> Tuple[Severity, List[Result]]:
     """
     Convenience function for checking a set of PVs without creating any
     configuration instances.
@@ -209,7 +209,7 @@ def at2l0(request):
 
     class FakeAT2L0:
         name: str = "fakedev"
-        state_attrs: list[str] = (
+        state_attrs: List[str] = (
             "blade_01.state.state blade_02.state.state blade_03.state.state "
             "blade_04.state.state blade_05.state.state blade_06.state.state "
             "blade_07.state.state blade_08.state.state blade_09.state.state "
@@ -374,7 +374,7 @@ def data_cache(
 @pytest.mark.asyncio
 async def test_pv_config(
     data_cache: cache.DataCache,
-    by_pv: dict[str, list[Comparison]],
+    by_pv: Dict[str, List[Comparison]],
     expected_severity: check.Severity
 ):
     overall, _ = await check_pvs(by_pv, cache=data_cache)

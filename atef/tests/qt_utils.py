@@ -1,6 +1,6 @@
 import logging
 import pathlib
-from typing import Optional
+from typing import List, Optional
 
 from qtpy import QtWidgets
 
@@ -69,7 +69,7 @@ def screenshot_top_level_widgets():
 
 def save_all_screenshots(
     prefix: str, path: Optional[pathlib.Path] = None, format: str = "png"
-) -> list[str]:
+) -> List[str]:
     """Save screenshots of all top-level widgets to ``path``."""
     path = pathlib.Path(path if path is not None else ".")
     screenshots = []
