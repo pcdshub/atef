@@ -32,11 +32,11 @@ class IdentifierAndComparison:
     """
 
     #: An optional identifier for this set.
-    name: Optional[str] = None
+    name: str | None = None
     #: PV name, attribute name, or test-specific identifier.
-    ids: List[str] = field(default_factory=list)
+    ids: list[str] = field(default_factory=list)
     #: The comparisons to perform for *each* of the ids.
-    comparisons: List[Comparison] = field(default_factory=list)
+    comparisons: list[Comparison] = field(default_factory=list)
 
 
 @dataclass
@@ -51,13 +51,13 @@ class Configuration:
     """
 
     #: Name tied to this configuration.
-    name: Optional[str] = None
+    name: str | None = None
     #: Description tied to this configuration.
-    description: Optional[str] = None
+    description: str | None = None
     #: Tags tied to this configuration.
-    tags: Optional[List[str]] = None
+    tags: list[str] | None = None
     #: Comparison checklist for this configuration.
-    checklist: List[IdentifierAndComparison] = field(default_factory=list)
+    checklist: list[IdentifierAndComparison] = field(default_factory=list)
 
 
 @dataclass
@@ -74,7 +74,7 @@ class DeviceConfiguration(Configuration):
     """
 
     #: Happi device names which give meaning to self.checklist[].ids.
-    devices: List[str] = field(default_factory=list)
+    devices: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -116,7 +116,7 @@ PathItem = Union[
 @dataclass
 class PrototypeConfigurationFile:
     #: configs: PVConfiguration, DeviceConfiguration, or ToolConfiguration.
-    configs: List[Configuration]
+    configs: list[Configuration]
 
     @classmethod
     def from_file(cls, filename: AnyPath) -> PrototypeConfigurationFile:
@@ -142,8 +142,8 @@ class PrototypeConfigurationFile:
 
 
 def _split_shared_checklist(
-    checklist: List[IdentifierAndComparison],
-) -> Tuple[List[Comparison], Dict[str, List[Comparison]]]:
+    checklist: list[IdentifierAndComparison],
+) -> tuple[list[Comparison], dict[str, list[Comparison]]]:
     """
     Split a prototype "checklist", consisting of pairs of identifiers and
     comparisons into the new format of "shared" and "per-identifier" (i.e.,

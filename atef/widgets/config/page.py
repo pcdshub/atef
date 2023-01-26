@@ -81,15 +81,15 @@ class AtefItem(QTreeWidgetItem):
     func_name : str
         The text on the right column of the tree view.
     """
-    widget: Optional[PageWidget]
+    widget: PageWidget | None
     parent_tree_item: QTreeWidgetItem
     full_tree: QTreeWidget
 
     def __init__(
         self,
-        tree_parent: Union[AtefItem, QTreeWidget],
+        tree_parent: AtefItem | QTreeWidget,
         name: str,
-        func_name: Optional[str] = None,
+        func_name: str | None = None,
     ):
         super().__init__()
         self.widget = None
@@ -115,7 +115,7 @@ class AtefItem(QTreeWidgetItem):
         """
         self.widget = widget
 
-    def find_ancestor_by_widget(self, cls: Type[QWidget]) -> Optional[AtefItem]:
+    def find_ancestor_by_widget(self, cls: type[QWidget]) -> AtefItem | None:
         """Find an ancestor widget of the given type."""
         ancestor = self.parent_tree_item
         while hasattr(ancestor, "parent_tree_item"):
@@ -126,7 +126,7 @@ class AtefItem(QTreeWidgetItem):
 
         return None
 
-    def find_ancestor_by_item(self, cls: Type[AtefItem]) -> Optional[AtefItem]:
+    def find_ancestor_by_item(self, cls: type[AtefItem]) -> AtefItem | None:
         """Find an ancestor widget of the given type."""
         ancestor = self.parent_tree_item
         while hasattr(ancestor, "parent_tree_item"):
@@ -158,7 +158,7 @@ class PageWidget(QWidget):
 
     # Set during runtime
     data: AnyDataclass
-    parent_button: Optional[QToolButton]
+    parent_button: QToolButton | None
 
     def __init__(self, data: AnyDataclass, **kwargs):
         super().__init__(**kwargs)
@@ -431,7 +431,7 @@ class PageWidget(QWidget):
     def setup_comparison_table_link(
         self,
         by_attr_key: str,
-        data_widget: Optional[DataWidget],
+        data_widget: DataWidget | None,
     ) -> bool:
         """
         Common link-time setup for the comparison tables.
@@ -494,7 +494,7 @@ class PageWidget(QWidget):
         self,
         checked: bool = False,
         attr: str = '',
-        comparison: Optional[Comparison] = None,
+        comparison: Comparison | None = None,
     ) -> None:
         """
         Add a new row to the comparison table.
@@ -540,7 +540,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     add_row_button: QPushButton
     add_row_type_combo: QComboBox
 
-    config_cls_options: ClassVar[Dict[str, Type[Configuration]]] = {
+    config_cls_options: ClassVar[dict[str, type[Configuration]]] = {
         cls.__name__: cls for cls in (
             ConfigurationGroup,
             DeviceConfiguration,
@@ -581,7 +581,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     def add_config_row(
         self,
         checked: bool = False,
-        config: Optional[Configuration] = None,
+        config: Configuration | None = None,
         **kwargs,
     ) -> None:
         """
@@ -712,7 +712,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         self,
         checked: bool = False,
         attr: str = '',
-        comparison: Optional[Comparison] = None,
+        comparison: Comparison | None = None,
     ) -> None:
         """
         Add a new row to the comparison table.
@@ -783,7 +783,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         """
         Rebuild by_attr and shared when user changes anything
         """
-        unsorted: List[Tuple[str, Comparison]] = []
+        unsorted: list[tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.rowCount()):
             row_widget = self.comparisons_table.cellWidget(row_index, 0)
@@ -791,7 +791,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                 (row_widget.attr_combo.currentText(), row_widget.data)
             )
 
-        def get_sort_key(elem: Tuple[str, Comparison]):
+        def get_sort_key(elem: tuple[str, Comparison]):
             return (elem[0], elem[1].name)
 
         by_attr = {
@@ -823,7 +823,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         def replace_in_list(
             old: Comparison,
             new: Comparison,
-            comparison_list: List[Comparison],
+            comparison_list: list[Comparison],
         ):
             index = comparison_list.index(old)
             comparison_list[index] = new
@@ -910,7 +910,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         self,
         checked: bool = False,
         attr: str = '',
-        comparison: Optional[Comparison] = None,
+        comparison: Comparison | None = None,
     ):
         """
         Add a new row to the comparison table.
@@ -981,7 +981,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         """
         Rebuild by_attr and shared when user changes anything
         """
-        unsorted: List[Tuple[str, Comparison]] = []
+        unsorted: list[tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.rowCount()):
             row_widget = self.comparisons_table.cellWidget(row_index, 0)
@@ -989,7 +989,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                 (row_widget.attr_combo.currentText(), row_widget.data)
             )
 
-        def get_sort_key(elem: Tuple[str, Comparison]):
+        def get_sort_key(elem: tuple[str, Comparison]):
             return (elem[0], elem[1].name)
 
         by_pv = {
@@ -1021,7 +1021,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         def replace_in_list(
             old: Comparison,
             new: Comparison,
-            comparison_list: List[Comparison],
+            comparison_list: list[Comparison],
         ):
             index = comparison_list.index(old)
             comparison_list[index] = new
@@ -1087,10 +1087,10 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
     attr_selector_cache: WeakSet[QComboBox]
 
     # Defines the valid tools, their result structs, and edit widgets
-    tool_map: ClassVar[Dict[Type[Tool], Tuple[Type[ToolResult], Type[DataWidget]]]] = {
+    tool_map: ClassVar[dict[type[Tool], tuple[type[ToolResult], type[DataWidget]]]] = {
         Ping: (PingResult, PingWidget),
     }
-    tool_names: Dict[str, Type[Tool]]
+    tool_names: dict[str, type[Tool]]
 
     def __init__(self, data: ToolConfiguration, **kwargs):
         super().__init__(data=data, **kwargs)
@@ -1120,7 +1120,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         self,
         checked: bool = False,
         attr: str = '',
-        comparison: Optional[Comparison] = None,
+        comparison: Comparison | None = None,
     ) -> None:
         """
         Add a new row to the comparison table.
@@ -1191,7 +1191,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         """
         Rebuild by_attr and shared when user changes anything
         """
-        unsorted: List[Tuple[str, Comparison]] = []
+        unsorted: list[tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.rowCount()):
             row_widget = self.comparisons_table.cellWidget(row_index, 0)
@@ -1199,14 +1199,14 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 (row_widget.attr_combo.currentText(), row_widget.data)
             )
 
-        def get_sort_key(elem: Tuple[str, Comparison]):
+        def get_sort_key(elem: tuple[str, Comparison]):
             return (elem[0], elem[1].name)
 
         result_type, _ = self.tool_map[type(self.data.tool)]
-        gui_compatible_fields = set((
+        gui_compatible_fields = {
             int, float, str, bool,
             'int', 'float', 'str', 'bool',
-        ))
+        }
         field_names = sorted(
             field.name
             for field in dataclasses.fields(result_type)
@@ -1236,7 +1236,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         def replace_in_list(
             old: Comparison,
             new: Comparison,
-            comparison_list: List[Comparison],
+            comparison_list: list[Comparison],
         ):
             index = comparison_list.index(old)
             comparison_list[index] = new
@@ -1347,7 +1347,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
     specific_combo: QComboBox
 
     # Defines the valid comparisons and their edit widgets
-    comp_map: ClassVar[Dict[Comparison, DataWidget]] = {
+    comp_map: ClassVar[dict[Comparison, DataWidget]] = {
         Equals: EqualsWidget,
         NotEquals: NotEqualsWidget,
         Greater: GreaterWidget,
@@ -1359,7 +1359,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         AnyValue: AnyValueWidget,
         AnyComparison: AnyComparisonWidget,
     }
-    comp_types: Dict[str, Comparison]
+    comp_types: dict[str, Comparison]
 
     def __init__(self, data: Comparison, **kwargs):
         super().__init__(data=data, **kwargs)
@@ -1608,7 +1608,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         def replace_in_list(
             old: Comparison,
             new: Comparison,
-            comparison_list: List[Comparison],
+            comparison_list: list[Comparison],
         ):
             index = comparison_list.index(old)
             comparison_list[index] = new

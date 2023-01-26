@@ -27,12 +27,12 @@ class MockEpicsArch:
         If provided, PVs not in the database will be assigned this value.
     """
 
-    database: Dict[str, ArchivedValue]
+    database: dict[str, ArchivedValue]
     default_value: Optional[ArchivedValue]
 
     def __init__(
         self,
-        database: Dict[str, ArchivedValue],
+        database: dict[str, ArchivedValue],
         default_value: Optional[ArchivedValue] = None,
     ):
         self.database = database
@@ -40,7 +40,7 @@ class MockEpicsArch:
 
     def get_snapshot(
         self, *pvnames: str, at: datetime.datetime
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> dict[str, dict[str, Any]]:
         result = {}
         for pv in pvnames:
             value = self.database.get(pv, self.default_value)

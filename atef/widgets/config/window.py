@@ -89,7 +89,7 @@ class Window(DesignerDisplay, QMainWindow):
         new_button.clicked.connect(self.new_file)
         welcome_box.exec()
 
-    def get_tab_name(self, filename: Optional[str] = None):
+    def get_tab_name(self, filename: str | None = None):
         """
         Get a standardized tab name from a filename.
         """
@@ -108,7 +108,7 @@ class Window(DesignerDisplay, QMainWindow):
             self.get_tab_name(filename),
         )
 
-    def get_current_tree(self) -> Union[EditTree, RunTree]:
+    def get_current_tree(self) -> EditTree | RunTree:
         """
         Return the widget of the current open tab.
         """
@@ -124,7 +124,7 @@ class Window(DesignerDisplay, QMainWindow):
         widget = EditTree(config_file=ConfigurationFile())
         self.tab_widget.addTab(widget, self.get_tab_name())
 
-    def open_file(self, *args, filename: Optional[str] = None, **kwargs):
+    def open_file(self, *args, filename: str | None = None, **kwargs):
         """
         Open an existing file and create a new tab containing it.
 
@@ -144,7 +144,7 @@ class Window(DesignerDisplay, QMainWindow):
             )
         if not filename:
             return
-        with open(filename, 'r') as fd:
+        with open(filename) as fd:
             serialized = json.load(fd)
 
         # TODO: Consider adding submenus for user to choose
@@ -179,7 +179,7 @@ class Window(DesignerDisplay, QMainWindow):
         current_tree = self.get_current_tree()
         self.save_as(filename=current_tree.full_path)
 
-    def save_as(self, *args, filename: Optional[str] = None, **kwargs):
+    def save_as(self, *args, filename: str | None = None, **kwargs):
         """
         Save the currently selected tab, to a specific filename.
 
@@ -273,15 +273,15 @@ class EditTree(DesignerDisplay, QWidget):
 
     tree_widget: QTreeWidget
     splitter: QtWidgets.QSplitter
-    last_selection: Optional[AtefItem]
+    last_selection: AtefItem | None
 
     full_path: str
 
     def __init__(
         self,
         *args,
-        config_file: Union[ConfigurationFile, ProcedureFile],
-        full_path: Optional[str] = None,
+        config_file: ConfigurationFile | ProcedureFile,
+        full_path: str | None = None,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -345,7 +345,7 @@ class EditTree(DesignerDisplay, QWidget):
         self.last_selection = item
 
 
-_edit_to_run_page: Dict[type, RunPage] = {
+_edit_to_run_page: dict[type, RunPage] = {
     # temporary dummy page
     ConfigurationGroup: ConfigurationGroupPage
 }
@@ -363,7 +363,7 @@ class RunTree(EditTree):
         self,
         *args,
         config_file: ConfigurationFile,
-        full_path: Optional[str] = None,
+        full_path: str | None = None,
         **kwargs
     ):
         super().__init__(config_file=config_file, full_path=full_path)
@@ -398,7 +398,7 @@ class RunTree(EditTree):
         # this is not a pythonic iterator, treat it differently
 
         # gather sets of item(with widget), and a list of configs/comparisons
-        item_config_list: List[Tuple[AtefItem, Any]] = []
+        item_config_list: list[tuple[AtefItem, Any]] = []
         while it.value():
             item: AtefItem = it.value()
             # for each item, grab the relevant Configurations or Comparisons
@@ -492,7 +492,7 @@ class DualTree(QWidget):
         self.toggle = Toggle()
         self.show_widgets()
 
-    def get_tree(self, mode: str = None) -> Union[EditTree, RunTree]:
+    def get_tree(self, mode: str = None) -> EditTree | RunTree:
         """
         Get the requested tree, either 'edit' or 'run'.
         Defaults to the currently active tree
@@ -573,8 +573,8 @@ class DualTree(QWidget):
 
 def get_relevant_configs_comps(
     prepared_file: PreparedFile,
-    original_c: Union[Configuration, Comparison]
-) -> List[Union[PreparedConfiguration, PreparedComparison]]:
+    original_c: Configuration | Comparison
+) -> list[PreparedConfiguration | PreparedComparison]:
     """
     Gather all the PreparedConfiguration or PreparedComparison dataclasses
     that correspond to the original comparison or config.

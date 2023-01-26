@@ -192,7 +192,7 @@ def _acquire(signal: ophyd.Signal):
         data.extend([start_value, signal.get()])
 
 
-def acquire_blocking(signal: ophyd.Signal, duration: Number) -> List[PrimitiveType]:
+def acquire_blocking(signal: ophyd.Signal, duration: Number) -> list[PrimitiveType]:
     """
     Subscribe to signal, acquire data for ``duration`` seconds.
 
@@ -214,7 +214,7 @@ def acquire_blocking(signal: ophyd.Signal, duration: Number) -> List[PrimitiveTy
     return data
 
 
-async def acquire_async(signal: ophyd.Signal, duration: Number) -> List[PrimitiveType]:
+async def acquire_async(signal: ophyd.Signal, duration: Number) -> list[PrimitiveType]:
     """
     Subscribe to signal, acquire data for ``duration`` seconds.
 

@@ -46,7 +46,7 @@ class QDataclassBridge(QObject):
     """
     data: Any
 
-    def __init__(self, data: Any, parent: Optional[QObject] = None):
+    def __init__(self, data: Any, parent: QObject | None = None):
         super().__init__(parent=parent)
         self.data = data
         for field in dataclasses.fields(data):
@@ -56,11 +56,11 @@ class QDataclassBridge(QObject):
             # 3. A list of values -> make a QDataclassList
             # 4. A list of dataclasses -> QDataclassList (object)
             normalized = normalize_annotation(field.type)
-            if Dict in normalized:
+            if dict in normalized:
                 # Use dataclass value and override to object type
                 NestedClass = QDataclassValue
                 dtype = object
-            elif List in normalized:
+            elif list in normalized:
                 # Make sure we have list manipulation methods
                 NestedClass = QDataclassList
                 dtype = normalized[-1]
@@ -80,7 +80,7 @@ class QDataclassBridge(QObject):
 
 normalize_map = {
     'Optional': Optional,
-    'List': List,
+    'List': list,
     'Number': float,
     'int': int,
     'str': str,
@@ -91,9 +91,9 @@ normalize_map = {
     'Severity': int,
     'reduce.ReduceMethod': str,
     'PrimitiveType': object,
-    'Sequence': List,
+    'Sequence': list,
     'Value': object,
-    'Dict': Dict,
+    'Dict': dict,
     'str, Any': object,
     'str, List': object,
     'GroupResultMode': str,
@@ -101,7 +101,7 @@ normalize_map = {
 }
 
 
-def normalize_annotation(annotation: str) -> Tuple[type]:
+def normalize_annotation(annotation: str) -> tuple[type]:
     """
     Change a string annotation into a tuple of the enclosing classes.
 
@@ -137,13 +137,13 @@ class QDataclassElem:
     data: Any
     attr: str
     updated: QSignal
-    _registry: ClassVar[Dict[str, type]]
+    _registry: ClassVar[dict[str, type]]
 
     def __init__(
         self,
         data: Any,
         attr: str,
-        parent: Optional[QObject] = None,
+        parent: QObject | None = None,
     ):
         super().__init__(parent=parent)
         self.data = data
@@ -159,7 +159,7 @@ class QDataclassValue(QDataclassElem):
     _registry = {}
 
     @classmethod
-    def of_type(cls, data_type: type) -> Type[QDataclassValue]:
+    def of_type(cls, data_type: type) -> type[QDataclassValue]:
         """
         Create a QDataclass with a specific QSignal
 
@@ -215,7 +215,7 @@ class QDataclassList(QDataclassElem):
     _registry = {}
 
     @classmethod
-    def of_type(cls, data_type: type) -> Type[QDataclassList]:
+    def of_type(cls, data_type: type) -> type[QDataclassList]:
         """
         Create a QDataclass with a specific QSignal
 
@@ -243,13 +243,13 @@ class QDataclassList(QDataclassElem):
         cls._registry[data_type] = new_class
         return new_class
 
-    def get(self) -> List[Any]:
+    def get(self) -> list[Any]:
         """
         Return the current list of values.
         """
         return getattr(self.data, self.attr)
 
-    def put(self, values: List[Any]) -> None:
+    def put(self, values: list[Any]) -> None:
         """
         Replace the current list of values.
         """
@@ -315,8 +315,8 @@ class ThreadWorker(QtCore.QThread):
     error_raised = QtCore.Signal(Exception)
     returned = QtCore.Signal(object)
     func: Callable
-    args: Tuple[Any, ...]
-    kwargs: Dict[str, Any]
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
     return_value: Any
 
     def __init__(self, func: Callable, *args, **kwargs):
@@ -348,7 +348,7 @@ def run_in_gui_thread(func: Callable, *args, _start_delay_ms: int = 0, **kwargs)
     QtCore.QTimer.singleShot(_start_delay_ms, functools.partial(func, *args, **kwargs))
 
 
-def get_clipboard() -> Optional[QtGui.QClipboard]:
+def get_clipboard() -> QtGui.QClipboard | None:
     """Get the clipboard instance. Requires a QApplication."""
     app = QtWidgets.QApplication.instance()
     if app is None:
@@ -357,7 +357,7 @@ def get_clipboard() -> Optional[QtGui.QClipboard]:
     return QtWidgets.QApplication.clipboard()
 
 
-def get_clipboard_modes() -> List[int]:
+def get_clipboard_modes() -> list[int]:
     """Get the clipboard modes for the current platform."""
     clipboard = get_clipboard()
     if clipboard is None:

@@ -29,7 +29,7 @@ def build_arg_parser(argparser=None):
     return argparser
 
 
-def main(filenames: Optional[List[AnyPath]] = None):
+def main(filenames: Optional[list[AnyPath]] = None):
     app = QApplication([])
     main_window = Window(show_welcome=not filenames)
     main_window.show()

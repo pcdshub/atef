@@ -44,14 +44,14 @@ def wrap_callback(event_type: str, callback: Callable):
 @dataclasses.dataclass(frozen=True)
 class ArchivedValue:
     pvname: str
-    value: Optional[Any]
+    value: Any | None
     timestamp: datetime.datetime
     status: int
     severity: int
-    appliance: Optional[archapp.EpicsArchive] = dataclasses.field(
+    appliance: archapp.EpicsArchive | None = dataclasses.field(
         default=None, repr=False
     )
-    enum_strs: Optional[Tuple[str, ...]] = None
+    enum_strs: tuple[str, ...] | None = None
 
     @classmethod
     def from_archapp(
@@ -80,7 +80,7 @@ class ArchivedValue:
             **kwargs
         )
 
-    def to_archapp(self) -> Dict[str, Any]:
+    def to_archapp(self) -> dict[str, Any]:
         """
         Testing helper to convert an ArchivedValue back into what the appliance
         API would respond with.
@@ -142,12 +142,12 @@ class ArchivedValueStore:
     data: Deque[ArchivedValue] = dataclasses.field(
         default_factory=lambda: collections.deque(maxlen=PER_PV_CACHE)
     )
-    timestamp_aliases: Dict[datetime.datetime, datetime.datetime] = dataclasses.field(
+    timestamp_aliases: dict[datetime.datetime, datetime.datetime] = dataclasses.field(
         default_factory=dict
     )
 
     @property
-    def by_timestamp(self) -> Dict[datetime.datetime, ArchivedValue]:
+    def by_timestamp(self) -> dict[datetime.datetime, ArchivedValue]:
         result = {
             data.timestamp: data
             for data in self.data
@@ -161,19 +161,19 @@ class ArchivedValueStore:
 
 
 ArchiverCallback = Callable[[ArchivedValue], None]
-MatchPVsResult = Tuple[
-    Dict[str, ArchivedValue],
-    Dict[archapp.EpicsArchive, List[str]],
-    List[str]
+MatchPVsResult = tuple[
+    dict[str, ArchivedValue],
+    dict[archapp.EpicsArchive, list[str]],
+    list[str]
 ]
 
 
 class ArchiverHelper:
     _instance_: ClassVar[ArchiverHelper]
-    appliances: List[archapp.EpicsArchive]
-    cache: Dict[str, ArchivedValueStore]
+    appliances: list[archapp.EpicsArchive]
+    cache: dict[str, ArchivedValueStore]
     search_loop_rate: ClassVar[float] = 0.2
-    _pv_to_callbacks: Dict[datetime.datetime, Dict[str, List[ArchiverCallback]]]
+    _pv_to_callbacks: dict[datetime.datetime, dict[str, list[ArchiverCallback]]]
 
     def __init__(self):
         self.appliances = []
@@ -265,7 +265,7 @@ class ArchiverHelper:
 
     def get_pvs_at_time(
         self, *pvnames: str, dt: datetime.datetime
-    ) -> Dict[str, ArchivedValue]:
+    ) -> dict[str, ArchivedValue]:
         """
         Bulk request many PVs at the given timestamp.
 
@@ -419,10 +419,10 @@ class ArchiverHelper:
 class ArchiverDevice(Device):
     # TODO: discuss if this mixin should exist; and if not, where the datetime
     # information should be stored
-    component_names: List[str]
+    component_names: list[str]
     archive_timestamp: datetime.datetime = datetime.datetime.now()
 
-    def _find_archiver_pvs(self) -> Generator[Tuple[str, ArchiverPV], None, None]:
+    def _find_archiver_pvs(self) -> Generator[tuple[str, ArchiverPV], None, None]:
         for walk in self.walk_signals(include_lazy=True):
             if isinstance(walk.item, EpicsSignalBase):
                 read_pv = getattr(walk.item, "_read_pv", None)
@@ -450,7 +450,7 @@ class ArchiverControlLayer:
     name = "archive"
 
     _instance_: ClassVar[ArchiverControlLayer]
-    _pvs: Dict[str, List[ArchiverPV]]
+    _pvs: dict[str, list[ArchiverPV]]
 
     def __init__(self):
         self._pvs = {}
@@ -478,7 +478,7 @@ class ArchiverControlLayer:
     def get_pv(
         self,
         pvname: str,
-        connection_callback: Optional[PyepicsConnectionCallback] = None,
+        connection_callback: PyepicsConnectionCallback | None = None,
         **kwargs
     ) -> ArchiverPV:
         if connection_callback is None:
@@ -519,7 +519,7 @@ class ArchiverControlLayer:
         return ophyd.get_cl().get_dispatcher()
 
 
-def make_archived_device(cls: Type[Device]) -> Type[ArchiverDevice]:
+def make_archived_device(cls: type[Device]) -> type[ArchiverDevice]:
     """
     Make an alternate device class that uses the ArchiveControlLayer.
 
@@ -552,14 +552,14 @@ def make_archived_device(cls: Type[Device]) -> Type[ArchiverDevice]:
 
 
 def switch_control_layer(
-    cls: Type[Device],
+    cls: type[Device],
     control_layer: SimpleNamespace,
-    component_classes: Iterable[Type[OphydObject]],
+    component_classes: Iterable[type[OphydObject]],
     *,
-    cache: Dict[Type[Device], Type[Device]],
+    cache: dict[type[Device], type[Device]],
     class_prefix: str = "",
-    new_bases: Optional[Iterable[type]] = None,
-) -> Type[ArchiverDevice]:
+    new_bases: Iterable[type] | None = None,
+) -> type[ArchiverDevice]:
     """
     Inspect cls and construct an archived device that has the same structure.
 
@@ -702,8 +702,8 @@ class ArchiverPV(PyepicsPvCompatibility):
         wait: bool = False,
         timeout: float = 30.0,
         use_complete: bool = False,
-        callback: Optional[PyepicsPutCallback] = None,
-        callback_data: Optional[Any] = None,
+        callback: PyepicsPutCallback | None = None,
+        callback_data: Any | None = None,
     ):
         """Stub for pv.put. Callback will be run, but no change will be made."""
         logger.warning(
@@ -723,7 +723,7 @@ class ArchiverPV(PyepicsPvCompatibility):
 
     def _update_state_from_archiver(
         self, data: ArchivedValue, as_string=None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Update _args and run callbacks based on the ArchivedValue."""
         as_string = as_string if as_string is not None else self.as_string
         if data.value is None:
@@ -749,7 +749,7 @@ class ArchiverPV(PyepicsPvCompatibility):
         self.run_callbacks()
         return self._args
 
-    def get_with_metadata(self, as_string=None, **kwargs) -> Dict[str, Any]:
+    def get_with_metadata(self, as_string=None, **kwargs) -> dict[str, Any]:
         """Query the ArchiverHelper to get the value at the referrer's timestamp."""
         as_string = as_string if as_string is not None else self.as_string
         helper = ArchiverHelper.instance()

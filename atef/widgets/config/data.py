@@ -39,7 +39,7 @@ class AnyDataclass(Protocol):
     """
     Protocol stub shamelessly lifted from stackoverflow to hint at dataclass
     """
-    __dataclass_fields__: Dict
+    __dataclass_fields__: dict
 
 
 class DataWidget(QWidget):
@@ -142,7 +142,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
 
     last_name: str
     last_desc: str
-    pvs: List[Tuple[str, str]]  # (pv, attrname)
+    pvs: list[tuple[str, str]]  # (pv, attrname)
 
     def __init__(self, data: AnyDataclass, **kwargs):
         super().__init__(data=data, **kwargs)
@@ -299,7 +299,7 @@ class TagsWidget(QWidget):
         flexibility in whether we arrange things horizontally,
         vertically, etc.
     """
-    widgets: List[TagsElem]
+    widgets: list[TagsElem]
 
     def __init__(
         self,
@@ -522,7 +522,7 @@ class ConfigurationGroupWidget(DesignerDisplay, DataWidget):
     def add_value_to_table(
         self,
         checked: bool = False,
-        name: Optional[str] = None,
+        name: str | None = None,
         value: Any = None,
         startup: bool = False,
         **kwargs,
@@ -704,7 +704,7 @@ class DeviceConfigurationWidget(DesignerDisplay, DataWidget):
         self.devices_layout.addWidget(self.device_widget)
         self.signals_layout.addWidget(self.cpt_widget)
 
-    def get_device_list(self) -> List[str]:
+    def get_device_list(self) -> list[str]:
         """
         Returns a list of the names of the configured happi devices.
         """
@@ -765,7 +765,7 @@ class ListHolder:
     things like signals, etc., and the widgets written for this
     version assume that a dataclass with a list attribute exists.
     """
-    some_list: List
+    some_list: list
 
 
 class PVConfigurationWidget(DataWidget):
@@ -1157,16 +1157,16 @@ class EqualsMixin:
 
     Used in EqualsWidget and ValueRowWidget
     """
-    label_to_type: Dict[str, type] = {
+    label_to_type: dict[str, type] = {
         'float': float,
         'integer': int,
         'bool': bool,
         'string': str,
     }
-    type_to_label: Dict[type, str] = {
+    type_to_label: dict[type, str] = {
         value: key for key, value in label_to_type.items()
     }
-    cast_from_user_str: Dict[type, Callable[[str], bool]] = {
+    cast_from_user_str: dict[type, Callable[[str], bool]] = {
         tp: tp for tp in type_to_label
     }
     cast_from_user_str[bool] = user_string_to_bool
@@ -1250,8 +1250,8 @@ class EqualsMixin:
 
     def value_from_str(
         self,
-        value: Optional[str] = None,
-        gui_type_str: Optional[str] = None,
+        value: str | None = None,
+        gui_type_str: str | None = None,
     ) -> PrimitiveType:
         """
         Convert our line edit value into a string based on the combobox.
@@ -1621,7 +1621,7 @@ class ValueRowWidget(DesignerDisplay, EqualsMixin, DataWidget):
     severity_combo: QComboBox
     delete_button: QToolButton
 
-    severity_map: Dict[int, Severity]
+    severity_map: dict[int, Severity]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1684,7 +1684,7 @@ class ValueSetWidget(DesignerDisplay, DataWidget):
     def add_value_row(
         self,
         checked: bool = False,
-        value: Optional[Value] = None,
+        value: Value | None = None,
         **kwargs,
     ) -> None:
         """
@@ -1957,7 +1957,7 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
     def add_comparison(
         self,
         checked: bool = False,
-        comparison: Optional[Comparison] = None,
+        comparison: Comparison | None = None,
         **kwargs,
     ) -> None:
         """
@@ -2047,7 +2047,7 @@ class AnyComparisonWidget(DesignerDisplay, DataWidget):
         self.update_comparison_list()
 
     def update_comparison_list(self) -> None:
-        unsorted: List[Comparison] = []
+        unsorted: list[Comparison] = []
 
         for row_index in range(self.comparisons_table.rowCount()):
             row_widget = self.comparisons_table.cellWidget(row_index, 0)

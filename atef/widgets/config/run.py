@@ -43,7 +43,7 @@ def run_active_step(config):  # takes procedure steps and groups
 
 def make_run_page(
     widget: QWidget,
-    configs: List[Union[PreparedComparison, ProcedureStep,
+    configs: list[Union[PreparedComparison, ProcedureStep,
                         AnyPreparedConfiguration]]
 ) -> QWidget:
     """
@@ -94,7 +94,7 @@ def disable_widget(widget: QWidget) -> QWidget:
     return widget
 
 
-def combine_results(results: List[Result]) -> Result:
+def combine_results(results: list[Result]) -> Result:
     """
     Combines results into a single result.
 
@@ -224,7 +224,7 @@ class RunCheck(DesignerDisplay, QWidget):
         return super().event(event)
 
     @property
-    def results(self) -> List[Result]:
+    def results(self) -> list[Result]:
         return [c.result for c in self.configs]
 
     def setup_next_button(self, next_item) -> None:
