@@ -106,10 +106,12 @@ class PyepicsPvCompatibility:
     def __init__(
         self,
         pvname: str,
-        callback: None | (
-            PyepicsMonitorCallback | list[PyepicsMonitorCallback] |
-                  tuple[PyepicsMonitorCallback, ...]
-            ) = None,
+        callback: None
+        | (
+            PyepicsMonitorCallback
+            | list[PyepicsMonitorCallback]
+            | tuple[PyepicsMonitorCallback, ...]
+        ) = None,
         form: PyepicsForm = "time",
         verbose: bool = False,
         auto_monitor: int | bool | None = None,

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import (Any, Callable, ClassVar, Protocol)
+from typing import Any, Callable, ClassVar, Protocol
 from weakref import WeakValueDictionary
 
 from pydm.widgets.drawing import PyDMDrawingLine

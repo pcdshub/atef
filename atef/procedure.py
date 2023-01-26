@@ -6,8 +6,7 @@ import datetime
 import json
 import pathlib
 from dataclasses import dataclass, field
-from typing import (Any, Generator, Literal, Sequence, Union,
-                    cast)
+from typing import Any, Generator, Literal, Sequence, Union, cast
 
 import apischema
 import databroker
