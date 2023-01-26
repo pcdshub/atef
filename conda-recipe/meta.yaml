@@ -1,57 +1,68 @@
-{% set data = load_setup_py_data() %}
+{% set package_name = "atef" %}
+{% set import_name = "atef" %}
+{% set version = load_file_regex(load_file=os.path.join(import_name, "_version.py"), regex_pattern=".*version = '(\S+)'").group(1) %}
 
 package:
-  name: atef
-  version: {{ data.get('version') }}
+  name: {{ package_name }}
+  version: {{ version }}
 
 source:
   path: ..
 
 build:
-  noarch: python
   number: 0
-  script: "{{ PYTHON }} -m pip install . -vv"
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv
+
+
 
 requirements:
   build:
-    - python >=3.7
-    - pip
+  - python >=3.7
+  - pip
+  - setuptools_scm
   run:
-    - python >=3.7
-    - apischema
-    - archapp >=1.1.0
-    - bluesky
-    - bluesky-widgets
-    - bluesky-queueserver
-    - happi
-    - ipython
-    - numpy
-    - ophyd
-    - pydm
-    - pyyaml
-    - qtpy
-    - pyqt
-    - reportlab
-    - rich
-    - typhos
-    - typing-extensions  # [py<38]
+  - python >=3.7
+  - apischema
+  - archapp >=1.1.0
+  - bluesky
+  - bluesky-widgets
+  - bluesky-queueserver
+  - happi
+  - ipython
+  - numpy
+  - ophyd
+  - pydm
+  - pyyaml
+  - qtpy
+  - pyqt
+  - reportlab
+  - rich
+  - typhos
+  - typing-extensions
+
+
 
 test:
-    imports:
-      - atef
-    requires:
-      - pytest
-      - pcdsdevices
+  imports:
+  - atef
+  requires:
+  - pytest
+  - pcdsdevices
+
+
 
 about:
+  dev_url: https://github.com/pcdshub/atef
+  doc_url: https://pcdshub.github.io/atef/
   home: https://github.com/pcdshub/atef
   license: LicenseRef-BSD-3-Clause-SLAC
-  summary: "Python Automated Test Execution Framework"
-  doc_url: https://pcdshub.github.io/atef/
-  dev_url: https://github.com/pcdshub/atef
+  summary: Python Automated Test Execution Framework
+
+
 
 extra:
   recipe-maintainers:
-    - klauer
-    - zllentz
-    - zrylettc
+  - klauer
+  - zllentz
+  - zrylettc
