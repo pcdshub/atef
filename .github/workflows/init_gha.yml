@@ -1,8 +1,0 @@
-name: GitHub Actions initialization
-run_name: ${{ github.actor }} is testing GitHub Actions
-on: [push]
-jobs:
-  dummy-job:
-    runs-on: ubuntu-20.04
-    steps:
-      - run: echo "dummy action"
