@@ -512,9 +512,14 @@ class PassiveAtefReport(AtefReport):
         story.append(Paragraph('Observed Data', l0))
         # use cached value.
         observed_value = getattr(config, 'data', 'N/A')
+        if not observed_value:
+            # attr can be set to None
+            observed_value = 'N/A'
+        observed_value = Paragraph(str(observed_value), styles['BodyText'])
         try:
             timestamp = datetime.fromtimestamp(config.signal.timestamp).ctime()
-            source = config.signal.name
+            timestamp = Paragraph(timestamp)
+            source = Paragraph(config.signal.name, styles['BodyText'])
         except AttributeError:
             timestamp = 'unknown'
             source = 'undefined'
