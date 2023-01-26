@@ -3,7 +3,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Generator, Iterable, List, Optional, Sequence
+from typing import Any, Generator, Iterable, Sequence
 
 import numpy as np
 import ophyd

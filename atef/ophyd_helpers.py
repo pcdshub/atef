@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 import logging
 import time
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
 import ophyd
 from ophyd.ophydobj import OphydObject

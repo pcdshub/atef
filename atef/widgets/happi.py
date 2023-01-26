@@ -5,7 +5,7 @@ Widget classes designed for atef-to-happi interaction.
 from __future__ import annotations
 
 import logging
-from typing import Any, ClassVar, Dict, List, Optional, Union, cast
+from typing import Any, ClassVar, cast
 
 import happi
 import ophyd

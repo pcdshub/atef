@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from itertools import zip_longest
-from typing import Any, Callable, ClassVar, List, Optional, Tuple, Type
+from typing import Any, Callable, ClassVar
 
 import qtawesome as qta
 from qtpy import QtCore, QtWidgets

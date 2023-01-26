@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections import OrderedDict
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, ClassVar
 from weakref import WeakSet, WeakValueDictionary
 
 from qtpy.QtGui import QDropEvent

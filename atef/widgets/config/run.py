@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Generator, List, Union
+from typing import Generator, Union
 
 from qtpy import QtCore
 from qtpy.QtWidgets import (QLabel, QLayout, QPushButton, QSpacerItem, QStyle,

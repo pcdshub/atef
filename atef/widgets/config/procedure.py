@@ -4,8 +4,7 @@ import dataclasses
 import logging
 import pathlib
 import pprint
-from typing import (Dict, Generator, List, Optional, Sequence, Type, TypeVar,
-                    Union)
+from typing import (Generator, Sequence, TypeVar)
 
 import pydm
 import pydm.display

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, ClassVar, Literal, Union
 
 from ophyd._dispatch import EventDispatcher, wrap_callback
 from ophyd.signal import EpicsSignalBase

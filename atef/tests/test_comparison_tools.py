@@ -1,6 +1,6 @@
 import sys
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from typing import Any, ClassVar, Optional
 
 import apischema
 import pytest

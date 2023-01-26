@@ -6,7 +6,7 @@ import shutil
 import sys
 import typing
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Dict, List, Mapping, Sequence, TypeVar, Union
+from typing import Any, ClassVar, Mapping, Sequence, TypeVar
 
 from . import serialization
 from .check import Result, Severity

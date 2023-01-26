@@ -3,7 +3,7 @@ from __future__ import annotations
 import concurrent.futures
 import enum
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, Sequence
+from typing import Any, Protocol, Sequence
 
 import numpy as np
 import ophyd

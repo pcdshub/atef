@@ -10,7 +10,7 @@ import dataclasses
 import functools
 import logging
 import platform
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, ClassVar, Optional
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QObject

@@ -10,8 +10,7 @@ import math
 import threading
 import time
 from types import SimpleNamespace
-from typing import (Any, Callable, ClassVar, Deque, Dict, Generator, Iterable,
-                    List, Optional, Tuple, Type)
+from typing import (Any, Callable, ClassVar, Deque, Generator, Iterable)
 
 import archapp
 import ophyd

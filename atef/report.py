@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Generator, List, Optional, Tuple, Union
+from typing import Any, Generator, Optional, Union
 
 from reportlab import platypus
 from reportlab.lib import colors, enums, pagesizes, units

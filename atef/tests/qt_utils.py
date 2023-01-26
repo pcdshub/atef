@@ -1,6 +1,6 @@
 import logging
 import pathlib
-from typing import List, Optional
+from typing import Optional
 
 from qtpy import QtWidgets
 

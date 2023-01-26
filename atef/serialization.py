@@ -6,7 +6,7 @@ Serialization helpers for apischema.
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 from types import new_class
-from typing import (Any, Dict, Generic, List, Tuple, TypeVar, get_origin,
+from typing import (Any, Generic, TypeVar, get_origin,
                     get_type_hints)
 
 from apischema import deserializer, serializer, type_name

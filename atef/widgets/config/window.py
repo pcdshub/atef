@@ -9,7 +9,7 @@ import os
 import os.path
 from copy import deepcopy
 from pprint import pprint
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from apischema import ValidationError, deserialize, serialize
 from qtpy import QtWidgets

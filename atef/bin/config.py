@@ -3,7 +3,7 @@
 """
 import argparse
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from pydm import exception
 from qtpy.QtWidgets import QApplication

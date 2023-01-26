@@ -6,8 +6,7 @@ import dataclasses
 import logging
 import typing
 from dataclasses import dataclass, field
-from typing import (Any, Dict, Hashable, Iterable, Mapping, Optional, Type,
-                    TypeVar, cast)
+from typing import (Any, Hashable, Iterable, Mapping, TypeVar, cast)
 
 import ophyd
 

@@ -8,7 +8,7 @@ import enum
 import logging
 import threading
 import time
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Set
+from typing import Any, Callable, ClassVar
 
 import numpy as np
 import ophyd

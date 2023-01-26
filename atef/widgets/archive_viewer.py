@@ -11,7 +11,7 @@ import logging
 import os
 import re
 import urllib
-from typing import Any, ClassVar, Dict, List, Optional
+from typing import Any, ClassVar
 
 from archapp.interactive import EpicsArchive
 from pydm.widgets.archiver_time_plot import PyDMArchiverTimePlot
