@@ -48,7 +48,7 @@ test:
   - atef
   requires:
   - pytest
-  - pcdsdevices
+  - pcdsdevices >=7.1.0
 
 
 
