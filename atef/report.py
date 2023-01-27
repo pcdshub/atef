@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
 from reportlab import platypus
 from reportlab.lib import colors, enums, pagesizes, units
@@ -201,6 +201,15 @@ class AtefReport(BaseDocTemplate):
         if approval_slots:
             self.approval_slots = approval_slots
 
+    def get_info(self) -> Dict[str, Any]:
+        return {
+            'author': self.author,
+            'version': self.version,
+            'header_text': self.header_center_text,
+            'footer_text': self.footer_center_text,
+            'approval_slots': self.approval_slots
+        }
+
     def build_cover_page(self, story: List[Flowable]) -> None:
         """
         Build the cover page and set up table of contents
@@ -225,15 +234,17 @@ class AtefReport(BaseDocTemplate):
         table_data = [
             ['Name:', 'Role:', 'Signature:', 'Date Approved:'],
         ]
+        heights = [1*cm]
         for _ in range(self.approval_slots):
             table_data.append(['', '', '', ''])
+            heights.append(1.5*cm)
         # Key, start(C,R), end(C,R), Setting
         approval_table = platypus.Table(
             table_data,
             colWidths=[3.5*cm, 5*cm, 5*cm, 3*cm],
-            rowHeights=[1*cm, 1.5*cm],
+            rowHeights=heights,
             style=[
-                ('GRID', (0, 0), (3, 1), 1, colors.black),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
                 ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
                 ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
                 ('ALIGN', (0, 0), (3, 0), 'CENTER'),
@@ -458,6 +469,7 @@ class PassiveAtefReport(AtefReport):
             style = h1
         elif kind == 'comparison':
             style = h2
+            header_text += f' - {config.identifier}'
         story.append(self.build_linked_header(header_text, style))
         story.append(Paragraph(setting_config.description))
         result = getattr(config, 'result', None)

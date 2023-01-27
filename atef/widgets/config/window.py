@@ -17,7 +17,6 @@ from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
                             QTabWidget, QTreeWidget, QWidget)
 
-import atef
 from atef.cache import DataCache
 from atef.check import Comparison
 from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
@@ -31,7 +30,7 @@ from ..core import DesignerDisplay
 from .page import (AtefItem, ConfigurationGroupPage, ProcedureGroupPage,
                    link_page)
 from .run import RunPage, make_run_page
-from .utils import Toggle
+from .utils import MultiInputDialog, Toggle
 
 logger = logging.getLogger(__name__)
 
@@ -459,9 +458,25 @@ class RunTree(EditTree):
         if not filename.endswith('.pdf'):
             filename += '.pdf'
 
-        doc = PassiveAtefReport(filename, config=self.prepared_file)
-        doc.set_info(author='atef', version=str(atef.__version__))
-        doc.create_report()
+        # To differentiate between active and passive checkout reports
+        if isinstance(self.prepared_file, PreparedFile):
+            doc = PassiveAtefReport(filename, config=self.prepared_file)
+        else:
+            raise TypeError('Unsupported data-type for report generation')
+
+        # allow user to customize header fields
+        doc_info = doc.get_info()
+        msg = self.show_report_cust_prompt(doc_info)
+        if msg.DialogCode is msg.Accepted:
+            new_info = msg.get_info()
+            doc.set_info(**new_info)
+            doc.create_report()
+
+    def show_report_cust_prompt(self, info):
+        """ generate a window allowing user to customize information """
+        msg = MultiInputDialog(init_values=info)
+        msg.exec()
+        return msg
 
 
 class DualTree(QWidget):
