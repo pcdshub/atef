@@ -128,13 +128,25 @@ class RunCheck(DesignerDisplay, QWidget):
     run_next_spacer: QSpacerItem
     next_button: QPushButton
 
-    unknown_icon = QStyle.SP_TitleBarContextHelpButton
-    complete_icon = QStyle.SP_DialogApplyButton
-    fail_icon = QStyle.SP_DialogCancelButton
+    style_icons = {
+        Severity.success: QStyle.SP_DialogApplyButton,
+        Severity.warning : QStyle.SP_TitleBarContextHelpButton,
+        Severity.internal_error: QStyle.SP_DialogCancelButton,
+        Severity.error: QStyle.SP_DialogCancelButton
+    }
+
+    unicode_icons = {
+        # check mark
+        Severity.success: '<span style="color: green;">&#10004;</span>',
+        Severity.warning : '<span style="color: orange;">?</span>',
+        # x mark
+        Severity.internal_error: '<span style="color: red;">&#10008;</span>',
+        Severity.error: '<span style="color: red;">&#10008;</span>',
+    }
 
     def __init__(self, *args, configs=None, **kwargs):
         super().__init__(*args, **kwargs)
-        icon = self.style().standardIcon(self.unknown_icon)
+        icon = self.style().standardIcon(self.style_icons[Severity.warning])
         self.status_label.setPixmap(icon.pixmap(25, 25))
         self.configs = configs
 
@@ -176,7 +188,6 @@ class RunCheck(DesignerDisplay, QWidget):
 
         def run_slot():
             """ Slot that runs each step in the config list """
-            print('running step')
             for cfg in configs:
                 config_type = self.infer_step_type(cfg)
                 if config_type == 'active':
@@ -197,25 +208,19 @@ class RunCheck(DesignerDisplay, QWidget):
             return
         combined_result = combine_results(self.results)
 
-        if combined_result.severity == Severity.success:
-            icon = self.style().standardIcon(self.complete_icon)
-        elif combined_result.severity in (Severity.internal_error, Severity.error):
-            icon = self.style().standardIcon(self.fail_icon)
-        else:
-            icon = self.style().standardIcon(self.unknown_icon)
+        chosen_icon = self.style_icons[combined_result.severity]
+        icon = self.style().standardIcon(chosen_icon)
 
         self.status_label.setPixmap(icon.pixmap(25, 25))
         self.update_status_label_tooltip()
 
     def update_status_label_tooltip(self) -> None:
-        # TODO: replace with something more spiffy.
-        # Icons?  Concise result output?
         tt = ''
         for r in self.results:
-            tt += str(r)
-            tt += '\n'
+            uni_icon = self.unicode_icons[r.severity]
+            tt += f'{uni_icon}: {r.reason or "-"}<br>'
 
-        self.status_label.setToolTip(tt[:-2])
+        self.status_label.setToolTip('<p>' + tt.rstrip('<br>') + '</p>')
 
     def event(self, event: QtCore.QEvent) -> bool:
         # Catch tooltip events to update status tooltip
