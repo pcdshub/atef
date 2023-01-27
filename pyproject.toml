@@ -27,7 +27,7 @@ write_to = "atef/_version.py"
 
 [tool.setuptools.packages.find]
 where = [ ".",]
-include = [ "atef",]
+include = [ "atef*",]
 namespaces = false
 
 [tool.setuptools.dynamic.readme]
