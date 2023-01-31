@@ -326,6 +326,9 @@ class EditTree(DesignerDisplay, QWidget):
         selection, creating the widget object if needed.
         """
         item = self.tree_widget.currentItem()
+        if item is None:
+            logger.error('Tree has no currentItem.  Cannot show selected')
+            return
         if item is self.last_selection:
             return
 
@@ -467,7 +470,7 @@ class RunTree(EditTree):
         # allow user to customize header fields
         doc_info = doc.get_info()
         msg = self.show_report_cust_prompt(doc_info)
-        if msg.DialogCode is msg.Accepted:
+        if msg.result() == msg.Accepted:
             new_info = msg.get_info()
             doc.set_info(**new_info)
             doc.create_report()

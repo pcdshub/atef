@@ -57,7 +57,7 @@ def make_run_page(
     Parameters
     ----------
     widget : QWidget
-        widget to f
+        widget to convert
     configs : List[Union[PreparedComparison,
                          ProcedureStep,
                          AnyPreparedConfiguration]]
@@ -232,13 +232,14 @@ class RunCheck(DesignerDisplay, QWidget):
     def results(self) -> List[Result]:
         return [c.result for c in self.configs]
 
-    def setup_next_button(self, next_item) -> None:
+    def setup_next_button(self, next_item=None) -> None:
         page = self.parent()
 
         def inner_navigate(*args, **kwargs):
             page.navigate_to(next_item)
 
-        self.next_button.clicked.connect(inner_navigate)
+        if next_item:
+            self.next_button.clicked.connect(inner_navigate)
 
     def setup_verify_button(self) -> None:
         """
