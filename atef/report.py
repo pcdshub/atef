@@ -48,7 +48,7 @@ class AtefReport(BaseDocTemplate):
 
     .. code-block:: python
 
-        doc = AtefReport('/path/to/pdf/location/report.pdf, config=file)
+        doc = AtefReport('/path/to/pdf/location/report.pdf', config=file)
 
     Extra information can be passed at init or configured prior to file
     creation
