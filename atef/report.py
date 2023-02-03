@@ -322,7 +322,7 @@ class PassiveAtefReport(AtefReport):
             if isinstance(item, PreparedConfiguration):
                 name = item.config.name
             elif isinstance(item, PreparedComparison):
-                name = item.comparison.name
+                name = item.comparison.name + ' - ' + item.identifier
             name = name or type(item).__name__
             table_data.append(
                 [
