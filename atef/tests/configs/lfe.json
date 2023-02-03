@@ -145,23 +145,6 @@
             ],
             "detector.trigger_mode": [
               {
-                "Equals": {
-                  "name": "target out",
-                  "description": "state must be out",
-                  "invert": false,
-                  "reduce_period": null,
-                  "reduce_method": "average",
-                  "string": true,
-                  "severity_on_failure": 2,
-                  "if_disconnected": 2,
-                  "value": "OUT",
-                  "rtol": null,
-                  "atol": null
-                }
-              }
-            ],
-            "target.state": [
-              {
                 "NotEquals": {
                   "name": "camera triggered",
                   "description": "camera must not be in free run",
@@ -172,6 +155,23 @@
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
                   "value": "Free Run",
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            ],
+            "target.state": [
+              {
+                "Equals": {
+                  "name": "target out",
+                  "description": "state must be out",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": true,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": "OUT",
                   "rtol": null,
                   "atol": null
                 }
