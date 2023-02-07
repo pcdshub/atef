@@ -176,6 +176,7 @@ class RunCheck(DesignerDisplay, QWidget):
         self.setup_verify_button()
 
     def infer_step_type(self, config: Union[PreparedComparison, ProcedureStep]) -> str:
+        # TODO: find a better way to decide the step type
         if hasattr(config, 'compare'):
             return 'passive'
         elif hasattr(config, 'run'):
