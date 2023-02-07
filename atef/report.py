@@ -274,8 +274,7 @@ class AtefReport(BaseDocTemplate):
 class PassiveAtefReport(AtefReport):
     """
     Report for Passive Checkouts.  Assumes specific PreparedFile structure
-    """
-    __doc__ = __doc__ + AtefReport.__doc__
+    """ + AtefReport.__doc__
 
     def create_report(self):
         """

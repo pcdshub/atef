@@ -190,7 +190,6 @@ class PassiveStep(ProcedureStep):
         else:
             config = ConfigurationFile.from_yaml(self.filepath)
 
-        # prepare file
         prepared_config = PreparedFile.from_config(file=config,
                                                    cache=DataCache())
 
