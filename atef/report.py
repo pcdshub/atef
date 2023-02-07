@@ -59,7 +59,7 @@ class AtefReport(BaseDocTemplate):
         doc.create_report()
 
     """
-    LOGO = platypus.Image(Path(__file__).parent / 'assets' / 'SLAC_short_red.jpeg',
+    LOGO = platypus.Image(Path(__file__).parent / 'assets' / 'SLAC_red.jpeg',
                           kind='proportional', width=6.0*units.inch,
                           height=6.0*units.inch)
 
