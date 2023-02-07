@@ -205,8 +205,7 @@ class PassiveStep(ProcedureStep):
 class ProcedureGroup(ProcedureStep):
     """A group of procedure steps (or nested groups)."""
     #: Steps included in the procedure.
-    steps: Sequence[Union[ProcedureStep, ProcedureGroup]] = \
-        field(default_factory=list)
+    steps: Sequence[Union[ProcedureStep, ProcedureGroup]] = field(default_factory=list)
 
     def walk_steps(self) -> Generator[AnyProcedure, None, None]:
         for step in self.steps:
