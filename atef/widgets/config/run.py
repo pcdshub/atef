@@ -83,6 +83,7 @@ def make_run_page(
 
 def disable_widget(widget: QWidget) -> QWidget:
     """ Disable widget, recurse through layouts """
+    # TODO: revisit, is there a better way to do this?
     for idx in range(widget.layout().count()):
         layout_item = widget.layout().itemAt(idx)
         if isinstance(layout_item, QLayout):

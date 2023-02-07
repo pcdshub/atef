@@ -466,6 +466,11 @@ class BulkListWidget(StringListWithDialog):
 
 
 class Toggle(QCheckBox):
+    """
+    A checkbox widget that looks like a sliding toggle. At default:
+    - The disabled state displays the slider as grey and to the left.
+    - The activated state displays the slider as blue and to the right
+    """
     # shamelessly vendored from qtwidgets:
     # github.com/pythonguis/python-qtwidgets/tree/master/qtwidgets/toggle
     _transparent_pen = QPen(Qt.transparent)
@@ -802,6 +807,13 @@ def cast_dataclass(data: Any, new_type: Type) -> Any:
 
 
 class MultiInputDialog(QtWidgets.QDialog):
+    """
+    Generates a dialog widget for requesting an arbitrary number of
+    pieces of information.  Selects the input widget type based on the
+    initial data type.
+
+    To retrieve the user provided data, call MultiInputDialog.get_info()
+    """
     def __init__(self, *args, init_values: Dict[str, Any], **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -827,10 +839,23 @@ class MultiInputDialog(QtWidgets.QDialog):
         self.ok_button.clicked.connect(self.accept)
         self.cancel_button.clicked.connect(self.reject)
 
-    def make_label(self, key: str):
+    def make_label(self, key: str) -> QtWidgets.QLabel:
         return QtWidgets.QLabel(key)
 
-    def make_field(self, value: Any):
+    def make_field(self, value: Any) -> QtWidgets.QWidget:
+        """
+        Make an input field widget for the given value based on its type
+
+        Parameters
+        ----------
+        value : Any
+            The default value to make a input field for
+
+        Returns
+        -------
+        QtWidgets.QWidget
+            The input field widget
+        """
         # no newlines allowed
         regexp = QRegularExpression(r'[^\n]*')
         if isinstance(value, str):
@@ -847,8 +872,12 @@ class MultiInputDialog(QtWidgets.QDialog):
             int_edit.setValue(value)
             return int_edit
 
-    def get_info(self):
-        """ Collect user provided information """
+    def get_info(self) -> Dict[str, Any]:
+        """
+        Collect user provided information.  Returns default values
+        provided to the widget at initialization if the user has not
+        entered any data.
+        """
         info = {}
         for r in range(self.grid_layout.rowCount()):
             key = self.grid_layout.itemAtPosition(r, 0).widget().text()
