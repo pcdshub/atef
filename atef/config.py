@@ -291,7 +291,7 @@ class PreparedFile:
 
     def walk_groups(
         self,
-    ) -> Generator[PreparedGroup, None, None]:
+    ) -> Generator[AnyPreparedConfiguration, None, None]:
         """Walk through the prepared groups."""
         yield self.root
         yield from self.root.walk_groups()
@@ -603,7 +603,7 @@ class PreparedGroup(PreparedConfiguration):
 
     def walk_groups(
         self,
-    ) -> Generator[PreparedGroup, None, None]:
+    ) -> Generator[AnyPreparedConfiguration, None, None]:
         """Walk through the prepared groups."""
         for config in self.configs:
             if isinstance(config, get_args(AnyPreparedConfiguration)):
