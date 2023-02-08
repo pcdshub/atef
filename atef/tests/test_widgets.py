@@ -19,7 +19,7 @@ parametrized_groups = pytest.mark.parametrize(
     [
         pytest.param(
             DescriptionStep(
-                title="Introduction",
+                name="Introduction",
                 description=(
                     "Introductory <strong>text</strong> can contain HTML "
                     "<ol>"
@@ -33,7 +33,7 @@ parametrized_groups = pytest.mark.parametrize(
         ),
         pytest.param(
             TyphosDisplayStep(
-                title="Display 1",
+                name="Display 1",
                 description="Configure device before beginning",
                 devices={
                     "at1k4": DisplayOptions(),
@@ -45,7 +45,7 @@ parametrized_groups = pytest.mark.parametrize(
         ),
         pytest.param(
             PydmDisplayStep(
-                title="Display 2",
+                name="Display 2",
                 description="PyDM display",
                 display=pathlib.Path("pydm.ui"),
                 options=DisplayOptions(),
@@ -54,11 +54,11 @@ parametrized_groups = pytest.mark.parametrize(
         ),
         pytest.param(
             ProcedureGroup(
-                title="Simple group procedure",
+                name="Simple group procedure",
                 description="Group procedure notes",
                 steps=[
                     DescriptionStep(
-                        title="Introduction",
+                        name="Introduction",
                         description=(
                             "Introductory <strong>text</strong> can contain HTML "
                             "<ol>"
@@ -74,15 +74,15 @@ parametrized_groups = pytest.mark.parametrize(
         ),
         pytest.param(
             ProcedureGroup(
-                title="Top-level procedure",
+                name="Top-level procedure",
                 description="Procedure notes",
                 steps=[
                     ProcedureGroup(
-                        title="Embedded group procedure",
+                        name="Embedded group procedure",
                         description="Group procedure notes",
                         steps=[
                             DescriptionStep(
-                                title="Introduction",
+                                name="Introduction",
                                 description=(
                                     "Introductory <strong>text</strong> can contain HTML "
                                     "<ol>"
@@ -100,11 +100,11 @@ parametrized_groups = pytest.mark.parametrize(
         ),
         pytest.param(
             ProcedureGroup(
-                title="Top-level procedure",
+                name="Top-level procedure",
                 description="Procedure notes",
                 steps=[
                     DescriptionStep(
-                        title="Introduction",
+                        name="Introduction",
                         description=(
                             "Introductory <strong>text</strong> can contain HTML "
                             "<ol>"
@@ -115,24 +115,24 @@ parametrized_groups = pytest.mark.parametrize(
                         ),
                     ),
                     TyphosDisplayStep(
-                        title="Display 1",
+                        name="Display 1",
                         description="Configure device before beginning",
                         devices={
                             "at1k4": DisplayOptions(),
                         }
                     ),
                     PydmDisplayStep(
-                        title="Display 2",
+                        name="Display 2",
                         description="PyDM display",
                         display=pathlib.Path("pydm.ui"),
                         options=DisplayOptions(),
                     ),
                     ProcedureGroup(
-                        title="Embedded group procedure",
+                        name="Embedded group procedure",
                         description="Group procedure notes",
                         steps=[
                             DescriptionStep(
-                                title="Introduction",
+                                name="Introduction",
                                 description=(
                                     "Introductory <strong>text</strong> can contain HTML "
                                     "<ol>"

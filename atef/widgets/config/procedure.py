@@ -15,9 +15,12 @@ import typhos.display
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
-from ..procedure import (DescriptionStep, DisplayOptions, PlanOptions,
-                         PlanStep, ProcedureGroup, ProcedureStep,
-                         PydmDisplayStep, TyphosDisplayStep)
+from atef.check import Result
+
+from ...procedure import (DescriptionStep, DisplayOptions, PlanOptions,
+                          PlanStep, ProcedureGroup, ProcedureStep,
+                          PydmDisplayStep, TyphosDisplayStep,
+                          incomplete_result)
 
 # TODO:  CodeStep, ConfigurationCheckStep,
 
@@ -75,18 +78,20 @@ class StepWidgetBase(QtWidgets.QWidget):
 
     def __init__(
         self,
-        title: Optional[str] = None,
+        name: Optional[str] = None,
         description: str = "",
+        verify: bool = False,
+        result: Result = incomplete_result(),
         *,
         parent: Optional[QtWidgets.QWidget] = None,
         **kwargs
     ):
         super().__init__(parent=parent)
-        self._title = title
+        self._title = name
         self._description = description
         self.title_widget = None
         self.description_widget = None
-        self.setWindowTitle(title or "Step")
+        self.setWindowTitle(name or "Step")
         self.setObjectName(self.windowTitle().replace(" ", "_"))
         self._setup_ui(**kwargs)
         self.updateGeometry()
@@ -209,7 +214,7 @@ class PlanStepWidget(StepWidgetBase, QtWidgets.QFrame):
         self.description_widget = _add_label(
             layout, self.description, object_name="step_description"
         )
-        from .re_widgets import Model, QtRePlanEditor
+        from ...re_widgets import Model, QtRePlanEditor
         model = Model()
         model.run_engine.clear_connection_status()
         model.run_engine.manager_connecting_ops()
@@ -346,9 +351,9 @@ class ProcedureGroupWidget(StepWidgetBase, QtWidgets.QFrame):
                 widget = procedure_step_to_widget(step)
             except Exception as ex:
                 widget = DescriptionStepWidget(
-                    title=step.title,
+                    name=step.name,
                     description=(
-                        f"atef error: failed to load step {step.title!r} "
+                        f"atef error: failed to load step {step.name!r} "
                         f"({type(step).__name__}) due to:<br/>\n"
                         f"<strong>{ex.__class__.__name__}</strong>: {ex}"
                     )

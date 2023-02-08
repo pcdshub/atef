@@ -16,4 +16,5 @@ recommonmark
 pytest-asyncio
 pytest-qt
 # for happi loading at lcls
-pcdsdevices
+pcdsdevices>=7.1.0
+sphinxcontrib-jquery

@@ -11,6 +11,7 @@ recursive-include docs *.rst conf.py Makefile make.bat
 
 include versioneer.py
 include atef/_version.py
+include atef/assets/SLAC_red.jpeg
 
 recursive-include atef/tests *.json *.yml
 

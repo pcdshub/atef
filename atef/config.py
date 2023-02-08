@@ -5,7 +5,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
-                    Tuple, Union, cast)
+                    Tuple, Union, cast, get_args)
 
 import apischema
 import happi
@@ -15,13 +15,17 @@ from ophyd.signal import ConnectionTimeoutError
 
 from . import serialization, tools, util
 from .cache import DataCache
-from .check import Comparison, Result
+from .check import Comparison, Result, incomplete
 from .enums import GroupResultMode, Severity
 from .exceptions import PreparedComparisonException
 from .type_hints import AnyPath
 from .yaml_support import init_yaml_support
 
 logger = logging.getLogger(__name__)
+
+
+def incomplete_result():
+    return incomplete
 
 
 @dataclass
@@ -287,7 +291,7 @@ class PreparedFile:
 
     def walk_groups(
         self,
-    ) -> Generator[PreparedGroup, None, None]:
+    ) -> Generator[AnyPreparedConfiguration, None, None]:
         """Walk through the prepared groups."""
         yield self.root
         yield from self.root.walk_groups()
@@ -354,7 +358,7 @@ class PreparedConfiguration:
     """
     #: The data cache to use for the preparation step.
     cache: DataCache = field(repr=False)
-    #: The data cache to use for the preparation step.
+    #: The hierarchical parent of this step.
     parent: Optional[PreparedGroup] = None
     #: The comparisons to be run on the given devices.
     comparisons: List[Union[PreparedSignalComparison, PreparedToolComparison]] = field(
@@ -363,7 +367,7 @@ class PreparedConfiguration:
     #: The comparisons that failed to be prepared.
     prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
     #: The result of all comparisons.
-    result: Result = field(default_factory=Result)
+    result: Result = field(default_factory=incomplete_result)
 
     @classmethod
     def from_config(
@@ -494,7 +498,7 @@ class PreparedGroup(PreparedConfiguration):
     #: The configs that failed to prepare.
     prepare_failures: List[FailedConfiguration] = field(default_factory=list)
     #: Result of all comparisons.
-    result: Result = field(default_factory=Result)
+    result: Result = field(default_factory=incomplete_result)
 
     def get_value_by_name(self, name: str) -> Any:
         """
@@ -599,12 +603,13 @@ class PreparedGroup(PreparedConfiguration):
 
     def walk_groups(
         self,
-    ) -> Generator[PreparedGroup, None, None]:
+    ) -> Generator[AnyPreparedConfiguration, None, None]:
         """Walk through the prepared groups."""
         for config in self.configs:
-            if isinstance(config, PreparedGroup):
+            if isinstance(config, get_args(AnyPreparedConfiguration)):
                 yield config
-                yield from config.walk_groups()
+                if isinstance(config, PreparedGroup):
+                    yield from config.walk_groups()
 
     def walk_comparisons(self) -> Generator[PreparedComparison, None, None]:
         """Walk through the prepared comparisons."""
@@ -628,7 +633,6 @@ class PreparedGroup(PreparedConfiguration):
             result = Result(
                 severity=severity
             )
-
         self.result = result
         return result
 
@@ -1016,7 +1020,7 @@ class PreparedComparison:
     #: The hierarhical parent of this comparison.
     parent: Optional[PreparedGroup] = field(default=None, repr=False)
     #: The last result of the comparison, if run.
-    result: Optional[Result] = None
+    result: Result = field(default_factory=incomplete_result)
 
     async def get_data_async(self) -> Any:
         """
@@ -1035,7 +1039,7 @@ class PreparedComparison:
         """
         Run the comparison.
 
-        To be immplemented in subclass.
+        To be implemented in subclass.
         """
         raise NotImplementedError()
 
@@ -1195,7 +1199,7 @@ class PreparedSignalComparison(PreparedComparison):
         PreparedSignalComparison
         """
         full_attr = f"{device.name}.{attr}"
-        logger.debug("Checking %s.%s with comparison %s", full_attr, comparison)
+        logger.debug("Checking %s with comparison %s", full_attr, comparison)
         if cache is None:
             cache = DataCache()
 
@@ -1410,3 +1414,23 @@ def get_result_from_comparison(
         )
 
     return item, item.result
+
+
+async def run_passive_step(
+    config: Union[PreparedComparison, PreparedConfiguration, PreparedFile]
+):
+    """ Runs a given check and returns the result. """
+    # Warn if will run all subcomparisons?
+    cache_fill_tasks = []
+    try:
+        cache_fill_tasks = await config.fill_cache()
+    except asyncio.CancelledError:
+        logger.error("Tests interrupted; no results available.")
+        return
+    try:
+        result = await config.compare()
+    except asyncio.CancelledError:
+        for task in cache_fill_tasks or []:
+            task.cancel()
+
+    return result

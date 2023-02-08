@@ -3,13 +3,15 @@ from __future__ import annotations
 import dataclasses
 import logging
 from itertools import zip_longest
-from typing import Any, Callable, ClassVar, List, Optional, Tuple, Type
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type
 
-from qtpy import QtWidgets
-from qtpy.QtCore import QPoint, Qt
+import qtawesome as qta
+from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import QPoint, QPointF, QRectF, QRegularExpression, Qt
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtGui import QClipboard, QGuiApplication
-from qtpy.QtWidgets import QInputDialog, QLineEdit, QMenu, QWidget
+from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
+                        QPaintEvent, QPen, QRegularExpressionValidator)
+from qtpy.QtWidgets import QCheckBox, QInputDialog, QLineEdit, QMenu, QWidget
 
 from atef import util
 from atef.check import Comparison, Equals, Range
@@ -463,6 +465,122 @@ class BulkListWidget(StringListWithDialog):
         self.edit_items(to_select, new_pvs)
 
 
+class Toggle(QCheckBox):
+    """
+    A checkbox widget that looks like a sliding toggle. At default:
+    - The disabled state displays the slider as grey and to the left.
+    - The activated state displays the slider as blue and to the right
+    """
+    # shamelessly vendored from qtwidgets:
+    # github.com/pythonguis/python-qtwidgets/tree/master/qtwidgets/toggle
+    _transparent_pen = QPen(Qt.transparent)
+    _light_grey_pen = QPen(Qt.lightGray)
+
+    def __init__(
+        self,
+        *args,
+        parent=None,
+        bar_color=Qt.gray,
+        checked_color="#00B0FF",
+        handle_color=Qt.white,
+        checked_icon='msc.run-all',
+        unchecked_icon='fa5s.edit',
+        **kwargs
+    ):
+        super().__init__(*args, parent=parent, **kwargs)
+        # Save our properties on the object via self, so we can access them later
+        # in the paintEvent.
+        self.checked_color = checked_color
+        self.checked_icon = checked_icon
+        self.unchecked_icon = unchecked_icon
+        self._bar_brush = QBrush(bar_color)
+        self._bar_checked_brush = QBrush(QColor(checked_color).lighter())
+
+        self._handle_brush = QBrush(handle_color)
+        self._handle_checked_brush = QBrush(QColor(checked_color))
+
+        # Setup the rest of the widget.
+
+        self.setContentsMargins(0, 0, 0, 0)
+        self._handle_position = 0
+
+        self.stateChanged.connect(self.handle_state_change)
+
+    def sizeHint(self) -> QtCore.QSize:
+        return QtCore.QSize(40, 25)
+
+    def hitButton(self, pos: QPoint):
+        return self.contentsRect().contains(pos)
+
+    def paintEvent(self, e: QPaintEvent):
+        contRect = self.contentsRect()
+        handleRadius = round(0.45 * contRect.height())
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+
+        p.setPen(self._transparent_pen)
+        barRect = QRectF(
+            0, 0,
+            contRect.width() - handleRadius, 0.40 * contRect.height()
+        )
+        barRect.moveCenter(contRect.center())
+        rounding = barRect.height() / 2
+
+        # the handle will move along this line
+        trailLength = contRect.width() - 2 * handleRadius
+        xPos = contRect.x() + handleRadius + trailLength * self._handle_position
+        iconRad = 0.7 * handleRadius
+        # center of handle
+        icon_x = xPos - (1.3 * handleRadius) + iconRad
+
+        if self.isChecked():
+            p.setBrush(self._bar_checked_brush)
+            p.drawRoundedRect(barRect, rounding, rounding)
+            p.setBrush(self._handle_checked_brush)
+            p.drawEllipse(
+                QPointF(xPos, barRect.center().y()),
+                handleRadius, handleRadius
+            )
+            icon = qta.icon(self.checked_icon,
+                            color=QColor(self.checked_color).darker())
+            icon.paint(p, icon_x, round(barRect.center().y()) - iconRad,
+                       2 * iconRad, 2 * iconRad)
+
+        else:
+            p.setBrush(self._bar_brush)
+            p.drawRoundedRect(barRect, rounding, rounding)
+            p.setPen(self._light_grey_pen)
+            p.setBrush(self._handle_brush)
+            p.drawEllipse(
+                QPointF(xPos, barRect.center().y()),
+                handleRadius, handleRadius
+            )
+            icon = qta.icon(self.unchecked_icon)
+            icon.paint(p, icon_x, round(barRect.center().y()) - iconRad,
+                       2 * iconRad, 2 * iconRad)
+
+        p.end()
+
+    @QtCore.Slot(int)
+    def handle_state_change(self, value):
+        self._handle_position = 1 if value else 0
+
+    @QtCore.Property(float)
+    def handle_position(self):
+        return self._handle_position
+
+    @handle_position.setter
+    def handle_position(self, pos):
+        """change the property
+        we need to trigger QWidget.update() method, either by:
+            1- calling it here [ what we're doing ].
+            2- connecting the QPropertyAnimation.valueChanged() signal to it.
+        """
+        self._handle_position = pos
+        self.update()
+
+
 def user_string_to_bool(text: str) -> bool:
     """
     Interpret a user's input as a boolean value.
@@ -686,3 +804,91 @@ def cast_dataclass(data: Any, new_type: Type) -> Any:
         if key in field_names
     }
     return new_type(**new_kwargs)
+
+
+class MultiInputDialog(QtWidgets.QDialog):
+    """
+    Generates a dialog widget for requesting an arbitrary number of
+    pieces of information.  Selects the input widget type based on the
+    initial data type.
+
+    To retrieve the user provided data, call MultiInputDialog.get_info()
+    """
+    def __init__(self, *args, init_values: Dict[str, Any], **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.init_values = init_values
+        vlayout = QtWidgets.QVBoxLayout(self)
+        self.grid_layout = QtWidgets.QGridLayout()
+        # add each name and field
+        for i, (key, value) in enumerate(init_values.items()):
+            spaced_key = key.replace('_', ' ')
+            self.grid_layout.addWidget(self.make_label(spaced_key), i, 0)
+            self.grid_layout.addWidget(self.make_field(value), i, 1)
+
+        vlayout.addLayout(self.grid_layout)
+
+        # add ok, cancel buttons
+        hlayout = QtWidgets.QHBoxLayout()
+        self.ok_button = QtWidgets.QPushButton('Accept')
+        self.cancel_button = QtWidgets.QPushButton('Cancel')
+        hlayout.addWidget(self.ok_button)
+        hlayout.addWidget(self.cancel_button)
+        vlayout.addLayout(hlayout)
+
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+
+    def make_label(self, key: str) -> QtWidgets.QLabel:
+        return QtWidgets.QLabel(key)
+
+    def make_field(self, value: Any) -> QtWidgets.QWidget:
+        """
+        Make an input field widget for the given value based on its type
+
+        Parameters
+        ----------
+        value : Any
+            The default value to make a input field for
+
+        Returns
+        -------
+        QtWidgets.QWidget
+            The input field widget
+        """
+        # no newlines allowed
+        regexp = QRegularExpression(r'[^\n]*')
+        if isinstance(value, str):
+            # make text edit
+            text_edit = QtWidgets.QLineEdit()
+            validator = QRegularExpressionValidator(regexp)
+            text_edit.setMaximumHeight(30)
+            text_edit.setPlaceholderText(value)
+            text_edit.setValidator(validator)
+            return text_edit
+        elif isinstance(value, int):
+            int_edit = QtWidgets.QSpinBox()
+            int_edit.setMaximum(10)
+            int_edit.setValue(value)
+            return int_edit
+
+    def get_info(self) -> Dict[str, Any]:
+        """
+        Collect user provided information.  Returns default values
+        provided to the widget at initialization if the user has not
+        entered any data.
+        """
+        info = {}
+        for r in range(self.grid_layout.rowCount()):
+            key = self.grid_layout.itemAtPosition(r, 0).widget().text()
+            input_widget = self.grid_layout.itemAtPosition(r, 1).widget()
+            if isinstance(input_widget, QtWidgets.QLineEdit):
+                value = input_widget.text()
+            elif isinstance(input_widget, QtWidgets.QSpinBox):
+                value = input_widget.value()
+
+            unspaced_key = key.replace(' ', '_')
+            # replace with default value if no input
+            info[unspaced_key] = value or self.init_values[unspaced_key]
+
+        return info

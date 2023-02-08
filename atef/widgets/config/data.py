@@ -235,7 +235,6 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         self.tags_content.addWidget(tags_list)
 
         def add_tag() -> None:
-            print('add_tag')
             if tags_list.widgets and not tags_list.widgets[-1].line_edit.text().strip():
                 # Don't add another tag if we haven't filled out the last one
                 return

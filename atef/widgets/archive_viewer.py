@@ -391,9 +391,11 @@ class PVModel(QtCore.QAbstractTableModel):
         # if nothing is found, return invalid QVariant
         return QtCore.QVariant()
 
-    def rowCount(self, index): return len(self.pvs)
+    def rowCount(self, index):
+        return len(self.pvs)
 
-    def columnCount(self, index): return len(self.headers)
+    def columnCount(self, index):
+        return len(self.headers)
 
     def headerData(
         self,

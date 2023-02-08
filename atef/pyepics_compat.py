@@ -109,7 +109,7 @@ class PyepicsPvCompatibility:
         callback: Optional[
             Union[PyepicsMonitorCallback, List[PyepicsMonitorCallback],
                   Tuple[PyepicsMonitorCallback, ...]]
-            ] = None,
+        ] = None,
         form: PyepicsForm = "time",
         verbose: bool = False,
         auto_monitor: Optional[Union[int, bool]] = None,
