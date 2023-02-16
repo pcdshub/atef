@@ -24,28 +24,20 @@ from atef.yaml_support import init_yaml_support
 
 from . import serialization
 
-run_engine_singleton = None
-db_singleton = None
-
-
 def incomplete_result():
     return incomplete
 
 
-def setup_temp_runengine():
-    global run_engine_singleton
-    global db_singleton
-    run_engine_singleton = RunEngine({})
-    db_singleton = databroker.Broker.named('temp')
-    run_engine_singleton.subscribe(db_singleton.insert)
-    return run_engine_singleton, db_singleton
+class BlueskyState(object):
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(BlueskyState, cls).__new__(cls)
+        return cls.instance
 
-
-def cleanup_temp_runengine():
-    global run_engine_singleton
-    global db_singleton
-    del run_engine_singleton
-    del db_singleton
+    def __init__(self):
+        self.db = databroker.Broker.named('temp')
+        self.RE = RunEngine({})
+        self.RE.subscribe(self.db.insert)
 
 
 @dataclasses.dataclass
