@@ -119,8 +119,7 @@ class Window(DesignerDisplay, QMainWindow):
 
         The parameters are open as to accept inputs from any signal.
         """
-        widget = DualTree(config_file=ConfigurationFile())
-        self.tab_widget.addTab(widget, self.get_tab_name())
+        self._new_tab(data=ConfigurationFile())
 
     def open_file(self, *args, filename: Optional[str] = None, **kwargs):
         """
@@ -155,9 +154,27 @@ class Window(DesignerDisplay, QMainWindow):
             except ValidationError:
                 logger.error('failed to open file as either active'
                              'or passive checkout')
+        self._new_tab(data=data, filename=filename)
 
+    def _new_tab(
+        self,
+        data: ConfigurationFile,
+        filename: Optional[str] = None,
+    ) -> None:
+        """
+        Open a new tab, setting up the tree widgets and run toggle.
+
+        Parameters
+        ----------
+        data : ConfigurationFile
+            The data to populate the widgets with. This is typically
+            loaded from a file but does not need to be.
+        filename : str, optional
+            The full path to the file the data was opened from, if
+            applicable. This lets us keep track of which filename to
+            save back to.
+        """
         widget = DualTree(config_file=data, full_path=filename)
-
         self.tab_widget.addTab(widget, self.get_tab_name(filename))
         curr_idx = self.tab_widget.count() - 1
         self.tab_widget.setCurrentIndex(curr_idx)
