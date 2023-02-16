@@ -119,8 +119,7 @@ class Window(DesignerDisplay, QMainWindow):
 
         The parameters are open as to accept inputs from any signal.
         """
-        # TODO add mode switch logic
-        widget = EditTree(config_file=ConfigurationFile())
+        widget = DualTree(config_file=ConfigurationFile())
         self.tab_widget.addTab(widget, self.get_tab_name())
 
     def open_file(self, *args, filename: Optional[str] = None, **kwargs):
@@ -491,7 +490,7 @@ class DualTree(QWidget):
         self,
         *args,
         config_file: ConfigurationFile,
-        full_path: str,
+        full_path: Optional[str] = None,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
