@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import datetime
 import json
+import logging
 import pathlib
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, Literal, Optional, Sequence, Union,
@@ -23,6 +24,9 @@ from atef.type_hints import AnyPath
 from atef.yaml_support import init_yaml_support
 
 from . import serialization
+
+logger = logging.getLogger(__name__)
+
 
 def incomplete_result():
     return incomplete
@@ -177,10 +181,7 @@ class PassiveStep(ProcedureStep):
 
     def _run(self) -> Result:
         """ Load, prepare, and run the passive step """
-        if self.filepath.suffix == '.json':
-            config = ConfigurationFile.from_json(self.filepath)
-        else:
-            config = ConfigurationFile.from_yaml(self.filepath)
+        config = ConfigurationFile.from_filename(self.filepath)
 
         prepared_config = PreparedFile.from_config(file=config,
                                                    cache=DataCache())
@@ -243,6 +244,15 @@ class ProcedureFile:
     def walk_steps(self) -> Generator[AnyProcedure, None, None]:
         yield self.root
         yield from self.root.walk_steps()
+
+    @classmethod
+    def from_filename(cls, filename: AnyPath) -> ProcedureFile:
+        path = pathlib.Path(filename)
+        if path.suffix == '.json':
+            config = ProcedureFile.from_json(path)
+        else:
+            config = ProcedureFile.from_yaml(path)
+        return config
 
     @classmethod
     def from_json(cls, filename: AnyPath) -> ProcedureFile:

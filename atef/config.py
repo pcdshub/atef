@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import pathlib
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
                     Tuple, Union, cast, get_args)
@@ -173,6 +174,15 @@ class ConfigurationFile:
         for config in self.walk_configs():
             if tag_set.intersection(set(config.tags or [])):
                 yield config
+
+    @classmethod
+    def from_filename(cls, filename: AnyPath) -> ConfigurationFile:
+        path = pathlib.Path(filename)
+        if path.suffix == '.json':
+            config = ConfigurationFile.from_json(path)
+        else:
+            config = ConfigurationFile.from_yaml(path)
+        return config
 
     @classmethod
     def from_json(cls, filename: AnyPath) -> ConfigurationFile:
