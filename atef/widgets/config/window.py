@@ -88,6 +88,28 @@ class Window(DesignerDisplay, QMainWindow):
         new_button.clicked.connect(self.new_file)
         welcome_box.exec()
 
+    def _passive_or_active(self) -> str:
+        """
+        Prompt user to select a passive or active checkout
+        """
+        choice_box = QMessageBox()
+        choice_box.setIcon(QMessageBox.Question)
+        choice_box.setWindowTitle('Select a checkout type...')
+        choice_box.setText('Would you like a passive or active checkout?')
+        choice_box.setDetailedText(
+            'Passive checkouts: involves comparing current to expected values.\n'
+            'Active checkouts: involves setting values or moving motors.\n'
+            'Note that passive checkouts can be run as a step in an active checkout'
+        )
+        passive = choice_box.addButton('Passive', QMessageBox.AcceptRole)
+        active = choice_box.addButton('Active', QMessageBox.AcceptRole)
+        choice_box.addButton(QMessageBox.Close)
+        choice_box.exec()
+        if choice_box.clickedButton() == passive:
+            return 'passive'
+        elif choice_box.clickedButton() == active:
+            return 'active'
+
     def get_tab_name(self, filename: Optional[str] = None):
         """
         Get a standardized tab name from a filename.
@@ -119,7 +141,15 @@ class Window(DesignerDisplay, QMainWindow):
 
         The parameters are open as to accept inputs from any signal.
         """
-        self._new_tab(data=ConfigurationFile())
+        # prompt user to select checkout type
+        checkout_type = self._passive_or_active()
+        if checkout_type == 'passive':
+            data = ConfigurationFile()
+        elif checkout_type == 'active':
+            data = ProcedureFile()
+        else:
+            return
+        self._new_tab(data=data)
 
     def open_file(self, *args, filename: Optional[str] = None, **kwargs):
         """
@@ -158,7 +188,7 @@ class Window(DesignerDisplay, QMainWindow):
 
     def _new_tab(
         self,
-        data: ConfigurationFile,
+        data: ConfigurationFile | ProcedureFile,
         filename: Optional[str] = None,
     ) -> None:
         """
@@ -166,7 +196,7 @@ class Window(DesignerDisplay, QMainWindow):
 
         Parameters
         ----------
-        data : ConfigurationFile
+        data : ConfigurationFile or ProcedureFile
             The data to populate the widgets with. This is typically
             loaded from a file but does not need to be.
         filename : str, optional
@@ -328,7 +358,7 @@ class EditTree(DesignerDisplay, QWidget):
             name=root_configuration_group.name,
             func_name='root',
         )
-        root_page = ConfigurationGroupPage(
+        root_page = self.page_class(
             data=root_configuration_group,
         )
         link_page(item=self.root_item, widget=root_page)
