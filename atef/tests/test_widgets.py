@@ -8,7 +8,7 @@ from pytestqt.qtbot import QtBot
 
 from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
                          ProcedureStep, PydmDisplayStep, TyphosDisplayStep)
-from ..widgets import procedure_step_to_widget
+from ..widgets.config.data_active import procedure_step_to_widget
 from . import qt_utils
 
 logger = logging.getLogger(__name__)
