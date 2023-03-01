@@ -29,7 +29,7 @@ from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
 from .page import (AtefItem, ConfigurationGroupPage, ProcedureGroupPage,
                    link_page)
-from .run import RunPage, make_run_page
+from .run_base import RunPage, make_run_page
 from .utils import MultiInputDialog, Toggle
 
 logger = logging.getLogger(__name__)

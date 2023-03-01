@@ -1,4 +1,8 @@
-""" helpers for run mode """
+"""
+Widgets and helpers for run mode
+
+Widgets here should map onto edit widgets, often from atef.widgets.config.data
+"""
 
 import asyncio
 import logging
@@ -277,11 +281,9 @@ class RunPage(PageWidget):
     def __init__(self, *args, config=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.setup_name_desc_tags_init()
-        self.insert_widget(
-            RunCheck(),
-            self.run_check
-        )
-
-
-class PassiveRunPage(RunPage):
-    filename = 'passive_run_page.ui'
+        self.run_check = RunCheck(configs=config)
+        self.layout().addWidget(self.run_check)
+        # self.insert_widget(  # insert into layout, maybe let subclass
+        #     RunCheck(),
+        #     self.run_check
+        # )
