@@ -35,14 +35,15 @@ from atef.config import (Configuration, ConfigurationGroup,
 from atef.tools import Ping, PingResult, Tool, ToolResult
 
 from ..core import DesignerDisplay
-from .data import (AnyComparisonWidget, AnyDataclass, AnyValueWidget,
-                   ComparisonRowWidget, ConfigurationGroupRowWidget,
-                   ConfigurationGroupWidget, DataWidget,
-                   DeviceConfigurationWidget, EqualsWidget,
-                   GeneralComparisonWidget, GreaterOrEqualWidget,
-                   GreaterWidget, LessOrEqualWidget, LessWidget,
-                   NameDescTagsWidget, NotEqualsWidget, PingWidget,
-                   PVConfigurationWidget, RangeWidget, ValueSetWidget)
+from .data_base import AnyDataclass, DataWidget, NameDescTagsWidget
+from .data_passive import (AnyComparisonWidget, AnyValueWidget,
+                           ComparisonRowWidget, ConfigurationGroupRowWidget,
+                           ConfigurationGroupWidget, DeviceConfigurationWidget,
+                           EqualsWidget, GeneralComparisonWidget,
+                           GreaterOrEqualWidget, GreaterWidget,
+                           LessOrEqualWidget, LessWidget, NotEqualsWidget,
+                           PingWidget, PVConfigurationWidget, RangeWidget,
+                           ValueSetWidget)
 from .utils import cast_dataclass, describe_comparison_context
 
 
