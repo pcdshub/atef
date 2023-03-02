@@ -76,7 +76,7 @@ class Window(DesignerDisplay, QMainWindow):
         """
         On open, ask the user what they'd like to do (new config? load?)
         """
-        welcome_box = QMessageBox()
+        welcome_box = QMessageBox(self)
         welcome_box.setIcon(QMessageBox.Question)
         welcome_box.setWindowTitle('Welcome')
         welcome_box.setText('Welcome to atef config!')
@@ -92,7 +92,7 @@ class Window(DesignerDisplay, QMainWindow):
         """
         Prompt user to select a passive or active checkout
         """
-        choice_box = QMessageBox()
+        choice_box = QMessageBox(self)
         choice_box.setIcon(QMessageBox.Question)
         choice_box.setWindowTitle('Select a checkout type...')
         choice_box.setText('Would you like a passive or active checkout?')
@@ -265,7 +265,7 @@ class Window(DesignerDisplay, QMainWindow):
         """
         try:
             return serialize(
-                ConfigurationFile,
+                type(tree.config_file),
                 tree.config_file,
             )
         except Exception:
