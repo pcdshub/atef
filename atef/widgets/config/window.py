@@ -29,7 +29,7 @@ from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
 from .page import (AtefItem, ConfigurationGroupPage, ProcedureGroupPage,
                    link_page)
-from .run_base import RunPage, make_run_page
+from .run_base import RunPage, infer_step_type, make_run_page
 from .utils import MultiInputDialog, Toggle
 
 logger = logging.getLogger(__name__)
@@ -433,7 +433,7 @@ class RunTree(EditTree):
             full_path=edit_tree.full_path
         )
 
-    def _swap_to_run_widgets(self) -> RunTree:
+    def _swap_to_run_widgets(self) -> None:
         """
         Swap out widgets for run widgets
 
@@ -449,8 +449,16 @@ class RunTree(EditTree):
         item_config_list: List[Tuple[AtefItem, Any]] = []
         while it.value():
             item: AtefItem = it.value()
-            # for each item, grab the relevant Configurations or Comparisons
-            c_list = get_relevant_configs_comps(self.prepared_file, item.widget.data)
+            data = item.widget.data  # Dataclass on widget
+            data_type = infer_step_type(data)
+            if data_type == 'passive':
+                # for each item, grab the relevant Configurations or Comparisons
+                c_list = get_relevant_configs_comps(self.prepared_file, data)
+            elif data_type == 'active':
+                # active checkout don't map many steps to one page
+                c_list = [data]
+            else:
+                raise ValueError('Unknown type found')
             item_config_list.append((item, c_list))
 
             it += 1
@@ -459,12 +467,11 @@ class RunTree(EditTree):
 
         # replace widgets with run versions
         # start at the root of the config file
-        ct = 0
         prev_widget = None
         for item, cfgs in item_config_list:
             if item.widget in _edit_to_run_page:
                 run_widget_cls = _edit_to_run_page[type(item.widget)]
-                run_widget = run_widget_cls(configs=cfgs)
+                run_widget = run_widget_cls(data=cfgs)
                 link_page(item, run_widget)
             else:
                 run_widget = make_run_page(item.widget, cfgs)
@@ -474,7 +481,6 @@ class RunTree(EditTree):
                 prev_widget.run_check.setup_next_button(item)
 
             prev_widget = run_widget
-            ct += 1
 
             # update all statuses every time a step is run
             run_button: QtWidgets.QPushButton = run_widget.run_check.run_button

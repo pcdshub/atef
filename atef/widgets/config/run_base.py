@@ -6,7 +6,7 @@ Widgets here should map onto edit widgets, often from atef.widgets.config.data
 
 import asyncio
 import logging
-from typing import Generator, List, Union
+from typing import Generator, List, Optional, Union
 
 from qtpy import QtCore
 from qtpy.QtWidgets import (QLabel, QLayout, QPushButton, QSpacerItem, QStyle,
@@ -78,7 +78,7 @@ def make_run_page(
     # make existing widgets read-only
     disable_widget(widget)
     # add RunCheck to end of layout
-    check_widget = RunCheck(configs=configs)
+    check_widget = RunCheck(data=configs)
     widget.layout().addWidget(check_widget)
     widget.run_check = check_widget
 
@@ -110,6 +110,18 @@ def combine_results(results: List[Result]) -> Result:
     reason = str([r.reason for r in results]) or ''
 
     return Result(severity=severity, reason=reason)
+
+
+def infer_step_type(config: Union[PreparedComparison, ProcedureStep]) -> str:
+    # TODO: find a better way to decide the step type
+    if hasattr(config, 'compare'):
+        return 'passive'
+    elif hasattr(config, 'run'):
+        return 'active'
+
+    # TODO: Uncomment this when we've fixed up the comparison walking...
+    # raise TypeError(f'incompatible type ({type(config)}), '
+    #                 'cannot infer active or passive')
 
 
 class RunCheck(DesignerDisplay, QWidget):
@@ -149,14 +161,19 @@ class RunCheck(DesignerDisplay, QWidget):
         Severity.error: '<span style="color: red;">&#10008;</span>',
     }
 
-    def __init__(self, *args, configs=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        data: Optional[list[Union[ProcedureStep, PreparedComparison]]] = None,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         icon = self.style().standardIcon(self.style_icons[Severity.warning])
         self.status_label.setPixmap(icon.pixmap(25, 25))
-        self.configs = configs
+        self.data = data
 
-        if configs:
-            self.setup_buttons(configs=configs)
+        if data:
+            self.setup_buttons(configs=data)
             # initialize tooltip
             self.update_status_label_tooltip()
 
@@ -179,23 +196,12 @@ class RunCheck(DesignerDisplay, QWidget):
 
         self.setup_verify_button()
 
-    def infer_step_type(self, config: Union[PreparedComparison, ProcedureStep]) -> str:
-        # TODO: find a better way to decide the step type
-        if hasattr(config, 'compare'):
-            return 'passive'
-        elif hasattr(config, 'run'):
-            return 'active'
-
-        # TODO: Uncomment this when we've fixed up the comparison walking...
-        # raise TypeError(f'incompatible type ({type(config)}), '
-        #                 'cannot infer active or passive')
-
     def _make_run_slot(self, configs) -> None:
 
         def run_slot():
             """ Slot that runs each step in the config list """
             for cfg in configs:
-                config_type = self.infer_step_type(cfg)
+                config_type = infer_step_type(cfg)
                 if config_type == 'active':
                     cfg.run()
                 elif config_type == 'passive':
@@ -209,7 +215,7 @@ class RunCheck(DesignerDisplay, QWidget):
         self.run_button.clicked.connect(run_slot)
 
     def update_status(self) -> None:
-        if not self.configs:
+        if not self.data:
             logger.warning('No config associated with this step')
             return
         combined_result = combine_results(self.results)
@@ -236,7 +242,7 @@ class RunCheck(DesignerDisplay, QWidget):
 
     @property
     def results(self) -> List[Result]:
-        return [c.result for c in self.configs]
+        return [c.result for c in self.data]
 
     def setup_next_button(self, next_item=None) -> None:
         page = self.parent()
@@ -254,7 +260,7 @@ class RunCheck(DesignerDisplay, QWidget):
         If passive checkout, remove button and spacer
         If active checkout, read verify options and expose
         """
-        step_types = {self.infer_step_type(step) for step in self.configs}
+        step_types = {infer_step_type(step) for step in self.data}
         if len(step_types) > 1:
             logger.debug('Multiple config types found, disabling verify')
             return
@@ -278,10 +284,10 @@ class RunPage(PageWidget):
 
     run_check: RunCheck
 
-    def __init__(self, *args, config=None, **kwargs):
+    def __init__(self, *args, data=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.setup_name_desc_tags_init()
-        self.run_check = RunCheck(configs=config)
+        self.run_check = RunCheck(data=data)
         self.layout().addWidget(self.run_check)
         # self.insert_widget(  # insert into layout, maybe let subclass
         #     RunCheck(),
