@@ -9,7 +9,7 @@ import os
 import os.path
 from copy import deepcopy
 from pprint import pprint
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Union
 
 from apischema import ValidationError, deserialize, serialize
 from qtpy import QtWidgets
@@ -18,18 +18,15 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
                             QTabWidget, QTreeWidget, QWidget)
 
 from atef.cache import DataCache
-from atef.check import Comparison
-from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
-                         PreparedComparison, PreparedConfiguration,
-                         PreparedFile)
-from atef.procedure import ProcedureFile
+from atef.config import ConfigurationFile, PreparedFile
+from atef.procedure import DescriptionStep, ProcedureFile
 from atef.report import PassiveAtefReport
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
-from .page import (AtefItem, ConfigurationGroupPage, ProcedureGroupPage,
-                   link_page)
-from .run_base import RunPage, infer_step_type, make_run_page
+from .page import (AtefItem, ConfigurationGroupPage, PageWidget,
+                   ProcedureGroupPage, RunStepPage, link_page)
+from .run_base import make_run_page
 from .utils import MultiInputDialog, Toggle
 
 logger = logging.getLogger(__name__)
@@ -182,7 +179,7 @@ class Window(DesignerDisplay, QMainWindow):
             try:
                 data = deserialize(ProcedureFile, serialized)
             except ValidationError:
-                logger.error('failed to open file as either active'
+                logger.error('failed to open file as either active '
                              'or passive checkout')
         self._new_tab(data=data, filename=filename)
 
@@ -393,9 +390,9 @@ class EditTree(DesignerDisplay, QWidget):
         self.last_selection = item
 
 
-_edit_to_run_page: Dict[type, RunPage] = {
+_edit_to_run_page: Dict[type, PageWidget] = {
     # temporary dummy page
-    ConfigurationGroup: ConfigurationGroupPage
+    DescriptionStep: RunStepPage
 }
 
 
@@ -415,6 +412,8 @@ class RunTree(EditTree):
         **kwargs
     ):
         super().__init__(config_file=config_file, full_path=full_path)
+        # Prepared file only exists for passive checkouts, None otherwise
+        self.prepared_file: Optional[PreparedFile] = None
         if isinstance(config_file, ConfigurationFile):
             self.prepared_file = PreparedFile.from_config(config_file,
                                                           cache=DataCache())
@@ -440,41 +439,23 @@ class RunTree(EditTree):
         If a run-specific version of the widget exists, return that.
         Otherwise makes a read-only copy of the widget with run controls
         """
-        # walk through tree items, make an analogous widget for each
-        # in edit tree
-        it = QtWidgets.QTreeWidgetItemIterator(self.tree_widget)
+        # walk through tree items, make an analogous widget for each in edit tree
         # this is not a pythonic iterator, treat it differently
-
-        # gather sets of item(with widget), and a list of configs/comparisons
-        item_config_list: List[Tuple[AtefItem, Any]] = []
-        while it.value():
-            item: AtefItem = it.value()
-            data = item.widget.data  # Dataclass on widget
-            data_type = infer_step_type(data)
-            if data_type == 'passive':
-                # for each item, grab the relevant Configurations or Comparisons
-                c_list = get_relevant_configs_comps(self.prepared_file, data)
-            elif data_type == 'active':
-                # active checkout don't map many steps to one page
-                c_list = [data]
-            else:
-                raise ValueError('Unknown type found')
-            item_config_list.append((item, c_list))
-
-            it += 1
-
-        self.item_config_list = item_config_list
+        it = QtWidgets.QTreeWidgetItemIterator(self.tree_widget)
 
         # replace widgets with run versions
         # start at the root of the config file
         prev_widget = None
-        for item, cfgs in item_config_list:
-            if item.widget in _edit_to_run_page:
-                run_widget_cls = _edit_to_run_page[type(item.widget)]
-                run_widget = run_widget_cls(data=cfgs)
+        while it.value():
+            item: AtefItem = it.value()
+            data = item.widget.data  # Dataclass on widget
+            if type(data) in _edit_to_run_page:
+                run_widget_cls = _edit_to_run_page[type(item.widget.data)]
+                run_widget = run_widget_cls(data=data)
                 link_page(item, run_widget)
             else:
-                run_widget = make_run_page(item.widget, cfgs)
+                run_widget = make_run_page(item.widget, data,
+                                           prepared_file=self.prepared_file)
                 link_page(item, run_widget)
 
             if prev_widget:
@@ -485,6 +466,8 @@ class RunTree(EditTree):
             # update all statuses every time a step is run
             run_button: QtWidgets.QPushButton = run_widget.run_check.run_button
             run_button.clicked.connect(self.update_statuses)
+
+            it += 1
 
     def update_statuses(self) -> None:
         """ update every status icon based on stored config result """
@@ -542,7 +525,7 @@ class DualTree(QWidget):
     def __init__(
         self,
         *args,
-        config_file: ConfigurationFile,
+        config_file: ConfigurationFile | ProcedureFile,
         full_path: Optional[str] = None,
         **kwargs
     ):
@@ -639,41 +622,3 @@ class DualTree(QWidget):
         r_widget.hide()
         self.layout.addWidget(r_widget)
         self.trees['run'] = r_widget
-
-
-def get_relevant_configs_comps(
-    prepared_file: PreparedFile,
-    original_c: Union[Configuration, Comparison]
-) -> List[Union[PreparedConfiguration, PreparedComparison]]:
-    """
-    Gather all the PreparedConfiguration or PreparedComparison dataclasses
-    that correspond to the original comparison or config.
-
-    Phrased another way: maps prepared comparisons onto the comparison
-    seen in the GUI
-
-    Currently for passive checkout files only
-
-    Parameters
-    ----------
-    prepared_file : PreparedFile
-        the file containing configs or comparisons to be gathered
-    original_c : Union[Configuration, Comparison]
-        the comparison to match PreparedComparison or PreparedConfigurations to
-
-    Returns
-    -------
-    List[Union[PreparedConfiguration, PreparedComparison]]:
-        the configuration or comparison dataclasses related to ``original_c``
-    """
-    matched_c = []
-
-    for config in prepared_file.walk_groups():
-        if config.config == original_c:
-            matched_c.append(config)
-
-    for comp in prepared_file.walk_comparisons():
-        if comp.comparison == original_c:
-            matched_c.append(comp)
-
-    return matched_c

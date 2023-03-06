@@ -3,23 +3,28 @@ Widgets and helpers for run mode
 
 Widgets here should map onto edit widgets, often from atef.widgets.config.data
 """
+from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Generator, List, Optional, Union
+from typing import TYPE_CHECKING, Generator, List, Optional, Union
 
 from qtpy import QtCore
 from qtpy.QtWidgets import (QLabel, QLayout, QPushButton, QSpacerItem, QStyle,
                             QToolButton, QWidget)
 
 from atef import util
-from atef.check import Result
-from atef.config import (AnyPreparedConfiguration, ConfigurationFile,
-                         PreparedComparison)
+from atef.check import Comparison, Result
+from atef.config import (AnyPreparedConfiguration, Configuration,
+                         ConfigurationFile, PreparedComparison,
+                         PreparedConfiguration, PreparedFile)
 from atef.enums import Severity
 from atef.procedure import ProcedureFile, ProcedureStep
-from atef.widgets.config.page import AtefItem, PageWidget
 from atef.widgets.core import DesignerDisplay
+
+# avoid circular imports
+if TYPE_CHECKING:
+    from atef.widgets.config.page import AtefItem
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +52,8 @@ def run_active_step(config):  # takes procedure steps and groups
 
 def make_run_page(
     widget: QWidget,
-    configs: List[Union[PreparedComparison, ProcedureStep,
-                        AnyPreparedConfiguration]]
+    data: Union[PreparedComparison, ProcedureStep, AnyPreparedConfiguration],
+    prepared_file: Optional[PreparedFile] = None
 ) -> QWidget:
     """
     Disables all the widgets in ``widget`` and adds the RunCheck widget.
@@ -62,10 +67,10 @@ def make_run_page(
     ----------
     widget : QWidget
         widget to convert
-    configs : List[Union[PreparedComparison,
-                         ProcedureStep,
-                         AnyPreparedConfiguration]]
-        A list of atef dataclasses that can each hold a Result.
+    data : Union[PreparedComparison, ProcedureStep, AnyPreparedConfiguration]
+        atef dataclasses corresponding to the widget
+    prepared_file: Optional[PreparedFile]
+        PreparedFile to collect relevant comparisons from (Passive checkouts only)
 
     Returns
     -------
@@ -78,7 +83,12 @@ def make_run_page(
     # make existing widgets read-only
     disable_widget(widget)
     # add RunCheck to end of layout
-    check_widget = RunCheck(data=configs)
+    if prepared_file:
+        # gather relevant comparisons
+        configs = get_relevant_configs_comps(prepared_file, data)
+        check_widget = RunCheck(data=configs)
+    else:
+        check_widget = RunCheck(data=[data])
     widget.layout().addWidget(check_widget)
     widget.run_check = check_widget
 
@@ -105,7 +115,6 @@ def combine_results(results: List[Result]) -> Result:
 
     Takes the highest severity, and currently all the reasons
     """
-
     severity = util.get_maximum_severity([r.severity for r in results])
     reason = str([r.reason for r in results]) or ''
 
@@ -122,6 +131,44 @@ def infer_step_type(config: Union[PreparedComparison, ProcedureStep]) -> str:
     # TODO: Uncomment this when we've fixed up the comparison walking...
     # raise TypeError(f'incompatible type ({type(config)}), '
     #                 'cannot infer active or passive')
+
+
+def get_relevant_configs_comps(
+    prepared_file: PreparedFile,
+    original_c: Union[Configuration, Comparison]
+) -> List[Union[PreparedConfiguration, PreparedComparison]]:
+    """
+    Gather all the PreparedConfiguration or PreparedComparison dataclasses
+    that correspond to the original comparison or config.
+
+    Phrased another way: maps prepared comparisons onto the comparison
+    seen in the GUI
+
+    Currently for passive checkout files only
+
+    Parameters
+    ----------
+    prepared_file : PreparedFile
+        the file containing configs or comparisons to be gathered
+    original_c : Union[Configuration, Comparison]
+        the comparison to match PreparedComparison or PreparedConfigurations to
+
+    Returns
+    -------
+    List[Union[PreparedConfiguration, PreparedComparison]]:
+        the configuration or comparison dataclasses related to ``original_c``
+    """
+    matched_c = []
+
+    for config in prepared_file.walk_groups():
+        if config.config == original_c:
+            matched_c.append(config)
+
+    for comp in prepared_file.walk_comparisons():
+        if comp.comparison == original_c:
+            matched_c.append(comp)
+
+    return matched_c
 
 
 class RunCheck(DesignerDisplay, QWidget):
@@ -270,26 +317,3 @@ class RunCheck(DesignerDisplay, QWidget):
         else:
             # TODO: verify functionality for active checkouts
             return
-
-
-class RunPage(PageWidget):
-    """
-    Base Widget for running passive checkout steps and displaying their
-    results
-
-    Will always have a RunCheck widget, which should be connected after
-    instantiation via ``RunCheck.setup_buttons()``
-    """
-    filename = ''
-
-    run_check: RunCheck
-
-    def __init__(self, *args, data=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setup_name_desc_tags_init()
-        self.run_check = RunCheck(data=data)
-        self.layout().addWidget(self.run_check)
-        # self.insert_widget(  # insert into layout, maybe let subclass
-        #     RunCheck(),
-        #     self.run_check
-        # )
