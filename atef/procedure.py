@@ -214,7 +214,8 @@ class ProcedureGroup(ProcedureStep):
         for step in self.steps:
             results.append(step.run())
 
-        result = _summarize_result_severity(GroupResultMode.all_, results)
+        severity = _summarize_result_severity(GroupResultMode.all_, results)
+        result = Result(severity=severity)
 
         self.result = result
         return result
