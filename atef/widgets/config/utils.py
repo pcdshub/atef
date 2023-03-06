@@ -17,6 +17,7 @@ from atef import util
 from atef.check import Comparison, Equals, Range
 from atef.config import (Configuration, DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
+from atef.procedure import ProcedureStep
 from atef.qt_helpers import QDataclassList, QDataclassValue
 from atef.tools import Ping
 from atef.widgets.archive_viewer import get_archive_viewer
@@ -737,6 +738,12 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
             )
         return 'Comparison to unknown tool results'
     return 'Invalid comparison'
+
+
+def describe_step_context(attr: str, step: ProcedureStep) -> str:
+    # TODO: actually write this method
+    # may not need attr, since ProcedureSteps are flatter
+    return 'yup step'
 
 
 def get_relevant_pvs(

@@ -36,6 +36,8 @@ from atef.procedure import (DescriptionStep, PassiveStep, ProcedureGroup,
                             ProcedureStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.widgets.config.data_active import GeneralProcedureWidget
+from atef.widgets.config.run_active import DescriptionRunWidget
+from atef.widgets.config.run_base import RunCheck
 
 from ..core import DesignerDisplay
 from .data_base import AnyDataclass, DataWidget, NameDescTagsWidget
@@ -1466,7 +1468,7 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
 
 class StepPage(DesignerDisplay, PageWidget):
     """
-    Page that handles any atomic ProcedureStep instance.
+    Page that handles any single ProcedureStep instance.
 
     Contains a selector, placeholder for the specific step,
     and general verification settings
@@ -1566,10 +1568,42 @@ class StepPage(DesignerDisplay, PageWidget):
         config = self.parent_tree_item.widget.data
         attr = ''
 
-        desc = describe_step_context(attr=attr, config=config)
+        desc = describe_step_context(attr=attr, step=config)
         self.name_desc_tags_widget.extra_text_label.setText(desc)
         self.name_desc_tags_widget.extra_text_label.setToolTip(desc)
         self.name_desc_tags_widget.init_viewer(attr, config)
+
+
+class RunStepPage(DesignerDisplay, PageWidget):
+    """
+    Base Widget for running active checkout steps and displaying their
+    results
+
+    Will always have a RunCheck widget, which should be connected after
+    instantiation via ``RunCheck.setup_buttons()``
+
+    Contains a placeholder for a DataWidget
+    """
+    filename = 'run_step_page.ui'
+
+    run_widget_placeholder: QWidget
+    run_widget: DataWidget
+    run_check_placeholder: QWidget
+    run_check: RunCheck
+
+    run_widget_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
+        DescriptionStep: DescriptionRunWidget
+    }
+
+    def __init__(self, *args, data, **kwargs):
+        super().__init__(*args, data, **kwargs)
+        self.run_check = RunCheck(data=[data])
+        self.insert_widget(self.run_check, self.run_check_placeholder)
+        # gather run_widget
+        run_widget_cls = self.run_widget_map[type(data)]
+        run_widget = run_widget_cls(data=data)
+
+        self.insert_widget(run_widget, self.run_widget_placeholder)
 
 
 PAGE_MAP = {
