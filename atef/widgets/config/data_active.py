@@ -1,3 +1,14 @@
+"""
+Widgets for manipulating active checkout data (edit-mode)
+
+Widgets here will replace the RunStepPage.run_widget_placeholder widget, and should
+subclass DataWidget and DesignerDisplay
+
+Contains several widgets carried over from before active checkout gui development
+started, which may not appear in the ``atef config`` GUI.
+These will be cleaned... eventually
+"""
+
 from __future__ import annotations
 
 import dataclasses
@@ -57,6 +68,17 @@ DEFAULT_STYLESHEET = """
         border: 2px dotted black;
     }
 """
+
+
+class GeneralProcedureWidget(DesignerDisplay, DataWidget):
+    """
+    Handle fields common to all ProcedureStep dataclasses
+    Currently simply a choice of verify-mode with no actual functionality,
+    but will likely be expanded
+    """
+    filename = 'general_procedure_widget.ui'
+
+    pass
 
 
 def _create_vbox_layout(
