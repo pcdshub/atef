@@ -19,7 +19,7 @@ from atef.cache import DataCache
 from atef.check import Result, incomplete
 from atef.config import (ConfigurationFile, PreparedFile,
                          _summarize_result_severity, run_passive_step)
-from atef.enums import GroupResultMode, Severity
+from atef.enums import GroupResultMode, Severity, VerifyMode
 from atef.type_hints import AnyPath
 from atef.yaml_support import init_yaml_support
 
@@ -62,6 +62,8 @@ class ProcedureStep:
     result: Result = field(default_factory=incomplete_result)
     #: confirmation by the user that result matches expectations
     verify: bool = False
+    #: verification requirements
+    verify_mode: VerifyMode = VerifyMode.require_verify
 
     def _run(self) -> Result:
         """ Run the comparison.  To be implemented in subclass. """

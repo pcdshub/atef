@@ -27,6 +27,7 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
 from atef.check import Result
+from atef.enums import VerifyMode
 from atef.widgets.config.data_base import DataWidget
 from atef.widgets.core import DesignerDisplay
 
@@ -78,7 +79,36 @@ class GeneralProcedureWidget(DesignerDisplay, DataWidget):
     """
     filename = 'general_procedure_widget.ui'
 
-    pass
+    verify_combo: QtWidgets.QComboBox
+
+    verify_combo_items = tuple(verify.name for verify in VerifyMode)
+
+    def __init__(self, data: ProcedureStep, **kwargs):
+        super().__init__(data=data, **kwargs)
+        for text in self.verify_combo_items:
+            self.verify_combo.addItem(text)
+
+        self.verify_combo.setCurrentIndex(
+            self.verify_combo_items.index(
+                self.bridge.verify_mode.get().name
+            )
+        )
+
+        self.verify_combo.currentTextChanged.connect(
+            self.new_verify_combo
+        )
+
+    def new_verify_combo(self, value: str) -> None:
+        """
+        Slot to handle user input in the "Verify Mode" combo box.
+        Uses current bridge to mutate the stored dataclass
+
+        Parameters
+        ----------
+        value : str
+            The string contents of the combo box.
+        """
+        self.bridge.verify_mode.put(VerifyMode[value])
 
 
 def _create_vbox_layout(
