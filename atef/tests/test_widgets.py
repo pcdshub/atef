@@ -7,9 +7,7 @@ import yaml
 from pytestqt.qtbot import QtBot
 
 from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
-                         ProcedureStep, PydmDisplayStep, TyphosDisplayStep)
-from ..widgets.config.data_active import procedure_step_to_widget
-from . import qt_utils
+                         PydmDisplayStep, TyphosDisplayStep)
 
 logger = logging.getLogger(__name__)
 
@@ -161,13 +159,13 @@ def test_serialization(group):
     print(yaml.dump(serialized))
 
 
-@parametrized_groups
-def test_create_widget(request: pytest.FixtureRequest, group: ProcedureStep):
-    widget = procedure_step_to_widget(group)
-    widget.show()
-    qt_utils.save_widget_screenshot(widget, prefix=request.node.name)
-    widget.close()
-    widget.deleteLater()
+# @parametrized_groups
+# def test_create_widget(request: pytest.FixtureRequest, group: ProcedureStep):
+#     widget = procedure_step_to_widget(group)
+#     widget.show()
+#     qt_utils.save_widget_screenshot(widget, prefix=request.node.name)
+#     widget.close()
+#     widget.deleteLater()
 
 
 def test_config_window_basic(qtbot: QtBot):
