@@ -35,7 +35,5 @@ class DescriptionRunWidget(DesignerDisplay, DataWidget):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        print(self.bridge.data)
-        print(self.bridge)
         self.title_label.setText(self.bridge.name.get())
         self.desc_label.setText(self.bridge.description.get())
