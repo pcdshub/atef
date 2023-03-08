@@ -296,7 +296,7 @@ class RunCheck(DesignerDisplay, QWidget):
 
         label.setToolTip('<p>' + tt.rstrip('<br>') + '</p>')
 
-    def update_icons_tooltips(self) -> None:
+    def update_all_icons_tooltips(self) -> None:
         """ Convenience method for updating all the icons and tooltips """
         self.update_icon(self.result_label, self.results)
         self.update_label_tooltip(self.result_label, self.results)
@@ -313,7 +313,7 @@ class RunCheck(DesignerDisplay, QWidget):
     def event(self, event: QtCore.QEvent) -> bool:
         # Catch tooltip events to update status tooltip
         if event.type() == QtCore.QEvent.ToolTip:
-            self.update_icons_tooltips()
+            self.update_all_icons_tooltips()
         return super().event(event)
 
     @property
@@ -383,8 +383,7 @@ class RunCheck(DesignerDisplay, QWidget):
                 for step in self.data:
                     step.verify_result = Result(severity=severity, reason=reason)
 
-                self.update_icon(self.verify_label, self.verify_results)
-                self.update_label_tooltip(self.verify_label, self.verify_results)
+                self.update_all_icons_tooltips()
 
                 widget_menu.hide()
 
@@ -408,4 +407,4 @@ class VerifyEntryWidget(DesignerDisplay, QWidget):
         super().__init__(*args, **kwargs)
         # modify button box labels
         self.verify_button_box.button(QDialogButtonBox.Ok).setText('Verify')
-        self.verify_button_box.button(QDialogButtonBox.Ok).setText('Reject')
+        self.verify_button_box.button(QDialogButtonBox.Cancel).setText('Reject')
