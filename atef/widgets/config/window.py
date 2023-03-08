@@ -391,7 +391,6 @@ class EditTree(DesignerDisplay, QWidget):
 
 
 _edit_to_run_page: Dict[type, PageWidget] = {
-    # temporary dummy page
     DescriptionStep: RunStepPage
 }
 

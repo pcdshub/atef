@@ -265,6 +265,7 @@ class RunCheck(DesignerDisplay, QWidget):
         self.run_button.clicked.connect(run_slot)
 
     def update_status(self) -> None:
+        """ Update all status labels in the RunCheck widget """
         # overall result label
         if not self.data:
             logger.warning('No config associated with this step')
@@ -281,6 +282,7 @@ class RunCheck(DesignerDisplay, QWidget):
             self.update_label_tooltip(self.verify_label, self.verify_results)
 
     def update_icon(self, label: QLabel, results: List[Result]) -> None:
+        """ Helper method to update icon on ``label`` based on ``results`` """
         combined_step_result = combine_results(results)
 
         chosen_icon = self.style_icons[combined_step_result.severity]
@@ -289,6 +291,7 @@ class RunCheck(DesignerDisplay, QWidget):
         label.setPixmap(icon.pixmap(25, 25))
 
     def update_label_tooltip(self, label: QLabel, results: List[Result]) -> None:
+        """ Helper method to update tooltip for ``label`` based on ``results`` """
         tt = ''
         for r in results:
             uni_icon = self.unicode_icons[r.severity]
@@ -311,6 +314,7 @@ class RunCheck(DesignerDisplay, QWidget):
             self.update_label_tooltip(self.verify_label, self.verify_results)
 
     def event(self, event: QtCore.QEvent) -> bool:
+        """ Overload event method to update tooltips on tooltip-request """
         # Catch tooltip events to update status tooltip
         if event.type() == QtCore.QEvent.ToolTip:
             self.update_all_icons_tooltips()
@@ -335,6 +339,7 @@ class RunCheck(DesignerDisplay, QWidget):
             return None
 
     def setup_next_button(self, next_item=None) -> None:
+        """ Link RunCheck's next button to the next widget in the tree """
         page = self.parent()
 
         def inner_navigate(*args, **kwargs):
@@ -398,6 +403,7 @@ class RunCheck(DesignerDisplay, QWidget):
 
 
 class VerifyEntryWidget(DesignerDisplay, QWidget):
+    """ Simple text entry widget to prompt for a verification result and reason """
     filename = 'verify_entry_widget.ui'
 
     reason_line_edit: QLineEdit

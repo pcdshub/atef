@@ -15,7 +15,11 @@
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
    <item>
-    <widget class="QLineEdit" name="reason_line_edit"/>
+    <widget class="QLineEdit" name="reason_line_edit">
+     <property name="placeholderText">
+      <string>enter a reason or note</string>
+     </property>
+    </widget>
    </item>
    <item>
     <widget class="QDialogButtonBox" name="verify_button_box">

@@ -19,11 +19,3 @@ class GroupResultMode(str, enum.Enum):
     all_ = "all"
     #: At least one item must succeed.
     any_ = "any"
-
-
-class VerifyMode(enum.IntEnum):
-    """How verification should be treated."""
-    #: Require human verification before proceeding
-    require_verify = 0
-    #: Allow process to continue without human verification
-    allow_bypass = 1
