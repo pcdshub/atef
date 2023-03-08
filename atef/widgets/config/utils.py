@@ -743,7 +743,8 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
 def describe_step_context(attr: str, step: ProcedureStep) -> str:
     # TODO: actually write this method
     # may not need attr, since ProcedureSteps are flatter
-    return 'yup step'
+    # Will have to be expanded with each new step type
+    return ''
 
 
 def get_relevant_pvs(
