@@ -19,7 +19,7 @@ from atef.cache import DataCache
 from atef.check import Result, incomplete
 from atef.config import (ConfigurationFile, PreparedFile,
                          _summarize_result_severity, run_passive_step)
-from atef.enums import GroupResultMode, Severity, VerifyMode
+from atef.enums import GroupResultMode, Severity
 from atef.type_hints import AnyPath
 from atef.yaml_support import init_yaml_support
 
@@ -58,12 +58,16 @@ class ProcedureStep:
     description: Optional[str] = None
     #: The hierarchical parent of this step.
     parent: Optional[Union[ProcedureGroup, ProcedureFile]] = None
-    #: result of running the step
-    result: Result = field(default_factory=incomplete_result)
+    #: overall result of running the step
+    _result: Result = field(default_factory=incomplete_result)
     #: confirmation by the user that result matches expectations
-    verify: bool = False
-    #: verification requirements
-    verify_mode: VerifyMode = VerifyMode.require_verify
+    verify_result: Result = field(default_factory=incomplete_result)
+    #: verification requirements, is human verification required?
+    verify_required: bool = False
+    #: whether or not the step completed successfully
+    step_result: Result = field(default_factory=incomplete_result)
+    #: step success requirements, does the step need to complete?
+    step_success_required: bool = False
 
     def _run(self) -> Result:
         """ Run the comparison.  To be implemented in subclass. """
@@ -79,8 +83,42 @@ class ProcedureStep:
                 reason=str(ex)
             )
 
-        self.result = result
-        return result
+        # stash step result
+        self.step_result = result
+        # return the overall result, including verification
+        return self.result
+
+    @property
+    def result(self) -> Result:
+        """
+        Combines the step result and verification result based on settings
+
+        Returns
+        -------
+        Result
+            The result of this step
+        """
+        results = []
+        reason = ''
+        if self.verify_required:
+            results.append(self.verify_result)
+            if self.verify_result.severity != Severity.success:
+                reason += f'Not Verified ({self.verify_result.reason}),'
+            else:
+                reason += f'Verified ({self.verify_result.reason})'
+
+        if self.step_success_required:
+            results.append(self.step_result)
+            if self.step_result.severity != Severity.success:
+                reason += f'Not Successful ({self.step_result.reason})'
+
+        if not results:
+            # Nothing required, auto-success
+            return Result()
+
+        severity = _summarize_result_severity(GroupResultMode.all_, results)
+        self._result = Result(severity=severity, reason=reason)
+        return self._result
 
     def allow_verify(self) -> bool:
         """
@@ -219,8 +257,8 @@ class ProcedureGroup(ProcedureStep):
         severity = _summarize_result_severity(GroupResultMode.all_, results)
         result = Result(severity=severity)
 
-        self.result = result
-        return result
+        self.step_result = result
+        return self.result
 
 
 AnyProcedure = Union[
