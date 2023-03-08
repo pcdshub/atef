@@ -1352,6 +1352,11 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         self.setup_done = False
         # Create the static sub-widgets and place them
         self.setup_name_desc_tags_init()
+
+        # set up general step settings
+        general_widget = GeneralProcedureWidget(data=data)
+        self.insert_widget(general_widget, self.procedure_group_placeholder)
+
         # Allow the user to add more rows
         self.add_row_button.clicked.connect(self.add_config_row)
         # Fill in the row type selector box

@@ -249,8 +249,6 @@ class ProcedureGroup(ProcedureStep):
                 yield from step.walk_steps()
 
     def run(self) -> Result:
-        # run each step in this group, yield the step
-        # how to deal with confirmation?
         results = []
         for step in self.steps:
             results.append(step.run())
