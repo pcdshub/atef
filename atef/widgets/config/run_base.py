@@ -10,8 +10,9 @@ import logging
 from typing import TYPE_CHECKING, Generator, List, Optional, Union
 
 from qtpy import QtCore
-from qtpy.QtWidgets import (QLabel, QLayout, QPushButton, QSpacerItem, QStyle,
-                            QToolButton, QWidget)
+from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLayout, QLineEdit,
+                            QMenu, QPushButton, QSpacerItem, QStyle,
+                            QToolButton, QWidget, QWidgetAction)
 
 from atef import util
 from atef.check import Comparison, Result
@@ -184,11 +185,13 @@ class RunCheck(DesignerDisplay, QWidget):
     filename = 'run_check.ui'
 
     # Left to right
-    status_label: QLabel
-    status_verify_spacer: QSpacerItem
+    result_label: QLabel
+    result_verify_spacer: QSpacerItem
     verify_button: QToolButton
+    verify_label: QLabel
     verify_run_spacer: QSpacerItem
     run_button: QPushButton
+    run_success_label: QLabel
     run_next_spacer: QSpacerItem
     next_button: QPushButton
 
@@ -216,13 +219,13 @@ class RunCheck(DesignerDisplay, QWidget):
     ):
         super().__init__(*args, **kwargs)
         icon = self.style().standardIcon(self.style_icons[Severity.warning])
-        self.status_label.setPixmap(icon.pixmap(25, 25))
+        self.result_label.setPixmap(icon.pixmap(25, 25))
         self.data = data
 
         if data:
             self.setup_buttons(configs=data)
             # initialize tooltip
-            self.update_status_label_tooltip()
+            self.update_status()
 
     def setup_buttons(self, configs, next_widget: AtefItem = None) -> None:
         """
@@ -262,34 +265,74 @@ class RunCheck(DesignerDisplay, QWidget):
         self.run_button.clicked.connect(run_slot)
 
     def update_status(self) -> None:
+        # overall result label
         if not self.data:
             logger.warning('No config associated with this step')
             return
-        combined_result = combine_results(self.results)
+        self.update_icon(self.result_label, self.results)
+        self.update_label_tooltip(self.result_label, self.results)
 
-        chosen_icon = self.style_icons[combined_result.severity]
+        # step result
+        if self.step_results:
+            self.update_icon(self.run_success_label, self.step_results)
+            self.update_label_tooltip(self.run_success_label, self.step_results)
+
+            self.update_icon(self.verify_label, self.verify_results)
+            self.update_label_tooltip(self.verify_label, self.verify_results)
+
+    def update_icon(self, label: QLabel, results: List[Result]) -> None:
+        combined_step_result = combine_results(results)
+
+        chosen_icon = self.style_icons[combined_step_result.severity]
         icon = self.style().standardIcon(chosen_icon)
 
-        self.status_label.setPixmap(icon.pixmap(25, 25))
-        self.update_status_label_tooltip()
+        label.setPixmap(icon.pixmap(25, 25))
 
-    def update_status_label_tooltip(self) -> None:
+    def update_label_tooltip(self, label: QLabel, results: List[Result]) -> None:
         tt = ''
-        for r in self.results:
+        for r in results:
             uni_icon = self.unicode_icons[r.severity]
             tt += f'{uni_icon}: {r.reason or "-"}<br>'
 
-        self.status_label.setToolTip('<p>' + tt.rstrip('<br>') + '</p>')
+        label.setToolTip('<p>' + tt.rstrip('<br>') + '</p>')
+
+    def update_icons_tooltips(self) -> None:
+        """ Convenience method for updating all the icons and tooltips """
+        self.update_icon(self.result_label, self.results)
+        self.update_label_tooltip(self.result_label, self.results)
+
+        # Extras for active checkouts
+        if self.step_results:
+            self.update_icon(self.run_success_label, self.step_results)
+            self.update_label_tooltip(self.run_success_label, self.step_results)
+
+        if self.verify_results:
+            self.update_icon(self.verify_label, self.verify_results)
+            self.update_label_tooltip(self.verify_label, self.verify_results)
 
     def event(self, event: QtCore.QEvent) -> bool:
         # Catch tooltip events to update status tooltip
         if event.type() == QtCore.QEvent.ToolTip:
-            self.update_status_label_tooltip()
+            self.update_icons_tooltips()
         return super().event(event)
 
     @property
     def results(self) -> List[Result]:
         return [c.result for c in self.data]
+
+    @property
+    def step_results(self) -> List[Result]:
+        try:
+            return [c.step_result for c in self.data]
+        except AttributeError:
+            return None
+
+    @property
+    def verify_results(self) -> List[Result]:
+        try:
+            return [c.verify_result for c in self.data]
+        except AttributeError:
+            return None
 
     def setup_next_button(self, next_item=None) -> None:
         page = self.parent()
@@ -313,7 +356,56 @@ class RunCheck(DesignerDisplay, QWidget):
             return
         elif 'passive' in step_types:
             self.verify_button.hide()
-            self.layout().itemAt(3).changeSize(0, 0)
+            self.run_success_label.hide()
+            self.verify_label.hide()
+            # Hide verify_run_spacer, not exposed by DesignerDisplay
+            self.layout().itemAt(5).changeSize(0, 0)
         else:
             # TODO: verify functionality for active checkouts
-            return
+            # Set up verify button depending on settings
+            widget = VerifyEntryWidget()
+
+            widget_action = QWidgetAction(self.verify_button)
+            widget_action.setDefaultWidget(widget)
+
+            widget_menu = QMenu(self.verify_button)
+            widget_menu.addAction(widget_action)
+            self.verify_button.setMenu(widget_menu)
+
+            # slots and connections for VerifyEntryWidget buttons
+            def set_verify(success: bool):
+                reason = widget.reason_line_edit.text()
+                if success:
+                    severity = Severity.success
+                else:
+                    severity = Severity.error
+                # do this for all, but expect only one dataclass
+                for step in self.data:
+                    step.verify_result = Result(severity=severity, reason=reason)
+
+                self.update_icon(self.verify_label, self.verify_results)
+                self.update_label_tooltip(self.verify_label, self.verify_results)
+
+                widget_menu.hide()
+
+            def verify_success_slot():
+                set_verify(True)
+
+            def verify_fail_slot():
+                set_verify(False)
+
+            widget.verify_button_box.accepted.connect(verify_success_slot)
+            widget.verify_button_box.rejected.connect(verify_fail_slot)
+
+
+class VerifyEntryWidget(DesignerDisplay, QWidget):
+    filename = 'verify_entry_widget.ui'
+
+    reason_line_edit: QLineEdit
+    verify_button_box: QDialogButtonBox
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # modify button box labels
+        self.verify_button_box.button(QDialogButtonBox.Ok).setText('Verify')
+        self.verify_button_box.button(QDialogButtonBox.Ok).setText('Reject')

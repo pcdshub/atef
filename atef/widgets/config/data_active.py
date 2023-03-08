@@ -27,7 +27,6 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
 from atef.check import Result
-from atef.enums import VerifyMode
 from atef.widgets.config.data_base import DataWidget
 from atef.widgets.core import DesignerDisplay
 
@@ -80,35 +79,56 @@ class GeneralProcedureWidget(DesignerDisplay, DataWidget):
     filename = 'general_procedure_widget.ui'
 
     verify_combo: QtWidgets.QComboBox
+    step_success_combo: QtWidgets.QComboBox
 
-    verify_combo_items = tuple(verify.name for verify in VerifyMode)
+    bool_choices = ('False', 'True')
+    verify_combo_items = bool_choices
+    step_success_combo_items = bool_choices
 
     def __init__(self, data: ProcedureStep, **kwargs):
         super().__init__(data=data, **kwargs)
         for text in self.verify_combo_items:
             self.verify_combo.addItem(text)
+        for text in self.step_success_combo_items:
+            self.step_success_combo.addItem(text)
 
         self.verify_combo.setCurrentIndex(
-            self.verify_combo_items.index(
-                self.bridge.verify_mode.get().name
-            )
+            int(self.bridge.verify_required.get())
+        )
+        self.step_success_combo.setCurrentIndex(
+            int(self.bridge.step_success_required.get())
         )
 
-        self.verify_combo.currentTextChanged.connect(
+        self.verify_combo.currentIndexChanged.connect(
             self.new_verify_combo
         )
+        self.step_success_combo.currentIndexChanged.connect(
+            self.new_step_success_combo
+        )
 
-    def new_verify_combo(self, value: str) -> None:
+    def new_step_success_combo(self, index: int) -> None:
         """
-        Slot to handle user input in the "Verify Mode" combo box.
+        Slot to handle user input in the "Step Success Required" combo box.
         Uses current bridge to mutate the stored dataclass
 
         Parameters
         ----------
-        value : str
-            The string contents of the combo box.
+        index : int
+            The index of the combo box.
         """
-        self.bridge.verify_mode.put(VerifyMode[value])
+        self.bridge.step_success_required.put(bool(index))
+
+    def new_verify_combo(self, index: int) -> None:
+        """
+        Slot to handle user input in the "Verify Required" combo box.
+        Uses current bridge to mutate the stored dataclass
+
+        Parameters
+        ----------
+        index : int
+            The index of the combo box.
+        """
+        self.bridge.verify_required.put(bool(index))
 
 
 def _create_vbox_layout(
