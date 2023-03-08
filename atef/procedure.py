@@ -57,7 +57,7 @@ class ProcedureStep:
     #: A description of narrative explanation of setup steps, what is to happen, etc.
     description: Optional[str] = None
     #: The hierarchical parent of this step.
-    parent: Optional[Union[ProcedureGroup, ProcedureFile]] = None
+    parent: Optional[ProcedureGroup] = None
     #: overall result of running the step
     _result: Result = field(default_factory=incomplete_result)
     #: confirmation by the user that result matches expectations
@@ -114,7 +114,8 @@ class ProcedureStep:
 
         if not results:
             # Nothing required, auto-success
-            return Result()
+            self._result = Result()
+            return self._result
 
         severity = _summarize_result_severity(GroupResultMode.all_, results)
         self._result = Result(severity=severity, reason=reason)
