@@ -1,4 +1,5 @@
 import logging
+import os
 import pathlib
 
 import apischema
@@ -10,6 +11,14 @@ from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
                          PydmDisplayStep, TyphosDisplayStep)
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def test_configs() -> list[pathlib.Path]:
+    filenames = ['lfe.json', 'all_fields.json', 'active_test.json']
+    test_config_path = pathlib.Path(__file__).parent / 'configs'
+    config_paths = [test_config_path / fn for fn in filenames]
+    return config_paths
 
 
 parametrized_groups = pytest.mark.parametrize(
@@ -198,16 +207,13 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
         assert source_lines == dest_lines
 
 
-def test_edit_run_toggle(qtbot: QtBot):
+def test_edit_run_toggle(qtbot: QtBot, test_configs: list[os.PathLike]):
     """ Smoke test run-mode for all sample configs """
     from ..widgets.config.window import Window
     window = Window(show_welcome=False)
     qtbot.add_widget(window)
-    test_configs = pathlib.Path(__file__).parent / 'configs'
-    for filename in ('lfe.json', 'all_fields.json', 'active_test.json'):
-        config_path = test_configs / filename
-        window.open_file(filename=str(config_path))
-        toggle = window.tab_widget.widget(0).toggle
+    for idx, filename in enumerate(test_configs):
+        window.open_file(filename=str(filename))
+        toggle = window.tab_widget.widget(idx).toggle
         toggle.setChecked(True)
         toggle.setChecked(False)
-        window.tab_widget.removeTab(0)
