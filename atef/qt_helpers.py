@@ -83,15 +83,15 @@ class QDataclassBridge(QObject):
             # a raw type, no Union, Optional, etc
             NestedClass = QDataclassValue
             dtype = type_hint
-        elif origin == dict:
+        elif origin is dict:
             # Use dataclass value and override to object type
             NestedClass = QDataclassValue
             dtype = object
-        elif origin == list:
+        elif origin is list:
             # Make sure we have list manipulation methods
             NestedClass = QDataclassList
             dtype = args[0]
-        elif origin == Union and (type(None) in args):
+        elif origin is Union and (type(None) in args):
             # Optional, strip Union and recurse
             self.set_field_from_data(name, args[0], data)
             return

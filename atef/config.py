@@ -179,7 +179,7 @@ class ConfigurationFile:
     def from_filename(cls, filename: AnyPath) -> ConfigurationFile:
         """ Load a configuration file from a file.  Dispatches based on file type """
         path = pathlib.Path(filename)
-        if path.suffix == '.json':
+        if path.suffix.lower() == '.json':
             config = ConfigurationFile.from_json(path)
         else:
             config = ConfigurationFile.from_yaml(path)

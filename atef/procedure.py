@@ -288,7 +288,7 @@ class ProcedureFile:
     @classmethod
     def from_filename(cls, filename: AnyPath) -> ProcedureFile:
         path = pathlib.Path(filename)
-        if path.suffix == '.json':
+        if path.suffix.lower() == '.json':
             config = ProcedureFile.from_json(path)
         else:
             config = ProcedureFile.from_yaml(path)
