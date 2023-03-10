@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Generator, List, Optional, Union
 from qtpy import QtCore
 from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLayout, QLineEdit,
                             QMenu, QPushButton, QSpacerItem, QStyle,
-                            QToolButton, QWidget, QWidgetAction)
+                            QToolButton, QVBoxLayout, QWidget, QWidgetAction)
 
 from atef import util
 from atef.check import Comparison, Result
@@ -90,7 +90,15 @@ def make_run_page(
         check_widget = RunCheck(data=configs)
     else:
         check_widget = RunCheck(data=[data])
-    widget.layout().addWidget(check_widget)
+
+    # mimic placeholder configuration
+    check_widget_placeholder = QWidget(parent=widget)
+    vlayout = QVBoxLayout()
+    vlayout.setContentsMargins(0, 0, 0, 0)
+    check_widget_placeholder.setLayout(vlayout)
+    vlayout.addWidget(check_widget)
+    widget.layout().addWidget(check_widget_placeholder)
+
     widget.run_check = check_widget
 
     return widget
@@ -340,7 +348,8 @@ class RunCheck(DesignerDisplay, QWidget):
 
     def setup_next_button(self, next_item=None) -> None:
         """ Link RunCheck's next button to the next widget in the tree """
-        page = self.parent()
+        # rise out of placeholder into containing PageWidget
+        page = self.parent().parent()
 
         def inner_navigate(*args, **kwargs):
             page.navigate_to(next_item)
