@@ -63,11 +63,11 @@ class ProcedureStep:
     #: confirmation by the user that result matches expectations
     verify_result: Result = field(default_factory=incomplete_result)
     #: verification requirements, is human verification required?
-    verify_required: bool = False
+    verify_required: bool = True
     #: whether or not the step completed successfully
     step_result: Result = field(default_factory=incomplete_result)
     #: step success requirements, does the step need to complete?
-    step_success_required: bool = False
+    step_success_required: bool = True
 
     def _run(self) -> Result:
         """ Run the comparison.  To be implemented in subclass. """
