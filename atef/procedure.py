@@ -59,7 +59,7 @@ class ProcedureStep:
     #: The hierarchical parent of this step.
     parent: Optional[ProcedureGroup] = None
     #: overall result of running the step
-    _result: Result = field(default_factory=incomplete_result)
+    combined_result: Result = field(default_factory=incomplete_result)
     #: confirmation by the user that result matches expectations
     verify_result: Result = field(default_factory=incomplete_result)
     #: verification requirements, is human verification required?
@@ -114,12 +114,12 @@ class ProcedureStep:
 
         if not results:
             # Nothing required, auto-success
-            self._result = Result()
-            return self._result
+            self.combined_result = Result()
+            return self.combined_result
 
         severity = _summarize_result_severity(GroupResultMode.all_, results)
-        self._result = Result(severity=severity, reason=reason)
-        return self._result
+        self.combined_result = Result(severity=severity, reason=reason)
+        return self.combined_result
 
     def allow_verify(self) -> bool:
         """

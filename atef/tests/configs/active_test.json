@@ -4,7 +4,7 @@
     "name": "active_all",
     "description": "Basic active checkout",
     "parent": null,
-    "_result": {
+    "combined_result": {
       "severity": 1,
       "reason": "step incomplete"
     },
@@ -24,7 +24,7 @@
           "name": "desc_title",
           "description": "description for description step",
           "parent": null,
-          "_result": {
+          "combined_result": {
             "severity": 1,
             "reason": "step incomplete"
           },
