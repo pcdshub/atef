@@ -32,7 +32,7 @@ def incomplete_result():
     return incomplete
 
 
-class BlueskyState(object):
+class BlueskyState:
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             cls.instance = super(BlueskyState, cls).__new__(cls)

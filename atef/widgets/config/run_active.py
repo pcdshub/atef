@@ -1,6 +1,6 @@
 """
 Widgets for config gui's active-checkout run mode.
-Widgets should mamp onto edit widgets from atef.widgets.config.data_active
+Widgets should map onto edit widgets from atef.widgets.config.data_active
 """
 
 from qtpy import QtWidgets

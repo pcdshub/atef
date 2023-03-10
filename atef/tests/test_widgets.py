@@ -168,6 +168,9 @@ def test_serialization(group):
     print(yaml.dump(serialized))
 
 
+# Test no longer applicable with change to ProcedureStep fields.
+# To be deleted when remaining vestigial portions of
+# atef.widgets.config.config.data_active are removed
 # @parametrized_groups
 # def test_create_widget(request: pytest.FixtureRequest, group: ProcedureStep):
 #     widget = procedure_step_to_widget(group)
