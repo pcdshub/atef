@@ -5,20 +5,23 @@ Widgets should map onto edit widgets from atef.widgets.config.data_active
 
 from qtpy import QtWidgets
 
-from atef.procedure import DescriptionStep
+from atef.procedure import DescriptionStep, PassiveStep
 from atef.widgets.config.data_base import DataWidget
 from atef.widgets.core import DesignerDisplay
 
 
-class PassiveRunPage(DesignerDisplay, DataWidget):
+class PassiveRunWidget(DesignerDisplay, DataWidget):
     """
     Widget for viewing run status of a passive checkout.
     Features a TreeView with icon status readouts, overall check status...
     """
-    filename = 'passive_run_page.ui'
+    filename = 'passive_run_widget.ui'
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, data: PassiveStep, **kwargs):
+        super().__init__(*args, data=data, **kwargs)
+
+        # set up tree
+        # connect results to tree column
 
 
 class DescriptionRunWidget(DesignerDisplay, DataWidget):

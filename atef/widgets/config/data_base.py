@@ -3,12 +3,13 @@ Widgets used for manipulating the configuration data.
 """
 from __future__ import annotations
 
-from typing import ClassVar, Dict, List, Protocol, Tuple
+import logging
+from typing import Any, ClassVar, Dict, List, Protocol, Tuple
 from weakref import WeakValueDictionary
 
 from qtpy.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QMessageBox, QPlainTextEdit, QStyle, QToolButton,
-                            QVBoxLayout, QWidget)
+                            QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from atef.config import Configuration, ToolConfiguration
 from atef.qt_helpers import QDataclassBridge, QDataclassList
@@ -17,6 +18,8 @@ from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
 
 from .utils import get_relevant_pvs
+
+logger = logging.getLogger(__name__)
 
 
 class AnyDataclass(Protocol):
@@ -478,3 +481,48 @@ class SimpleRowWidget(NameMixin, DataWidget):
         match_line_edit_text_width(self.name_edit)
         if not self.name_edit.hasFocus():
             self.adjust_edit_filter()
+
+
+def create_tree_items(
+    data: Any,
+    parent: QTreeWidgetItem
+) -> None:
+    """ Recursively create the tree starting from the given data """
+    try:
+        for cfg in data.configs:
+            item = QTreeWidgetItem([cfg.name, type(cfg).__name__])
+            create_tree_items(cfg, item)
+            parent.addChild(item)
+    except Exception as ex:
+        logger.debug(ex)
+
+    # look into configs, by_attr, shared
+    # TODO: better, less repetitive logic
+    try:
+        for comp in data.shared:
+            item = QTreeWidgetItem(
+                [comp.name, type(comp).__name__]
+            )
+            parent.addChild(item)
+    except Exception as ex:
+        logger.debug(ex)
+
+    try:
+        for comp_list in data.by_attr.values():
+            for comp in comp_list:
+                item = QTreeWidgetItem(
+                    [comp.name, type(comp).__name__]
+                )
+                parent.addChild(item)
+    except Exception as ex:
+        logger.debug(ex)
+
+    try:
+        for comp_list in data.by_pv.values():
+            for comp in comp_list:
+                item = QTreeWidgetItem(
+                    [comp.name, type(comp).__name__]
+                )
+                parent.addChild(item)
+    except Exception as ex:
+        logger.debug(ex)
