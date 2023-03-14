@@ -45,7 +45,7 @@
           "name": "passive_title",
           "description": null,
           "parent": null,
-          "_result": {
+          "combined_result": {
             "severity": 1,
             "reason": "step incomplete"
           },
@@ -59,7 +59,7 @@
             "reason": "step incomplete"
           },
           "step_success_required": true,
-          "filepath": "/Users/roberttk/src/atef/atef/tests/configs/all_fields.json"
+          "filepath": "/cds/home/r/roberttk/devrepos/atef/atef/tests/configs/all_fields.json"
         }
       }
     ]

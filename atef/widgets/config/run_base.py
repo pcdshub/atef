@@ -457,7 +457,6 @@ def create_tree_items(
                     prep_configs = get_relevant_configs_comps(prepared_file, comp)
                 else:
                     prep_configs = None
-            print(f'{comp.name} -> {prep_configs}')
             item = TreeItem(comp, prepared_data=prep_configs)
             parent.addChild(item)
     except Exception as ex:
@@ -471,7 +470,6 @@ def create_tree_items(
                     prep_configs = get_relevant_configs_comps(prepared_file, comp)
                 else:
                     prep_configs = None
-            print(f'{comp.name} -> {prep_configs}')
             item = TreeItem(comp, prepared_data=prep_configs)
             parent.addChild(item)
     except Exception as ex:

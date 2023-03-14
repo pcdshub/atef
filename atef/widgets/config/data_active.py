@@ -566,7 +566,6 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
             return
 
         self.bridge.filepath.put(filename)
-
         self.passive_config = ConfigurationFile.from_filename(filename)
         self.setup_tree(self.passive_config)
 
