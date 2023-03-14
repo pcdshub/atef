@@ -37,7 +37,8 @@ from atef.procedure import (DescriptionStep, PassiveStep, ProcedureGroup,
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.widgets.config.data_active import (GeneralProcedureWidget,
                                              PassiveEditWidget)
-from atef.widgets.config.run_active import DescriptionRunWidget
+from atef.widgets.config.run_active import (DescriptionRunWidget,
+                                            PassiveRunWidget)
 from atef.widgets.config.run_base import RunCheck
 
 from ..core import DesignerDisplay
@@ -1663,7 +1664,8 @@ class RunStepPage(DesignerDisplay, PageWidget):
     run_check: RunCheck
 
     run_widget_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
-        DescriptionStep: DescriptionRunWidget
+        DescriptionStep: DescriptionRunWidget,
+        PassiveStep: PassiveRunWidget
     }
 
     def __init__(self, *args, data, **kwargs):

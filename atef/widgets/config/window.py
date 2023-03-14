@@ -19,7 +19,7 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
 
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, PreparedFile
-from atef.procedure import DescriptionStep, ProcedureFile
+from atef.procedure import DescriptionStep, PassiveStep, ProcedureFile
 from atef.report import PassiveAtefReport
 
 from ..archive_viewer import get_archive_viewer
@@ -391,7 +391,8 @@ class EditTree(DesignerDisplay, QWidget):
 
 
 _edit_to_run_page: Dict[type, PageWidget] = {
-    DescriptionStep: RunStepPage
+    DescriptionStep: RunStepPage,
+    PassiveStep: RunStepPage
 }
 
 
