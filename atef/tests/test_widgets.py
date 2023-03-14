@@ -1,4 +1,5 @@
 import logging
+import os
 import pathlib
 
 import apischema
@@ -7,11 +8,17 @@ import yaml
 from pytestqt.qtbot import QtBot
 
 from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
-                         ProcedureStep, PydmDisplayStep, TyphosDisplayStep)
-from ..widgets import procedure_step_to_widget
-from . import qt_utils
+                         PydmDisplayStep, TyphosDisplayStep)
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def test_configs() -> list[pathlib.Path]:
+    filenames = ['lfe.json', 'all_fields.json', 'active_test.json']
+    test_config_path = pathlib.Path(__file__).parent / 'configs'
+    config_paths = [test_config_path / fn for fn in filenames]
+    return config_paths
 
 
 parametrized_groups = pytest.mark.parametrize(
@@ -161,13 +168,16 @@ def test_serialization(group):
     print(yaml.dump(serialized))
 
 
-@parametrized_groups
-def test_create_widget(request: pytest.FixtureRequest, group: ProcedureStep):
-    widget = procedure_step_to_widget(group)
-    widget.show()
-    qt_utils.save_widget_screenshot(widget, prefix=request.node.name)
-    widget.close()
-    widget.deleteLater()
+# Test no longer applicable with change to ProcedureStep fields.
+# To be deleted when remaining vestigial portions of
+# atef.widgets.config.config.data_active are removed
+# @parametrized_groups
+# def test_create_widget(request: pytest.FixtureRequest, group: ProcedureStep):
+#     widget = procedure_step_to_widget(group)
+#     widget.show()
+#     qt_utils.save_widget_screenshot(widget, prefix=request.node.name)
+#     widget.close()
+#     widget.deleteLater()
 
 
 def test_config_window_basic(qtbot: QtBot):
@@ -175,7 +185,7 @@ def test_config_window_basic(qtbot: QtBot):
     Pass if the config gui can open
     """
     from ..widgets.config.window import Window
-    window = Window()
+    window = Window(show_welcome=False)
     qtbot.add_widget(window)
 
 
@@ -187,7 +197,7 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
     window = Window(show_welcome=False)
     qtbot.add_widget(window)
     test_configs = pathlib.Path(__file__).parent / 'configs'
-    for filename in ('lfe.json', 'all_fields.json'):
+    for filename in ('lfe.json', 'all_fields.json', 'active_test.json'):
         config_path = test_configs / filename
         source = str(config_path)
         dest = str(tmp_path / filename)
@@ -198,3 +208,15 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
         with open(dest, 'r') as fd:
             dest_lines = fd.readlines()
         assert source_lines == dest_lines
+
+
+def test_edit_run_toggle(qtbot: QtBot, test_configs: list[os.PathLike]):
+    """ Smoke test run-mode for all sample configs """
+    from ..widgets.config.window import Window
+    window = Window(show_welcome=False)
+    qtbot.add_widget(window)
+    for idx, filename in enumerate(test_configs):
+        window.open_file(filename=str(filename))
+        toggle = window.tab_widget.widget(idx).toggle
+        toggle.setChecked(True)
+        toggle.setChecked(False)

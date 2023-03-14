@@ -1,3 +1,14 @@
+"""
+Widgets for manipulating active checkout data (edit-mode)
+
+Widgets here will replace the RunStepPage.run_widget_placeholder widget, and should
+subclass DataWidget and DesignerDisplay
+
+Contains several widgets carried over from before active checkout gui development
+started, which may not appear in the ``atef config`` GUI.
+These will be cleaned... eventually
+"""
+
 from __future__ import annotations
 
 import dataclasses
@@ -16,6 +27,8 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
 from atef.check import Result
+from atef.widgets.config.data_base import DataWidget
+from atef.widgets.core import DesignerDisplay
 
 from ...procedure import (DescriptionStep, DisplayOptions, PlanOptions,
                           PlanStep, ProcedureGroup, ProcedureStep,
@@ -55,6 +68,67 @@ DEFAULT_STYLESHEET = """
         border: 2px dotted black;
     }
 """
+
+
+class GeneralProcedureWidget(DesignerDisplay, DataWidget):
+    """
+    Handle fields common to all ProcedureStep dataclasses
+    Currently simply a choice of verify-mode with no actual functionality,
+    but will likely be expanded
+    """
+    filename = 'general_procedure_widget.ui'
+
+    verify_combo: QtWidgets.QComboBox
+    step_success_combo: QtWidgets.QComboBox
+
+    bool_choices = ('False', 'True')
+    verify_combo_items = bool_choices
+    step_success_combo_items = bool_choices
+
+    def __init__(self, data: ProcedureStep, **kwargs):
+        super().__init__(data=data, **kwargs)
+        for text in self.verify_combo_items:
+            self.verify_combo.addItem(text)
+        for text in self.step_success_combo_items:
+            self.step_success_combo.addItem(text)
+
+        self.verify_combo.setCurrentIndex(
+            int(self.bridge.verify_required.get())
+        )
+        self.step_success_combo.setCurrentIndex(
+            int(self.bridge.step_success_required.get())
+        )
+
+        self.verify_combo.currentIndexChanged.connect(
+            self.new_verify_combo
+        )
+        self.step_success_combo.currentIndexChanged.connect(
+            self.new_step_success_combo
+        )
+
+    def new_step_success_combo(self, index: int) -> None:
+        """
+        Slot to handle user input in the "Step Success Required" combo box.
+        Uses current bridge to mutate the stored dataclass
+
+        Parameters
+        ----------
+        index : int
+            The index of the combo box.
+        """
+        self.bridge.step_success_required.put(bool(index))
+
+    def new_verify_combo(self, index: int) -> None:
+        """
+        Slot to handle user input in the "Verify Required" combo box.
+        Uses current bridge to mutate the stored dataclass
+
+        Parameters
+        ----------
+        index : int
+            The index of the combo box.
+        """
+        self.bridge.verify_required.put(bool(index))
 
 
 def _create_vbox_layout(
@@ -458,3 +532,22 @@ def procedure_step_to_widget(step: ProcedureStep) -> StepWidgetBase:
     cls = type(step)
     widget_cls = _settings_to_widget_class[cls]
     return widget_cls.from_settings(step)
+
+
+class PassiveEditPage(DesignerDisplay, DataWidget):
+    """
+    Widget for selecting and previewing a passive checkout.
+    Features readouts for number of checks to run, ... and more?
+    """
+    filename = 'passive_edit_page.ui'
+    pass
+
+
+class PlanEditPage(DesignerDisplay, DataWidget):
+    """
+    Widget for creating and editing a plan step
+    Accesses the Bluesky RunEngine
+    Should include some readout?
+    """
+    filename = ''
+    pass

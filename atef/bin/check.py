@@ -8,7 +8,6 @@ import asyncio
 import enum
 import itertools
 import logging
-import pathlib
 from typing import Dict, Optional, Sequence, Tuple, Union
 
 import happi
@@ -475,11 +474,7 @@ async def main(
         show_passed_tests=show_passed_tests,
     )
 
-    path = pathlib.Path(filename)
-    if path.suffix.lower() == ".json":
-        config_file = ConfigurationFile.from_json(filename)
-    else:
-        config_file = ConfigurationFile.from_yaml(filename)
+    config_file = ConfigurationFile.from_filename(filename)
 
     console = rich.console.Console()
     cache = DataCache(signals=signal_cache or get_signal_cache())

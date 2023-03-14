@@ -32,18 +32,25 @@ from atef.check import (AnyComparison, AnyValue, Comparison, Equals, Greater,
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
+from atef.procedure import (DescriptionStep, PassiveStep, ProcedureGroup,
+                            ProcedureStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
+from atef.widgets.config.data_active import GeneralProcedureWidget
+from atef.widgets.config.run_active import DescriptionRunWidget
+from atef.widgets.config.run_base import RunCheck
 
 from ..core import DesignerDisplay
-from .data import (AnyComparisonWidget, AnyDataclass, AnyValueWidget,
-                   ComparisonRowWidget, ConfigurationGroupRowWidget,
-                   ConfigurationGroupWidget, DataWidget,
-                   DeviceConfigurationWidget, EqualsWidget,
-                   GeneralComparisonWidget, GreaterOrEqualWidget,
-                   GreaterWidget, LessOrEqualWidget, LessWidget,
-                   NameDescTagsWidget, NotEqualsWidget, PingWidget,
-                   PVConfigurationWidget, RangeWidget, ValueSetWidget)
-from .utils import cast_dataclass, describe_comparison_context
+from .data_base import AnyDataclass, DataWidget, NameDescTagsWidget
+from .data_passive import (AnyComparisonWidget, AnyValueWidget,
+                           ComparisonRowWidget, ConfigurationGroupRowWidget,
+                           ConfigurationGroupWidget, DeviceConfigurationWidget,
+                           EqualsWidget, GeneralComparisonWidget,
+                           GreaterOrEqualWidget, GreaterWidget,
+                           LessOrEqualWidget, LessWidget, NotEqualsWidget,
+                           PingWidget, PVConfigurationWidget, RangeWidget,
+                           ValueSetWidget)
+from .utils import (cast_dataclass, describe_comparison_context,
+                    describe_step_context)
 
 
 def link_page(item: AtefItem, widget: PageWidget) -> None:
@@ -1317,11 +1324,302 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         self.new_tool_widget(new_tool)
 
 
+class ProcedureGroupPage(DesignerDisplay, PageWidget):
+    """
+    Top level page for Procedures (active checkout)
+
+    currently nearly identical to ConfigurationGroupPage, with minor changes
+    to account for ProcedureGroup dataclass.
+    """
+    filename = 'procedure_group_page.ui'
+
+    # currently not set, left for future use if desired
+    procedure_group_placeholder: QWidget
+    procedure_table: QTableWidget
+    add_row_button: QPushButton
+    add_row_type_combo: QComboBox
+
+    config_cls_options: ClassVar[Dict[str, Type[ProcedureStep]]] = {
+        cls.__name__: cls for cls in (
+            ProcedureGroup,
+            DescriptionStep,
+            PassiveStep
+        )
+    }
+
+    def __init__(self, data: ProcedureGroup, **kwargs):
+        super().__init__(data=data, **kwargs)
+        self.setup_done = False
+        # Create the static sub-widgets and place them
+        self.setup_name_desc_tags_init()
+
+        # set up general step settings
+        general_widget = GeneralProcedureWidget(data=data)
+        self.insert_widget(general_widget, self.procedure_group_placeholder)
+
+        # Allow the user to add more rows
+        self.add_row_button.clicked.connect(self.add_config_row)
+        # Fill in the row type selector box
+        for option in self.config_cls_options:
+            self.add_row_type_combo.addItem(option)
+        self.procedure_table.dropEvent = self.table_drop_event
+
+    def assign_tree_item(self, item: AtefItem) -> None:
+        """
+        Link-time setup of existing sub-nodes and navigation.
+        """
+        super().assign_tree_item(item)
+        if not self.setup_done:
+            # Fill in the rows from the initial data
+            for config in self.data.steps:
+                self.add_config_row(config=config)
+            self.setup_done = True
+        self.setup_name_desc_tags_link()
+
+    def add_config_row(
+        self,
+        checked: bool = False,
+        config: Optional[ProcedureStep] = None,
+        **kwargs,
+    ) -> None:
+        """
+        Add a new row to the configuration table.
+
+        This also creates a Configuration instance if necessary, creates
+        the corresponding page, and does all the related setup.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument.
+        config : Configuration, optional
+            The configuration to add. If omitted, we'll create a blank
+            configuration of the selected type from the add_row_type_combo.
+        """
+        if config is None:
+            # New configuration
+            config = self.config_cls_options[
+                self.add_row_type_combo.currentText()
+            ]()
+            self.data.steps.append(config)
+        # configuration group still works, only looks at name and class
+        config_row = ConfigurationGroupRowWidget(data=config)
+        config_page = PAGE_MAP[type(config)](data=config)
+        config_item = AtefItem(
+            tree_parent=self.tree_item,
+            name=config.name or 'untitled',
+            func_name=type(config).__name__,
+        )
+        link_page(item=config_item, widget=config_page)
+        self.setup_row_buttons(
+            row_widget=config_row,
+            item=config_item,
+            table=self.procedure_table,
+        )
+        row_count = self.procedure_table.rowCount()
+        self.procedure_table.insertRow(row_count)
+        self.procedure_table.setRowHeight(row_count, config_row.sizeHint().height())
+        self.procedure_table.setCellWidget(row_count, 0, config_row)
+
+    def remove_table_data(self, data: ProcedureStep) -> None:
+        """
+        Remove the data associated with a given configuration.
+        """
+        self.data.steps.remove(data)
+
+    def move_config_row(self, source: int, dest: int) -> None:
+        """
+        Move the row at index source to index dest.
+
+        Rearanges the table, the file, and the tree.
+        """
+        # Skip if into the same index
+        if source == dest:
+            return
+        config_data = self.data.steps.pop(source)
+        self.data.steps.insert(dest, config_data)
+        # Rearrange the tree
+        config_item = self.tree_item.takeChild(source)
+        self.tree_item.insertChild(dest, config_item)
+        # Rearrange the table: need a whole new widget or else segfault
+        self.procedure_table.removeRow(source)
+        self.procedure_table.insertRow(dest)
+        config_row = ConfigurationGroupRowWidget(data=config_data)
+        self.setup_row_buttons(
+            row_widget=config_row,
+            item=config_item,
+            table=self.procedure_table,
+        )
+        self.procedure_table.setRowHeight(dest, config_row.sizeHint().height())
+        self.procedure_table.setCellWidget(dest, 0, config_row)
+
+    def table_drop_event(self, event: QDropEvent) -> None:
+        """
+        Monkeypatch onto the table to allow us to drag/drop rows.
+
+        Shoutouts to stackoverflow
+        """
+        if event.source() is self.config_table:
+            selected_indices = self.procedure_table.selectedIndexes()
+            if not selected_indices:
+                return
+            selected_row = selected_indices[0].row()
+            dest_row = self.procedure_table.indexAt(event.pos()).row()
+            if dest_row == -1:
+                dest_row = self.procedure_table.rowCount() - 1
+            self.move_config_row(selected_row, dest_row)
+
+
+class StepPage(DesignerDisplay, PageWidget):
+    """
+    Page that handles any single ProcedureStep instance.
+
+    Contains a selector, placeholder for the specific step,
+    and general verification settings
+    """
+    filename = 'step_page.ui'
+
+    specific_procedure_placeholder: QWidget
+    specific_procedure_widget: DataWidget
+    general_procedure_placeholder: QWidget
+    general_procedure_widget: QWidget
+    bottom_spacer: QWidget
+
+    specific_combo: QComboBox
+
+    step_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
+        DescriptionStep: None
+    }
+
+    def __init__(self, data: ProcedureStep, **kwargs):
+        super().__init__(data=data, **kwargs)
+        self.step_types = {}
+        for index, step_type in enumerate(self.step_map):
+            self.specific_combo.addItem(step_type.__name__)
+            if isinstance(data, step_type):
+                self.specific_combo.setCurrentIndex(index)
+            self.step_types[step_type.__name__] = step_type
+        self.new_step(step=data)
+
+    def assign_tree_item(self, item: AtefItem) -> None:
+        """
+        Link-time setup of existing sub-nodes and navigation.
+        """
+        super().assign_tree_item(item)
+        self.setup_name_desc_tags_link()
+
+    def new_step(self, step: ProcedureStep) -> None:
+        """
+        Set up the widgets for a new step and save it as self.data.
+
+        ComparisonPage is unique in that the comparison can be swapped out
+        while the page is loaded. This method doesn't handle the complexity
+        of how to manage this in the Configuration instance, but it does
+        make sure all the widgets on this page connect to the new
+        comparison.
+
+        This is accomplished by discarding the old widgets in favor
+        of new widgets.
+        """
+        general_widget = GeneralProcedureWidget(data=step)
+        self.insert_widget(
+            general_widget,
+            self.general_procedure_placeholder,
+        )
+        SpecificWidgetType = self.step_map[type(step)]
+        if SpecificWidgetType:
+            new_specific_widget = SpecificWidgetType(data=step)
+            self.insert_widget(
+                new_specific_widget,
+                self.specific_procedure_placeholder,
+            )
+        else:
+            new_specific_widget = QWidget()
+
+        self.general_procedure_widget = general_widget
+        self.specific_procedure_widget = new_specific_widget
+        self.data = step
+        self.setup_name_desc_tags_init()
+        try:
+            item = self.tree_item
+        except AttributeError:
+            pass
+        else:
+            # Reinitialize this for the new name/desc/tags widget
+            self.assign_tree_item(item)
+
+    def showEvent(self, *args, **kwargs) -> None:
+        """
+        Whenever the page is shown, update the context text.
+        """
+        self.update_context()
+        return super().showEvent(*args, **kwargs)
+
+    def update_context(self) -> None:
+        """
+        Update the context text in the top right of the page.
+
+        This will then have information about which signals, PVs, or
+        other data is being compared against.
+        """
+        parent_widget = self.parent_tree_item.widget
+        if isinstance(parent_widget, StepPage):
+            parent_widget.update_context()
+            self.name_desc_tags_widget.extra_text_label.setText(
+                parent_widget.name_desc_tags_widget.extra_text_label.text()
+            )
+            return
+        config = self.parent_tree_item.widget.data
+        attr = ''
+
+        desc = describe_step_context(attr=attr, step=config)
+        self.name_desc_tags_widget.extra_text_label.setText(desc)
+        self.name_desc_tags_widget.extra_text_label.setToolTip(desc)
+        self.name_desc_tags_widget.init_viewer(attr, config)
+
+
+class RunStepPage(DesignerDisplay, PageWidget):
+    """
+    Base Widget for running active checkout steps and displaying their
+    results
+
+    Will always have a RunCheck widget, which should be connected after
+    instantiation via ``RunCheck.setup_buttons()``
+
+    Contains a placeholder for a DataWidget
+    """
+    filename = 'run_step_page.ui'
+
+    run_widget_placeholder: QWidget
+    run_widget: DataWidget
+    run_check_placeholder: QWidget
+    run_check: RunCheck
+
+    run_widget_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
+        DescriptionStep: DescriptionRunWidget
+    }
+
+    def __init__(self, *args, data, **kwargs):
+        super().__init__(*args, data, **kwargs)
+        self.run_check = RunCheck(data=[data])
+        self.insert_widget(self.run_check, self.run_check_placeholder)
+        # gather run_widget
+        run_widget_cls = self.run_widget_map[type(data)]
+        run_widget = run_widget_cls(data=data)
+
+        self.insert_widget(run_widget, self.run_widget_placeholder)
+
+
 PAGE_MAP = {
+    # Passive Pages
     ConfigurationGroup: ConfigurationGroupPage,
     DeviceConfiguration: DeviceConfigurationPage,
     PVConfiguration: PVConfigurationPage,
     ToolConfiguration: ToolConfigurationPage,
+    # Active Pages
+    ProcedureGroup: ProcedureGroupPage,
+    DescriptionStep: StepPage
 }
 
 
@@ -1659,16 +1957,3 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         - Cleans up all the sub-nodes.
         """
         self.tree_item.takeChildren()
-
-
-class ProcedureGroupPage(ConfigurationGroupPage):
-    """
-    Top level page for Procedures (active checkout)
-
-    Is this needed?  Config-specific bits:
-    - ConfigGroupWidget @ init
-    - 608: ConfigGroupRowWidget @
-        - add_config_row
-        - move_config_row
-    """
-    pass

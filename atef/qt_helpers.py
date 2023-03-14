@@ -6,11 +6,11 @@ widgets.
 """
 from __future__ import annotations
 
-import dataclasses
 import functools
 import logging
 import platform
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
+                    Union, get_args, get_origin, get_type_hints)
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QObject
@@ -49,78 +49,70 @@ class QDataclassBridge(QObject):
     def __init__(self, data: Any, parent: Optional[QObject] = None):
         super().__init__(parent=parent)
         self.data = data
-        for field in dataclasses.fields(data):
-            # Need to figure out which category this is:
-            # 1. Primitive value -> make a QDataclassValue
-            # 2. Another dataclass -> make a QDataclassValue (object)
-            # 3. A list of values -> make a QDataclassList
-            # 4. A list of dataclasses -> QDataclassList (object)
-            normalized = normalize_annotation(field.type)
-            if Dict in normalized:
-                # Use dataclass value and override to object type
-                NestedClass = QDataclassValue
-                dtype = object
-            elif List in normalized:
-                # Make sure we have list manipulation methods
-                NestedClass = QDataclassList
-                dtype = normalized[-1]
-            else:
-                NestedClass = QDataclassValue
-                dtype = normalized[-1]
-            setattr(
-                self,
-                field.name,
-                NestedClass.of_type(dtype)(
-                    data,
-                    field.name,
-                    parent=self,
-                ),
-            )
+        fields = get_type_hints(type(data))
+        for name, type_hint in fields.items():
+            self.set_field_from_data(name, type_hint, data)
 
+    def set_field_from_data(
+        self,
+        name: str,
+        type_hint: Any,
+        data: Any
+    ):
+        """
+        Set a field for this bridge based on the data and its type
 
-normalize_map = {
-    'Optional': Optional,
-    'List': List,
-    'Number': float,
-    'int': int,
-    'str': str,
-    'bool': bool,
-    'Configuration': object,
-    'IdentifierAndComparison': object,
-    'Comparison': object,
-    'Severity': int,
-    'reduce.ReduceMethod': str,
-    'PrimitiveType': object,
-    'Sequence': List,
-    'Value': object,
-    'Dict': Dict,
-    'str, Any': object,
-    'str, List': object,
-    'GroupResultMode': str,
-    'tools.Tool': object,
-}
+        Parameters
+        ----------
+        name : str
+            name of the field
+        type_hint : Any
+            The type hint annotation, returned from typing.get_type_hints
+        data : any
+            The dataclass for this bridge
+        """
+        # Need to figure out which category this is:
+        # 1. Primitive value -> make a QDataclassValue
+        # 2. Another dataclass -> make a QDataclassValue (object)
+        # 3. A list of values -> make a QDataclassList
+        # 4. A list of dataclasses -> QDataclassList (object)
+        origin = get_origin(type_hint)
+        args = get_args(type_hint)
 
+        if not origin:
+            # a raw type, no Union, Optional, etc
+            NestedClass = QDataclassValue
+            dtype = type_hint
+        elif origin is dict:
+            # Use dataclass value and override to object type
+            NestedClass = QDataclassValue
+            dtype = object
+        elif origin is list:
+            # Make sure we have list manipulation methods
+            NestedClass = QDataclassList
+            dtype = args[0]
+        elif origin is Union and (type(None) in args):
+            # Optional, strip Union and recurse
+            self.set_field_from_data(name, args[0], data)
+            return
+        else:
+            # some complex Union? e.g. Union[str, int, bool, float]
+            NestedClass = QDataclassValue
+            dtype = object
 
-def normalize_annotation(annotation: str) -> Tuple[type]:
-    """
-    Change a string annotation into a tuple of the enclosing classes.
+        # handle more complex datatype annotations
+        if dtype not in (int, float, bool, str):
+            dtype = object
 
-    For example: "Optional[List[SomeClass]]" becomes
-    (Optional, List, object)
-
-    Somewhat incomplete- only correct to the level needed for this
-    application.
-
-    Only supports the cases where we have exactly one element in each
-    square bracket nesting level.
-
-    There is definitely a better way to handle this, but I can't
-    figure it out quickly and want to press forward to v0.
-    """
-    elems = []
-    for text in annotation.strip(']').split('['):
-        elems.append(normalize_map[text])
-    return tuple(elems)
+        setattr(
+            self,
+            name,
+            NestedClass.of_type(dtype)(
+                data,
+                name,
+                parent=self,
+            ),
+        )
 
 
 class QDataclassElem:

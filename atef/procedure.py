@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import datetime
 import json
+import logging
 import pathlib
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, Literal, Optional, Sequence, Union,
@@ -24,28 +25,23 @@ from atef.yaml_support import init_yaml_support
 
 from . import serialization
 
-run_engine_singleton = None
-db_singleton = None
+logger = logging.getLogger(__name__)
 
 
 def incomplete_result():
     return incomplete
 
 
-def setup_temp_runengine():
-    global run_engine_singleton
-    global db_singleton
-    run_engine_singleton = RunEngine({})
-    db_singleton = databroker.Broker.named('temp')
-    run_engine_singleton.subscribe(db_singleton.insert)
-    return run_engine_singleton, db_singleton
+class BlueskyState:
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(BlueskyState, cls).__new__(cls)
+        return cls.instance
 
-
-def cleanup_temp_runengine():
-    global run_engine_singleton
-    global db_singleton
-    del run_engine_singleton
-    del db_singleton
+    def __init__(self):
+        self.db = databroker.Broker.named('temp')
+        self.RE = RunEngine({})
+        self.RE.subscribe(self.db.insert)
 
 
 @dataclasses.dataclass
@@ -61,11 +57,17 @@ class ProcedureStep:
     #: A description of narrative explanation of setup steps, what is to happen, etc.
     description: Optional[str] = None
     #: The hierarchical parent of this step.
-    parent: Optional[Union[ProcedureGroup, ProcedureFile]] = None
-    #: result of running the step
-    result: Result = field(default_factory=incomplete_result)
+    parent: Optional[ProcedureGroup] = None
+    #: overall result of running the step
+    combined_result: Result = field(default_factory=incomplete_result)
     #: confirmation by the user that result matches expectations
-    verify: bool = False
+    verify_result: Result = field(default_factory=incomplete_result)
+    #: verification requirements, is human verification required?
+    verify_required: bool = True
+    #: whether or not the step completed successfully
+    step_result: Result = field(default_factory=incomplete_result)
+    #: step success requirements, does the step need to complete?
+    step_success_required: bool = True
 
     def _run(self) -> Result:
         """ Run the comparison.  To be implemented in subclass. """
@@ -81,8 +83,43 @@ class ProcedureStep:
                 reason=str(ex)
             )
 
-        self.result = result
-        return result
+        # stash step result
+        self.step_result = result
+        # return the overall result, including verification
+        return self.result
+
+    @property
+    def result(self) -> Result:
+        """
+        Combines the step result and verification result based on settings
+
+        Returns
+        -------
+        Result
+            The result of this step
+        """
+        results = []
+        reason = ''
+        if self.verify_required:
+            results.append(self.verify_result)
+            if self.verify_result.severity != Severity.success:
+                reason += f'Not Verified ({self.verify_result.reason}),'
+            else:
+                reason += f'Verified ({self.verify_result.reason})'
+
+        if self.step_success_required:
+            results.append(self.step_result)
+            if self.step_result.severity != Severity.success:
+                reason += f'Not Successful ({self.step_result.reason})'
+
+        if not results:
+            # Nothing required, auto-success
+            self.combined_result = Result()
+            return self.combined_result
+
+        severity = _summarize_result_severity(GroupResultMode.all_, results)
+        self.combined_result = Result(severity=severity, reason=reason)
+        return self.combined_result
 
     def allow_verify(self) -> bool:
         """
@@ -185,10 +222,7 @@ class PassiveStep(ProcedureStep):
 
     def _run(self) -> Result:
         """ Load, prepare, and run the passive step """
-        if self.filepath.suffix == '.json':
-            config = ConfigurationFile.from_json(self.filepath)
-        else:
-            config = ConfigurationFile.from_yaml(self.filepath)
+        config = ConfigurationFile.from_filename(self.filepath)
 
         prepared_config = PreparedFile.from_config(file=config,
                                                    cache=DataCache())
@@ -215,16 +249,15 @@ class ProcedureGroup(ProcedureStep):
                 yield from step.walk_steps()
 
     def run(self) -> Result:
-        # run each step in this group, yield the step
-        # how to deal with confirmation?
         results = []
         for step in self.steps:
             results.append(step.run())
 
-        result = _summarize_result_severity(GroupResultMode.all_, results)
+        severity = _summarize_result_severity(GroupResultMode.all_, results)
+        result = Result(severity=severity)
 
-        self.result = result
-        return result
+        self.step_result = result
+        return self.result
 
 
 AnyProcedure = Union[
@@ -251,6 +284,15 @@ class ProcedureFile:
     def walk_steps(self) -> Generator[AnyProcedure, None, None]:
         yield self.root
         yield from self.root.walk_steps()
+
+    @classmethod
+    def from_filename(cls, filename: AnyPath) -> ProcedureFile:
+        path = pathlib.Path(filename)
+        if path.suffix.lower() == '.json':
+            config = ProcedureFile.from_json(path)
+        else:
+            config = ProcedureFile.from_yaml(path)
+        return config
 
     @classmethod
     def from_json(cls, filename: AnyPath) -> ProcedureFile:
