@@ -15,11 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="QTreeWidget" name="tree_widget">
-     <property name="columnCount">
-      <number>0</number>
-     </property>
-    </widget>
+    <widget class="QTreeView" name="tree_view"/>
    </item>
   </layout>
  </widget>

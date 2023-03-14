@@ -12,7 +12,6 @@ These will be cleaned... eventually
 from __future__ import annotations
 
 import dataclasses
-import json
 import logging
 import pathlib
 import pprint
@@ -24,13 +23,14 @@ import pydm.display
 import typhos
 import typhos.cli
 import typhos.display
-from apischema import ValidationError, deserialize
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
 from atef.check import Result
 from atef.config import ConfigurationFile
-from atef.widgets.config.data_base import DataWidget, create_tree_items
+from atef.widgets.config.data_base import DataWidget
+from atef.widgets.config.run_base import create_tree_items
+from atef.widgets.config.utils import ConfigTreeModel, TreeItem
 from atef.widgets.core import DesignerDisplay
 
 from ...procedure import (DescriptionStep, DisplayOptions, PassiveStep,
@@ -546,10 +546,11 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
 
     open_button: QtWidgets.QPushButton
     select_button: QtWidgets.QPushButton
-    tree_widget: QtWidgets.QTreeWidget
+    tree_view: QtWidgets.QTreeView
 
     def __init__(self, *args, data=PassiveStep, **kwargs):
         super().__init__(data=data, **kwargs)
+        self.select_file(filename=self.bridge.filepath.get())
         # set up buttons, connect to tree-opening method
         self.select_button.clicked.connect(self.select_file)
         self.open_button.clicked.connect(self.open_in_new_tab)
@@ -561,36 +562,28 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
                 caption='Select a passive checkout',
                 filter='Json Files (*.json)',
             )
-        if not filename:
+        if not filename or filename == pathlib.Path():
             return
 
         self.bridge.filepath.put(filename)
-        with open(filename, 'r') as fd:
-            serialized = json.load(fd)
 
-        # TODO: Consider adding submenus for user to choose
-        try:
-            data = deserialize(ConfigurationFile, serialized)
-        except ValidationError:
-            logger.error('failed to open as passive checkout')
-            return
-
-        self.passive_config = data
+        self.passive_config = ConfigurationFile.from_filename(filename)
         self.setup_tree(self.passive_config)
 
     def setup_tree(self, config_file: ConfigurationFile):
         """ Assemble the tree view representation of ``config_file`` """
-        self.tree_widget.setColumnCount(2)
-        self.tree_widget.setHeaderLabels(['Node', 'Type'])
-        root_configuration_group = config_file.root
-        self.root_item = QtWidgets.QTreeWidgetItem(
-            [root_configuration_group.name, type(root_configuration_group).__name__]
-        )
-        create_tree_items(root_configuration_group, self.root_item)
-        self.tree_widget.insertTopLevelItems(0, [self.root_item])
+        # tree data
+        root_item = TreeItem(data=config_file)
+        create_tree_items(data=config_file.root, parent=root_item)
 
-        # expand root node
-        self.root_item.setExpanded(True)
+        model = ConfigTreeModel(data=root_item)
+
+        self.tree_view.setModel(model)
+        header = self.tree_view.header()
+        header.setSectionResizeMode(header.ResizeToContents)
+        # Hide the irrelevant status column
+        self.tree_view.setColumnHidden(1, True)
+        self.tree_view.expandAll()
 
     def open_in_new_tab(self):
         window = QtWidgets.QApplication.activeWindow()

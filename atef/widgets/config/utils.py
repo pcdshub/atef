@@ -14,9 +14,10 @@ from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
 from qtpy.QtWidgets import QCheckBox, QInputDialog, QLineEdit, QMenu, QWidget
 
 from atef import util
-from atef.check import Comparison, Equals, Range
+from atef.check import Comparison, Equals, Range, Result
 from atef.config import (Configuration, DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
+from atef.enums import Severity
 from atef.procedure import ProcedureStep
 from atef.qt_helpers import QDataclassList, QDataclassValue
 from atef.tools import Ping
@@ -900,3 +901,157 @@ class MultiInputDialog(QtWidgets.QDialog):
             info[unspaced_key] = value or self.init_values[unspaced_key]
 
         return info
+
+
+def combine_results(results: List[Result]) -> Result:
+    """
+    Combines results into a single result.
+
+    Takes the highest severity, and currently all the reasons
+    """
+    severity = util.get_maximum_severity([r.severity for r in results])
+    reason = str([r.reason for r in results]) or ''
+
+    return Result(severity=severity, reason=reason)
+
+
+class ConfigTreeModel(QtCore.QAbstractItemModel):
+    """
+    Item model for tree data.  Goes through all this effort due to the need for
+    tooltips, icons, etc
+    """
+    def __init__(self, *args, data: TreeItem, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tree_data = data or TreeItem()
+        self.root_item = self.tree_data
+        self.headers = ['Name', 'Status', 'Type']
+
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int
+    ) -> Any:
+        """
+        Returns the header data for the model.
+        Currently only displays horizontal header data
+        """
+        if role != Qt.DisplayRole:
+            return
+
+        if orientation == Qt.Horizontal:
+            return self.headers[section]
+
+    def index(self, row: int, column: int, parent: QtCore.QModelIndex = None):
+        if not self.hasIndex(row, column, parent):
+            return QtCore.QModelIndex()
+
+        parent_item = None
+        if not parent or not parent.isValid():
+            parent_item = self.root_item
+        else:
+            parent_item = parent.internalPointer()
+
+        child_item = parent_item.child(row)
+        if child_item:
+            return self.createIndex(row, column, child_item)
+
+        # all else
+        return QtCore.QModelIndex()
+
+    def parent(self, index: QtCore.QModelIndex):
+        if not index.isValid():
+            return QtCore.QModelIndex()
+        child = index.internalPointer()
+        parent = child.parent()
+        if parent == self.root_item:
+            return QtCore.QModelIndex()
+
+        return self.createIndex(parent.row(), 0, parent)
+
+    def rowCount(self, parent: QtCore.QModelIndex):
+        """ Called by tree view to determine number of children. """
+        if not parent.isValid():
+            parent_item = self.root_item
+        else:
+            parent_item = parent.internalPointer()
+        return parent_item.childCount()
+
+    def columnCount(self, parent: QtCore.QModelIndex):
+        if not parent.isValid():
+            parent_item = self.root_item
+        else:
+            parent_item = parent.internalPointer()
+        return parent_item.columnCount()
+
+    def data(self, index, role):
+        if not index.isValid():
+            return None
+        if index.column() == 1 and role == Qt.ForegroundRole:
+            brush = QBrush()
+            brush.setColor(QColor(255, 0, 0, 255))
+            return brush
+
+        item = index.internalPointer()
+        if role == Qt.ToolTipRole:
+            return 'tooltipbaby'
+        if role == Qt.DisplayRole:
+            return item.data(index.column())
+
+        return None
+
+
+class TreeItem:
+    result_icon_map = {
+        # check mark
+        Severity.success: '\u2713',
+        Severity.warning : '?',
+        # x mark
+        Severity.internal_error: '\u2718'
+    }
+
+    def __init__(
+        self,
+        data: Optional[Any] = None,
+        prepared_data: Optional[List[Any]] = None
+    ) -> None:
+        self._data = data
+        self.prepared_data = prepared_data
+
+        self._columncount = 3
+        self._children = []
+        self._parent = None
+        self._row = 0
+
+    def data(self, column):
+        if column == 0:
+            return self._data.name
+        elif column == 1:
+            if self.prepared_data:
+                prep_results = [d.result for d in self.prepared_data]
+                combined_result = combine_results(prep_results)
+                return self.result_icon_map[combined_result.severity]
+        elif column == 2:
+            return type(self._data).__name__
+
+    def columnCount(self):
+        return self._columncount
+
+    def childCount(self):
+        return len(self._children)
+
+    def child(self, row):
+        if row >= 0 and row < self.childCount():
+            return self._children[row]
+
+    def parent(self):
+        return self._parent
+
+    def row(self):
+        return self._row
+
+    def addChild(self, child):
+        child._parent = self
+        child._row = len(self._children)
+        self._children.append(child)
+        self._columncount = max(child.columnCount(), self._columncount)

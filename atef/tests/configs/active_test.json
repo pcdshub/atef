@@ -39,6 +39,28 @@
           },
           "step_success_required": false
         }
+      },
+      {
+        "PassiveStep": {
+          "name": "passive_title",
+          "description": null,
+          "parent": null,
+          "_result": {
+            "severity": 1,
+            "reason": "step incomplete"
+          },
+          "verify_result": {
+            "severity": 1,
+            "reason": "step incomplete"
+          },
+          "verify_required": true,
+          "step_result": {
+            "severity": 1,
+            "reason": "step incomplete"
+          },
+          "step_success_required": true,
+          "filepath": "/Users/roberttk/src/atef/atef/tests/configs/all_fields.json"
+        }
       }
     ]
   }

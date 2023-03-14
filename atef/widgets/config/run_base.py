@@ -7,20 +7,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Generator, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Generator, List, Optional, Union
 
 from qtpy import QtCore
 from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLayout, QLineEdit,
                             QMenu, QPushButton, QSpacerItem, QStyle,
                             QToolButton, QVBoxLayout, QWidget, QWidgetAction)
 
-from atef import util
 from atef.check import Comparison, Result
 from atef.config import (AnyPreparedConfiguration, Configuration,
                          ConfigurationFile, PreparedComparison,
                          PreparedConfiguration, PreparedFile)
 from atef.enums import Severity
 from atef.procedure import ProcedureFile, ProcedureStep
+from atef.widgets.config.utils import TreeItem, combine_results
 from atef.widgets.core import DesignerDisplay
 
 # avoid circular imports
@@ -116,18 +116,6 @@ def disable_widget(widget: QWidget) -> QWidget:
             if wid:
                 wid.setEnabled(False)
     return widget
-
-
-def combine_results(results: List[Result]) -> Result:
-    """
-    Combines results into a single result.
-
-    Takes the highest severity, and currently all the reasons
-    """
-    severity = util.get_maximum_severity([r.severity for r in results])
-    reason = str([r.reason for r in results]) or ''
-
-    return Result(severity=severity, reason=reason)
 
 
 def infer_step_type(config: Union[PreparedComparison, ProcedureStep]) -> str:
@@ -423,3 +411,68 @@ class VerifyEntryWidget(DesignerDisplay, QWidget):
         # modify button box labels
         self.verify_button_box.button(QDialogButtonBox.Ok).setText('Verify')
         self.verify_button_box.button(QDialogButtonBox.Cancel).setText('Reject')
+
+
+def create_tree_items(
+    data: Any,
+    parent: TreeItem,
+    prepared_file: Optional[PreparedFile] = None
+) -> None:
+    """
+    Recursively create the tree starting from the given data
+    Optionally associate prepared dataclasses with the TreeItems
+    """
+    try:
+        for cfg in data.configs:
+            if prepared_file:
+                # Grab relevant comps/configs so tree item can hold results
+                prep_configs = get_relevant_configs_comps(prepared_file, cfg)
+            else:
+                prep_configs = None
+            item = TreeItem(cfg, prepared_data=prep_configs)
+            create_tree_items(cfg, item, prepared_file=prepared_file)
+            parent.addChild(item)
+    except Exception as ex:
+        logger.debug(ex)
+
+    # look into configs, by_attr, shared
+    # TODO: better, less repetitive logic
+    try:
+        for comp in data.shared:
+            if prepared_file:
+                # Grab relevant comps/configs so tree item can hold results
+                prep_configs = get_relevant_configs_comps(prepared_file, comp)
+            else:
+                prep_configs = None
+            item = TreeItem(comp, prepared_data=prep_configs)
+            parent.addChild(item)
+    except Exception as ex:
+        logger.debug(ex)
+
+    try:
+        for comp_list in data.by_attr.values():
+            for comp in comp_list:
+                if prepared_file:
+                    # Grab relevant comps/configs so tree item can hold results
+                    prep_configs = get_relevant_configs_comps(prepared_file, comp)
+                else:
+                    prep_configs = None
+            print(f'{comp.name} -> {prep_configs}')
+            item = TreeItem(comp, prepared_data=prep_configs)
+            parent.addChild(item)
+    except Exception as ex:
+        logger.debug(ex)
+
+    try:
+        for comp_list in data.by_pv.values():
+            for comp in comp_list:
+                if prepared_file:
+                    # Grab relevant comps/configs so tree item can hold results
+                    prep_configs = get_relevant_configs_comps(prepared_file, comp)
+                else:
+                    prep_configs = None
+            print(f'{comp.name} -> {prep_configs}')
+            item = TreeItem(comp, prepared_data=prep_configs)
+            parent.addChild(item)
+    except Exception as ex:
+        logger.debug(ex)
