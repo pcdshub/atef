@@ -562,7 +562,7 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
                 caption='Select a passive checkout',
                 filter='Json Files (*.json)',
             )
-        if not filename or filename == pathlib.Path():
+        if not pathlib.Path(filename).is_file():
             return
 
         self.bridge.filepath.put(filename)

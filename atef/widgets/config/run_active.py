@@ -5,6 +5,7 @@ Widgets should map onto edit widgets from atef.widgets.config.data_active
 
 import asyncio
 import logging
+import pathlib
 
 from qtpy import QtWidgets
 
@@ -37,7 +38,9 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
             logger.warning('no passive step to run')
             return
 
-        fp = self.bridge.filepath.get()
+        fp = pathlib.Path(self.bridge.filepath.get())
+        if not fp.is_file():
+            return
         self.config_file = ConfigurationFile.from_filename(fp)
         self.prepared_config = PreparedFile.from_config(self.config_file)
 
