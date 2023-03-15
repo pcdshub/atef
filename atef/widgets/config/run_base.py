@@ -6,6 +6,7 @@ Widgets here should map onto edit widgets, often from atef.widgets.config.data
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
 from typing import TYPE_CHECKING, Any, Generator, List, Optional, Union
 
@@ -436,9 +437,14 @@ def create_tree_items(
         logger.debug(ex)
 
     # look into configs, by_attr, shared
-    # TODO: better, less repetitive logic
-    try:
-        for comp in data.shared:
+    # merges List[List[Comparison]] --> List[Comparison] with itertools
+    config_categories = [
+        getattr(data, 'shared', []),
+        itertools.chain.from_iterable(getattr(data, 'by_attr', {}).values()),
+        itertools.chain.from_iterable(getattr(data, 'by_pv', {}).values())
+    ]
+    for comp_list in config_categories:
+        for comp in comp_list:
             if prepared_file:
                 # Grab relevant comps/configs so tree item can hold results
                 prep_configs = get_relevant_configs_comps(prepared_file, comp)
@@ -446,31 +452,3 @@ def create_tree_items(
                 prep_configs = None
             item = TreeItem(comp, prepared_data=prep_configs)
             parent.addChild(item)
-    except Exception as ex:
-        logger.debug(ex)
-
-    try:
-        for comp_list in data.by_attr.values():
-            for comp in comp_list:
-                if prepared_file:
-                    # Grab relevant comps/configs so tree item can hold results
-                    prep_configs = get_relevant_configs_comps(prepared_file, comp)
-                else:
-                    prep_configs = None
-            item = TreeItem(comp, prepared_data=prep_configs)
-            parent.addChild(item)
-    except Exception as ex:
-        logger.debug(ex)
-
-    try:
-        for comp_list in data.by_pv.values():
-            for comp in comp_list:
-                if prepared_file:
-                    # Grab relevant comps/configs so tree item can hold results
-                    prep_configs = get_relevant_configs_comps(prepared_file, comp)
-                else:
-                    prep_configs = None
-            item = TreeItem(comp, prepared_data=prep_configs)
-            parent.addChild(item)
-    except Exception as ex:
-        logger.debug(ex)
