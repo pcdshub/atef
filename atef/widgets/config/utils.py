@@ -987,14 +987,19 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
     def data(self, index, role):
         if not index.isValid():
             return None
-        if index.column() == 1 and role == Qt.ForegroundRole:
-            brush = QBrush()
-            brush.setColor(QColor(255, 0, 0, 255))
-            return brush
 
         item = index.internalPointer()
+        # special handling for status info
+        if index.column() == 1:
+            if role == Qt.ForegroundRole:
+                brush = QBrush()
+                brush.setColor(item.data(index.column())[1])
+                return brush
+            if role == Qt.DisplayRole:
+                return item.data(1)[0]
+
         if role == Qt.ToolTipRole:
-            return 'tooltipbaby'
+            return item.tooltip()
         if role == Qt.DisplayRole:
             return item.data(index.column())
 
@@ -1004,10 +1009,11 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
 class TreeItem:
     result_icon_map = {
         # check mark
-        Severity.success: '\u2713',
-        Severity.warning : '?',
+        Severity.success: ('\u2713', QColor(0, 128, 0, 255)),
+        Severity.warning : ('?', QColor(255, 165, 0, 255)),
         # x mark
-        Severity.internal_error: '\u2718'
+        Severity.internal_error: ('\u2718', QColor(255, 0, 0, 255)),
+        Severity.error: ('\u2718', QColor(255, 0, 0, 255))
     }
 
     def __init__(
@@ -1017,7 +1023,7 @@ class TreeItem:
     ) -> None:
         self._data = data
         self.prepared_data = prepared_data
-
+        self.combined_result = None
         self._columncount = 3
         self._children = []
         self._parent = None
@@ -1029,10 +1035,17 @@ class TreeItem:
         elif column == 1:
             if self.prepared_data:
                 prep_results = [d.result for d in self.prepared_data]
-                combined_result = combine_results(prep_results)
-                return self.result_icon_map[combined_result.severity]
+                self.combined_result = combine_results(prep_results)
+                icon_data = self.result_icon_map[self.combined_result.severity]
+                return icon_data
         elif column == 2:
             return type(self._data).__name__
+
+    def tooltip(self):
+        if self.combined_result:
+            reason = self.combined_result.reason
+            return reason.replace(',', '\n').strip(' []')
+        return ''
 
     def columnCount(self):
         return self._columncount

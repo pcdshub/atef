@@ -3,11 +3,12 @@ Widgets for config gui's active-checkout run mode.
 Widgets should map onto edit widgets from atef.widgets.config.data_active
 """
 
+import asyncio
 import logging
 
 from qtpy import QtWidgets
 
-from atef.config import ConfigurationFile, PreparedFile
+from atef.config import ConfigurationFile, PreparedFile, run_passive_step
 from atef.procedure import DescriptionStep, PassiveStep
 from atef.widgets.config.data_base import DataWidget
 from atef.widgets.config.run_base import create_tree_items
@@ -34,18 +35,16 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
 
         fp = self.bridge.filepath.get()
         self.config_file = ConfigurationFile.from_filename(fp)
-        self.prepared_file = PreparedFile.from_config(self.config_file)
+        self.prepared_config = PreparedFile.from_config(self.config_file)
+
         self.setup_tree()
 
-        # need to setup RunCheck widget
-
     def setup_tree(self):
-        # tree data
         root_item = TreeItem(
-            data=self.config_file, prepared_data=self.prepared_file
+            data=self.config_file, prepared_data=self.prepared_config
         )
         create_tree_items(data=self.config_file.root, parent=root_item,
-                          prepared_file=self.prepared_file)
+                          prepared_file=self.prepared_config)
 
         model = ConfigTreeModel(data=root_item)
 
@@ -54,6 +53,16 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
         header.setSectionResizeMode(header.ResizeToContents)
         self.tree_view.header().swapSections(0, 1)
         self.tree_view.expandAll()
+
+    def run_config(self, *args, **kwargs) -> None:
+        """ to be connected to RunCheck Button """
+        self.tree_view.model().layoutAboutToBeChanged.emit()
+
+        loop = asyncio.get_event_loop()
+        coroutine = run_passive_step(self.prepared_config)
+        loop.run_until_complete(coroutine)
+
+        self.tree_view.model().layoutChanged.emit()
 
 
 class DescriptionRunWidget(DesignerDisplay, DataWidget):

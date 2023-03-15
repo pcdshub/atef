@@ -1678,6 +1678,9 @@ class RunStepPage(DesignerDisplay, PageWidget):
 
         self.insert_widget(run_widget, self.run_widget_placeholder)
 
+        if type(data) == PassiveStep:
+            self.run_check.run_button.clicked.connect(run_widget.run_config)
+
 
 PAGE_MAP = {
     # Passive Pages
