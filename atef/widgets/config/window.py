@@ -113,6 +113,7 @@ class Window(DesignerDisplay, QMainWindow):
         """
         if filename is None:
             filename = self.user_default_filename
+        filename = str(filename)
         if '.' not in filename:
             filename = '.'.join((filename, self.user_filename_ext))
         return os.path.basename(filename)
