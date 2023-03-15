@@ -12,12 +12,12 @@
       "severity": 1,
       "reason": "step incomplete"
     },
-    "verify_required": false,
+    "verify_required": true,
     "step_result": {
       "severity": 1,
       "reason": "step incomplete"
     },
-    "step_success_required": false,
+    "step_success_required": true,
     "steps": [
       {
         "DescriptionStep": {
@@ -59,7 +59,7 @@
             "reason": "step incomplete"
           },
           "step_success_required": true,
-          "filepath": "/cds/home/r/roberttk/devrepos/atef/atef/tests/configs/all_fields.json"
+          "filepath": "."
         }
       }
     ]
