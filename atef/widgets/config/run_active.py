@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 class PassiveRunWidget(DesignerDisplay, DataWidget):
     """
     Widget for viewing run status of a passive checkout.
-    Features a TreeView with icon status readouts, overall check status...
+    Features a TreeView with icon status readouts, overall check status
+
+    This widget holds onto a different ``PreparedFile`` from the ``RunCheck``
+    widget in ``RunStepPage``.  We assume they return the same result, and will
+    be run at roughly the same time
     """
     filename = 'passive_run_widget.ui'
 
@@ -40,6 +44,7 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
         self.setup_tree()
 
     def setup_tree(self):
+        """ Sets up ConfigTreeModel with the data from the ConfigurationFile """
         root_item = TreeItem(
             data=self.config_file, prepared_data=self.prepared_config
         )
@@ -47,15 +52,16 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
                           prepared_file=self.prepared_config)
 
         model = ConfigTreeModel(data=root_item)
-
         self.tree_view.setModel(model)
+
+        # Customize the look of the table
         header = self.tree_view.header()
         header.setSectionResizeMode(header.ResizeToContents)
         self.tree_view.header().swapSections(0, 1)
         self.tree_view.expandAll()
 
     def run_config(self, *args, **kwargs) -> None:
-        """ to be connected to RunCheck Button """
+        """ slot to be connected to RunCheck Button """
         self.tree_view.model().layoutAboutToBeChanged.emit()
 
         loop = asyncio.get_event_loop()

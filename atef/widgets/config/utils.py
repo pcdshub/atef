@@ -3,7 +3,8 @@ from __future__ import annotations
 import dataclasses
 import logging
 from itertools import zip_longest
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
+                    Union)
 
 import qtawesome as qta
 from qtpy import QtCore, QtWidgets
@@ -15,8 +16,9 @@ from qtpy.QtWidgets import QCheckBox, QInputDialog, QLineEdit, QMenu, QWidget
 
 from atef import util
 from atef.check import Comparison, Equals, Range, Result
-from atef.config import (Configuration, DeviceConfiguration, PVConfiguration,
-                         ToolConfiguration)
+from atef.config import (Configuration, DeviceConfiguration,
+                         PreparedComparison, PreparedConfiguration,
+                         PVConfiguration, ToolConfiguration)
 from atef.enums import Severity
 from atef.procedure import ProcedureStep
 from atef.qt_helpers import QDataclassList, QDataclassValue
@@ -918,7 +920,11 @@ def combine_results(results: List[Result]) -> Result:
 class ConfigTreeModel(QtCore.QAbstractItemModel):
     """
     Item model for tree data.  Goes through all this effort due to the need for
-    tooltips, icons, etc
+    tooltips, icons, etc.  This model is READ-ONLY, and does not implement
+    the ``setData`` method.
+
+    Expects the item to specifically TreeItem, which each holds a
+    Configuration or Comparison
     """
     def __init__(self, *args, data: TreeItem, **kwargs):
         super().__init__(*args, **kwargs)
@@ -943,6 +949,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
             return self.headers[section]
 
     def index(self, row: int, column: int, parent: QtCore.QModelIndex = None):
+        """ Returns the index of the item in the model """
         if not self.hasIndex(row, column, parent):
             return QtCore.QModelIndex()
 
@@ -960,6 +967,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         return QtCore.QModelIndex()
 
     def parent(self, index: QtCore.QModelIndex):
+        """ Returns the parent of the given model item. """
         if not index.isValid():
             return QtCore.QModelIndex()
         child = index.internalPointer()
@@ -970,7 +978,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         return self.createIndex(parent.row(), 0, parent)
 
     def rowCount(self, parent: QtCore.QModelIndex):
-        """ Called by tree view to determine number of children. """
+        """ Called by tree view to determine number of children an item has. """
         if not parent.isValid():
             parent_item = self.root_item
         else:
@@ -985,6 +993,10 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         return parent_item.columnCount()
 
     def data(self, index, role):
+        """
+        Returns the data stored under the given ``role`` for the item
+        referred to by the ``index``.  Uses and assumes ``TreeItem`` methods.
+        """
         if not index.isValid():
             return None
 
@@ -997,6 +1009,8 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
                 return brush
             if role == Qt.DisplayRole:
                 return item.data(1)[0]
+            if role == Qt.TextAlignmentRole:
+                return Qt.AlignCenter
 
         if role == Qt.ToolTipRole:
             return item.tooltip()
@@ -1007,6 +1021,15 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
 
 
 class TreeItem:
+    """
+    Node in a tree representation of a passive checkout.
+
+    Each node takes a Configuration or Comparison, and provides ``ConfigTreeModel``
+    information from it.
+
+    If ``prepared_data`` is provided, Result information can be provided to the
+    model via the ``.data()`` method
+    """
     result_icon_map = {
         # check mark
         Severity.success: ('\u2713', QColor(0, 128, 0, 255)),
@@ -1018,8 +1041,8 @@ class TreeItem:
 
     def __init__(
         self,
-        data: Optional[Any] = None,
-        prepared_data: Optional[List[Any]] = None
+        data: Union[Configuration, Comparison],
+        prepared_data: Optional[List[PreparedConfiguration, PreparedComparison]] = None
     ) -> None:
         self._data = data
         self.prepared_data = prepared_data
@@ -1029,7 +1052,7 @@ class TreeItem:
         self._parent = None
         self._row = 0
 
-    def data(self, column):
+    def data(self, column: int):
         if column == 0:
             return self._data.name
         elif column == 1:
@@ -1044,7 +1067,7 @@ class TreeItem:
     def tooltip(self):
         if self.combined_result:
             reason = self.combined_result.reason
-            return reason.replace(',', '\n').strip(' []')
+            return reason.strip('[]').replace(', ', '\n')
         return ''
 
     def columnCount(self):
@@ -1053,7 +1076,7 @@ class TreeItem:
     def childCount(self):
         return len(self._children)
 
-    def child(self, row):
+    def child(self, row: int):
         if row >= 0 and row < self.childCount():
             return self._children[row]
 
@@ -1063,7 +1086,7 @@ class TreeItem:
     def row(self):
         return self._row
 
-    def addChild(self, child):
+    def addChild(self, child: TreeItem):
         child._parent = self
         child._row = len(self._children)
         self._children.append(child)
