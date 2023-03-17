@@ -228,9 +228,7 @@ class PassiveStep(ProcedureStep):
                                                    cache=DataCache())
 
         # run passive checkout.  Will need to set up asyncio loop
-        loop = asyncio.get_event_loop()
-        coroutine = run_passive_step(prepared_config)
-        result = loop.run_until_complete(coroutine)
+        result = asyncio.run(run_passive_step(prepared_config))
 
         return result
 

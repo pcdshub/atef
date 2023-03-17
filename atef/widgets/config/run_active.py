@@ -65,11 +65,13 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
 
     def run_config(self, *args, **kwargs) -> None:
         """ slot to be connected to RunCheck Button """
-        self.tree_view.model().layoutAboutToBeChanged.emit()
+        try:
+            self.tree_view.model().layoutAboutToBeChanged.emit()
+        except AttributeError:
+            # no model has been set, this method should be no-op
+            return
 
-        loop = asyncio.get_event_loop()
-        coroutine = run_passive_step(self.prepared_config)
-        loop.run_until_complete(coroutine)
+        asyncio.run(run_passive_step(self.prepared_config))
 
         self.tree_view.model().layoutChanged.emit()
 

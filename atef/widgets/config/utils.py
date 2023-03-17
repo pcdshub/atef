@@ -1061,6 +1061,8 @@ class TreeItem:
                 self.combined_result = combine_results(prep_results)
                 icon_data = self.result_icon_map[self.combined_result.severity]
                 return icon_data
+            else:
+                return self.result_icon_map[Severity.internal_error]
         elif column == 2:
             return type(self._data).__name__
 
