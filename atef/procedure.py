@@ -44,6 +44,12 @@ class BlueskyState:
         self.RE.subscribe(self.db.insert)
 
 
+def walk_steps(step: ProcedureStep) -> Generator[ProcedureStep, None, None]:
+    yield step
+    for sub_step in getattr(step, 'steps', []):
+        yield from walk_steps(sub_step)
+
+
 @dataclasses.dataclass
 @serialization.as_tagged_union
 class ProcedureStep:

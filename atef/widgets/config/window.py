@@ -19,7 +19,8 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
 
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, PreparedFile
-from atef.procedure import DescriptionStep, PassiveStep, ProcedureFile
+from atef.procedure import (DescriptionStep, PassiveStep, ProcedureFile,
+                            incomplete_result, walk_steps)
 from atef.report import PassiveAtefReport
 
 from ..archive_viewer import get_archive_viewer
@@ -408,7 +409,7 @@ class RunTree(EditTree):
     def __init__(
         self,
         *args,
-        config_file: ConfigurationFile,
+        config_file: ConfigurationFile | ProcedureFile,
         full_path: Optional[str] = None,
         **kwargs
     ):
@@ -418,6 +419,12 @@ class RunTree(EditTree):
         if isinstance(config_file, ConfigurationFile):
             self.prepared_file = PreparedFile.from_config(config_file,
                                                           cache=DataCache())
+        if isinstance(config_file, ProcedureFile):
+            # clear all results when making a new run tree
+            for step in walk_steps(config_file.root):
+                step.step_result = incomplete_result()
+                step.verify_result = incomplete_result()
+                step.combined_result = incomplete_result()
 
         self._swap_to_run_widgets()
         self.print_report_button.clicked.connect(self.print_report)
