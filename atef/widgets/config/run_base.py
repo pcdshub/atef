@@ -222,7 +222,7 @@ class RunCheck(DesignerDisplay, QWidget):
         if data:
             self.setup_buttons(configs=data)
             # initialize tooltip
-            self.update_status()
+            self.update_all_icons_tooltips()
 
     def setup_buttons(self, configs, next_widget: AtefItem = None) -> None:
         """
@@ -257,26 +257,9 @@ class RunCheck(DesignerDisplay, QWidget):
                     raise TypeError('incompatible type found: '
                                     f'{config_type}, {cfg}')
 
-                self.update_status()
+                self.update_all_icons_tooltips()
 
         self.run_button.clicked.connect(run_slot)
-
-    def update_status(self) -> None:
-        """ Update all status labels in the RunCheck widget """
-        # overall result label
-        if not self.data:
-            logger.warning('No config associated with this step')
-            return
-        self.update_icon(self.result_label, self.results)
-        self.update_label_tooltip(self.result_label, self.results)
-
-        # step result
-        if self.step_results:
-            self.update_icon(self.run_success_label, self.step_results)
-            self.update_label_tooltip(self.run_success_label, self.step_results)
-
-            self.update_icon(self.verify_label, self.verify_results)
-            self.update_label_tooltip(self.verify_label, self.verify_results)
 
     def update_icon(self, label: QLabel, results: List[Result]) -> None:
         """ Helper method to update icon on ``label`` based on ``results`` """
@@ -298,6 +281,10 @@ class RunCheck(DesignerDisplay, QWidget):
 
     def update_all_icons_tooltips(self) -> None:
         """ Convenience method for updating all the icons and tooltips """
+        if not self.data:
+            logger.warning('No config associated with this step')
+            return
+
         self.update_icon(self.result_label, self.results)
         self.update_label_tooltip(self.result_label, self.results)
 
