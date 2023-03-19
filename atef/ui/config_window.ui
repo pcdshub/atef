@@ -53,6 +53,7 @@
     </property>
     <addaction name="action_open_archive_viewer"/>
     <addaction name="action_print_report"/>
+    <addaction name="action_clear_results"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDebug"/>
@@ -102,6 +103,11 @@
   <action name="action_print_report">
    <property name="text">
     <string>Print Report</string>
+   </property>
+  </action>
+  <action name="action_clear_results">
+   <property name="text">
+    <string>Clear Results</string>
    </property>
   </action>
  </widget>
