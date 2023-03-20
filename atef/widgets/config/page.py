@@ -1505,7 +1505,6 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
             table=self.procedure_table,
         )
         self.procedure_table.setCellWidget(found_row, 0, step_row)
-        # self.update_combo_attrs()
 
 
 class StepPage(DesignerDisplay, PageWidget):
