@@ -941,6 +941,20 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         """
         Returns the header data for the model.
         Currently only displays horizontal header data
+
+        Parameters
+        ----------
+        section : int
+            section to provide header information for
+        orientation : Qt.Orientation
+            header orientation, Qt.Horizontal or Qt.Vertical
+        role : int
+            Qt role to provide header information for
+
+        Returns
+        -------
+        Any
+            requested header data
         """
         if role != Qt.DisplayRole:
             return
@@ -948,8 +962,32 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         if orientation == Qt.Horizontal:
             return self.headers[section]
 
-    def index(self, row: int, column: int, parent: QtCore.QModelIndex = None):
-        """ Returns the index of the item in the model """
+    def index(
+        self,
+        row: int,
+        column: int,
+        parent: QtCore.QModelIndex = None
+    ) -> QtCore.QModelIndex:
+        """
+        Returns the index of the item in the model.
+
+        In a tree view the rows are defined relative to parent item.  If an
+        item is the first child under its parent, it will have row=0,
+        regardless of the number of items in the tree.
+
+        Parameters
+        ----------
+        row : int
+            The row of the requested index.
+        column : int
+            The column of the requested index
+        parent : QtCore.QModelIndex, optional
+            The parent of the requested index, by default None
+
+        Returns
+        -------
+        QtCore.QModelIndex
+        """
         if not self.hasIndex(row, column, parent):
             return QtCore.QModelIndex()
 
@@ -966,8 +1004,20 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         # all else
         return QtCore.QModelIndex()
 
-    def parent(self, index: QtCore.QModelIndex):
-        """ Returns the parent of the given model item. """
+    def parent(self, index: QtCore.QModelIndex) -> QtCore.QModelIndex:
+        """
+        Returns the parent of the given model item.
+
+        Parameters
+        ----------
+        index : QtCore.QModelIndex
+            item to retrieve parent of
+
+        Returns
+        -------
+        QtCore.QModelIndex
+            index of the parent item
+        """
         if not index.isValid():
             return QtCore.QModelIndex()
         child = index.internalPointer()
@@ -977,25 +1027,61 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
 
         return self.createIndex(parent.row(), 0, parent)
 
-    def rowCount(self, parent: QtCore.QModelIndex):
-        """ Called by tree view to determine number of children an item has. """
+    def rowCount(self, parent: QtCore.QModelIndex) -> int:
+        """
+        Called by tree view to determine number of children an item has.
+
+        Parameters
+        ----------
+        parent : QtCore.QModelIndex
+            index of the parent item being queried
+
+        Returns
+        -------
+        int
+            number of children ``parent`` has
+        """
         if not parent.isValid():
             parent_item = self.root_item
         else:
             parent_item = parent.internalPointer()
         return parent_item.childCount()
 
-    def columnCount(self, parent: QtCore.QModelIndex):
+    def columnCount(self, parent: QtCore.QModelIndex) -> int:
+        """
+        Called by tree view to determine number of columns of data ``parent`` has
+
+        Parameters
+        ----------
+        parent : QtCore.QModelIndex
+
+        Returns
+        -------
+        int
+            number of columns ``parent`` has
+        """
         if not parent.isValid():
             parent_item = self.root_item
         else:
             parent_item = parent.internalPointer()
         return parent_item.columnCount()
 
-    def data(self, index, role):
+    def data(self, index: QtCore.QModelIndex, role: int) -> Any:
         """
         Returns the data stored under the given ``role`` for the item
         referred to by the ``index``.  Uses and assumes ``TreeItem`` methods.
+
+        Parameters
+        ----------
+        index : QtCore.QModelIndex
+            index that identifies the portion of the model in question
+        role : int
+            the data role
+
+        Returns
+        -------
+        Any
+            The data to be displayed by the model
         """
         if not index.isValid():
             return None
@@ -1048,11 +1134,26 @@ class TreeItem:
         self.prepared_data = prepared_data
         self.combined_result = None
         self._columncount = 3
-        self._children = []
+        self._children: List[TreeItem] = []
         self._parent = None
         self._row = 0
 
-    def data(self, column: int):
+    def data(self, column: int) -> Any:
+        """
+        Return the data for the requested column.
+        Column 0: name
+        Column 1: (status icon, color)
+        Column 2: type
+
+        Parameters
+        ----------
+        column : int
+            data column requested
+
+        Returns
+        -------
+        Any
+        """
         if column == 0:
             return self._data.name
         elif column == 1:
@@ -1066,29 +1167,43 @@ class TreeItem:
         elif column == 2:
             return type(self._data).__name__
 
-    def tooltip(self):
+    def tooltip(self) -> str:
+        """ Construct the tooltip based on the stored result """
         if self.combined_result:
             reason = self.combined_result.reason
             return reason.strip('[]').replace(', ', '\n')
         return ''
 
-    def columnCount(self):
+    def columnCount(self) -> int:
+        """ Return the item's column count """
         return self._columncount
 
-    def childCount(self):
+    def childCount(self) -> int:
+        """ Return the item's child count """
         return len(self._children)
 
-    def child(self, row: int):
+    def child(self, row: int) -> TreeItem:
+        """ Return the item's child """
         if row >= 0 and row < self.childCount():
             return self._children[row]
 
-    def parent(self):
+    def parent(self) -> TreeItem:
+        """ Return the item's parent """
         return self._parent
 
-    def row(self):
+    def row(self) -> int:
+        """ Return the item's row under its parent """
         return self._row
 
-    def addChild(self, child: TreeItem):
+    def addChild(self, child: TreeItem) -> None:
+        """
+        Add a child to this item.
+
+        Parameters
+        ----------
+        child : TreeItem
+            Child TreeItem to add to this TreeItem
+        """
         child._parent = self
         child._row = len(self._children)
         self._children.append(child)

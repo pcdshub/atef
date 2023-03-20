@@ -45,6 +45,18 @@ class BlueskyState:
 
 
 def walk_steps(step: ProcedureStep) -> Generator[ProcedureStep, None, None]:
+    """
+    Yield ProedureSteps in ``step``, depth-first.
+
+    Parameters
+    ----------
+    step : ProcedureStep
+        Step to yield ProcedureSteps from
+
+    Yields
+    ------
+    Generator[ProcedureStep, None, None]
+    """
     yield step
     for sub_step in getattr(step, 'steps', []):
         yield from walk_steps(sub_step)

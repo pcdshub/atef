@@ -405,7 +405,19 @@ def get_clipboard_text() -> str:
 def walk_tree_widget_items(
     tree_widget: QtWidgets.QTreeWidget
 ) -> Generator[Any, None, None]:
-    # walk through tree items, make an analogous widget for each in edit tree
+    """
+    Walk a ``QtWidgets.QTreeWidget``'s tree items.  Steps through items depht-first
+
+    Parameters
+    ----------
+    tree_widget : QtWidgets.QTreeWidget
+        tree widget to walk through.
+
+    Yields
+    ------
+    Generator[Any, None, None]
+        each item in the QTreeWidget
+    """
     # this is not a pythonic iterator, treat it differently
     iter = QtWidgets.QTreeWidgetItemIterator(tree_widget)
 

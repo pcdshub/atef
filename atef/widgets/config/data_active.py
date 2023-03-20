@@ -553,7 +553,7 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
 
     def __init__(self, *args, data=PassiveStep, **kwargs):
         super().__init__(data=data, **kwargs)
-        self.select_file(filename=self.bridge.filepath.get())
+        self.select_file(filepath=self.bridge.filepath.get())
 
         self.select_button.setIcon(qtawesome.icon('fa.folder-open-o'))
         self.open_button.setIcon(qtawesome.icon('mdi.open-in-new'))
@@ -561,23 +561,39 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
         self.select_button.clicked.connect(self.select_file)
         self.open_button.clicked.connect(self.open_in_new_tab)
 
-    def select_file(self, *args, filename: Optional[str] = None, **kwargs) -> None:
-        if filename is None:
-            filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+    def select_file(self, *args, filepath: Optional[str] = None, **kwargs) -> None:
+        """
+        Select the passive checkout file to be loaded into the widget's tree view.
+        If no filename is provided, opens a QFileDialog to prompt the user for a file
+
+        Parameters
+        ----------
+        filepath : Optional[str], optional
+            filepath to the passive checkout, by default None
+        """
+        if filepath is None:
+            filepath, _ = QtWidgets.QFileDialog.getOpenFileName(
                 parent=self,
                 caption='Select a passive checkout',
                 filter='Json Files (*.json)',
             )
-        if not pathlib.Path(filename).is_file():
+        if not pathlib.Path(filepath).is_file():
             return
 
-        self.bridge.filepath.put(filename)
-        self.passive_config = ConfigurationFile.from_filename(filename)
+        self.bridge.filepath.put(filepath)
+        self.passive_config = ConfigurationFile.from_filename(filepath)
         self.setup_tree(self.passive_config)
         self.load_time_label.setText(f'Loaded: {datetime.datetime.now().ctime()}')
 
-    def setup_tree(self, config_file: ConfigurationFile):
-        """ Assemble the tree view representation of ``config_file`` """
+    def setup_tree(self, config_file: ConfigurationFile) -> None:
+        """
+        Assemble the tree view representation of ``config_file``
+
+        Parameters
+        ----------
+        config_file : ConfigurationFile
+            Passive checkout configuration file dataclass
+        """
         # tree data
         root_item = TreeItem(data=config_file)
         create_tree_items(data=config_file.root, parent=root_item)
@@ -591,7 +607,10 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
         self.tree_view.setColumnHidden(1, True)
         self.tree_view.expandAll()
 
-    def open_in_new_tab(self):
+    def open_in_new_tab(self, *args, **kwargs) -> None:
+        """
+        Slot for opening the selected passive checkout in a new tab.
+        """
         window = QtWidgets.QApplication.activeWindow()
         try:
             window.open_file(filename=self.bridge.filepath.get())

@@ -1472,11 +1472,24 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
                 dest_row = self.procedure_table.rowCount() - 1
             self.move_config_row(selected_row, dest_row)
 
-    def replace_step(self, old_step, new_step, comp_item) -> None:
+    def replace_step(
+        self,
+        old_step: ProcedureStep,
+        new_step: ProcedureStep,
+        comp_item: AtefItem
+    ) -> None:
         """
         Find old_step and replace it with new_step
-
         Also finds the row widget and replaces with a new row widget
+
+        Parameters
+        ----------
+        old_step : ProcedureStep
+            old ProcedureStep, to be replaced
+        new_step : ProcedureStep
+            new ProcedureStep to replace old_step with
+        comp_item : AtefItem
+            AtefItem holding the old comparison and widget
         """
         def replace_in_list(
             old: ProcedureStep,
