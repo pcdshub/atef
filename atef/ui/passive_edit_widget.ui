@@ -25,14 +25,26 @@
      <item>
       <widget class="QPushButton" name="select_button">
        <property name="text">
-        <string>Select Passive Checkout</string>
+        <string> Select Passive Checkout</string>
+       </property>
+       <property name="iconSize">
+        <size>
+         <width>20</width>
+         <height>20</height>
+        </size>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="open_button">
        <property name="text">
-        <string>Open in New Tab</string>
+        <string> Open in New Tab</string>
+       </property>
+       <property name="iconSize">
+        <size>
+         <width>20</width>
+         <height>20</height>
+        </size>
        </property>
       </widget>
      </item>

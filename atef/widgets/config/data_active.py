@@ -20,6 +20,7 @@ from typing import (Dict, Generator, List, Optional, Sequence, Type, TypeVar,
 
 import pydm
 import pydm.display
+import qtawesome
 import typhos
 import typhos.cli
 import typhos.display
@@ -551,6 +552,9 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
     def __init__(self, *args, data=PassiveStep, **kwargs):
         super().__init__(data=data, **kwargs)
         self.select_file(filename=self.bridge.filepath.get())
+
+        self.select_button.setIcon(qtawesome.icon('fa.folder-open-o'))
+        self.open_button.setIcon(qtawesome.icon('mdi.open-in-new'))
         # set up buttons, connect to tree-opening method
         self.select_button.clicked.connect(self.select_file)
         self.open_button.clicked.connect(self.open_in_new_tab)
