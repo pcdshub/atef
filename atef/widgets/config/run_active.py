@@ -7,6 +7,7 @@ import asyncio
 import logging
 import pathlib
 
+import qtawesome
 from qtpy import QtWidgets
 
 from atef.config import ConfigurationFile, PreparedFile, run_passive_step
@@ -31,6 +32,7 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
     filename = 'passive_run_widget.ui'
 
     tree_view: QtWidgets.QTreeView
+    refresh_button: QtWidgets.QPushButton
 
     def __init__(self, *args, data: PassiveStep, **kwargs):
         super().__init__(*args, data=data, **kwargs)
@@ -45,6 +47,9 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
         self.prepared_config = PreparedFile.from_config(self.config_file)
 
         self.setup_tree()
+
+        self.refresh_button.setIcon(qtawesome.icon('fa.refresh'))
+        self.refresh_button.clicked.connect(self.run_config)
 
     def setup_tree(self):
         """ Sets up ConfigTreeModel with the data from the ConfigurationFile """
