@@ -12,6 +12,7 @@ These will be cleaned... eventually
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import logging
 import pathlib
 import pprint
@@ -548,6 +549,7 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
     open_button: QtWidgets.QPushButton
     select_button: QtWidgets.QPushButton
     tree_view: QtWidgets.QTreeView
+    load_time_label: QtWidgets.QLabel
 
     def __init__(self, *args, data=PassiveStep, **kwargs):
         super().__init__(data=data, **kwargs)
@@ -572,6 +574,7 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
         self.bridge.filepath.put(filename)
         self.passive_config = ConfigurationFile.from_filename(filename)
         self.setup_tree(self.passive_config)
+        self.load_time_label.setText(f'Loaded: {datetime.datetime.now().ctime()}')
 
     def setup_tree(self, config_file: ConfigurationFile):
         """ Assemble the tree view representation of ``config_file`` """

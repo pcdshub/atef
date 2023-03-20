@@ -18,6 +18,13 @@
     <widget class="QTreeView" name="tree_view"/>
    </item>
    <item>
+    <widget class="QLabel" name="load_time_label">
+     <property name="text">
+      <string>Please select a passive checkout...</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <property name="bottomMargin">
       <number>4</number>
