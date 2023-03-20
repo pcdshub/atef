@@ -410,18 +410,15 @@ def create_tree_items(
     Recursively create the tree starting from the given data
     Optionally associate prepared dataclasses with the TreeItems
     """
-    try:
-        for cfg in data.configs:
-            if prepared_file:
-                # Grab relevant comps/configs so tree item can hold results
-                prep_configs = get_relevant_configs_comps(prepared_file, cfg)
-            else:
-                prep_configs = None
-            item = TreeItem(cfg, prepared_data=prep_configs)
-            create_tree_items(cfg, item, prepared_file=prepared_file)
-            parent.addChild(item)
-    except Exception as ex:
-        logger.debug(ex)
+    for cfg in getattr(data, 'configs', []):
+        if prepared_file:
+            # Grab relevant comps/configs so tree item can hold results
+            prep_configs = get_relevant_configs_comps(prepared_file, cfg)
+        else:
+            prep_configs = None
+        item = TreeItem(cfg, prepared_data=prep_configs)
+        create_tree_items(cfg, item, prepared_file=prepared_file)
+        parent.addChild(item)
 
     # look into configs, by_attr, shared
     # merges List[List[Comparison]] --> List[Comparison] with itertools
