@@ -18,9 +18,10 @@ from atef import util
 from atef.check import Comparison, Equals, Range, Result
 from atef.config import (Configuration, DeviceConfiguration,
                          PreparedComparison, PreparedConfiguration,
-                         PVConfiguration, ToolConfiguration)
+                         PreparedFile, PVConfiguration, ToolConfiguration,
+                         incomplete_result)
 from atef.enums import Severity
-from atef.procedure import ProcedureStep
+from atef.procedure import ProcedureFile, ProcedureStep, walk_steps
 from atef.qt_helpers import QDataclassList, QDataclassValue
 from atef.tools import Ping
 from atef.widgets.archive_viewer import get_archive_viewer
@@ -915,6 +916,21 @@ def combine_results(results: List[Result]) -> Result:
     reason = str([r.reason for r in results]) or ''
 
     return Result(severity=severity, reason=reason)
+
+
+def clear_results(config_file: PreparedFile | ProcedureFile) -> None:
+    if isinstance(config_file, ProcedureFile):
+        # clear all results when making a new run tree
+        for step in walk_steps(config_file.root):
+            step.step_result = incomplete_result()
+            step.verify_result = incomplete_result()
+            step.combined_result = incomplete_result()
+
+    elif isinstance(config_file, PreparedFile):
+        for comp in config_file.walk_comparisons():
+            comp.result = incomplete_result()
+        for group in config_file.walk_groups():
+            group.result = incomplete_result()
 
 
 class ConfigTreeModel(QtCore.QAbstractItemModel):

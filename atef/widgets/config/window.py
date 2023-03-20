@@ -19,8 +19,7 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
 
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, PreparedFile
-from atef.procedure import (DescriptionStep, PassiveStep, ProcedureFile,
-                            incomplete_result, walk_steps)
+from atef.procedure import DescriptionStep, PassiveStep, ProcedureFile
 from atef.qt_helpers import walk_tree_widget_items
 from atef.report import PassiveAtefReport
 
@@ -29,7 +28,7 @@ from ..core import DesignerDisplay
 from .page import (AtefItem, ConfigurationGroupPage, PageWidget,
                    ProcedureGroupPage, RunStepPage, link_page)
 from .run_base import make_run_page
-from .utils import MultiInputDialog, Toggle
+from .utils import MultiInputDialog, Toggle, clear_results
 
 logger = logging.getLogger(__name__)
 
@@ -319,19 +318,10 @@ class Window(DesignerDisplay, QMainWindow):
             if reply != QMessageBox.Yes:
                 return
 
-            if isinstance(config_file, ProcedureFile):
-                # clear all results when making a new run tree
-                for step in walk_steps(config_file.root):
-                    step.step_result = incomplete_result()
-                    step.verify_result = incomplete_result()
-                    step.combined_result = incomplete_result()
-            elif isinstance(config_file, ConfigurationFile):
-                prepared_file = current_tree.prepared_file
-                for comp in prepared_file.walk_comparisons():
-                    comp.result = incomplete_result()
-
-                for group in prepared_file.walk_groups():
-                    group.result = incomplete_result()
+            if current_tree.prepared_file:
+                clear_results(current_tree.prepared_file)
+            else:
+                clear_results(config_file)
 
             current_tree.update_statuses()
 
@@ -458,10 +448,7 @@ class RunTree(EditTree):
                                                           cache=DataCache())
         if isinstance(config_file, ProcedureFile):
             # clear all results when making a new run tree
-            for step in walk_steps(config_file.root):
-                step.step_result = incomplete_result()
-                step.verify_result = incomplete_result()
-                step.combined_result = incomplete_result()
+            clear_results(config_file)
 
         self._swap_to_run_widgets()
         self.print_report_button.clicked.connect(self.print_report)
