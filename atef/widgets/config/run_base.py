@@ -6,21 +6,22 @@ Widgets here should map onto edit widgets, often from atef.widgets.config.data
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
-from typing import TYPE_CHECKING, Generator, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Generator, List, Optional, Union
 
 from qtpy import QtCore
 from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLayout, QLineEdit,
                             QMenu, QPushButton, QSpacerItem, QStyle,
                             QToolButton, QVBoxLayout, QWidget, QWidgetAction)
 
-from atef import util
 from atef.check import Comparison, Result
 from atef.config import (AnyPreparedConfiguration, Configuration,
                          ConfigurationFile, PreparedComparison,
                          PreparedConfiguration, PreparedFile)
 from atef.enums import Severity
 from atef.procedure import ProcedureFile, ProcedureStep
+from atef.widgets.config.utils import TreeItem, combine_results
 from atef.widgets.core import DesignerDisplay
 
 # avoid circular imports
@@ -116,18 +117,6 @@ def disable_widget(widget: QWidget) -> QWidget:
             if wid:
                 wid.setEnabled(False)
     return widget
-
-
-def combine_results(results: List[Result]) -> Result:
-    """
-    Combines results into a single result.
-
-    Takes the highest severity, and currently all the reasons
-    """
-    severity = util.get_maximum_severity([r.severity for r in results])
-    reason = str([r.reason for r in results]) or ''
-
-    return Result(severity=severity, reason=reason)
 
 
 def infer_step_type(config: Union[PreparedComparison, ProcedureStep]) -> str:
@@ -233,7 +222,7 @@ class RunCheck(DesignerDisplay, QWidget):
         if data:
             self.setup_buttons(configs=data)
             # initialize tooltip
-            self.update_status()
+            self.update_all_icons_tooltips()
 
     def setup_buttons(self, configs, next_widget: AtefItem = None) -> None:
         """
@@ -268,26 +257,9 @@ class RunCheck(DesignerDisplay, QWidget):
                     raise TypeError('incompatible type found: '
                                     f'{config_type}, {cfg}')
 
-                self.update_status()
+                self.update_all_icons_tooltips()
 
         self.run_button.clicked.connect(run_slot)
-
-    def update_status(self) -> None:
-        """ Update all status labels in the RunCheck widget """
-        # overall result label
-        if not self.data:
-            logger.warning('No config associated with this step')
-            return
-        self.update_icon(self.result_label, self.results)
-        self.update_label_tooltip(self.result_label, self.results)
-
-        # step result
-        if self.step_results:
-            self.update_icon(self.run_success_label, self.step_results)
-            self.update_label_tooltip(self.run_success_label, self.step_results)
-
-            self.update_icon(self.verify_label, self.verify_results)
-            self.update_label_tooltip(self.verify_label, self.verify_results)
 
     def update_icon(self, label: QLabel, results: List[Result]) -> None:
         """ Helper method to update icon on ``label`` based on ``results`` """
@@ -309,6 +281,10 @@ class RunCheck(DesignerDisplay, QWidget):
 
     def update_all_icons_tooltips(self) -> None:
         """ Convenience method for updating all the icons and tooltips """
+        if not self.data:
+            logger.warning('No config associated with this step')
+            return
+
         self.update_icon(self.result_label, self.results)
         self.update_label_tooltip(self.result_label, self.results)
 
@@ -423,3 +399,40 @@ class VerifyEntryWidget(DesignerDisplay, QWidget):
         # modify button box labels
         self.verify_button_box.button(QDialogButtonBox.Ok).setText('Verify')
         self.verify_button_box.button(QDialogButtonBox.Cancel).setText('Reject')
+
+
+def create_tree_items(
+    data: Any,
+    parent: TreeItem,
+    prepared_file: Optional[PreparedFile] = None
+) -> None:
+    """
+    Recursively create the tree starting from the given data
+    Optionally associate prepared dataclasses with the TreeItems
+    """
+    for cfg in getattr(data, 'configs', []):
+        if prepared_file:
+            # Grab relevant comps/configs so tree item can hold results
+            prep_configs = get_relevant_configs_comps(prepared_file, cfg)
+        else:
+            prep_configs = None
+        item = TreeItem(cfg, prepared_data=prep_configs)
+        create_tree_items(cfg, item, prepared_file=prepared_file)
+        parent.addChild(item)
+
+    # look into configs, by_attr, shared
+    # merges List[List[Comparison]] --> List[Comparison] with itertools
+    config_categories = [
+        getattr(data, 'shared', []),
+        itertools.chain.from_iterable(getattr(data, 'by_attr', {}).values()),
+        itertools.chain.from_iterable(getattr(data, 'by_pv', {}).values())
+    ]
+    for comp_list in config_categories:
+        for comp in comp_list:
+            if prepared_file:
+                # Grab relevant comps/configs so tree item can hold results
+                prep_configs = get_relevant_configs_comps(prepared_file, comp)
+            else:
+                prep_configs = None
+            item = TreeItem(comp, prepared_data=prep_configs)
+            parent.addChild(item)

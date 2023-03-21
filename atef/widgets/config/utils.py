@@ -3,7 +3,8 @@ from __future__ import annotations
 import dataclasses
 import logging
 from itertools import zip_longest
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
+                    Union)
 
 import qtawesome as qta
 from qtpy import QtCore, QtWidgets
@@ -14,10 +15,13 @@ from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
 from qtpy.QtWidgets import QCheckBox, QInputDialog, QLineEdit, QMenu, QWidget
 
 from atef import util
-from atef.check import Comparison, Equals, Range
-from atef.config import (Configuration, DeviceConfiguration, PVConfiguration,
-                         ToolConfiguration)
-from atef.procedure import ProcedureStep
+from atef.check import Comparison, Equals, Range, Result
+from atef.config import (Configuration, DeviceConfiguration,
+                         PreparedComparison, PreparedConfiguration,
+                         PreparedFile, PVConfiguration, ToolConfiguration,
+                         incomplete_result)
+from atef.enums import Severity
+from atef.procedure import ProcedureFile, ProcedureStep, walk_steps
 from atef.qt_helpers import QDataclassList, QDataclassValue
 from atef.tools import Ping
 from atef.widgets.archive_viewer import get_archive_viewer
@@ -900,3 +904,323 @@ class MultiInputDialog(QtWidgets.QDialog):
             info[unspaced_key] = value or self.init_values[unspaced_key]
 
         return info
+
+
+def combine_results(results: List[Result]) -> Result:
+    """
+    Combines results into a single result.
+
+    Takes the highest severity, and currently all the reasons
+    """
+    severity = util.get_maximum_severity([r.severity for r in results])
+    reason = str([r.reason for r in results]) or ''
+
+    return Result(severity=severity, reason=reason)
+
+
+def clear_results(config_file: PreparedFile | ProcedureFile) -> None:
+    if isinstance(config_file, ProcedureFile):
+        # clear all results when making a new run tree
+        for step in walk_steps(config_file.root):
+            step.step_result = incomplete_result()
+            step.verify_result = incomplete_result()
+            step.combined_result = incomplete_result()
+
+    elif isinstance(config_file, PreparedFile):
+        for comp in config_file.walk_comparisons():
+            comp.result = incomplete_result()
+        for group in config_file.walk_groups():
+            group.result = incomplete_result()
+
+
+class ConfigTreeModel(QtCore.QAbstractItemModel):
+    """
+    Item model for tree data.  Goes through all this effort due to the need for
+    tooltips, icons, etc.  This model is READ-ONLY, and does not implement
+    the ``setData`` method.
+
+    Expects the item to specifically TreeItem, which each holds a
+    Configuration or Comparison
+    """
+    def __init__(self, *args, data: TreeItem, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tree_data = data or TreeItem()
+        self.root_item = self.tree_data
+        self.headers = ['Name', 'Status', 'Type']
+
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int
+    ) -> Any:
+        """
+        Returns the header data for the model.
+        Currently only displays horizontal header data
+
+        Parameters
+        ----------
+        section : int
+            section to provide header information for
+        orientation : Qt.Orientation
+            header orientation, Qt.Horizontal or Qt.Vertical
+        role : int
+            Qt role to provide header information for
+
+        Returns
+        -------
+        Any
+            requested header data
+        """
+        if role != Qt.DisplayRole:
+            return
+
+        if orientation == Qt.Horizontal:
+            return self.headers[section]
+
+    def index(
+        self,
+        row: int,
+        column: int,
+        parent: QtCore.QModelIndex = None
+    ) -> QtCore.QModelIndex:
+        """
+        Returns the index of the item in the model.
+
+        In a tree view the rows are defined relative to parent item.  If an
+        item is the first child under its parent, it will have row=0,
+        regardless of the number of items in the tree.
+
+        Parameters
+        ----------
+        row : int
+            The row of the requested index.
+        column : int
+            The column of the requested index
+        parent : QtCore.QModelIndex, optional
+            The parent of the requested index, by default None
+
+        Returns
+        -------
+        QtCore.QModelIndex
+        """
+        if not self.hasIndex(row, column, parent):
+            return QtCore.QModelIndex()
+
+        parent_item = None
+        if not parent or not parent.isValid():
+            parent_item = self.root_item
+        else:
+            parent_item = parent.internalPointer()
+
+        child_item = parent_item.child(row)
+        if child_item:
+            return self.createIndex(row, column, child_item)
+
+        # all else
+        return QtCore.QModelIndex()
+
+    def parent(self, index: QtCore.QModelIndex) -> QtCore.QModelIndex:
+        """
+        Returns the parent of the given model item.
+
+        Parameters
+        ----------
+        index : QtCore.QModelIndex
+            item to retrieve parent of
+
+        Returns
+        -------
+        QtCore.QModelIndex
+            index of the parent item
+        """
+        if not index.isValid():
+            return QtCore.QModelIndex()
+        child = index.internalPointer()
+        parent = child.parent()
+        if parent == self.root_item:
+            return QtCore.QModelIndex()
+
+        return self.createIndex(parent.row(), 0, parent)
+
+    def rowCount(self, parent: QtCore.QModelIndex) -> int:
+        """
+        Called by tree view to determine number of children an item has.
+
+        Parameters
+        ----------
+        parent : QtCore.QModelIndex
+            index of the parent item being queried
+
+        Returns
+        -------
+        int
+            number of children ``parent`` has
+        """
+        if not parent.isValid():
+            parent_item = self.root_item
+        else:
+            parent_item = parent.internalPointer()
+        return parent_item.childCount()
+
+    def columnCount(self, parent: QtCore.QModelIndex) -> int:
+        """
+        Called by tree view to determine number of columns of data ``parent`` has
+
+        Parameters
+        ----------
+        parent : QtCore.QModelIndex
+
+        Returns
+        -------
+        int
+            number of columns ``parent`` has
+        """
+        if not parent.isValid():
+            parent_item = self.root_item
+        else:
+            parent_item = parent.internalPointer()
+        return parent_item.columnCount()
+
+    def data(self, index: QtCore.QModelIndex, role: int) -> Any:
+        """
+        Returns the data stored under the given ``role`` for the item
+        referred to by the ``index``.  Uses and assumes ``TreeItem`` methods.
+
+        Parameters
+        ----------
+        index : QtCore.QModelIndex
+            index that identifies the portion of the model in question
+        role : int
+            the data role
+
+        Returns
+        -------
+        Any
+            The data to be displayed by the model
+        """
+        if not index.isValid():
+            return None
+
+        item = index.internalPointer()
+        # special handling for status info
+        if index.column() == 1:
+            if role == Qt.ForegroundRole:
+                brush = QBrush()
+                brush.setColor(item.data(index.column())[1])
+                return brush
+            if role == Qt.DisplayRole:
+                return item.data(1)[0]
+            if role == Qt.TextAlignmentRole:
+                return Qt.AlignCenter
+
+        if role == Qt.ToolTipRole:
+            return item.tooltip()
+        if role == Qt.DisplayRole:
+            return item.data(index.column())
+
+        return None
+
+
+class TreeItem:
+    """
+    Node in a tree representation of a passive checkout.
+
+    Each node takes a Configuration or Comparison, and provides ``ConfigTreeModel``
+    information from it.
+
+    If ``prepared_data`` is provided, Result information can be provided to the
+    model via the ``.data()`` method
+    """
+    result_icon_map = {
+        # check mark
+        Severity.success: ('\u2713', QColor(0, 128, 0, 255)),
+        Severity.warning : ('?', QColor(255, 165, 0, 255)),
+        # x mark
+        Severity.internal_error: ('\u2718', QColor(255, 0, 0, 255)),
+        Severity.error: ('\u2718', QColor(255, 0, 0, 255))
+    }
+
+    def __init__(
+        self,
+        data: Union[Configuration, Comparison],
+        prepared_data: Optional[List[PreparedConfiguration, PreparedComparison]] = None
+    ) -> None:
+        self._data = data
+        self.prepared_data = prepared_data
+        self.combined_result = None
+        self._columncount = 3
+        self._children: List[TreeItem] = []
+        self._parent = None
+        self._row = 0
+
+    def data(self, column: int) -> Any:
+        """
+        Return the data for the requested column.
+        Column 0: name
+        Column 1: (status icon, color)
+        Column 2: type
+
+        Parameters
+        ----------
+        column : int
+            data column requested
+
+        Returns
+        -------
+        Any
+        """
+        if column == 0:
+            return self._data.name
+        elif column == 1:
+            if self.prepared_data:
+                prep_results = [d.result for d in self.prepared_data]
+                self.combined_result = combine_results(prep_results)
+                icon_data = self.result_icon_map[self.combined_result.severity]
+                return icon_data
+            else:
+                return self.result_icon_map[Severity.internal_error]
+        elif column == 2:
+            return type(self._data).__name__
+
+    def tooltip(self) -> str:
+        """ Construct the tooltip based on the stored result """
+        if self.combined_result:
+            reason = self.combined_result.reason
+            return reason.strip('[]').replace(', ', '\n')
+        return ''
+
+    def columnCount(self) -> int:
+        """ Return the item's column count """
+        return self._columncount
+
+    def childCount(self) -> int:
+        """ Return the item's child count """
+        return len(self._children)
+
+    def child(self, row: int) -> TreeItem:
+        """ Return the item's child """
+        if row >= 0 and row < self.childCount():
+            return self._children[row]
+
+    def parent(self) -> TreeItem:
+        """ Return the item's parent """
+        return self._parent
+
+    def row(self) -> int:
+        """ Return the item's row under its parent """
+        return self._row
+
+    def addChild(self, child: TreeItem) -> None:
+        """
+        Add a child to this item.
+
+        Parameters
+        ----------
+        child : TreeItem
+            Child TreeItem to add to this TreeItem
+        """
+        child._parent = self
+        child._row = len(self._children)
+        self._children.append(child)
+        self._columncount = max(child.columnCount(), self._columncount)

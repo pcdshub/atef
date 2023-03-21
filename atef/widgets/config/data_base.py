@@ -3,6 +3,7 @@ Widgets used for manipulating the configuration data.
 """
 from __future__ import annotations
 
+import logging
 from typing import ClassVar, Dict, List, Protocol, Tuple
 from weakref import WeakValueDictionary
 
@@ -17,6 +18,8 @@ from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
 
 from .utils import get_relevant_pvs
+
+logger = logging.getLogger(__name__)
 
 
 class AnyDataclass(Protocol):

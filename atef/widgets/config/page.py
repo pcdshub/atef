@@ -35,8 +35,10 @@ from atef.config import (Configuration, ConfigurationGroup,
 from atef.procedure import (DescriptionStep, PassiveStep, ProcedureGroup,
                             ProcedureStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
-from atef.widgets.config.data_active import GeneralProcedureWidget
-from atef.widgets.config.run_active import DescriptionRunWidget
+from atef.widgets.config.data_active import (GeneralProcedureWidget,
+                                             PassiveEditWidget)
+from atef.widgets.config.run_active import (DescriptionRunWidget,
+                                            PassiveRunWidget)
 from atef.widgets.config.run_base import RunCheck
 
 from ..core import DesignerDisplay
@@ -1470,6 +1472,53 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
                 dest_row = self.procedure_table.rowCount() - 1
             self.move_config_row(selected_row, dest_row)
 
+    def replace_step(
+        self,
+        old_step: ProcedureStep,
+        new_step: ProcedureStep,
+        comp_item: AtefItem
+    ) -> None:
+        """
+        Find old_step and replace it with new_step
+        Also finds the row widget and replaces with a new row widget
+
+        Parameters
+        ----------
+        old_step : ProcedureStep
+            old ProcedureStep, to be replaced
+        new_step : ProcedureStep
+            new ProcedureStep to replace old_step with
+        comp_item : AtefItem
+            AtefItem holding the old comparison and widget
+        """
+        def replace_in_list(
+            old: ProcedureStep,
+            new: ProcedureStep,
+            step_list: List[ProcedureStep]
+        ):
+            index = step_list.index(old)
+            step_list[index] = new
+
+        replace_in_list(old_step, new_step, self.data.steps)
+
+        # go through rows
+        found_row = None
+        for row_index in range(self.procedure_table.rowCount()):
+            widget = self.procedure_table.cellWidget(row_index, 0)
+            if widget.data is old_step:
+                found_row = row_index
+                break
+        if found_row is None:
+            return
+
+        step_row = ComparisonRowWidget(data=new_step)
+        self.setup_row_buttons(
+            row_widget=step_row,
+            item=comp_item,
+            table=self.procedure_table,
+        )
+        self.procedure_table.setCellWidget(found_row, 0, step_row)
+
 
 class StepPage(DesignerDisplay, PageWidget):
     """
@@ -1489,8 +1538,10 @@ class StepPage(DesignerDisplay, PageWidget):
     specific_combo: QComboBox
 
     step_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
-        DescriptionStep: None
+        DescriptionStep: None,
+        PassiveStep: PassiveEditWidget
     }
+    step_types: Dict[str, ProcedureStep]
 
     def __init__(self, data: ProcedureStep, **kwargs):
         super().__init__(data=data, **kwargs)
@@ -1501,6 +1552,7 @@ class StepPage(DesignerDisplay, PageWidget):
                 self.specific_combo.setCurrentIndex(index)
             self.step_types[step_type.__name__] = step_type
         self.new_step(step=data)
+        self.specific_combo.activated.connect(self.select_step_type)
 
     def assign_tree_item(self, item: AtefItem) -> None:
         """
@@ -1530,12 +1582,13 @@ class StepPage(DesignerDisplay, PageWidget):
         SpecificWidgetType = self.step_map[type(step)]
         if SpecificWidgetType:
             new_specific_widget = SpecificWidgetType(data=step)
-            self.insert_widget(
-                new_specific_widget,
-                self.specific_procedure_placeholder,
-            )
         else:
             new_specific_widget = QWidget()
+
+        self.insert_widget(
+            new_specific_widget,
+            self.specific_procedure_placeholder,
+        )
 
         self.general_procedure_widget = general_widget
         self.specific_procedure_widget = new_specific_widget
@@ -1548,6 +1601,32 @@ class StepPage(DesignerDisplay, PageWidget):
         else:
             # Reinitialize this for the new name/desc/tags widget
             self.assign_tree_item(item)
+
+    def select_step_type(self, new_type_index: int) -> None:
+        """
+        The user wants to change to a different step type.
+
+        This needs to do the following:
+        - create a new dataclass with as much overlap with
+          the previous dataclass as possible, but using the new type
+        - replace references in the configuration to the old dataclass
+          with the new dataclass, including in the row widgets
+        - call self.new_step to update the edit widgets here
+        """
+        new_type_name = self.specific_combo.itemText(new_type_index)
+        new_type = self.step_types[new_type_name]
+        if isinstance(self.data, new_type):
+            return
+
+        step = cast_dataclass(data=self.data, new_type=new_type)
+        self.parent_tree_item.widget.replace_step(
+            old_step=self.data,
+            new_step=step,
+            comp_item=self.tree_item,
+        )
+        self.tree_item.setText(1, new_type.__name__)
+        self.new_step(step=step)
+        self.update_context()
 
     def showEvent(self, *args, **kwargs) -> None:
         """
@@ -1597,7 +1676,8 @@ class RunStepPage(DesignerDisplay, PageWidget):
     run_check: RunCheck
 
     run_widget_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
-        DescriptionStep: DescriptionRunWidget
+        DescriptionStep: DescriptionRunWidget,
+        PassiveStep: PassiveRunWidget
     }
 
     def __init__(self, *args, data, **kwargs):
@@ -1610,6 +1690,9 @@ class RunStepPage(DesignerDisplay, PageWidget):
 
         self.insert_widget(run_widget, self.run_widget_placeholder)
 
+        if type(data) == PassiveStep:
+            self.run_check.run_button.clicked.connect(run_widget.run_config)
+
 
 PAGE_MAP = {
     # Passive Pages
@@ -1619,7 +1702,8 @@ PAGE_MAP = {
     ToolConfiguration: ToolConfigurationPage,
     # Active Pages
     ProcedureGroup: ProcedureGroupPage,
-    DescriptionStep: StepPage
+    DescriptionStep: StepPage,
+    PassiveStep: StepPage
 }
 
 

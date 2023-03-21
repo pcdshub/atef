@@ -9,8 +9,8 @@ from __future__ import annotations
 import functools
 import logging
 import platform
-from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
-                    Union, get_args, get_origin, get_type_hints)
+from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
+                    Tuple, Type, Union, get_args, get_origin, get_type_hints)
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QObject
@@ -400,3 +400,27 @@ def get_clipboard_text() -> str:
         if text:
             return text
     return ""
+
+
+def walk_tree_widget_items(
+    tree_widget: QtWidgets.QTreeWidget
+) -> Generator[Any, None, None]:
+    """
+    Walk a ``QtWidgets.QTreeWidget``'s tree items.  Steps through items depht-first
+
+    Parameters
+    ----------
+    tree_widget : QtWidgets.QTreeWidget
+        tree widget to walk through.
+
+    Yields
+    ------
+    Generator[Any, None, None]
+        each item in the QTreeWidget
+    """
+    # this is not a pythonic iterator, treat it differently
+    iter = QtWidgets.QTreeWidgetItemIterator(tree_widget)
+
+    while iter.value():
+        yield iter.value()
+        iter += 1

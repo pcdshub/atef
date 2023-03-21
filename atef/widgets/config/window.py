@@ -19,7 +19,8 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
 
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, PreparedFile
-from atef.procedure import DescriptionStep, ProcedureFile
+from atef.procedure import DescriptionStep, PassiveStep, ProcedureFile
+from atef.qt_helpers import walk_tree_widget_items
 from atef.report import PassiveAtefReport
 
 from ..archive_viewer import get_archive_viewer
@@ -27,7 +28,7 @@ from ..core import DesignerDisplay
 from .page import (AtefItem, ConfigurationGroupPage, PageWidget,
                    ProcedureGroupPage, RunStepPage, link_page)
 from .run_base import make_run_page
-from .utils import MultiInputDialog, Toggle
+from .utils import MultiInputDialog, Toggle, clear_results
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ class Window(DesignerDisplay, QMainWindow):
     action_print_serialized: QAction
     action_open_archive_viewer: QAction
     action_print_report: QAction
+    action_clear_results: QAction
 
     def __init__(self, *args, show_welcome: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
@@ -66,6 +68,7 @@ class Window(DesignerDisplay, QMainWindow):
             self.open_archive_viewer
         )
         self.action_print_report.triggered.connect(self.print_report)
+        self.action_clear_results.triggered.connect(self.clear_results)
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
 
@@ -113,6 +116,7 @@ class Window(DesignerDisplay, QMainWindow):
         """
         if filename is None:
             filename = self.user_default_filename
+        filename = str(filename)
         if '.' not in filename:
             filename = '.'.join((filename, self.user_filename_ext))
         return os.path.basename(filename)
@@ -296,6 +300,31 @@ class Window(DesignerDisplay, QMainWindow):
 
         run_tree.print_report()
 
+    def clear_results(self, *args, **kwargs):
+        """ clear results for a given tree """
+        current_tree = self.tab_widget.currentWidget().get_tree()
+
+        if isinstance(current_tree, RunTree):
+            config_file = current_tree.config_file
+            # ask for confirmation first
+            reply = QMessageBox.question(
+                self,
+                'Confirm deletion',
+                (
+                    'Are you sure you want to clear the results of the checkout: '
+                    f'{config_file.root.name}?'
+                ),
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+            if current_tree.prepared_file:
+                clear_results(current_tree.prepared_file)
+            else:
+                clear_results(config_file)
+
+            current_tree.update_statuses()
+
 
 class EditTree(DesignerDisplay, QWidget):
     """
@@ -391,7 +420,8 @@ class EditTree(DesignerDisplay, QWidget):
 
 
 _edit_to_run_page: Dict[type, PageWidget] = {
-    DescriptionStep: RunStepPage
+    DescriptionStep: RunStepPage,
+    PassiveStep: RunStepPage
 }
 
 
@@ -406,7 +436,7 @@ class RunTree(EditTree):
     def __init__(
         self,
         *args,
-        config_file: ConfigurationFile,
+        config_file: ConfigurationFile | ProcedureFile,
         full_path: Optional[str] = None,
         **kwargs
     ):
@@ -416,6 +446,9 @@ class RunTree(EditTree):
         if isinstance(config_file, ConfigurationFile):
             self.prepared_file = PreparedFile.from_config(config_file,
                                                           cache=DataCache())
+        if isinstance(config_file, ProcedureFile):
+            # clear all results when making a new run tree
+            clear_results(config_file)
 
         self._swap_to_run_widgets()
         self.print_report_button.clicked.connect(self.print_report)
@@ -438,15 +471,10 @@ class RunTree(EditTree):
         If a run-specific version of the widget exists, return that.
         Otherwise makes a read-only copy of the widget with run controls
         """
-        # walk through tree items, make an analogous widget for each in edit tree
-        # this is not a pythonic iterator, treat it differently
-        it = QtWidgets.QTreeWidgetItemIterator(self.tree_widget)
-
         # replace widgets with run versions
         # start at the root of the config file
         prev_widget = None
-        while it.value():
-            item: AtefItem = it.value()
+        for item in walk_tree_widget_items(self.tree_widget):
             data = item.widget.data  # Dataclass on widget
             if type(data) in _edit_to_run_page:
                 run_widget_cls = _edit_to_run_page[type(item.widget.data)]
@@ -466,20 +494,13 @@ class RunTree(EditTree):
             run_button: QtWidgets.QPushButton = run_widget.run_check.run_button
             run_button.clicked.connect(self.update_statuses)
 
-            it += 1
-
     def update_statuses(self) -> None:
         """ update every status icon based on stored config result """
-        # walk through tree
-        it = QtWidgets.QTreeWidgetItemIterator(self.tree_widget)
-        while it.value():
-            item: AtefItem = it.value()
+        for item in walk_tree_widget_items(self.tree_widget):
             try:
-                item.widget.run_check.update_status()
+                item.widget.run_check.update_all_icons_tooltips()
             except AttributeError as ex:
                 logger.debug(f'Run Check widget not properly setup: {ex}')
-
-            it += 1
 
     def print_report(self, *args, **kwargs):
         """ setup button to print the report """

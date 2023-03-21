@@ -44,6 +44,24 @@ class BlueskyState:
         self.RE.subscribe(self.db.insert)
 
 
+def walk_steps(step: ProcedureStep) -> Generator[ProcedureStep, None, None]:
+    """
+    Yield ProedureSteps in ``step``, depth-first.
+
+    Parameters
+    ----------
+    step : ProcedureStep
+        Step to yield ProcedureSteps from
+
+    Yields
+    ------
+    Generator[ProcedureStep, None, None]
+    """
+    yield step
+    for sub_step in getattr(step, 'steps', []):
+        yield from walk_steps(sub_step)
+
+
 @dataclasses.dataclass
 @serialization.as_tagged_union
 class ProcedureStep:
@@ -228,9 +246,7 @@ class PassiveStep(ProcedureStep):
                                                    cache=DataCache())
 
         # run passive checkout.  Will need to set up asyncio loop
-        loop = asyncio.get_event_loop()
-        coroutine = run_passive_step(prepared_config)
-        result = loop.run_until_complete(coroutine)
+        result = asyncio.run(run_passive_step(prepared_config))
 
         return result
 

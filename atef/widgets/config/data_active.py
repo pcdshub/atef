@@ -12,6 +12,7 @@ These will be cleaned... eventually
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import logging
 import pathlib
 import pprint
@@ -20,6 +21,7 @@ from typing import (Dict, Generator, List, Optional, Sequence, Type, TypeVar,
 
 import pydm
 import pydm.display
+import qtawesome
 import typhos
 import typhos.cli
 import typhos.display
@@ -27,11 +29,14 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
 from atef.check import Result
+from atef.config import ConfigurationFile
 from atef.widgets.config.data_base import DataWidget
+from atef.widgets.config.run_base import create_tree_items
+from atef.widgets.config.utils import ConfigTreeModel, TreeItem
 from atef.widgets.core import DesignerDisplay
 
-from ...procedure import (DescriptionStep, DisplayOptions, PlanOptions,
-                          PlanStep, ProcedureGroup, ProcedureStep,
+from ...procedure import (DescriptionStep, DisplayOptions, PassiveStep,
+                          PlanOptions, PlanStep, ProcedureGroup, ProcedureStep,
                           PydmDisplayStep, TyphosDisplayStep,
                           incomplete_result)
 
@@ -534,13 +539,84 @@ def procedure_step_to_widget(step: ProcedureStep) -> StepWidgetBase:
     return widget_cls.from_settings(step)
 
 
-class PassiveEditPage(DesignerDisplay, DataWidget):
+class PassiveEditWidget(DesignerDisplay, DataWidget):
     """
     Widget for selecting and previewing a passive checkout.
     Features readouts for number of checks to run, ... and more?
     """
-    filename = 'passive_edit_page.ui'
-    pass
+    filename = 'passive_edit_widget.ui'
+
+    open_button: QtWidgets.QPushButton
+    select_button: QtWidgets.QPushButton
+    tree_view: QtWidgets.QTreeView
+    load_time_label: QtWidgets.QLabel
+
+    def __init__(self, *args, data=PassiveStep, **kwargs):
+        super().__init__(data=data, **kwargs)
+        self.select_file(filepath=self.bridge.filepath.get())
+
+        self.select_button.setIcon(qtawesome.icon('fa.folder-open-o'))
+        self.open_button.setIcon(qtawesome.icon('mdi.open-in-new'))
+        # set up buttons, connect to tree-opening method
+        self.select_button.clicked.connect(self.select_file)
+        self.open_button.clicked.connect(self.open_in_new_tab)
+
+    def select_file(self, *args, filepath: Optional[str] = None, **kwargs) -> None:
+        """
+        Select the passive checkout file to be loaded into the widget's tree view.
+        If no filename is provided, opens a QFileDialog to prompt the user for a file
+
+        Parameters
+        ----------
+        filepath : Optional[str], optional
+            filepath to the passive checkout, by default None
+        """
+        if filepath is None:
+            filepath, _ = QtWidgets.QFileDialog.getOpenFileName(
+                parent=self,
+                caption='Select a passive checkout',
+                filter='Json Files (*.json)',
+            )
+        if not pathlib.Path(filepath).is_file():
+            return
+
+        self.bridge.filepath.put(filepath)
+        self.passive_config = ConfigurationFile.from_filename(filepath)
+        self.setup_tree(self.passive_config)
+        self.load_time_label.setText(f'Loaded: {datetime.datetime.now().ctime()}')
+
+    def setup_tree(self, config_file: ConfigurationFile) -> None:
+        """
+        Assemble the tree view representation of ``config_file``
+
+        Parameters
+        ----------
+        config_file : ConfigurationFile
+            Passive checkout configuration file dataclass
+        """
+        # tree data
+        root_item = TreeItem(data=config_file)
+        create_tree_items(data=config_file.root, parent=root_item)
+
+        model = ConfigTreeModel(data=root_item)
+
+        self.tree_view.setModel(model)
+        header = self.tree_view.header()
+        header.setSectionResizeMode(header.ResizeToContents)
+        # Hide the irrelevant status column
+        self.tree_view.setColumnHidden(1, True)
+        self.tree_view.expandAll()
+
+    def open_in_new_tab(self, *args, **kwargs) -> None:
+        """
+        Slot for opening the selected passive checkout in a new tab.
+        """
+        window = QtWidgets.QApplication.activeWindow()
+        try:
+            window.open_file(filename=self.bridge.filepath.get())
+        except IsADirectoryError:
+            # just prompt if something fails
+            window.open_file(filename=None)
 
 
 class PlanEditPage(DesignerDisplay, DataWidget):

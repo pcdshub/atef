@@ -186,7 +186,7 @@ def test_config_window_basic(qtbot: QtBot):
     """
     from ..widgets.config.window import Window
     window = Window(show_welcome=False)
-    qtbot.add_widget(window)
+    qtbot.addWidget(window)
 
 
 def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
@@ -195,7 +195,7 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
     """
     from ..widgets.config.window import Window
     window = Window(show_welcome=False)
-    qtbot.add_widget(window)
+    qtbot.addWidget(window)
     test_configs = pathlib.Path(__file__).parent / 'configs'
     for filename in ('lfe.json', 'all_fields.json', 'active_test.json'):
         config_path = test_configs / filename
@@ -214,7 +214,7 @@ def test_edit_run_toggle(qtbot: QtBot, test_configs: list[os.PathLike]):
     """ Smoke test run-mode for all sample configs """
     from ..widgets.config.window import Window
     window = Window(show_welcome=False)
-    qtbot.add_widget(window)
+    qtbot.addWidget(window)
     for idx, filename in enumerate(test_configs):
         window.open_file(filename=str(filename))
         toggle = window.tab_widget.widget(idx).toggle

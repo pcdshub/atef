@@ -10,6 +10,8 @@ Welcome to atef's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   upcoming_changes.rst
+
 .. toctree::
    :maxdepth: 1
    :caption: Links
