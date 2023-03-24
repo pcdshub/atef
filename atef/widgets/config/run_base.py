@@ -15,13 +15,14 @@ from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLayout, QLineEdit,
                             QMenu, QPushButton, QSpacerItem, QStyle,
                             QToolButton, QVBoxLayout, QWidget, QWidgetAction)
 
-from atef.check import Comparison, Result
+from atef.check import Comparison
 from atef.config import (AnyPreparedConfiguration, Configuration,
                          ConfigurationFile, PreparedComparison,
                          PreparedConfiguration, PreparedFile)
 from atef.enums import Severity
 from atef.procedure import ProcedureFile, ProcedureStep
-from atef.widgets.config.utils import TreeItem, combine_results
+from atef.result import Result, combine_results
+from atef.widgets.config.utils import TreeItem
 from atef.widgets.core import DesignerDisplay
 
 # avoid circular imports

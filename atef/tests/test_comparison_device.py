@@ -6,12 +6,13 @@ import ophyd.sim
 import pytest
 
 from .. import cache, check, reduce, util
-from ..check import Comparison, Result, Severity
+from ..check import Comparison, Severity
 from ..config import (ConfigurationFile, ConfigurationGroup,
                       DeviceConfiguration, PreparedDeviceConfiguration,
                       PreparedFile, PreparedPVConfiguration, PVConfiguration,
                       get_result_from_comparison)
 from ..exceptions import PreparedComparisonException
+from ..result import Result
 
 
 async def check_device(

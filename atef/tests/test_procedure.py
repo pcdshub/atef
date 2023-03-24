@@ -1,8 +1,8 @@
 import pytest
 
-from atef.check import Result
 from atef.enums import Severity
 from atef.procedure import DescriptionStep, ProcedureStep
+from atef.result import Result
 
 pass_result = Result()
 fail_result = Result(severity=Severity.error)

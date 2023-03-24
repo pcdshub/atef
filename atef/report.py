@@ -20,13 +20,13 @@ from reportlab.platypus.frames import Frame
 from reportlab.platypus.paragraph import Paragraph
 from reportlab.platypus.tableofcontents import TableOfContents
 
-from atef.check import Result
 from atef.config import (PreparedComparison, PreparedConfiguration,
                          PreparedDeviceConfiguration, PreparedFile,
                          PreparedGroup, PreparedPVConfiguration,
                          PreparedSignalComparison, PreparedToolComparison,
                          PreparedToolConfiguration)
 from atef.enums import Severity
+from atef.result import Result
 
 h1 = PS(name='Heading1', fontSize=16, leading=20)
 

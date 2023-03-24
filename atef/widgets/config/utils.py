@@ -15,14 +15,14 @@ from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
 from qtpy.QtWidgets import QCheckBox, QInputDialog, QLineEdit, QMenu, QWidget
 
 from atef import util
-from atef.check import Comparison, Equals, Range, Result
+from atef.check import Comparison, Equals, Range
 from atef.config import (Configuration, DeviceConfiguration,
                          PreparedComparison, PreparedConfiguration,
-                         PreparedFile, PVConfiguration, ToolConfiguration,
-                         incomplete_result)
+                         PreparedFile, PVConfiguration, ToolConfiguration)
 from atef.enums import Severity
 from atef.procedure import ProcedureFile, ProcedureStep, walk_steps
 from atef.qt_helpers import QDataclassList, QDataclassValue
+from atef.result import combine_results, incomplete_result
 from atef.tools import Ping
 from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
@@ -904,18 +904,6 @@ class MultiInputDialog(QtWidgets.QDialog):
             info[unspaced_key] = value or self.init_values[unspaced_key]
 
         return info
-
-
-def combine_results(results: List[Result]) -> Result:
-    """
-    Combines results into a single result.
-
-    Takes the highest severity, and currently all the reasons
-    """
-    severity = util.get_maximum_severity([r.severity for r in results])
-    reason = str([r.reason for r in results]) or ''
-
-    return Result(severity=severity, reason=reason)
 
 
 def clear_results(config_file: PreparedFile | ProcedureFile) -> None:

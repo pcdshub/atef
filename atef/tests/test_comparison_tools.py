@@ -7,8 +7,9 @@ import pytest
 
 from .. import check, config, tools
 from ..cache import DataCache
-from ..check import Result, Severity
 from ..config import Comparison, PreparedToolConfiguration, ToolConfiguration
+from ..enums import Severity
+from ..result import Result
 
 
 async def check_tool(

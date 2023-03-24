@@ -14,19 +14,18 @@ import ophyd
 import yaml
 from ophyd.signal import ConnectionTimeoutError
 
+from atef.result import _summarize_result_severity
+
 from . import serialization, tools, util
 from .cache import DataCache
-from .check import Comparison, Result, incomplete
+from .check import Comparison
 from .enums import GroupResultMode, Severity
 from .exceptions import PreparedComparisonException
+from .result import Result, incomplete_result
 from .type_hints import AnyPath
 from .yaml_support import init_yaml_support
 
 logger = logging.getLogger(__name__)
-
-
-def incomplete_result():
-    return incomplete
 
 
 @dataclass
@@ -325,41 +324,6 @@ class FailedConfiguration:
     result: Result
     #: Exception that was caught, if available.
     exception: Optional[Exception] = None
-
-
-def _summarize_result_severity(
-    mode: GroupResultMode,
-    results: List[Union[Result, Exception, None]]
-) -> Severity:
-    """
-    Summarize all results based on the configured mode.
-
-    Parameters
-    ----------
-    mode : GroupResultMode
-        The mode to apply to the results.
-    results : list of (Result, Exception, or None)
-        The list of results.
-
-    Returns
-    -------
-    Severity
-        The calculated severity.
-    """
-    if any(result is None or isinstance(result, Exception) for result in results):
-        return Severity.error
-
-    severities = [
-        result.severity for result in results if isinstance(result, Result)
-    ]
-
-    if mode == GroupResultMode.all_:
-        return util.get_maximum_severity(severities)
-
-    if mode == GroupResultMode.any_:
-        return util.get_minimum_severity(severities)
-
-    return Severity.internal_error
 
 
 @dataclass

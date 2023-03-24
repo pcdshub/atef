@@ -16,20 +16,15 @@ import yaml
 from bluesky import RunEngine
 
 from atef.cache import DataCache
-from atef.check import Result, incomplete
-from atef.config import (ConfigurationFile, PreparedFile,
-                         _summarize_result_severity, run_passive_step)
+from atef.config import ConfigurationFile, PreparedFile, run_passive_step
 from atef.enums import GroupResultMode, Severity
+from atef.result import Result, _summarize_result_severity, incomplete_result
 from atef.type_hints import AnyPath
 from atef.yaml_support import init_yaml_support
 
 from . import serialization
 
 logger = logging.getLogger(__name__)
-
-
-def incomplete_result():
-    return incomplete
 
 
 class BlueskyState:
