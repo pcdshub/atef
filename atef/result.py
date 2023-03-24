@@ -4,7 +4,8 @@ class, as well as accompanying helper functions
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import List, Optional, Union
 
 from atef import exceptions, util
@@ -16,6 +17,7 @@ from atef.exceptions import PreparedComparisonException
 class Result:
     severity: Severity = Severity.success
     reason: Optional[str] = None
+    timestamp: datetime = field(default_factory=datetime.utcnow, compare=False)
 
     @classmethod
     def from_exception(cls, error: Exception) -> Result:
