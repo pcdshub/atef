@@ -28,7 +28,6 @@ import databroker
 import yaml
 from bluesky import RunEngine
 
-from atef.cache import DataCache
 from atef.config import ConfigurationFile, PreparedFile, run_passive_step
 from atef.enums import GroupResultMode, Severity
 from atef.result import Result, _summarize_result_severity, incomplete_result
@@ -304,7 +303,7 @@ class FailedStep:
     #: The data cache to use for the preparation step.
     parent: Optional[PreparedProcedureGroup]
     #: Configuration instance.
-    step: AnyProcedure
+    origin: AnyProcedure
     #: overall result of running the step
     combined_result: Result
     #: confirmation by the user that result matches expectations
@@ -394,7 +393,6 @@ class PreparedProcedureStep:
         parent: Optional[PreparedProcedureGroup] = None
     ) -> PreparedProcedureStep:
         try:
-            print(type(step))
             if isinstance(step, DescriptionStep):
                 return PreparedDescriptionStep.from_origin(
                     step=step, parent=parent
@@ -410,7 +408,7 @@ class PreparedProcedureStep:
             raise NotImplementedError(f"Step type unsupported: {type(step)}")
         except Exception as ex:
             return FailedStep(
-                step=step,
+                origin=step,
                 parent=parent,
                 exception=ex,
                 combined_result=Result(
@@ -482,21 +480,22 @@ class PreparedDescriptionStep(PreparedProcedureStep):
         step: DescriptionStep,
         parent: Optional[PreparedProcedureGroup]
     ) -> PreparedDescriptionStep:
-        return cls(origin=step, parent=parent)
+        return cls(
+            origin=step,
+            parent=parent,
+            name=step.name,
+        )
 
 
 @dataclass
 class PreparedPassiveStep(PreparedProcedureStep):
-    prepared_passive_config: Optional[PreparedFile] = None
+    prepared_passive_file: Optional[PreparedFile] = None
 
     async def _run(self) -> Result:
         """ Load, prepare, and run the passive step """
-        config = ConfigurationFile.from_filename(self.origin.filepath)
-
-        prepared_config = PreparedFile.from_config(file=config,
-                                                   cache=DataCache())
-        self.prepared_passive_config = prepared_config
-        return await run_passive_step(prepared_config)
+        if not self.prepared_passive_file:
+            return
+        return await run_passive_step(self.prepared_passive_file)
 
     @classmethod
     def from_origin(
@@ -504,10 +503,16 @@ class PreparedPassiveStep(PreparedProcedureStep):
         step: PassiveStep,
         parent: Optional[PreparedProcedureGroup]
     ):
-        passive_file = ConfigurationFile.from_filename(step.filepath)
-        prep_passive_file = PreparedFile.from_config(file=passive_file)
+        try:
+            passive_file = ConfigurationFile.from_filename(step.filepath)
+            prep_passive_file = PreparedFile.from_config(file=passive_file)
+        except OSError as ex:
+            logger.debug(f'failed to generate prepared passive checkout: {ex}')
+            prep_passive_file = None
+
         return cls(
             origin=step,
-            prepared_passive_config=prep_passive_file,
-            parent=parent
+            prepared_passive_file=prep_passive_file,
+            parent=parent,
+            name=step.name
         )

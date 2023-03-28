@@ -32,7 +32,9 @@ from atef.check import (AnyComparison, AnyValue, Comparison, Equals, Greater,
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
-from atef.procedure import (DescriptionStep, PassiveStep, ProcedureGroup,
+from atef.procedure import (DescriptionStep, PassiveStep,
+                            PreparedDescriptionStep, PreparedPassiveStep,
+                            PreparedProcedureStep, ProcedureGroup,
                             ProcedureStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.widgets.config.data_active import (GeneralProcedureWidget,
@@ -1675,9 +1677,9 @@ class RunStepPage(DesignerDisplay, PageWidget):
     run_check_placeholder: QWidget
     run_check: RunCheck
 
-    run_widget_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
-        DescriptionStep: DescriptionRunWidget,
-        PassiveStep: PassiveRunWidget
+    run_widget_map: ClassVar[Dict[PreparedProcedureStep, DataWidget]] = {
+        PreparedDescriptionStep: DescriptionRunWidget,
+        PreparedPassiveStep: PassiveRunWidget
     }
 
     def __init__(self, *args, data, **kwargs):

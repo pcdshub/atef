@@ -78,7 +78,9 @@ def test_prepared_procedure(active_test_config):
     procedure_file = ProcedureFile.from_filename(filename=active_test_config)
     # monkeypatch passive step to have
     # TODO make this more general for future sample active checkouts
-    procedure_file.root.steps[1].filepath = active_test_config.parent / 'all_fields.json'
+    procedure_file.root.steps[1].filepath = (
+        active_test_config.parent / 'all_fields.json'
+    )
     # simple smoke test
     ppf = PreparedProcedureFile.from_origin(file=procedure_file)
     asyncio.run(ppf.run())

@@ -1,6 +1,7 @@
 """
 Widgets for config gui's active-checkout run mode.
-Widgets should map onto edit widgets from atef.widgets.config.data_active
+Widgets should map onto edit widgets from atef.widgets.config.data_active, and
+take a subclass of PreparedProcedureStep as their ``data``.
 """
 
 import asyncio
@@ -11,7 +12,7 @@ import qtawesome
 from qtpy import QtWidgets
 
 from atef.config import ConfigurationFile, PreparedFile, run_passive_step
-from atef.procedure import DescriptionStep, PassiveStep
+from atef.procedure import PreparedDescriptionStep, PreparedPassiveStep
 from atef.widgets.config.data_base import DataWidget
 from atef.widgets.config.run_base import create_tree_items
 from atef.widgets.config.utils import ConfigTreeModel, TreeItem
@@ -34,13 +35,13 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
     tree_view: QtWidgets.QTreeView
     refresh_button: QtWidgets.QPushButton
 
-    def __init__(self, *args, data: PassiveStep, **kwargs):
+    def __init__(self, *args, data: PreparedPassiveStep, **kwargs):
         super().__init__(*args, data=data, **kwargs)
-        if not self.bridge.filepath.get():
+        if not self.bridge.origin.get().filepath:
             logger.warning('no passive step to run')
             return
 
-        fp = pathlib.Path(self.bridge.filepath.get())
+        fp = pathlib.Path(self.bridge.origin.get().filepath)
         if not fp.is_file():
             return
         self.config_file = ConfigurationFile.from_filename(fp)
@@ -90,10 +91,10 @@ class DescriptionRunWidget(DesignerDisplay, DataWidget):
     title_label: QtWidgets.QLabel
     desc_label: QtWidgets.QLabel
 
-    def __init__(self, *args, data: DescriptionStep, **kwargs):
+    def __init__(self, *args, data: PreparedDescriptionStep, **kwargs):
         super().__init__(*args, data=data, **kwargs)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        self.title_label.setText(self.bridge.name.get())
-        self.desc_label.setText(self.bridge.description.get())
+        self.title_label.setText(self.bridge.origin.get().name)
+        self.desc_label.setText(self.bridge.origin.get().description)

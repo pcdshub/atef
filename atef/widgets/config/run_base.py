@@ -20,7 +20,9 @@ from atef.config import (AnyPreparedConfiguration, Configuration,
                          ConfigurationFile, PreparedComparison,
                          PreparedConfiguration, PreparedFile)
 from atef.enums import Severity
-from atef.procedure import ProcedureFile, ProcedureStep
+from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
+                            PreparedProcedureStep, ProcedureFile,
+                            ProcedureGroup, ProcedureStep, walk_steps)
 from atef.result import Result, combine_results
 from atef.widgets.config.utils import TreeItem
 from atef.widgets.core import DesignerDisplay
@@ -55,8 +57,8 @@ def run_active_step(config):  # takes procedure steps and groups
 
 def make_run_page(
     widget: QWidget,
-    data: Union[PreparedComparison, ProcedureStep, AnyPreparedConfiguration],
-    prepared_file: Optional[PreparedFile] = None
+    prepared_data: List[Union[PreparedComparison, AnyPreparedConfiguration,
+                              PreparedProcedureStep, PreparedProcedureGroup]],
 ) -> QWidget:
     """
     Disables all the widgets in ``widget`` and adds the RunCheck widget.
@@ -86,12 +88,7 @@ def make_run_page(
     # make existing widgets read-only
     disable_widget(widget)
     # add RunCheck to end of layout
-    if prepared_file:
-        # gather relevant comparisons
-        configs = get_relevant_configs_comps(prepared_file, data)
-        check_widget = RunCheck(data=configs)
-    else:
-        check_widget = RunCheck(data=[data])
+    check_widget = RunCheck(data=prepared_data)
 
     # mimic placeholder configuration
     check_widget_placeholder = QWidget(parent=widget)
@@ -168,6 +165,17 @@ def get_relevant_configs_comps(
             matched_c.append(comp)
 
     return matched_c
+
+
+def get_prepared_step(
+    prepared_file: PreparedProcedureFile,
+    step: Union[ProcedureStep, ProcedureGroup]
+) -> List[Union[PreparedProcedureStep, PreparedProcedureGroup]]:
+    matched_steps = []
+    for pstep in walk_steps(prepared_file.root):
+        if pstep.origin == step:
+            matched_steps.append(pstep)
+    return matched_steps
 
 
 class RunCheck(DesignerDisplay, QWidget):
@@ -251,7 +259,7 @@ class RunCheck(DesignerDisplay, QWidget):
             for cfg in configs:
                 config_type = infer_step_type(cfg)
                 if config_type == 'active':
-                    cfg.run()
+                    asyncio.run(cfg.run())
                 elif config_type == 'passive':
                     asyncio.run(cfg.compare())
                 else:
