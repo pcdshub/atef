@@ -1,7 +1,11 @@
+import asyncio
+import pathlib
+
 import pytest
 
 from atef.enums import Severity
-from atef.procedure import DescriptionStep, ProcedureStep
+from atef.procedure import (DescriptionStep, PreparedProcedureFile,
+                            PreparedProcedureStep, ProcedureFile)
 from atef.result import Result
 
 pass_result = Result()
@@ -40,22 +44,41 @@ def test_procedure_step_results(
     expected: Result
 ):
     """ Verify logic used to combine step_result and verify_result """
-    pstep = ProcedureStep()
+    pstep = DescriptionStep()
+    prep_pstep = PreparedProcedureStep.from_origin(pstep)
     pstep.verify_required = verify_required
     if verify_result:
-        pstep.verify_result = verify_result
+        prep_pstep.verify_result = verify_result
     pstep.step_success_required = step_success_required
     if step_result:
-        pstep.step_result = step_result
+        prep_pstep.step_result = step_result
 
     # verify internal logic for final result
-    assert pstep.result.severity == expected.severity
-    assert (expected.reason or '') in (pstep.result.reason or '')
+    assert prep_pstep.result.severity == expected.severity
+    assert (expected.reason or '') in (prep_pstep.result.reason or '')
 
 
 def test_description_step_results():
     """ Pass if DescriptionStep step_result always passes """
     desc_step = DescriptionStep()
-    desc_step.run()
+    prep_desc_step = PreparedProcedureStep.from_origin(desc_step)
+    asyncio.run(prep_desc_step.run())
     # step phase of the description step always passes
-    assert desc_step.step_result == pass_result
+    assert prep_desc_step.step_result == pass_result
+
+
+@pytest.fixture
+def active_test_config() -> pathlib.Path:
+    filename = 'active_test.json'
+    test_config_path = pathlib.Path(__file__).parent / 'configs'
+    return test_config_path / filename
+
+
+def test_prepared_procedure(active_test_config):
+    procedure_file = ProcedureFile.from_filename(filename=active_test_config)
+    # monkeypatch passive step to have
+    # TODO make this more general for future sample active checkouts
+    procedure_file.root.steps[1].filepath = active_test_config.parent / 'all_fields.json'
+    # simple smoke test
+    ppf = PreparedProcedureFile.from_origin(file=procedure_file)
+    asyncio.run(ppf.run())

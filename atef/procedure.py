@@ -1,14 +1,27 @@
+"""
+Dataclasses for describing active checkout procedures.  These dataclasses come in
+normal (edit) and Prepared (run) variants
+
+Edit variants hold data needed to specify the step.
+Prepared variants hold a reference to their originating edit-step, along with
+Result objects and a .run() method.
+
+Adding a step requires:
+- write the edit-variant
+- add the edit-variant to the AnyProcedure type hint
+- write the run-variant, along with its ._run() and .from_origin() methods
+- add the step to PreparedProcedure.from_origin classmethod case statement
+"""
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import datetime
 import json
 import logging
 import pathlib
 from dataclasses import dataclass, field
-from typing import (Any, Dict, Generator, Literal, Optional, Sequence, Union,
-                    cast)
+from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
+                    Union, cast)
 
 import apischema
 import databroker
@@ -71,68 +84,10 @@ class ProcedureStep:
     description: Optional[str] = None
     #: The hierarchical parent of this step.
     parent: Optional[ProcedureGroup] = None
-    #: overall result of running the step
-    combined_result: Result = field(default_factory=incomplete_result)
-    #: confirmation by the user that result matches expectations
-    verify_result: Result = field(default_factory=incomplete_result)
     #: verification requirements, is human verification required?
     verify_required: bool = True
-    #: whether or not the step completed successfully
-    step_result: Result = field(default_factory=incomplete_result)
     #: step success requirements, does the step need to complete?
     step_success_required: bool = True
-
-    def _run(self) -> Result:
-        """ Run the comparison.  To be implemented in subclass. """
-        raise NotImplementedError()
-
-    def run(self) -> Result:
-        """ Run the step and return the result """
-        try:
-            result = self._run()
-        except Exception as ex:
-            result = Result(
-                severity=Severity.internal_error,
-                reason=str(ex)
-            )
-
-        # stash step result
-        self.step_result = result
-        # return the overall result, including verification
-        return self.result
-
-    @property
-    def result(self) -> Result:
-        """
-        Combines the step result and verification result based on settings
-
-        Returns
-        -------
-        Result
-            The result of this step
-        """
-        results = []
-        reason = ''
-        if self.verify_required:
-            results.append(self.verify_result)
-            if self.verify_result.severity != Severity.success:
-                reason += f'Not Verified ({self.verify_result.reason}),'
-            else:
-                reason += f'Verified ({self.verify_result.reason})'
-
-        if self.step_success_required:
-            results.append(self.step_result)
-            if self.step_result.severity != Severity.success:
-                reason += f'Not Successful ({self.step_result.reason})'
-
-        if not results:
-            # Nothing required, auto-success
-            self.combined_result = Result()
-            return self.combined_result
-
-        severity = _summarize_result_severity(GroupResultMode.all_, results)
-        self.combined_result = Result(severity=severity, reason=reason)
-        return self.combined_result
 
     def allow_verify(self) -> bool:
         """
@@ -145,9 +100,7 @@ class ProcedureStep:
 @dataclass
 class DescriptionStep(ProcedureStep):
     """A simple title or descriptive step in the procedure."""
-    def _run(self) -> Result:
-        """ Always a successful result, allowing verification """
-        return Result()
+    pass
 
 
 @dataclass
@@ -233,18 +186,6 @@ class PassiveStep(ProcedureStep):
     """A step that runs a passive checkout file"""
     filepath: pathlib.Path = field(default_factory=pathlib.Path)
 
-    def _run(self) -> Result:
-        """ Load, prepare, and run the passive step """
-        config = ConfigurationFile.from_filename(self.filepath)
-
-        prepared_config = PreparedFile.from_config(file=config,
-                                                   cache=DataCache())
-
-        # run passive checkout.  Will need to set up asyncio loop
-        result = asyncio.run(run_passive_step(prepared_config))
-
-        return result
-
 
 @dataclass
 class ProcedureGroup(ProcedureStep):
@@ -258,17 +199,6 @@ class ProcedureGroup(ProcedureStep):
             yield step
             if isinstance(step, ProcedureGroup):
                 yield from step.walk_steps()
-
-    def run(self) -> Result:
-        results = []
-        for step in self.steps:
-            results.append(step.run())
-
-        severity = _summarize_result_severity(GroupResultMode.all_, results)
-        result = Result(severity=severity)
-
-        self.step_result = result
-        return self.result
 
 
 AnyProcedure = Union[
@@ -328,24 +258,256 @@ class ProcedureFile:
         init_yaml_support()
         return yaml.dump(self.to_json())
 
-    def compare(self) -> Result:
-        return self.root.compare()
+
+######################
+# Prepared Dataclasses
+######################
 
 
-def run_procedure(
-    process: ProcedureFile,
-):
-    """
-    Run a procedure given a ProcedureFile.
+@dataclass
+class PreparedProcedureFile:
+    #: Corresponding ProcedureFile information
+    file: ProcedureFile
+    #: Procedure steps defined in the top-level file
+    root: PreparedProcedureGroup
 
-    Gross skeleton code I am organizing my thoughts
-    """
-    for step in process.walk_steps():
-        print(step)
-        # check that the step has been completed
+    @classmethod
+    def from_origin(
+        cls,
+        file: ProcedureFile,
+    ) -> PreparedProcedureFile:
+        """
+        Prepare a ProcedureFile for running
 
-        # if verified
-        step.verify = True
-        step.result = Result()
+        Parameters
+        ----------
+        file : ProcedureFile
+            the procedure file instance
+        """
+        prepared_root = PreparedProcedureGroup.from_origin(group=file.root)
 
-    return process
+        prep_proc_file = PreparedProcedureFile(
+            file=file,
+            root=prepared_root
+        )
+
+        prepared_root.parent = prep_proc_file
+        return prep_proc_file
+
+    async def run(self) -> Result:
+        return await self.root.run()
+
+
+@dataclass
+class FailedStep:
+    """ A step that failed to be prepared for running. """
+    #: The data cache to use for the preparation step.
+    parent: Optional[PreparedProcedureGroup]
+    #: Configuration instance.
+    step: AnyProcedure
+    #: overall result of running the step
+    combined_result: Result
+    #: confirmation by the user that result matches expectations
+    verify_result: Result = field(default_factory=incomplete_result)
+    #: whether or not the step completed successfully
+    step_result: Result = field(default_factory=incomplete_result)
+    #: Exception that was caught, if available.
+    exception: Optional[Exception] = None
+
+    @property
+    def result(self) -> Result:
+        return self.combined_result
+
+
+@dataclass
+class PreparedProcedureStep:
+    #: name of this comparison
+    name: Optional[str] = None
+    #: original procedure step, of which this is the prepared version
+    origin: ProcedureStep = field(default_factory=ProcedureStep)
+    #: hierarchical parent of this step
+    parent: Optional[PreparedProcedureGroup] = None
+
+    #: overall result of running the step
+    combined_result: Result = field(default_factory=incomplete_result)
+    #: confirmation by the user that result matches expectations
+    verify_result: Result = field(default_factory=incomplete_result)
+    #: whether or not the step completed successfully
+    step_result: Result = field(default_factory=incomplete_result)
+
+    @property
+    def result(self) -> Result:
+        """
+        Combines the step result and verification result based on settings
+
+        Returns
+        -------
+        Result
+            The result of this step
+        """
+        results = []
+        reason = ''
+        if self.origin.verify_required:
+            results.append(self.verify_result)
+            if self.verify_result.severity != Severity.success:
+                reason += f'Not Verified ({self.verify_result.reason})'
+            else:
+                reason += f'Verified ({self.verify_result.reason})'
+
+        if self.origin.step_success_required:
+            results.append(self.step_result)
+            if self.step_result.severity != Severity.success:
+                reason += f', Not Successful ({self.step_result.reason})'
+
+        if not results:
+            # Nothing required, auto-success
+            self.combined_result = Result()
+            return self.combined_result
+
+        severity = _summarize_result_severity(GroupResultMode.all_, results)
+        self.combined_result = Result(severity=severity, reason=reason)
+        return self.combined_result
+
+    async def _run(self) -> Result:
+        """ Run the step.  To be implemented in subclass. """
+        raise NotImplementedError()
+
+    async def run(self) -> Result:
+        """ Run the step and return the result """
+        try:
+            result = await self._run()
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=str(ex)
+            )
+
+        # stash step result
+        self.step_result = result
+        # return the overall result, including verification
+        return self.result
+
+    @classmethod
+    def from_origin(
+        cls,
+        step: AnyProcedure,
+        parent: Optional[PreparedProcedureGroup] = None
+    ) -> PreparedProcedureStep:
+        try:
+            print(type(step))
+            if isinstance(step, DescriptionStep):
+                return PreparedDescriptionStep.from_origin(
+                    step=step, parent=parent
+                )
+            if isinstance(step, ProcedureGroup):
+                return PreparedProcedureGroup.from_origin(
+                    group=step, parent=parent
+                )
+            if isinstance(step, PassiveStep):
+                return PreparedPassiveStep.from_origin(
+                    step=step, parent=parent
+                )
+            raise NotImplementedError(f"Step type unsupported: {type(step)}")
+        except Exception as ex:
+            return FailedStep(
+                step=step,
+                parent=parent,
+                exception=ex,
+                combined_result=Result(
+                    severity=Severity.internal_error,
+                    reason=(
+                        f"Failed to instantiate step: {ex}."
+                        f"Step is: {step.name} ({step.description or ''!r})"
+                    )
+                )
+            )
+
+
+@dataclass
+class PreparedProcedureGroup(PreparedProcedureStep):
+    #: hierarchical parent of this step
+    parent: Optional[Union[PreparedProcedureFile, PreparedProcedureGroup]] = field(
+        default=None, repr=False
+    )
+    steps: List[AnyProcedure] = field(default_factory=list)
+    prepare_failures: List[FailedStep] = field(default_factory=list)
+
+    @classmethod
+    def from_origin(
+        cls,
+        group: ProcedureGroup,
+        parent: Optional[PreparedProcedureGroup | PreparedProcedureFile] = None,
+    ) -> PreparedProcedureGroup:
+        prepared = cls(origin=group, parent=parent, steps=[])
+
+        for step in group.steps:
+            prep_step = PreparedProcedureStep.from_origin(
+                step=cast(AnyProcedure, step),
+                parent=prepared
+            )
+            if isinstance(prep_step, FailedStep):
+                prepared.prepare_failures.append(prep_step)
+            else:
+                prepared.steps.append(prep_step)
+
+        return prepared
+
+    async def run(self) -> Result:
+        """ Run all steps and return a combined result """
+        results = []
+        for step in self.steps:
+            results.append(await step.run())
+
+        if self.prepare_failures:
+            result = Result(
+                severity=Severity.error,
+                reason='At least one step failed to initialize'
+            )
+        else:
+            severity = _summarize_result_severity(GroupResultMode.all_, results)
+            result = Result(severity=severity)
+
+        self.step_result = result
+        return self.result
+
+
+@dataclass
+class PreparedDescriptionStep(PreparedProcedureStep):
+    async def _run(self):
+        return Result()
+
+    @classmethod
+    def from_origin(
+        cls,
+        step: DescriptionStep,
+        parent: Optional[PreparedProcedureGroup]
+    ) -> PreparedDescriptionStep:
+        return cls(origin=step, parent=parent)
+
+
+@dataclass
+class PreparedPassiveStep(PreparedProcedureStep):
+    prepared_passive_config: Optional[PreparedFile] = None
+
+    async def _run(self) -> Result:
+        """ Load, prepare, and run the passive step """
+        config = ConfigurationFile.from_filename(self.origin.filepath)
+
+        prepared_config = PreparedFile.from_config(file=config,
+                                                   cache=DataCache())
+        self.prepared_passive_config = prepared_config
+        return await run_passive_step(prepared_config)
+
+    @classmethod
+    def from_origin(
+        cls,
+        step: PassiveStep,
+        parent: Optional[PreparedProcedureGroup]
+    ):
+        passive_file = ConfigurationFile.from_filename(step.filepath)
+        prep_passive_file = PreparedFile.from_config(file=passive_file)
+        return cls(
+            origin=step,
+            prepared_passive_config=prep_passive_file,
+            parent=parent
+        )
