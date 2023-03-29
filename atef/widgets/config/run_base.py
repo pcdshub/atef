@@ -157,11 +157,11 @@ def get_relevant_configs_comps(
     matched_c = []
 
     for config in prepared_file.walk_groups():
-        if config.config == original_c:
+        if config.config is original_c:
             matched_c.append(config)
 
     for comp in prepared_file.walk_comparisons():
-        if comp.comparison == original_c:
+        if comp.comparison is original_c:
             matched_c.append(comp)
 
     return matched_c
@@ -194,7 +194,7 @@ def get_prepared_step(
     # we still return a list of relevant steps.
     matched_steps = []
     for pstep in walk_steps(prepared_file.root):
-        if pstep.origin == step:
+        if pstep.origin is step:
             matched_steps.append(pstep)
     return matched_steps
 
