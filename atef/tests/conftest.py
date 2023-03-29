@@ -31,6 +31,21 @@ ACTIVE_CONFIG_PATHS = active_checkout_configs()
 ALL_CONFIG_PATHS = PASSIVE_CONFIG_PATHS + ACTIVE_CONFIG_PATHS
 
 
+@pytest.fixture(params=PASSIVE_CONFIG_PATHS)
+def passive_config_path(request) -> pathlib.Path:
+    return request.param
+
+
+@pytest.fixture(params=ACTIVE_CONFIG_PATHS)
+def active_config_path(request) -> pathlib.Path:
+    return request.param
+
+
+@pytest.fixture(params=ALL_CONFIG_PATHS)
+def all_config_path(request) -> pathlib.Path:
+    return request.param
+
+
 class MockEpicsArch:
     """
     Mock archapp.EpicsArch.

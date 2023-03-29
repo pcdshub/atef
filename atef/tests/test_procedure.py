@@ -1,12 +1,9 @@
-import asyncio
-
 import pytest
 
 from atef.enums import Severity
 from atef.procedure import (DescriptionStep, PreparedProcedureFile,
                             PreparedProcedureStep, ProcedureFile)
 from atef.result import Result
-from atef.tests.conftest import ACTIVE_CONFIG_PATHS
 
 pass_result = Result()
 fail_result = Result(severity=Severity.error)
@@ -58,19 +55,19 @@ def test_procedure_step_results(
     assert (expected.reason or '') in (prep_pstep.result.reason or '')
 
 
-def test_description_step_results():
+@pytest.mark.asyncio
+async def test_description_step_results():
     """ Pass if DescriptionStep step_result always passes """
     desc_step = DescriptionStep()
     prep_desc_step = PreparedProcedureStep.from_origin(desc_step)
-    asyncio.run(prep_desc_step.run())
+    await prep_desc_step.run()
     # step phase of the description step always passes
     assert prep_desc_step.step_result == pass_result
 
 
-@pytest.mark.parametrize('active_config', ACTIVE_CONFIG_PATHS)
-def test_prepared_procedure(active_config):
-    procedure_file = ProcedureFile.from_filename(filename=active_config)
-    # monkeypatch passive step to have
+@pytest.mark.asyncio
+async def test_prepared_procedure(active_config_path):
+    procedure_file = ProcedureFile.from_filename(filename=active_config_path)
     # simple smoke test
     ppf = PreparedProcedureFile.from_origin(file=procedure_file)
-    asyncio.run(ppf.run())
+    await ppf.run()
