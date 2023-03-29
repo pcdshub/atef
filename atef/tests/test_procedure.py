@@ -1,5 +1,4 @@
 import asyncio
-import pathlib
 
 import pytest
 
@@ -7,6 +6,7 @@ from atef.enums import Severity
 from atef.procedure import (DescriptionStep, PreparedProcedureFile,
                             PreparedProcedureStep, ProcedureFile)
 from atef.result import Result
+from atef.tests.conftest import ACTIVE_CONFIG_PATHS
 
 pass_result = Result()
 fail_result = Result(severity=Severity.error)
@@ -67,20 +67,10 @@ def test_description_step_results():
     assert prep_desc_step.step_result == pass_result
 
 
-@pytest.fixture
-def active_test_config() -> pathlib.Path:
-    filename = 'active_test.json'
-    test_config_path = pathlib.Path(__file__).parent / 'configs'
-    return test_config_path / filename
-
-
-def test_prepared_procedure(active_test_config):
-    procedure_file = ProcedureFile.from_filename(filename=active_test_config)
+@pytest.mark.parametrize('active_config', ACTIVE_CONFIG_PATHS)
+def test_prepared_procedure(active_config):
+    procedure_file = ProcedureFile.from_filename(filename=active_config)
     # monkeypatch passive step to have
-    # TODO make this more general for future sample active checkouts
-    procedure_file.root.steps[1].filepath = (
-        active_test_config.parent / 'all_fields.json'
-    )
     # simple smoke test
     ppf = PreparedProcedureFile.from_origin(file=procedure_file)
     asyncio.run(ppf.run())

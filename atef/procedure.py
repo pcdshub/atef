@@ -532,7 +532,7 @@ class PreparedPassiveStep(PreparedProcedureStep):
     async def _run(self) -> Result:
         """ Load, prepare, and run the passive step """
         if not self.prepared_passive_file:
-            return
+            return Result(severity=Severity.error, reason='No passive checkout to run')
         return await run_passive_step(self.prepared_passive_file)
 
     @classmethod
