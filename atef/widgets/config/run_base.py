@@ -22,7 +22,7 @@ from atef.config import (AnyPreparedConfiguration, Configuration,
 from atef.enums import Severity
 from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
                             PreparedProcedureStep, ProcedureFile,
-                            ProcedureGroup, ProcedureStep, walk_steps)
+                            ProcedureStep, walk_steps)
 from atef.result import Result, combine_results
 from atef.widgets.config.utils import TreeItem
 from atef.widgets.core import DesignerDisplay
@@ -117,7 +117,7 @@ def disable_widget(widget: QWidget) -> QWidget:
     return widget
 
 
-def infer_step_type(config: Union[PreparedComparison, ProcedureStep]) -> str:
+def infer_step_type(config: Union[PreparedComparison, PreparedProcedureStep]) -> str:
     # TODO: find a better way to decide the step type
     if hasattr(config, 'compare'):
         return 'passive'
@@ -169,8 +169,29 @@ def get_relevant_configs_comps(
 
 def get_prepared_step(
     prepared_file: PreparedProcedureFile,
-    step: Union[ProcedureStep, ProcedureGroup]
-) -> List[Union[PreparedProcedureStep, PreparedProcedureGroup]]:
+    step: ProcedureStep
+) -> List[PreparedProcedureStep]:
+    """
+    Gather all PreparedProcedureStep dataclasses the correspond to the original
+    ProcedureStep.
+
+    Only relevant for active checkouts.
+
+    Parameters
+    ----------
+    prepared_file : PreparedProcedureFile
+        the PreparedProcedureFile to search through
+    step : Union[ProcedureStep, ProcedureGroup]
+        the step to match
+
+    Returns
+    -------
+    List[Union[PreparedProcedureStep, PreparedProcedureGroup]]
+        the PreparedProcedureSteps related to ``step``
+    """
+    # As of the writing of this docstring, this helper is only expected to return
+    # lists of length 1.  However in order to match the passive checkout workflow,
+    # we still return a list of relevant steps.
     matched_steps = []
     for pstep in walk_steps(prepared_file.root):
         if pstep.origin == step:

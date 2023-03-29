@@ -15,6 +15,11 @@ from atef.exceptions import PreparedComparisonException
 
 @dataclass(frozen=True)
 class Result:
+    """
+    The result of a check or step.  Contains a severity enum and reason.
+    The timestamp field should not be specified at creation, as it will be
+    automatically filled.
+    """
     severity: Severity = Severity.success
     reason: Optional[str] = None
     timestamp: datetime = field(default_factory=datetime.utcnow, compare=False)
@@ -53,6 +58,16 @@ def combine_results(results: List[Result]) -> Result:
     """
     Combines results into a single result.
     Takes the highest severity, and currently all the reasons
+
+    Parameters
+    ----------
+    results : List[Result]
+        a list of Results to combine
+
+    Returns
+    -------
+    Result
+        the combined Result
     """
     severity = util.get_maximum_severity([r.severity for r in results])
     reason = str([r.reason for r in results]) or ''
@@ -66,12 +81,14 @@ def _summarize_result_severity(
 ) -> Severity:
     """
     Summarize all results based on the configured mode.
+
     Parameters
     ----------
     mode : GroupResultMode
         The mode to apply to the results.
     results : list of (Result, Exception, or None)
         The list of results.
+
     Returns
     -------
     Severity

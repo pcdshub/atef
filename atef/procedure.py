@@ -265,6 +265,10 @@ class ProcedureFile:
 
 @dataclass
 class PreparedProcedureFile:
+    """
+    A Prepared Procedure file.  Constructs prepared dataclasses for steps
+    in the root ProcedureGroup
+    """
     #: Corresponding ProcedureFile information
     file: ProcedureFile
     #: Procedure steps defined in the top-level file
@@ -276,7 +280,7 @@ class PreparedProcedureFile:
         file: ProcedureFile,
     ) -> PreparedProcedureFile:
         """
-        Prepare a ProcedureFile for running
+        Prepare a ProcedureFile for running, based off an existing ProcedureFile
 
         Parameters
         ----------
@@ -320,6 +324,9 @@ class FailedStep:
 
 @dataclass
 class PreparedProcedureStep:
+    """
+    Base class for a ProcedureStep that has been prepared to run.
+    """
     #: name of this comparison
     name: Optional[str] = None
     #: original procedure step, of which this is the prepared version
@@ -342,7 +349,7 @@ class PreparedProcedureStep:
         Returns
         -------
         Result
-            The result of this step
+            The overall result of this step
         """
         results = []
         reason = ''
@@ -392,14 +399,25 @@ class PreparedProcedureStep:
         step: AnyProcedure,
         parent: Optional[PreparedProcedureGroup] = None
     ) -> PreparedProcedureStep:
+        """
+        Prepare a ProcedureStep for running.  If the creation of the prepared step
+        fails for any reason, a FailedStep is returned.
+
+        Parameters
+        ----------
+        step : AnyProcedure
+            the ProcedureStep to prepare
+        parent : Optional[PreparedProcedureGroup]
+            the parent of this step, by default None
+        """
         try:
-            if isinstance(step, DescriptionStep):
-                return PreparedDescriptionStep.from_origin(
-                    step=step, parent=parent
-                )
             if isinstance(step, ProcedureGroup):
                 return PreparedProcedureGroup.from_origin(
                     group=step, parent=parent
+                )
+            if isinstance(step, DescriptionStep):
+                return PreparedDescriptionStep.from_origin(
+                    step=step, parent=parent
                 )
             if isinstance(step, PassiveStep):
                 return PreparedPassiveStep.from_origin(
@@ -436,6 +454,16 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         group: ProcedureGroup,
         parent: Optional[PreparedProcedureGroup | PreparedProcedureFile] = None,
     ) -> PreparedProcedureGroup:
+        """
+        Prepare a ProcedureGroup for running.  Prepares all of the group's children
+
+        Parameters
+        ----------
+        group : ProcedureGroup
+            the group to prepare
+        parent : Optional[PreparedProcedureGroup  |  PreparedProcedureFile]
+            the hierarchical parent of this step, by default None
+        """
         prepared = cls(origin=group, parent=parent, steps=[])
 
         for step in group.steps:
@@ -478,8 +506,18 @@ class PreparedDescriptionStep(PreparedProcedureStep):
     def from_origin(
         cls,
         step: DescriptionStep,
-        parent: Optional[PreparedProcedureGroup]
+        parent: Optional[PreparedProcedureGroup] = None
     ) -> PreparedDescriptionStep:
+        """
+        Prepare a DescriptionStep for running
+
+        Parameters
+        ----------
+        step : DescriptionStep
+            the description step to prepare
+        parent : Optional[PreparedProcedureGroup]
+            the hierarchical parent of this step, by default None
+        """
         return cls(
             origin=step,
             parent=parent,
