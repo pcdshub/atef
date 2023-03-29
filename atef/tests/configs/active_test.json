@@ -2,15 +2,15 @@
   "version": 0,
   "root": {
     "name": "root",
-    "description": null,
+    "description": "sample active test checkout",
     "parent": null,
     "verify_required": true,
     "step_success_required": true,
     "steps": [
       {
         "DescriptionStep": {
-          "name": "fdsa",
-          "description": null,
+          "name": "desc_title",
+          "description": "description for description step",
           "parent": null,
           "verify_required": true,
           "step_success_required": true
@@ -18,8 +18,8 @@
       },
       {
         "PassiveStep": {
-          "name": "fdsa",
-          "description": null,
+          "name": "passive_title",
+          "description": "description for passive step",
           "parent": null,
           "verify_required": true,
           "step_success_required": true,
