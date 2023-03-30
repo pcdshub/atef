@@ -21,17 +21,21 @@ import logging
 import pathlib
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
-                    Union, cast)
+                    Tuple, Union, cast)
 
 import apischema
 import databroker
+import ophyd
 import yaml
 from bluesky import RunEngine
 
-from atef.config import ConfigurationFile, PreparedFile, run_passive_step
+from atef import util
+from atef.check import Comparison
+from atef.config import (ConfigurationFile, PreparedFile,
+                         PreparedSignalComparison, run_passive_step)
 from atef.enums import GroupResultMode, Severity
 from atef.result import Result, _summarize_result_severity, incomplete_result
-from atef.type_hints import AnyPath
+from atef.type_hints import AnyPath, PrimitiveType
 from atef.yaml_support import init_yaml_support
 
 from . import serialization
@@ -97,9 +101,62 @@ class ProcedureStep:
 
 
 @dataclass
+class ProcedureGroup(ProcedureStep):
+    """A group of procedure steps (or nested groups)."""
+    #: Steps included in the procedure.
+    steps: Sequence[Union[ProcedureStep, ProcedureGroup]] = field(default_factory=list)
+
+    def walk_steps(self) -> Generator[AnyProcedure, None, None]:
+        for step in self.steps:
+            step = cast(AnyProcedure, step)
+            yield step
+            if isinstance(step, ProcedureGroup):
+                yield from step.walk_steps()
+
+
+@dataclass
 class DescriptionStep(ProcedureStep):
     """A simple title or descriptive step in the procedure."""
     pass
+
+
+@dataclass
+class PassiveStep(ProcedureStep):
+    """A step that runs a passive checkout file"""
+    filepath: pathlib.Path = field(default_factory=pathlib.Path)
+
+
+@dataclass
+class SetValueStep(ProcedureStep):
+    """ A step that sets one or more values and checks one or more values after """
+    actions: List[Tuple[Target, PrimitiveType]] = field(default_factory=list)
+    success_criteria: List[Tuple[Target, Comparison]] = field(default_factory=list)
+
+    continue_on_fail: bool
+    require_action_success: bool
+
+
+@dataclass
+class Target:
+    """
+    A destination for a value.  Either an ophyd device+attr pair or EPICS PV
+    """
+    #: device name and attr
+    device: Optional[str]
+    attr: Optional[str]
+    #: EPICS PV
+    pv: Optional[str]
+
+    def to_signal(self) -> ophyd.EpicsSignal:
+        if self.device and self.attr:
+            device = util.get_happi_device_by_name(self.device)
+            signal = getattr(device, self.attr)
+        elif self.pv:
+            signal = ophyd.EpicsSignal(self.pv)
+        else:
+            raise ValueError('No signal or device found')
+
+        return signal
 
 
 @dataclass
@@ -178,26 +235,6 @@ class PydmDisplayStep(ProcedureStep):
     display: pathlib.Path = field(default_factory=pathlib.Path)
     #: Options for displaying.
     options: DisplayOptions = field(default_factory=DisplayOptions)
-
-
-@dataclass
-class PassiveStep(ProcedureStep):
-    """A step that runs a passive checkout file"""
-    filepath: pathlib.Path = field(default_factory=pathlib.Path)
-
-
-@dataclass
-class ProcedureGroup(ProcedureStep):
-    """A group of procedure steps (or nested groups)."""
-    #: Steps included in the procedure.
-    steps: Sequence[Union[ProcedureStep, ProcedureGroup]] = field(default_factory=list)
-
-    def walk_steps(self) -> Generator[AnyProcedure, None, None]:
-        for step in self.steps:
-            step = cast(AnyProcedure, step)
-            yield step
-            if isinstance(step, ProcedureGroup):
-                yield from step.walk_steps()
 
 
 AnyProcedure = Union[
@@ -554,3 +591,41 @@ class PreparedPassiveStep(PreparedProcedureStep):
             parent=parent,
             name=step.name
         )
+
+
+@dataclass
+class PreparedSetValueStep(PreparedProcedureStep):
+    prepared_actions: List[Tuple[ophyd.Signal, PrimitiveType]] = field(
+        default_factory=list
+    )
+    prepared_criteria: Optional[List[PreparedSignalComparison]] = field(
+        default_factory=list
+    )
+
+    @classmethod
+    def from_origin(
+        cls,
+        step: SetValueStep,
+        parent: Optional[PreparedProcedureGroup]
+    ):
+        """
+        Prepare a SetValueStep for running.  Gathers and prepares necessary
+        signals and comparisons.
+        """
+        prep_step = cls(
+            origin=step,
+            parent=parent,
+            name=step.name
+        )
+
+        for target, value in step.actions:
+            signal = target.to_signal()
+            prep_step.prepared_actions.append((signal, value))
+
+        for target, comp in step.success_criteria:
+            signal = target.to_signal()
+            prep_comp = PreparedSignalComparison.from_pvname(pvname=signal.pvname,
+                                                             comparison=comp)
+            prep_step.prepared_criteria.append(prep_comp)
+
+        return prep_step
