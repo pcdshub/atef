@@ -16,8 +16,8 @@ import datetime
 import logging
 import pathlib
 import pprint
-from typing import (Dict, Generator, List, Optional, Sequence, Type, TypeVar,
-                    Union)
+from typing import (ClassVar, Dict, Generator, List, Optional, Sequence, Type,
+                    TypeVar, Union)
 
 import pydm
 import pydm.display
@@ -25,19 +25,26 @@ import qtawesome
 import typhos
 import typhos.cli
 import typhos.display
-from qtpy import QtCore, QtWidgets
+# from ophyd import EpicsSignal
+from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
+from qtpy.QtWidgets import QDialogButtonBox
 
+from atef import util
 from atef.config import ConfigurationFile
 from atef.result import Result, incomplete_result
-from atef.widgets.config.data_base import DataWidget
+from atef.widgets.config.data_base import (AddRowWidget, DataWidget,
+                                           SimpleRowWidget)
 from atef.widgets.config.run_base import create_tree_items
 from atef.widgets.config.utils import ConfigTreeModel, TreeItem
 from atef.widgets.core import DesignerDisplay
+from atef.widgets.happi import HappiDeviceComponentWidget
+from atef.widgets.ophyd import OphydAttributeData
 
 from ...procedure import (DescriptionStep, DisplayOptions, PassiveStep,
                           PlanOptions, PlanStep, ProcedureGroup, ProcedureStep,
-                          PydmDisplayStep, TyphosDisplayStep)
+                          PydmDisplayStep, SetValueStep, Target,
+                          TyphosDisplayStep, ValueToTarget)
 
 # TODO:  CodeStep, ConfigurationCheckStep,
 
@@ -626,3 +633,339 @@ class PlanEditPage(DesignerDisplay, DataWidget):
     """
     filename = ''
     pass
+
+
+class SetValueEditWidget(DesignerDisplay, DataWidget):
+    """
+    Widget for creating and editing a SetValueStep.
+    Contains a table of actions and a table of checks to execute after actions
+    have completed
+
+    actions_table will be filled with ActionRowWidget
+    checks_table will be filled with CheckRowWidget
+    """
+    filename = 'set_value_edit_widget.ui'
+
+    action_success_radio_button: QtWidgets.QRadioButton
+    step_failure_radio_button: QtWidgets.QRadioButton
+
+    actions_table: QtWidgets.QTableWidget
+    checks_table: QtWidgets.QTableWidget
+
+    def __init__(self, *args, data=SetValueStep, **kwargs):
+        super().__init__(*args, data=data, **kwargs)
+
+        self.add_add_row_widget(self.actions_table, 'Add new action')
+        add_action_row_widget = self.actions_table.cellWidget(0, 0)
+        add_action_row_widget.add_button.clicked.connect(self.add_action)
+        self.add_add_row_widget(self.checks_table, 'Add new check')
+        self.actions_table.dropEvent = self.table_drop_event
+
+        # add existing actions to table
+        for action in data.actions:
+            self.add_action(action=action)
+
+    def add_action(
+        self,
+        checked: bool = False,
+        action: Optional[ValueToTarget] = None,
+        **kwargs
+    ) -> None:
+        """
+        add a new or existing action to the table.
+        """
+        if action is None:
+            action = ValueToTarget()
+            new_action = True
+        else:
+            new_action = False
+
+        action_row = ActionRowWidget(data=action)
+        # Insert just above the add-row-row
+        ins_ind = self.actions_table.rowCount() - 1
+        self.actions_table.insertRow(ins_ind)
+        self.actions_table.setRowHeight(ins_ind, action_row.sizeHint().height())
+        self.actions_table.setCellWidget(ins_ind, 0, action_row)
+        if new_action:
+            self.update_list(self.actions_table, self.bridge.actions)
+        self.setup_delete_button(action_row)
+
+    def add_check(self):
+        """
+        add a new or existing check to the table.
+        """
+        pass
+
+    def add_add_row_widget(self, table_widget: QtWidgets.QTableWidget, text: str):
+        """ add the AddRowWidget to the end of the specified table-widget"""
+        add_row = AddRowWidget(text=text)
+        # row_count = table_widget.rowCount()
+        table_widget.insertRow(0)
+        table_widget.setRowHeight(0, add_row.sizeHint().height())
+        table_widget.setCellWidget(0, 0, add_row)
+
+    def setup_delete_button(self, row: SimpleRowWidget) -> None:
+        # TODO: Make this work for an arbitrary list and its row
+        delete_icon = self.style().standardIcon(
+            QtWidgets.QStyle.SP_TitleBarCloseButton
+        )
+        row.delete_button.setIcon(delete_icon)
+
+        def inner_delete(*args, **kwargs):
+            self.delete_table_row(row)
+
+        row.delete_button.clicked.connect(inner_delete)
+
+    def delete_table_row(self, row: SimpleRowWidget):
+        # get the data
+        for row_index in range(self.actions_table.rowCount()):
+            widget = self.actions_table.cellWidget(row_index, 0)
+            if widget is row:
+                self.actions_table.removeRow(row_index)
+                break
+
+        self.update_list(self.actions_table, self.bridge.actions)
+
+    def update_list(self, table_widget: QtWidgets.QTableWidget, bridge_attr):
+        row_data = []
+        for row_index in range(table_widget.rowCount()):
+            row_widget = table_widget.cellWidget(row_index, 0)
+            data = getattr(row_widget, 'data', None)
+            if data:
+                row_data.append(data)
+
+        bridge_attr.put(row_data)
+
+    def table_drop_event(self, event: QtGui.QDropEvent) -> None:
+        """
+        Monkeypatch onto the table to allow us to drag/drop rows.
+
+        if using row widget to add a row, need to make dest_row == -1 a noop
+        Shoutouts to stackoverflow
+        """
+        pass
+        # if event.source() is self.config_table:
+        #     selected_indices = self.config_table.selectedIndexes()
+        #     if not selected_indices:
+        #         return
+        #     selected_row = selected_indices[0].row()
+        #     dest_row = self.config_table.indexAt(event.pos()).row()
+        #     if dest_row == -1:
+        #         dest_row = self.config_table.rowCount() - 1
+        #     self.move_config_row(selected_row, dest_row)
+
+    def move_config_row(self, source: int, dest: int) -> None:
+        """
+        Move the row at index source to index dest.
+
+        Rearanges the table, the file, and the tree.
+        """
+        pass
+        # # Skip if into the same index
+        # if source == dest:
+        #     return
+        # config_data = self.data.steps.pop(source)
+        # self.data.steps.insert(dest, config_data)
+        # # Rearrange the tree
+        # config_item = self.tree_item.takeChild(source)
+        # self.tree_item.insertChild(dest, config_item)
+        # # Rearrange the table: need a whole new widget or else segfault
+        # self.procedure_table.removeRow(source)
+        # self.procedure_table.insertRow(dest)
+        # config_row = ConfigurationGroupRowWidget(data=config_data)
+        # self.setup_row_buttons(
+        #     row_widget=config_row,
+        #     item=config_item,
+        #     table=self.procedure_table,
+        # )
+        # self.procedure_table.setRowHeight(dest, config_row.sizeHint().height())
+        # self.procedure_table.setCellWidget(dest, 0, config_row)
+
+
+class ActionRowWidget(DesignerDisplay, SimpleRowWidget):
+    filename = 'action_row_widget.ui'
+
+    target_button: QtWidgets.QToolButton
+    value_input_placeholder: QtWidgets.QWidget
+
+    def __init__(self, data: ValueToTarget, **kwargs):
+        super().__init__(data=data, **kwargs)
+        # TODO: initialize row using data if it exists, do something with data
+        self.setup_row()
+        self.setup_ui()
+
+    def setup_ui(self):
+        self.child_button.hide()
+        # target entry widget dropdown from target_button
+        self.target_entry_widget = TargetEntryWidget()
+        widget_action = QtWidgets.QWidgetAction(self.target_button)
+        widget_action.setDefaultWidget(self.target_entry_widget)
+
+        widget_menu = QtWidgets.QMenu(self.target_button)
+        widget_menu.addAction(widget_action)
+        self.target_button.setMenu(widget_menu)
+
+        # Link buttons
+        # ok: change tool button text, write to data
+        # cancel: clear on first, close on second
+
+        # update data on target_button update
+        self.target_entry_widget.data_updated.connect(self.update_target)
+
+        self.update_input_placeholder()
+
+    def update_target(self):
+        """
+        Slot for updating data based on the entry_widget
+        Move Target datat to TargetToValue
+        """
+        target = self.target_entry_widget.chosen_target
+        self.bridge.name.put(target.name)
+        self.bridge.device.put(target.device)
+        self.bridge.attr.put(target.attr)
+        self.bridge.pv.put(target.pv)
+
+        self.target_button.setText(f'{target.device}.{target.attr}')
+
+        self.update_input_placeholder()
+
+    def update_input_placeholder(self):
+        # TODO: expand validator, edit behavior
+        # Could use metadata in the future?
+        # Enum drop box?
+        print(self.data)
+        sig = self.data.to_signal()
+        if sig is None:
+            edit_widget = QtWidgets.QLabel('??')
+            self.insert_widget(edit_widget, self.value_input_placeholder)
+            return
+        dtype = type(sig.get())
+        edit_widget = QtWidgets.QLineEdit()
+
+        if dtype is int:
+            validator = QtGui.QIntValidator()
+        elif dtype is float:
+            validator = QtGui.QDoubleValidator()
+        else:
+            validator = None
+
+        edit_widget.setValidator(validator)
+        edit_widget.setPlaceholderText(f'({sig.get()}) ⏎')
+
+        # slot for value update on ReturnPress
+        def update_value():
+            self.bridge.value.put(dtype(edit_widget.text()))
+
+        edit_widget.returnPressed.connect(update_value)
+
+        self.insert_widget(edit_widget, self.value_input_placeholder)
+
+    def insert_widget(self, widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> None:
+        """
+        Helper function for slotting e.g. data widgets into placeholders.
+        """
+        if placeholder.layout() is None:
+            layout = QtWidgets.QVBoxLayout()
+            layout.setContentsMargins(0, 0, 0, 0)
+            placeholder.setLayout(layout)
+        else:
+            old_widget = placeholder.layout().takeAt(0).widget()
+            if old_widget is not None:
+                # old_widget.setParent(None)
+                old_widget.deleteLater()
+        placeholder.layout().addWidget(widget)
+
+
+class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
+    """
+    Simple text entry widget to prompt for a signal, via PV or ophyd device signal
+
+    resets with each open action, clicking apply emits to signal_selected which
+    should be connected to.
+    """
+    filename = 'target_entry_widget.ui'
+
+    data_updated: ClassVar[QtCore.Signal] = QtCore.Signal()
+    chosen_target: Optional[Target] = None
+
+    _search_widget: Optional[HappiDeviceComponentWidget] = None
+    pv_edit: QtWidgets.QLineEdit
+    signal_button: QtWidgets.QPushButton
+    target_button_box: QDialogButtonBox
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # button box setup
+        reset_button = self.target_button_box.button(QDialogButtonBox.Reset)
+        reset_button.clicked.connect(self.reset_fields)
+        apply_button = self.target_button_box.button(QDialogButtonBox.Apply)
+        apply_button.clicked.connect(self.data_updated.emit)
+        # signal select setup
+        self.signal_button.clicked.connect(self.pick_signal)
+        # PV edit setup
+        regexp = QtCore.QRegularExpression(r'^\w+(:\w+)+(\.\w+)*$')
+        validator = QtGui.QRegularExpressionValidator(regexp)
+        self.pv_edit.setValidator(validator)
+        self.pv_edit.returnPressed.connect(self.pick_pv)
+
+        self.reset_fields()
+
+    def reset_fields(self):
+        self.chosen_target = None
+        self.target_button_box.hide()
+        self.signal_button.show()
+        self.pv_edit.show()
+        self.pv_edit.clear()
+        self.signal_button.setText('pick a device_signal')
+        self.data_updated.emit()
+
+    def confirm_signal(self):
+        if self.chosen_target is None:
+            raise ValueError("Signal not chosen.  Something went wrong")
+
+        self.data_updated.emit()
+
+    def pick_signal(self):
+        if self._search_widget is None:
+            widget = HappiDeviceComponentWidget(
+                client=util.get_happi_client()
+            )
+            # look at connecting widget.attributes_selected -> List[OphydAttributeData]
+            widget.device_widget.attributes_selected.connect(self.set_signal)
+            widget.device_widget.attributes_selected.connect(widget.close)
+            # prevent multiple selection
+            self._search_widget = widget
+
+        self._search_widget.show()
+        self._search_widget.activateWindow()
+
+        self.pv_edit.hide()
+        self.target_button_box.show()
+
+    def pick_pv(self):
+        # Try to get signal
+        pass
+        # try:
+        #     sig = EpicsSignal(self.pv_edit.text())
+        # except Exception as ex:
+        #     return
+
+    def set_signal(self, attr_selected: List[OphydAttributeData]):
+        """
+        Slot to be connected to
+        HappiDeviceComponentWidget.device_widget.attributes_selected
+        """
+        attr = attr_selected[0]
+        logger.debug(f'found attr: {attr}')
+        print(f'found attr: {attr}')
+        self.signal_button.setText(attr.signal.name)
+        self.chosen_target = self.attr_to_target(attr)
+
+    def attr_to_target(self, attr: OphydAttributeData) -> Target:
+        # surely there's a better way...
+        full_name = attr.signal.name
+        dot_attr = attr.attr
+        _attr = '_' + dot_attr.replace('.', '_')
+        dev_name = full_name[:-len(_attr)]
+
+        return Target(device=dev_name, attr=dot_attr, pv=attr.pvname)

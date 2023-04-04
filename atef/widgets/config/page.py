@@ -35,10 +35,11 @@ from atef.config import (Configuration, ConfigurationGroup,
 from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedDescriptionStep, PreparedPassiveStep,
                             PreparedProcedureStep, ProcedureGroup,
-                            ProcedureStep)
+                            ProcedureStep, SetValueStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.widgets.config.data_active import (GeneralProcedureWidget,
-                                             PassiveEditWidget)
+                                             PassiveEditWidget,
+                                             SetValueEditWidget)
 from atef.widgets.config.run_active import (DescriptionRunWidget,
                                             PassiveRunWidget)
 from atef.widgets.config.run_base import RunCheck
@@ -1347,7 +1348,8 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         cls.__name__: cls for cls in (
             ProcedureGroup,
             DescriptionStep,
-            PassiveStep
+            PassiveStep,
+            SetValueStep
         )
     }
 
@@ -1464,7 +1466,7 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
 
         Shoutouts to stackoverflow
         """
-        if event.source() is self.config_table:
+        if event.source() is self.procedure_table:
             selected_indices = self.procedure_table.selectedIndexes()
             if not selected_indices:
                 return
@@ -1541,7 +1543,8 @@ class StepPage(DesignerDisplay, PageWidget):
 
     step_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
         DescriptionStep: None,
-        PassiveStep: PassiveEditWidget
+        PassiveStep: PassiveEditWidget,
+        SetValueStep: SetValueEditWidget
     }
     step_types: Dict[str, ProcedureStep]
 
@@ -1705,7 +1708,8 @@ PAGE_MAP = {
     # Active Pages
     ProcedureGroup: ProcedureGroupPage,
     DescriptionStep: StepPage,
-    PassiveStep: StepPage
+    PassiveStep: StepPage,
+    SetValueStep: StepPage
 }
 
 

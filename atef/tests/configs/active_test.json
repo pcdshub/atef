@@ -25,6 +25,19 @@
           "step_success_required": true,
           "filepath": "."
         }
+      },
+      {
+        "SetValueStep": {
+          "name": "set_value_title",
+          "description": null,
+          "parent": null,
+          "verify_required": true,
+          "step_success_required": true,
+          "actions": [],
+          "success_criteria": [],
+          "continue_on_fail": false,
+          "require_action_success": true
+        }
       }
     ]
   }

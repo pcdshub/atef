@@ -7,6 +7,7 @@ import logging
 from typing import ClassVar, Dict, List, Protocol, Tuple
 from weakref import WeakValueDictionary
 
+import qtawesome
 from qtpy.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QMessageBox, QPlainTextEdit, QStyle, QToolButton,
                             QVBoxLayout, QWidget)
@@ -481,3 +482,19 @@ class SimpleRowWidget(NameMixin, DataWidget):
         match_line_edit_text_width(self.name_edit)
         if not self.name_edit.hasFocus():
             self.adjust_edit_filter()
+
+
+class AddRowWidget(DesignerDisplay, QWidget):
+    """
+    A simple row widget with an add button.  To be used when space is precious
+    Connect a new-row slot to the add_button signal to create new rows
+    """
+    filename = 'add_row_widget.ui'
+
+    add_button: QToolButton
+    row_label: QLabel
+
+    def __init__(self, *args, text='Add new row', **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_button.setIcon(qtawesome.icon('ri.add-circle-line'))
+        self.row_label.setText(text)
