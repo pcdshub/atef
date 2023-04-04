@@ -21,7 +21,7 @@ import logging
 import pathlib
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
-                    Tuple, Union, cast)
+                    Union, cast)
 
 import apischema
 import databroker
@@ -129,11 +129,13 @@ class PassiveStep(ProcedureStep):
 @dataclass
 class SetValueStep(ProcedureStep):
     """ A step that sets one or more values and checks one or more values after """
-    actions: List[Tuple[Target, PrimitiveType]] = field(default_factory=list)
-    success_criteria: List[Tuple[Target, Comparison]] = field(default_factory=list)
+    actions: List[ValueToTarget] = field(default_factory=list)
+    success_criteria: List[ComparisonToTarget] = field(default_factory=list)
 
-    continue_on_fail: bool
-    require_action_success: bool
+    #: Continue performing actions if one fails
+    continue_on_fail: bool = False
+    #: Only mark the step_result as successful if all actions have succeeded
+    require_action_success: bool = True
 
 
 @dataclass
@@ -141,22 +143,37 @@ class Target:
     """
     A destination for a value.  Either an ophyd device+attr pair or EPICS PV
     """
+    #: name of target
+    name: Optional[str] = None
     #: device name and attr
-    device: Optional[str]
-    attr: Optional[str]
+    device: Optional[str] = None
+    attr: Optional[str] = None
     #: EPICS PV
-    pv: Optional[str]
+    pv: Optional[str] = None
 
     def to_signal(self) -> ophyd.EpicsSignal:
+        """ attempt to use happi first, failing that use stored PV info"""
         if self.device and self.attr:
             device = util.get_happi_device_by_name(self.device)
             signal = getattr(device, self.attr)
         elif self.pv:
             signal = ophyd.EpicsSignal(self.pv)
         else:
-            raise ValueError('No signal or device found')
+            return
 
         return signal
+
+
+@dataclass
+class ValueToTarget(Target):
+    #: the value to set to the target
+    value: Optional[PrimitiveType] = None
+
+
+@dataclass
+class ComparisonToTarget(Target):
+    #: the comparison to apply to the target
+    comparison: Optional[Comparison] = None
 
 
 @dataclass
@@ -595,7 +612,7 @@ class PreparedPassiveStep(PreparedProcedureStep):
 
 @dataclass
 class PreparedSetValueStep(PreparedProcedureStep):
-    prepared_actions: List[Tuple[ophyd.Signal, PrimitiveType]] = field(
+    prepared_actions: List[PreparedValueToSignal] = field(
         default_factory=list
     )
     prepared_criteria: Optional[List[PreparedSignalComparison]] = field(
@@ -618,14 +635,27 @@ class PreparedSetValueStep(PreparedProcedureStep):
             name=step.name
         )
 
-        for target, value in step.actions:
-            signal = target.to_signal()
-            prep_step.prepared_actions.append((signal, value))
+        for value_to_target in step.actions:
+            signal = value_to_target.to_signal()
+            value = value_to_target.value
+            prep_value_to_signal = PreparedValueToSignal(
+                signal=signal, value=value
+            )
+            prep_step.prepared_actions.append(prep_value_to_signal)
 
-        for target, comp in step.success_criteria:
-            signal = target.to_signal()
-            prep_comp = PreparedSignalComparison.from_pvname(pvname=signal.pvname,
-                                                             comparison=comp)
+        for comp_to_target in step.success_criteria:
+            signal = comp_to_target.to_signal()
+            comp = comp_to_target.comparison
+            prep_comp = PreparedSignalComparison.from_pvname(
+                pvname=signal.pvname, comparison=comp
+            )
             prep_step.prepared_criteria.append(prep_comp)
 
         return prep_step
+
+
+@dataclass
+class PreparedValueToSignal:
+    signal: ophyd.Signal
+    value: PrimitiveType
+    result: Result = field(default_factory=incomplete_result)
