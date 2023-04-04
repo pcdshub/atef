@@ -93,7 +93,10 @@ class QDataclassBridge(QObject):
             dtype = args[0]
         elif origin is Union and (type(None) in args):
             # Optional, strip Union and recurse
-            self.set_field_from_data(name, args[0], data)
+            if len(args[:-1]) > 1:
+                self.set_field_from_data(name, Union[args[:-1]], data)  # noqa
+            else:
+                self.set_field_from_data(name, args[0], data)
             return
         else:
             # some complex Union? e.g. Union[str, int, bool, float]
