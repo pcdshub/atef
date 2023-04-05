@@ -25,7 +25,7 @@ import qtawesome
 import typhos
 import typhos.cli
 import typhos.display
-# from ophyd import EpicsSignal
+from ophyd import EpicsSignal
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QDialogButtonBox
@@ -782,20 +782,22 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
         # self.procedure_table.setCellWidget(dest, 0, config_row)
 
 
-class ActionRowWidget(DesignerDisplay, SimpleRowWidget):
+class TargetRowWidget(DesignerDisplay, SimpleRowWidget):
+    """ Base widget with target selection """
     filename = 'action_row_widget.ui'
 
     target_button: QtWidgets.QToolButton
-    value_input_placeholder: QtWidgets.QWidget
 
-    def __init__(self, data: ValueToTarget, **kwargs):
+    def __init__(self, data: Target, **kwargs):
         super().__init__(data=data, **kwargs)
-        # TODO: initialize row using data if it exists, do something with data
         self.setup_row()
         self.setup_ui()
+        # TODO: initialize row using data if it exists, do something with data
+        if data.to_signal() is not None:
+            self.target_entry_widget.chosen_target = data
+            self.target_entry_widget.data_updated.emit()
 
     def setup_ui(self):
-        self.child_button.hide()
         # target entry widget dropdown from target_button
         self.target_entry_widget = TargetEntryWidget()
         widget_action = QtWidgets.QWidgetAction(self.target_button)
@@ -805,75 +807,38 @@ class ActionRowWidget(DesignerDisplay, SimpleRowWidget):
         widget_menu.addAction(widget_action)
         self.target_button.setMenu(widget_menu)
 
-        # Link buttons
-        # ok: change tool button text, write to data
-        # cancel: clear on first, close on second
-
         # update data on target_button update
         self.target_entry_widget.data_updated.connect(self.update_target)
-
-        self.update_input_placeholder()
 
     def update_target(self):
         """
         Slot for updating data based on the entry_widget
-        Move Target datat to TargetToValue
+        Move Target data to TargetToValue
         """
-        target = self.target_entry_widget.chosen_target
-        self.bridge.name.put(target.name)
-        self.bridge.device.put(target.device)
-        self.bridge.attr.put(target.attr)
-        self.bridge.pv.put(target.pv)
-
-        self.target_button.setText(f'{target.device}.{target.attr}')
-
-        self.update_input_placeholder()
-
-    def update_input_placeholder(self):
-        # TODO: expand validator, edit behavior
-        # Could use metadata in the future?
-        # Enum drop box?
-        print(self.data)
-        sig = self.data.to_signal()
-        if sig is None:
-            edit_widget = QtWidgets.QLabel('??')
-            self.insert_widget(edit_widget, self.value_input_placeholder)
-            return
-        dtype = type(sig.get())
-        edit_widget = QtWidgets.QLineEdit()
-
-        if dtype is int:
-            validator = QtGui.QIntValidator()
-        elif dtype is float:
-            validator = QtGui.QDoubleValidator()
+        if self.target_entry_widget.chosen_target is None:
+            self.bridge.name.put(None)
+            self.bridge.device.put(None)
+            self.bridge.attr.put(None)
+            self.bridge.pv.put(None)
+            self.target_button.setText('select a target')
+            self.target_button.setToolTip('')
         else:
-            validator = None
+            target = self.target_entry_widget.chosen_target
+            self.bridge.name.put(target.name)
+            self.bridge.device.put(target.device)
+            self.bridge.attr.put(target.attr)
+            self.bridge.pv.put(target.pv)
 
-        edit_widget.setValidator(validator)
-        edit_widget.setPlaceholderText(f'({sig.get()}) ⏎')
-
-        # slot for value update on ReturnPress
-        def update_value():
-            self.bridge.value.put(dtype(edit_widget.text()))
-
-        edit_widget.returnPressed.connect(update_value)
-
-        self.insert_widget(edit_widget, self.value_input_placeholder)
-
-    def insert_widget(self, widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> None:
-        """
-        Helper function for slotting e.g. data widgets into placeholders.
-        """
-        if placeholder.layout() is None:
-            layout = QtWidgets.QVBoxLayout()
-            layout.setContentsMargins(0, 0, 0, 0)
-            placeholder.setLayout(layout)
-        else:
-            old_widget = placeholder.layout().takeAt(0).widget()
-            if old_widget is not None:
-                # old_widget.setParent(None)
-                old_widget.deleteLater()
-        placeholder.layout().addWidget(widget)
+            if target.device is not None and target.attr is not None:
+                self.target_button.setText(f'{target.device}.{target.attr}')
+                self.target_button.setToolTip(f'{target.device}.{target.attr}')
+            elif target.pv is not None:
+                self.target_button.setText(target.pv)
+                self.target_button.setToolTip(target.pv)
+            else:
+                raise ValueError(
+                    f'insufficient information to specifiy target: {target}'
+                )
 
 
 class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
@@ -899,14 +864,14 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         reset_button = self.target_button_box.button(QDialogButtonBox.Reset)
         reset_button.clicked.connect(self.reset_fields)
         apply_button = self.target_button_box.button(QDialogButtonBox.Apply)
-        apply_button.clicked.connect(self.data_updated.emit)
+        apply_button.clicked.connect(self.confirm_signal)
         # signal select setup
         self.signal_button.clicked.connect(self.pick_signal)
         # PV edit setup
         regexp = QtCore.QRegularExpression(r'^\w+(:\w+)+(\.\w+)*$')
         validator = QtGui.QRegularExpressionValidator(regexp)
         self.pv_edit.setValidator(validator)
-        self.pv_edit.returnPressed.connect(self.pick_pv)
+        self.pv_edit.textChanged.connect(self.pick_pv)
 
         self.reset_fields()
 
@@ -917,12 +882,23 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.pv_edit.show()
         self.pv_edit.clear()
         self.signal_button.setText('pick a device_signal')
+        self.signal_button.setToolTip('')
         self.data_updated.emit()
 
     def confirm_signal(self):
-        if self.chosen_target is None:
-            raise ValueError("Signal not chosen.  Something went wrong")
+        # signal button is used
+        if self.pv_edit.text() is None:
+            self.data_updated.emit()
 
+        sig = EpicsSignal(self.pv_edit.text())
+        try:
+            sig.wait_for_connection()
+        except TimeoutError:
+            logger.error(f'Could not connect to PV: {self.pv_edit.text()}')
+            self.reset_fields()
+            return
+
+        self.chosen_target = Target(pv=self.pv_edit.text())
         self.data_updated.emit()
 
     def pick_signal(self):
@@ -942,14 +918,6 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.pv_edit.hide()
         self.target_button_box.show()
 
-    def pick_pv(self):
-        # Try to get signal
-        pass
-        # try:
-        #     sig = EpicsSignal(self.pv_edit.text())
-        # except Exception as ex:
-        #     return
-
     def set_signal(self, attr_selected: List[OphydAttributeData]):
         """
         Slot to be connected to
@@ -959,7 +927,13 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         logger.debug(f'found attr: {attr}')
         print(f'found attr: {attr}')
         self.signal_button.setText(attr.signal.name)
+        self.signal_button.setToolTip(attr.signal.name)
         self.chosen_target = self.attr_to_target(attr)
+
+    def pick_pv(self):
+        # prompt for confirmation
+        self.signal_button.hide()
+        self.target_button_box.show()
 
     def attr_to_target(self, attr: OphydAttributeData) -> Target:
         # surely there's a better way...
@@ -969,3 +943,87 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         dev_name = full_name[:-len(_attr)]
 
         return Target(device=dev_name, attr=dot_attr, pv=attr.pvname)
+
+
+class ActionRowWidget(TargetRowWidget):
+    filename = 'action_row_widget.ui'
+
+    value_input_placeholder: QtWidgets.QWidget
+    value_button_box: QtWidgets.QDialogButtonBox
+
+    def __init__(self, data: ValueToTarget, **kwargs):
+        super().__init__(data=data, **kwargs)
+
+    def setup_ui(self):
+        super().setup_ui()
+        self.child_button.hide()
+        apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
+        apply_button.setText('')
+        self.update_input_placeholder()
+
+    def update_target(self):
+        super().update_target()
+
+        self.update_input_placeholder()
+
+    def update_input_placeholder(self):
+        # TODO: expand validator, edit behavior
+        # Could use metadata in the future?
+        # Enum drop box?
+        sig = self.data.to_signal()
+        if sig is None:
+            self.edit_widget = QtWidgets.QLabel('(no target set)')
+            self.insert_widget(self.edit_widget, self.value_input_placeholder)
+            self.value_button_box.hide()
+            return
+        dtype = type(sig.get())
+        self.edit_widget = QtWidgets.QLineEdit()
+
+        if dtype is int:
+            validator = QtGui.QIntValidator()
+        elif dtype is float:
+            validator = QtGui.QDoubleValidator()
+        else:
+            validator = None
+
+        self.edit_widget.setValidator(validator)
+        self.edit_widget.setPlaceholderText(f'({sig.get()}) ⏎')
+        if self.bridge.value.get() is not None:
+            self.edit_widget.setText(str(self.bridge.value.get()))
+            self.edit_widget.setToolTip(str(self.bridge.value.get()))
+
+        # slot for value update on ReturnPress
+        def update_value():
+            self.bridge.value.put(dtype(self.edit_widget.text()))
+            self.value_button_box.hide()
+            self.edit_widget.setFrame(False)
+
+        def value_changed():
+            self.value_button_box.show()
+            self.edit_widget.setFrame(True)
+
+        self.edit_widget.textChanged.connect(value_changed)
+
+        self.insert_widget(self.edit_widget, self.value_input_placeholder)
+        self.value_button_box.show()
+        apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
+        apply_button.clicked.connect(update_value)
+
+    def insert_widget(self, widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> None:
+        """
+        Helper function for slotting e.g. data widgets into placeholders.
+        """
+        if placeholder.layout() is None:
+            layout = QtWidgets.QVBoxLayout()
+            layout.setContentsMargins(0, 0, 0, 0)
+            placeholder.setLayout(layout)
+        else:
+            old_widget = placeholder.layout().takeAt(0).widget()
+            if old_widget is not None:
+                # old_widget.setParent(None)
+                old_widget.deleteLater()
+        placeholder.layout().addWidget(widget)
+
+
+class CheckRowWidget(TargetRowWidget):
+    filename = 'check_row_widget.ui'

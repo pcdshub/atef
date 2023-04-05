@@ -33,7 +33,15 @@
           "parent": null,
           "verify_required": true,
           "step_success_required": true,
-          "actions": [],
+          "actions": [
+            {
+              "name": null,
+              "device": null,
+              "attr": null,
+              "pv": "AT2L0:XTES:MMS:01",
+              "value": 55.0
+            }
+          ],
           "success_criteria": [],
           "continue_on_fail": false,
           "require_action_success": true
