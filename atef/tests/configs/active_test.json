@@ -38,8 +38,8 @@
               "name": null,
               "device": null,
               "attr": null,
-              "pv": "AT2L0:XTES:MMS:01",
-              "value": 55.0
+              "pv": "MY:PREFIX:dt",
+              "value": 1.0
             }
           ],
           "success_criteria": [
@@ -47,7 +47,7 @@
               "name": null,
               "device": null,
               "attr": null,
-              "pv": null,
+              "pv": "MY:PREFIX:dt",
               "comparison": {
                 "Equals": {
                   "name": "equal_check",
@@ -58,7 +58,7 @@
                   "string": null,
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
-                  "value": 0.0,
+                  "value": 1.0,
                   "rtol": null,
                   "atol": null
                 }
