@@ -1,22 +1,10 @@
 {
   "version": 0,
   "root": {
-    "name": "active_all",
-    "description": "Basic active checkout",
+    "name": "root",
+    "description": "sample active test checkout",
     "parent": null,
-    "combined_result": {
-      "severity": 1,
-      "reason": "step incomplete"
-    },
-    "verify_result": {
-      "severity": 1,
-      "reason": "step incomplete"
-    },
     "verify_required": true,
-    "step_result": {
-      "severity": 1,
-      "reason": "step incomplete"
-    },
     "step_success_required": true,
     "steps": [
       {
@@ -24,40 +12,16 @@
           "name": "desc_title",
           "description": "description for description step",
           "parent": null,
-          "combined_result": {
-            "severity": 1,
-            "reason": "step incomplete"
-          },
-          "verify_result": {
-            "severity": 1,
-            "reason": "step incomplete"
-          },
           "verify_required": true,
-          "step_result": {
-            "severity": 1,
-            "reason": "step incomplete"
-          },
-          "step_success_required": false
+          "step_success_required": true
         }
       },
       {
         "PassiveStep": {
           "name": "passive_title",
-          "description": null,
+          "description": "description for passive step",
           "parent": null,
-          "combined_result": {
-            "severity": 1,
-            "reason": "step incomplete"
-          },
-          "verify_result": {
-            "severity": 1,
-            "reason": "step incomplete"
-          },
           "verify_required": true,
-          "step_result": {
-            "severity": 1,
-            "reason": "step incomplete"
-          },
           "step_success_required": true,
           "filepath": "."
         }

@@ -9,8 +9,9 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Mapping, Sequence, TypeVar, Union
 
 from . import serialization
-from .check import Result, Severity
+from .check import Severity
 from .exceptions import ToolDependencyMissingException
+from .result import Result
 
 T = TypeVar("T", bound="Tool")
 

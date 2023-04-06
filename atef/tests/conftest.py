@@ -1,7 +1,7 @@
 import contextlib
 import datetime
 import pathlib
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pydm
 import pydm.exception
@@ -12,6 +12,38 @@ from ..archive_device import ArchivedValue, ArchiverHelper
 
 TEST_PATH = pathlib.Path(__file__).parent.resolve()
 CONFIG_PATH = TEST_PATH / "configs"
+
+
+def passive_checkout_configs() -> List[pathlib.Path]:
+    filenames = ['lfe.json', 'all_fields.json', 'ping_localhost.json']
+    config_paths = [CONFIG_PATH / fn for fn in filenames]
+    return config_paths
+
+
+def active_checkout_configs() -> List[pathlib.Path]:
+    filenames = ['active_test.json']
+    config_paths = [CONFIG_PATH / fn for fn in filenames]
+    return config_paths
+
+
+PASSIVE_CONFIG_PATHS = passive_checkout_configs()
+ACTIVE_CONFIG_PATHS = active_checkout_configs()
+ALL_CONFIG_PATHS = PASSIVE_CONFIG_PATHS + ACTIVE_CONFIG_PATHS
+
+
+@pytest.fixture(params=PASSIVE_CONFIG_PATHS)
+def passive_config_path(request) -> pathlib.Path:
+    return request.param
+
+
+@pytest.fixture(params=ACTIVE_CONFIG_PATHS)
+def active_config_path(request) -> pathlib.Path:
+    return request.param
+
+
+@pytest.fixture(params=ALL_CONFIG_PATHS)
+def all_config_path(request) -> pathlib.Path:
+    return request.param
 
 
 class MockEpicsArch:

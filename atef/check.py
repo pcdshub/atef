@@ -8,40 +8,14 @@ from typing import Any, Generator, Iterable, List, Optional, Sequence
 import numpy as np
 import ophyd
 
-from . import exceptions, reduce, serialization
+from atef.result import Result, successful_result
+
+from . import reduce, serialization
 from .enums import Severity
-from .exceptions import (ComparisonError, ComparisonException,
-                         ComparisonWarning, PreparedComparisonException)
+from .exceptions import ComparisonError, ComparisonException, ComparisonWarning
 from .type_hints import Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class Result:
-    severity: Severity = Severity.success
-    reason: Optional[str] = None
-
-    @classmethod
-    def from_exception(cls, error: Exception) -> Result:
-        """Convert an error exception to a Result."""
-        severity = Severity.internal_error
-        if isinstance(error, exceptions.ConfigFileHappiError):
-            reason = f"Failed to load: {error.dev_name}"
-        elif isinstance(error, PreparedComparisonException):
-            if error.comparison is not None:
-                severity = error.comparison.severity_on_failure
-            reason = (
-                f"Failed to prepare comparison {error.name!r} for "
-                f"{error.identifier!r}: {error}"
-            )
-        else:
-            reason = f"Failed to load: {type(error).__name__}: {error}"
-
-        return cls(
-            severity=severity,
-            reason=reason,
-        )
 
 
 def _is_in_range(
@@ -59,12 +33,6 @@ def _raise_for_severity(severity: Severity, reason: str):
     if severity == Severity.warning:
         raise ComparisonWarning(reason)
     raise ComparisonError(reason)
-
-
-success = Result()
-
-incomplete = Result(severity=Severity.warning,
-                    reason='step incomplete')
 
 
 @dataclass
@@ -267,7 +235,7 @@ class Comparison:
             passed = all(passed)
 
         if passed:
-            return success
+            return successful_result()
 
         desc = f"{identifier_prefix}{self.describe()}"
         return Result(

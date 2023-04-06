@@ -1,8 +1,8 @@
 import pytest
 
 from .. import check
-from ..check import (Comparison, Equals, NotEquals, PrimitiveType, Result,
-                     Severity)
+from ..check import Comparison, Equals, NotEquals, PrimitiveType, Severity
+from ..result import Result
 
 
 def _parametrize(comparison, *value_and_result):

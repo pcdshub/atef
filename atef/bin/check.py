@@ -16,10 +16,11 @@ import rich.console
 import rich.tree
 
 from ..cache import DataCache, _SignalCache, get_signal_cache
-from ..check import Comparison, Result, Severity
+from ..check import Comparison, Severity
 from ..config import (AnyConfiguration, AnyPreparedConfiguration,
                       ConfigurationFile, FailedConfiguration,
                       PreparedComparison, PreparedFile, PreparedGroup)
+from ..result import Result
 from ..util import ophyd_cleanup
 
 logger = logging.getLogger(__name__)

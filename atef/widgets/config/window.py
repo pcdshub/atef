@@ -19,7 +19,8 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
 
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, PreparedFile
-from atef.procedure import DescriptionStep, PassiveStep, ProcedureFile
+from atef.procedure import (DescriptionStep, PassiveStep,
+                            PreparedProcedureFile, ProcedureFile)
 from atef.qt_helpers import walk_tree_widget_items
 from atef.report import PassiveAtefReport
 
@@ -27,7 +28,8 @@ from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
 from .page import (AtefItem, ConfigurationGroupPage, PageWidget,
                    ProcedureGroupPage, RunStepPage, link_page)
-from .run_base import make_run_page
+from .run_base import (get_prepared_step, get_relevant_configs_comps,
+                       make_run_page)
 from .utils import MultiInputDialog, Toggle, clear_results
 
 logger = logging.getLogger(__name__)
@@ -448,7 +450,7 @@ class RunTree(EditTree):
                                                           cache=DataCache())
         if isinstance(config_file, ProcedureFile):
             # clear all results when making a new run tree
-            clear_results(config_file)
+            self.prepared_file = PreparedProcedureFile.from_origin(config_file)
 
         self._swap_to_run_widgets()
         self.print_report_button.clicked.connect(self.print_report)
@@ -474,15 +476,24 @@ class RunTree(EditTree):
         # replace widgets with run versions
         # start at the root of the config file
         prev_widget = None
+        if isinstance(self.config_file, ConfigurationFile):
+            get_prepare_fn = get_relevant_configs_comps
+        elif isinstance(self.config_file, ProcedureFile):
+            get_prepare_fn = get_prepared_step
         for item in walk_tree_widget_items(self.tree_widget):
             data = item.widget.data  # Dataclass on widget
+            prepared_data = get_prepare_fn(self.prepared_file, data)
             if type(data) in _edit_to_run_page:
-                run_widget_cls = _edit_to_run_page[type(item.widget.data)]
-                run_widget = run_widget_cls(data=data)
+                if len(prepared_data) != 1:
+                    raise ValueError(
+                        'number of prepared dataclasses is not 1, while the '
+                        'target page expects one: '
+                        f'{type(data)} -> {[type(d) for d in prepared_data]}')
+                run_widget_cls = _edit_to_run_page[type(data)]
+                run_widget = run_widget_cls(data=prepared_data[0])
                 link_page(item, run_widget)
             else:
-                run_widget = make_run_page(item.widget, data,
-                                           prepared_file=self.prepared_file)
+                run_widget = make_run_page(item.widget, prepared_data)
                 link_page(item, run_widget)
 
             if prev_widget:

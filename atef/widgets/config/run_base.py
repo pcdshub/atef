@@ -15,13 +15,16 @@ from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLayout, QLineEdit,
                             QMenu, QPushButton, QSpacerItem, QStyle,
                             QToolButton, QVBoxLayout, QWidget, QWidgetAction)
 
-from atef.check import Comparison, Result
+from atef.check import Comparison
 from atef.config import (AnyPreparedConfiguration, Configuration,
                          ConfigurationFile, PreparedComparison,
                          PreparedConfiguration, PreparedFile)
 from atef.enums import Severity
-from atef.procedure import ProcedureFile, ProcedureStep
-from atef.widgets.config.utils import TreeItem, combine_results
+from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
+                            PreparedProcedureStep, ProcedureFile,
+                            ProcedureStep, walk_steps)
+from atef.result import Result, combine_results
+from atef.widgets.config.utils import TreeItem
 from atef.widgets.core import DesignerDisplay
 
 # avoid circular imports
@@ -54,8 +57,8 @@ def run_active_step(config):  # takes procedure steps and groups
 
 def make_run_page(
     widget: QWidget,
-    data: Union[PreparedComparison, ProcedureStep, AnyPreparedConfiguration],
-    prepared_file: Optional[PreparedFile] = None
+    prepared_data: List[Union[PreparedComparison, AnyPreparedConfiguration,
+                              PreparedProcedureStep, PreparedProcedureGroup]],
 ) -> QWidget:
     """
     Disables all the widgets in ``widget`` and adds the RunCheck widget.
@@ -85,12 +88,7 @@ def make_run_page(
     # make existing widgets read-only
     disable_widget(widget)
     # add RunCheck to end of layout
-    if prepared_file:
-        # gather relevant comparisons
-        configs = get_relevant_configs_comps(prepared_file, data)
-        check_widget = RunCheck(data=configs)
-    else:
-        check_widget = RunCheck(data=[data])
+    check_widget = RunCheck(data=prepared_data)
 
     # mimic placeholder configuration
     check_widget_placeholder = QWidget(parent=widget)
@@ -119,7 +117,7 @@ def disable_widget(widget: QWidget) -> QWidget:
     return widget
 
 
-def infer_step_type(config: Union[PreparedComparison, ProcedureStep]) -> str:
+def infer_step_type(config: Union[PreparedComparison, PreparedProcedureStep]) -> str:
     # TODO: find a better way to decide the step type
     if hasattr(config, 'compare'):
         return 'passive'
@@ -159,14 +157,46 @@ def get_relevant_configs_comps(
     matched_c = []
 
     for config in prepared_file.walk_groups():
-        if config.config == original_c:
+        if config.config is original_c:
             matched_c.append(config)
 
     for comp in prepared_file.walk_comparisons():
-        if comp.comparison == original_c:
+        if comp.comparison is original_c:
             matched_c.append(comp)
 
     return matched_c
+
+
+def get_prepared_step(
+    prepared_file: PreparedProcedureFile,
+    step: ProcedureStep
+) -> List[PreparedProcedureStep]:
+    """
+    Gather all PreparedProcedureStep dataclasses the correspond to the original
+    ProcedureStep.
+
+    Only relevant for active checkouts.
+
+    Parameters
+    ----------
+    prepared_file : PreparedProcedureFile
+        the PreparedProcedureFile to search through
+    step : Union[ProcedureStep, ProcedureGroup]
+        the step to match
+
+    Returns
+    -------
+    List[Union[PreparedProcedureStep, PreparedProcedureGroup]]
+        the PreparedProcedureSteps related to ``step``
+    """
+    # As of the writing of this docstring, this helper is only expected to return
+    # lists of length 1.  However in order to match the passive checkout workflow,
+    # we still return a list of relevant steps.
+    matched_steps = []
+    for pstep in walk_steps(prepared_file.root):
+        if pstep.origin is step:
+            matched_steps.append(pstep)
+    return matched_steps
 
 
 class RunCheck(DesignerDisplay, QWidget):
@@ -250,7 +280,7 @@ class RunCheck(DesignerDisplay, QWidget):
             for cfg in configs:
                 config_type = infer_step_type(cfg)
                 if config_type == 'active':
-                    cfg.run()
+                    asyncio.run(cfg.run())
                 elif config_type == 'passive':
                     asyncio.run(cfg.compare())
                 else:

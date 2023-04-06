@@ -28,8 +28,8 @@ import typhos.display
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 
-from atef.check import Result
 from atef.config import ConfigurationFile
+from atef.result import Result, incomplete_result
 from atef.widgets.config.data_base import DataWidget
 from atef.widgets.config.run_base import create_tree_items
 from atef.widgets.config.utils import ConfigTreeModel, TreeItem
@@ -37,8 +37,7 @@ from atef.widgets.core import DesignerDisplay
 
 from ...procedure import (DescriptionStep, DisplayOptions, PassiveStep,
                           PlanOptions, PlanStep, ProcedureGroup, ProcedureStep,
-                          PydmDisplayStep, TyphosDisplayStep,
-                          incomplete_result)
+                          PydmDisplayStep, TyphosDisplayStep)
 
 # TODO:  CodeStep, ConfigurationCheckStep,
 
