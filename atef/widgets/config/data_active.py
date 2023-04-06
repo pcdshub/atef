@@ -33,17 +33,17 @@ from qtpy.QtWidgets import QDialogButtonBox
 from atef import util
 from atef.config import ConfigurationFile
 from atef.result import Result, incomplete_result
-from atef.widgets.config.data_base import (AddRowWidget, DataWidget,
-                                           SimpleRowWidget)
+from atef.widgets.config.data_base import DataWidget, SimpleRowWidget
 from atef.widgets.config.run_base import create_tree_items
-from atef.widgets.config.utils import ConfigTreeModel, TreeItem
+from atef.widgets.config.utils import (ConfigTreeModel, TableWidgetWithAddRow,
+                                       TreeItem)
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData
 
-from ...procedure import (DescriptionStep, DisplayOptions, PassiveStep,
-                          PlanOptions, PlanStep, ProcedureGroup, ProcedureStep,
-                          PydmDisplayStep, SetValueStep, Target,
+from ...procedure import (ComparisonToTarget, DescriptionStep, DisplayOptions,
+                          PassiveStep, PlanOptions, PlanStep, ProcedureGroup,
+                          ProcedureStep, PydmDisplayStep, SetValueStep, Target,
                           TyphosDisplayStep, ValueToTarget)
 
 # TODO:  CodeStep, ConfigurationCheckStep,
@@ -649,137 +649,66 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
     action_success_radio_button: QtWidgets.QRadioButton
     step_failure_radio_button: QtWidgets.QRadioButton
 
-    actions_table: QtWidgets.QTableWidget
-    checks_table: QtWidgets.QTableWidget
+    actions_table: TableWidgetWithAddRow
+    actions_table_placeholder: QtWidgets.QWidget
+    checks_table: TableWidgetWithAddRow
+    checks_table_placeholder: QtWidgets.QWidget
 
     def __init__(self, *args, data=SetValueStep, **kwargs):
         super().__init__(*args, data=data, **kwargs)
 
-        self.add_add_row_widget(self.actions_table, 'Add new action')
-        add_action_row_widget = self.actions_table.cellWidget(0, 0)
-        add_action_row_widget.add_button.clicked.connect(self.add_action)
-        self.add_add_row_widget(self.checks_table, 'Add new check')
-        self.actions_table.dropEvent = self.table_drop_event
+        self.actions_table = TableWidgetWithAddRow(
+            add_row_text='Add new action',
+            title_text='Actions',
+            row_widget_cls=ActionRowWidget
+        )
+        self.actions_table.table_updated.connect(
+            self.update_list(self.actions_table, self.bridge.actions)
+        )
+        self.insert_widget(self.actions_table, self.actions_table_placeholder)
+        self.checks_table = TableWidgetWithAddRow(
+            add_row_text='Add new check',
+            title_text='Checks',
+            row_widget_cls=CheckRowWidget
+        )
+        self.checks_table.table_updated.connect(
+            self.update_list(self.checks_table, self.bridge.success_criteria)
+        )
+        self.insert_widget(self.checks_table, self.checks_table_placeholder)
 
         # add existing actions to table
         for action in data.actions:
-            self.add_action(action=action)
-
-    def add_action(
-        self,
-        checked: bool = False,
-        action: Optional[ValueToTarget] = None,
-        **kwargs
-    ) -> None:
-        """
-        add a new or existing action to the table.
-        """
-        if action is None:
-            action = ValueToTarget()
-            new_action = True
-        else:
-            new_action = False
-
-        action_row = ActionRowWidget(data=action)
-        # Insert just above the add-row-row
-        ins_ind = self.actions_table.rowCount() - 1
-        self.actions_table.insertRow(ins_ind)
-        self.actions_table.setRowHeight(ins_ind, action_row.sizeHint().height())
-        self.actions_table.setCellWidget(ins_ind, 0, action_row)
-        if new_action:
-            self.update_list(self.actions_table, self.bridge.actions)
-        self.setup_delete_button(action_row)
-
-    def add_check(self):
-        """
-        add a new or existing check to the table.
-        """
-        pass
-
-    def add_add_row_widget(self, table_widget: QtWidgets.QTableWidget, text: str):
-        """ add the AddRowWidget to the end of the specified table-widget"""
-        add_row = AddRowWidget(text=text)
-        # row_count = table_widget.rowCount()
-        table_widget.insertRow(0)
-        table_widget.setRowHeight(0, add_row.sizeHint().height())
-        table_widget.setCellWidget(0, 0, add_row)
-
-    def setup_delete_button(self, row: SimpleRowWidget) -> None:
-        # TODO: Make this work for an arbitrary list and its row
-        delete_icon = self.style().standardIcon(
-            QtWidgets.QStyle.SP_TitleBarCloseButton
-        )
-        row.delete_button.setIcon(delete_icon)
-
-        def inner_delete(*args, **kwargs):
-            self.delete_table_row(row)
-
-        row.delete_button.clicked.connect(inner_delete)
-
-    def delete_table_row(self, row: SimpleRowWidget):
-        # get the data
-        for row_index in range(self.actions_table.rowCount()):
-            widget = self.actions_table.cellWidget(row_index, 0)
-            if widget is row:
-                self.actions_table.removeRow(row_index)
-                break
-
-        self.update_list(self.actions_table, self.bridge.actions)
+            self.actions_table.add_row(data=action)
+        for check in data.success_criteria:
+            self.checks_table.add_row(data=check)
 
     def update_list(self, table_widget: QtWidgets.QTableWidget, bridge_attr):
-        row_data = []
-        for row_index in range(table_widget.rowCount()):
-            row_widget = table_widget.cellWidget(row_index, 0)
-            data = getattr(row_widget, 'data', None)
-            if data:
-                row_data.append(data)
+        def inner_slot():
+            row_data = []
+            for row_index in range(table_widget.rowCount()):
+                row_widget = table_widget.cellWidget(row_index, 0)
+                data = getattr(row_widget, 'data', None)
+                if data:
+                    row_data.append(data)
 
-        bridge_attr.put(row_data)
+            bridge_attr.put(row_data)
 
-    def table_drop_event(self, event: QtGui.QDropEvent) -> None:
+        return inner_slot
+
+    def insert_widget(self, widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> None:
         """
-        Monkeypatch onto the table to allow us to drag/drop rows.
-
-        if using row widget to add a row, need to make dest_row == -1 a noop
-        Shoutouts to stackoverflow
+        Helper function for slotting e.g. data widgets into placeholders.
         """
-        pass
-        # if event.source() is self.config_table:
-        #     selected_indices = self.config_table.selectedIndexes()
-        #     if not selected_indices:
-        #         return
-        #     selected_row = selected_indices[0].row()
-        #     dest_row = self.config_table.indexAt(event.pos()).row()
-        #     if dest_row == -1:
-        #         dest_row = self.config_table.rowCount() - 1
-        #     self.move_config_row(selected_row, dest_row)
-
-    def move_config_row(self, source: int, dest: int) -> None:
-        """
-        Move the row at index source to index dest.
-
-        Rearanges the table, the file, and the tree.
-        """
-        pass
-        # # Skip if into the same index
-        # if source == dest:
-        #     return
-        # config_data = self.data.steps.pop(source)
-        # self.data.steps.insert(dest, config_data)
-        # # Rearrange the tree
-        # config_item = self.tree_item.takeChild(source)
-        # self.tree_item.insertChild(dest, config_item)
-        # # Rearrange the table: need a whole new widget or else segfault
-        # self.procedure_table.removeRow(source)
-        # self.procedure_table.insertRow(dest)
-        # config_row = ConfigurationGroupRowWidget(data=config_data)
-        # self.setup_row_buttons(
-        #     row_widget=config_row,
-        #     item=config_item,
-        #     table=self.procedure_table,
-        # )
-        # self.procedure_table.setRowHeight(dest, config_row.sizeHint().height())
-        # self.procedure_table.setCellWidget(dest, 0, config_row)
+        if placeholder.layout() is None:
+            layout = QtWidgets.QVBoxLayout()
+            layout.setContentsMargins(0, 0, 0, 0)
+            placeholder.setLayout(layout)
+        else:
+            old_widget = placeholder.layout().takeAt(0).widget()
+            if old_widget is not None:
+                # old_widget.setParent(None)
+                old_widget.deleteLater()
+        placeholder.layout().addWidget(widget)
 
 
 class TargetRowWidget(DesignerDisplay, SimpleRowWidget):
@@ -925,7 +854,6 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         """
         attr = attr_selected[0]
         logger.debug(f'found attr: {attr}')
-        print(f'found attr: {attr}')
         self.signal_button.setText(attr.signal.name)
         self.signal_button.setToolTip(attr.signal.name)
         self.chosen_target = self.attr_to_target(attr)
@@ -951,7 +879,9 @@ class ActionRowWidget(TargetRowWidget):
     value_input_placeholder: QtWidgets.QWidget
     value_button_box: QtWidgets.QDialogButtonBox
 
-    def __init__(self, data: ValueToTarget, **kwargs):
+    def __init__(self, data: Optional[ValueToTarget] = None, **kwargs):
+        if data is None:
+            data = ValueToTarget()
         super().__init__(data=data, **kwargs)
 
     def setup_ui(self):
@@ -1027,3 +957,6 @@ class ActionRowWidget(TargetRowWidget):
 
 class CheckRowWidget(TargetRowWidget):
     filename = 'check_row_widget.ui'
+
+    def __init__(self, data=ComparisonToTarget, **kwargs):
+        super().__init__(data=data, **kwargs)

@@ -1530,6 +1530,9 @@ class StepPage(DesignerDisplay, PageWidget):
 
     Contains a selector, placeholder for the specific step,
     and general verification settings
+
+    Carries many methods that may or may not apply to active checkout steps.
+    Consider refactoring in the future?
     """
     filename = 'step_page.ui'
 
@@ -1565,6 +1568,10 @@ class StepPage(DesignerDisplay, PageWidget):
         """
         super().assign_tree_item(item)
         self.setup_name_desc_tags_link()
+
+        # extra setup for SetValueStep.  Reminiscent of AnyComparison
+        if isinstance(self.data, SetValueStep):
+            self.setup_set_value_step()
 
     def new_step(self, step: ProcedureStep) -> None:
         """
@@ -1661,6 +1668,91 @@ class StepPage(DesignerDisplay, PageWidget):
         self.name_desc_tags_widget.extra_text_label.setText(desc)
         self.name_desc_tags_widget.extra_text_label.setToolTip(desc)
         self.name_desc_tags_widget.init_viewer(attr, config)
+
+    def setup_set_value_step(self) -> None:
+        # helpful methods?...
+        # self.setup_child_button
+        self.update_subpages()
+        self.specific_procedure_widget.bridge.success_criteria.updated.connect(
+            self.update_subpages
+        )
+
+    def update_subpages(self) -> None:
+        """
+        Update nodes based on the current SetValueStep state.
+
+        This may add or remove pages as appropriate.
+
+        The node order should match the sequence in the table
+        """
+        # Cache the previous selection
+        pre_selected = self.full_tree.selectedItems()
+        display_order = OrderedDict()
+        table = self.specific_procedure_widget.checks_table
+        for row_index in range(table.rowCount()):
+            widget = table.cellWidget(row_index, 0)
+            comp = widget.data.comparison
+            display_order[id(comp)] = comp
+        # Pull off all of the existing items
+        old_items = self.tree_item.takeChildren()
+        old_item_map = {
+            id(item.widget.data): item for item in old_items
+        }
+        # Add items back as needed, may be a mix of old and new
+        new_item = None
+        for ident, comp in display_order.items():
+            try:
+                item = old_item_map[ident]
+            except KeyError:
+                # Need to make a new page/item
+                new_item = self.add_sub_comparison_node(comp)
+            else:
+                # An old item existed, add it again
+                self.tree_item.addChild(item)
+        # Fix selection if it changed
+        post_selected = self.full_tree.selectedItems()
+        if (
+            new_item is not None
+            and pre_selected
+            and post_selected
+            and pre_selected[0] is not post_selected[0]
+        ):
+            # Selection normal and changed, usually the new item
+            self.full_tree.setCurrentItem(new_item)
+
+    def add_sub_comparison_node(self, comparison: Comparison) -> AtefItem:
+        """
+        For the AnyComparison, add a sub-comparison.
+        """
+        page = ComparisonPage(data=comparison)
+        item = AtefItem(
+            tree_parent=self.tree_item,
+            name=comparison.name,
+            func_name=type(comparison).__name__,
+        )
+        link_page(item=item, widget=page)
+        self.setup_any_comparison_row_buttons(
+            comparison=comparison,
+            item=item,
+        )
+        return item
+
+    def setup_set_value_check_row_buttons(
+        self,
+        comparison: Comparison,
+        item: AtefItem
+    ) -> None:
+        table: QTableWidget = self.specific_comparison_widget.comparisons_table
+        for index in range(table.rowCount()):
+            row_widget = table.cellWidget(index, 0)
+            if row_widget.data.comparison is comparison:
+                break
+        if row_widget.data.comparison is not comparison:
+            return
+        self.setup_child_button(
+            button=row_widget.child_button,
+            item=item,
+        )
 
 
 class RunStepPage(DesignerDisplay, PageWidget):

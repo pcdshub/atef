@@ -7,7 +7,7 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
 
 import qtawesome as qta
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QPoint, QPointF, QRectF, QRegularExpression, Qt
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
@@ -1212,3 +1212,151 @@ class TreeItem:
         child._row = len(self._children)
         self._children.append(child)
         self._columncount = max(child.columnCount(), self._columncount)
+
+
+class AddRowWidget(DesignerDisplay, QWidget):
+    """
+    A simple row widget with an add button.  To be used when space is precious
+    Connect a new-row slot to the add_button signal to create new rows
+    """
+    filename = 'add_row_widget.ui'
+
+    add_button: QtWidgets.QToolButton
+    row_label: QtWidgets.QLabel
+
+    def __init__(self, *args, text='Add new row', **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_button.setIcon(qta.icon('ri.add-circle-line'))
+        self.row_label.setText(text)
+
+
+class TableWidgetWithAddRow(QtWidgets.QTableWidget):
+    """
+    A standard QTableWidget with an AddRowWidget.
+    Intended to be a n x 1 table, with each row being a SimpleRowWidget.
+    Emits table_updated when the table contents change.
+
+
+
+    The AddRowWidget is not treated as a row, and as such the following methods
+    are modified.
+    - rowCount(): Returns super().rowCount() - 1
+    - ... and more as I find more methods
+    """
+
+    add_row_widget: AddRowWidget
+
+    table_updated: ClassVar[QtCore.Signal] = QtCore.Signal()
+
+    def __init__(self, *args, add_row_text: str, title_text: str, row_widget_cls: QtWidgets.QWidget, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # self.dropEvent = self.table_drop_event
+        self.setColumnCount(1)
+        self.horizontalHeader().setStretchLastSection(True)
+        self.setHorizontalHeaderLabels([title_text])
+        self.verticalHeader().setHidden(True)
+        self.row_widget_cls = row_widget_cls
+        self.add_add_row_widget(text=add_row_text)
+
+    def add_add_row_widget(self, text: str):
+        """ add the AddRowWidget to the end of the specified table-widget"""
+        self.add_row_widget = AddRowWidget(text=text)
+        self.insertRow(0)
+        self.setRowHeight(0, self.add_row_widget.sizeHint().height())
+        self.setCellWidget(0, 0, self.add_row_widget)
+        self.add_row_widget.add_button.clicked.connect(self.add_row)
+
+    def rowCount(self) -> int:
+        # exclude add-row in row counts
+        return super().rowCount() - 1
+
+    def add_row(
+        self,
+        checked: bool = False,
+        data: Optional[Any] = None,
+        **kwargs
+    ) -> None:
+        """
+        add a new or existing action to the table.
+        """
+        new_row = self.row_widget_cls(data=data)
+        # Insert just above the add-row-row
+        ins_ind = self.rowCount()
+        self.insertRow(ins_ind)
+        self.setRowHeight(ins_ind, new_row.sizeHint().height())
+        self.setCellWidget(ins_ind, 0, new_row)
+        self.setup_delete_button(new_row)
+        self.table_updated.emit()
+
+    def setup_delete_button(self, row: QtWidgets.QWidget) -> None:
+        # row: SimpleRowWidget, but can't import due to module structure
+        # TODO: Make this work for an arbitrary list and its row
+        delete_icon = self.style().standardIcon(
+            QtWidgets.QStyle.SP_TitleBarCloseButton
+        )
+        row.delete_button.setIcon(delete_icon)
+
+        def inner_delete(*args, **kwargs):
+            self.delete_table_row(row)
+
+        row.delete_button.clicked.connect(inner_delete)
+
+    def delete_table_row(self, row: QtWidgets.QWidget):
+        # get the data
+        for row_index in range(self.rowCount()):
+            widget = self.cellWidget(row_index, 0)
+            if widget is row:
+                self.removeRow(row_index)
+                break
+
+        self.table_updated.emit()
+
+    def table_drop_event(self, event: QtGui.QDropEvent) -> None:
+        """
+        Monkeypatch onto the table to allow us to drag/drop rows.
+
+        if using row widget to add a row, need to make dest_row == -1 a noop
+        Shoutouts to stackoverflow
+        """
+        if event.source() is self:
+            selected_indices = self.config_table.selectedIndexes()
+            if not selected_indices:
+                return
+            selected_row = selected_indices[0].row()
+            dest_row = self.indexAt(event.pos()).row()
+            if dest_row == -1:
+                # Cannot move a row below the AddRowWidget
+                return
+            self.move_config_row(selected_row, dest_row)
+
+    def move_config_row(self, source: int, dest: int) -> None:
+        """
+        Move the row at index source to index dest.
+
+        Rearanges the table, the file, and the tree.
+        """
+        # Skip if into the same index
+        return
+        # if source == dest:
+        #     return
+
+        # ####
+        # config_data = self.data.steps.pop(source)
+        # ####
+
+        # self.data.steps.insert(dest, config_data)
+        # # Rearrange the tree
+        # config_item = self.tree_item.takeChild(source)
+        # self.tree_item.insertChild(dest, config_item)
+        # # Rearrange the table: need a whole new widget or else segfault
+        # self.removeRow(source)
+        # self.insertRow(dest)
+        # config_row = self.row_widget_cls(data=config_data)
+        # self.setup_row_buttons(
+        #     row_widget=config_row,
+        #     item=config_item,
+        #     table=self.procedure_table,
+        # )
+        # self.setRowHeight(dest, config_row.sizeHint().height())
+        # self.setCellWidget(dest, 0, config_row)
