@@ -32,12 +32,13 @@ from atef.check import (AnyComparison, AnyValue, Comparison, Equals, Greater,
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
-from atef.procedure import (DescriptionStep, PassiveStep,
+from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedDescriptionStep, PreparedPassiveStep,
                             PreparedProcedureStep, ProcedureGroup,
                             ProcedureStep, SetValueStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
-from atef.widgets.config.data_active import (GeneralProcedureWidget,
+from atef.widgets.config.data_active import (CheckRowWidget,
+                                             GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
 from atef.widgets.config.run_active import (DescriptionRunWidget,
@@ -54,8 +55,8 @@ from .data_passive import (AnyComparisonWidget, AnyValueWidget,
                            LessOrEqualWidget, LessWidget, NotEqualsWidget,
                            PingWidget, PVConfigurationWidget, RangeWidget,
                            ValueSetWidget)
-from .utils import (cast_dataclass, describe_comparison_context,
-                    describe_step_context)
+from .utils import (TableWidgetWithAddRow, cast_dataclass,
+                    describe_comparison_context, describe_step_context)
 
 
 def link_page(item: AtefItem, widget: PageWidget) -> None:
@@ -1731,7 +1732,7 @@ class StepPage(DesignerDisplay, PageWidget):
             func_name=type(comparison).__name__,
         )
         link_page(item=item, widget=page)
-        self.setup_any_comparison_row_buttons(
+        self.setup_set_value_check_row_buttons(
             comparison=comparison,
             item=item,
         )
@@ -1742,7 +1743,7 @@ class StepPage(DesignerDisplay, PageWidget):
         comparison: Comparison,
         item: AtefItem
     ) -> None:
-        table: QTableWidget = self.specific_comparison_widget.comparisons_table
+        table: QTableWidget = self.specific_procedure_widget.checks_table
         for index in range(table.rowCount()):
             row_widget = table.cellWidget(index, 0)
             if row_widget.data.comparison is comparison:
@@ -1753,6 +1754,39 @@ class StepPage(DesignerDisplay, PageWidget):
             button=row_widget.child_button,
             item=item,
         )
+
+    def replace_comparison(
+        self,
+        old_comparison: Comparison,
+        new_comparison: Comparison,
+        comp_item: AtefItem,
+    ) -> None:
+        """
+        Find old_comparison and replace it with new_comparison.
+
+        Also finds the row widget and replaces it with a new row widget.
+        """
+        if isinstance(self.specific_procedure_widget, SetValueEditWidget):
+            table: TableWidgetWithAddRow = self.specific_procedure_widget.checks_table
+            row_widget_cls = CheckRowWidget
+            row_data_cls = ComparisonToTarget
+
+        found_row = None
+        for row_index in range(table.rowCount()):
+            widget = table.cellWidget(row_index, 0)
+            if widget.data.comparison is old_comparison:
+                found_row = row_index
+                # prev_attr_index = widget.attr_combo.currentIndex()
+                break
+        if found_row is None:
+            return
+        comp_row = row_widget_cls(data=row_data_cls(comparison=new_comparison))
+        self.setup_row_buttons(
+            row_widget=comp_row,
+            item=comp_item,
+            table=table,
+        )
+        table.setCellWidget(found_row, 0, comp_row)
 
 
 class RunStepPage(DesignerDisplay, PageWidget):
@@ -1975,6 +2009,11 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                 parent_widget.name_desc_tags_widget.extra_text_label.text()
             )
             return
+        if isinstance(parent_widget, StepPage):
+            # No-op to let this be used in active checkouts without
+            # passive checkout config files in the parent widget
+            return
+
         config = self.parent_tree_item.widget.data
         attr = ''
         if self.data in config.shared:

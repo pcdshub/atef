@@ -42,7 +42,29 @@
               "value": 55.0
             }
           ],
-          "success_criteria": [],
+          "success_criteria": [
+            {
+              "name": null,
+              "device": null,
+              "attr": null,
+              "pv": null,
+              "comparison": {
+                "Equals": {
+                  "name": "equal_check",
+                  "description": "equal_check_desc",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": 0.0,
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            }
+          ],
           "continue_on_fail": false,
           "require_action_success": true
         }

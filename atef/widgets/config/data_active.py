@@ -31,6 +31,7 @@ from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QDialogButtonBox
 
 from atef import util
+from atef.check import Equals
 from atef.config import ConfigurationFile
 from atef.result import Result, incomplete_result
 from atef.widgets.config.data_base import DataWidget, SimpleRowWidget
@@ -666,6 +667,7 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
             self.update_list(self.actions_table, self.bridge.actions)
         )
         self.insert_widget(self.actions_table, self.actions_table_placeholder)
+
         self.checks_table = TableWidgetWithAddRow(
             add_row_text='Add new check',
             title_text='Checks',
@@ -885,6 +887,7 @@ class ActionRowWidget(TargetRowWidget):
         super().__init__(data=data, **kwargs)
 
     def setup_ui(self):
+        """ Called by TargetRowWidget.__init__ """
         super().setup_ui()
         self.child_button.hide()
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
@@ -922,7 +925,7 @@ class ActionRowWidget(TargetRowWidget):
             self.edit_widget.setText(str(self.bridge.value.get()))
             self.edit_widget.setToolTip(str(self.bridge.value.get()))
 
-        # slot for value update on ReturnPress
+        # slot for value update on apply button press
         def update_value():
             self.bridge.value.put(dtype(self.edit_widget.text()))
             self.value_button_box.hide()
@@ -958,5 +961,11 @@ class ActionRowWidget(TargetRowWidget):
 class CheckRowWidget(TargetRowWidget):
     filename = 'check_row_widget.ui'
 
-    def __init__(self, data=ComparisonToTarget, **kwargs):
+    check_summary_label: QtWidgets.QLabel
+
+    def __init__(self, data: Optional[ComparisonToTarget] = None, **kwargs):
+        if data is None:
+            data = ComparisonToTarget(name='untitled_check', comparison=Equals())
         super().__init__(data=data, **kwargs)
+
+        self.name_edit.hide()

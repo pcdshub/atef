@@ -1234,9 +1234,10 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
     """
     A standard QTableWidget with an AddRowWidget.
     Intended to be a n x 1 table, with each row being a SimpleRowWidget.
+    allows drag-and-drop to re-order rows
     Emits table_updated when the table contents change.
 
-
+    use .add_row() to initialize a new row with an optional dataclass.
 
     The AddRowWidget is not treated as a row, and as such the following methods
     are modified.
@@ -1291,7 +1292,6 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
 
     def setup_delete_button(self, row: QtWidgets.QWidget) -> None:
         # row: SimpleRowWidget, but can't import due to module structure
-        # TODO: Make this work for an arbitrary list and its row
         delete_icon = self.style().standardIcon(
             QtWidgets.QStyle.SP_TitleBarCloseButton
         )
@@ -1320,7 +1320,7 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         Shoutouts to stackoverflow
         """
         if event.source() is self:
-            selected_indices = self.config_table.selectedIndexes()
+            selected_indices = self.selectedIndexes()
             if not selected_indices:
                 return
             selected_row = selected_indices[0].row()
@@ -1337,26 +1337,22 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         Rearanges the table, the file, and the tree.
         """
         # Skip if into the same index
-        return
-        # if source == dest:
-        #     return
+        if source == dest:
+            return
 
-        # ####
-        # config_data = self.data.steps.pop(source)
-        # ####
-
+        config_data = self.data.steps.pop(source)
         # self.data.steps.insert(dest, config_data)
         # # Rearrange the tree
         # config_item = self.tree_item.takeChild(source)
         # self.tree_item.insertChild(dest, config_item)
-        # # Rearrange the table: need a whole new widget or else segfault
-        # self.removeRow(source)
-        # self.insertRow(dest)
-        # config_row = self.row_widget_cls(data=config_data)
+        # Rearrange the table: need a whole new widget or else segfault
+        self.removeRow(source)
+        self.insertRow(dest)
+        config_row = self.row_widget_cls(data=config_data)
         # self.setup_row_buttons(
         #     row_widget=config_row,
         #     item=config_item,
         #     table=self.procedure_table,
         # )
-        # self.setRowHeight(dest, config_row.sizeHint().height())
-        # self.setCellWidget(dest, 0, config_row)
+        self.setRowHeight(dest, config_row.sizeHint().height())
+        self.setCellWidget(dest, 0, config_row)

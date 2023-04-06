@@ -64,6 +64,13 @@
     </spacer>
    </item>
    <item>
+    <widget class="QLabel" name="check_summary_label">
+     <property name="text">
+      <string>unconfigured check</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QToolButton" name="delete_button">
      <property name="text">
       <string>...</string>
