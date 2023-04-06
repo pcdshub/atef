@@ -34,6 +34,7 @@ from atef.check import Comparison
 from atef.config import (ConfigurationFile, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
 from atef.enums import GroupResultMode, Severity
+from atef.exceptions import PreparedComparisonException
 from atef.result import Result, _summarize_result_severity, incomplete_result
 from atef.type_hints import AnyPath, PrimitiveType
 from atef.yaml_support import init_yaml_support
@@ -429,7 +430,10 @@ class PreparedProcedureStep:
         return self.combined_result
 
     async def _run(self) -> Result:
-        """ Run the step.  To be implemented in subclass. """
+        """
+        Run the step.  To be implemented in subclass.
+        Returns the step_result
+        """
         raise NotImplementedError()
 
     async def run(self) -> Result:
@@ -475,6 +479,10 @@ class PreparedProcedureStep:
                 )
             if isinstance(step, PassiveStep):
                 return PreparedPassiveStep.from_origin(
+                    step=step, parent=parent
+                )
+            if isinstance(step, SetValueStep):
+                return PreparedSetValueStep.from_origin(
                     step=step, parent=parent
                 )
             raise NotImplementedError(f"Step type unsupported: {type(step)}")
@@ -615,9 +623,57 @@ class PreparedSetValueStep(PreparedProcedureStep):
     prepared_actions: List[PreparedValueToSignal] = field(
         default_factory=list
     )
+    prepare_action_failures: List[ValueToTarget] = field(default_factory=list)
+    prepare_criteria_failures: List[PreparedComparisonException] = field(
+        default_factory=list
+    )
     prepared_criteria: Optional[List[PreparedSignalComparison]] = field(
         default_factory=list
     )
+
+    async def _run(self) -> Result:
+        """
+        Prepare and execute the actions, record their Results
+        Prepare and execute success criteria, record their Results
+        """
+        self = cast(SetValueStep, self)
+        for prep_action in self.prepared_actions:
+            await prep_action.run()
+            if (not self.origin.continue_on_fail
+                    and prep_action.result.severity > Severity.success):
+                self.step_result = Result(
+                    severity=Severity.error,
+                    reason=f'action failed ({prep_action.name}), step halted'
+                )
+                break
+        for prep_criteria in self.prepared_criteria:
+            await prep_criteria.compare()
+
+        if self.origin.require_action_success:
+            if self.prepare_action_failures:
+                return Result(
+                    severity=Severity.error,
+                    reason=('One or more actions failed to initialize: '
+                            f'{[act.name for act in self.prepare_action_failures]}')
+                )
+
+            action_results = [action.result for action in self.prepared_actions]
+        else:
+            action_results = []
+
+        criteria_results = [crit.result for crit in self.prepared_criteria]
+
+        if self.prepare_criteria_failures:
+            return Result(
+                severity=Severity.error,
+                reason=('One or more success criteria failed to initialize: '
+                        f'{[crit.name for crit in self.prepare_criteria_failures]}')
+            )
+
+        severity = _summarize_result_severity(GroupResultMode.all_,
+                                              criteria_results + action_results)
+
+        return Result(severity=severity)
 
     @classmethod
     def from_origin(
@@ -638,24 +694,47 @@ class PreparedSetValueStep(PreparedProcedureStep):
         for value_to_target in step.actions:
             signal = value_to_target.to_signal()
             value = value_to_target.value
-            prep_value_to_signal = PreparedValueToSignal(
-                signal=signal, value=value
-            )
-            prep_step.prepared_actions.append(prep_value_to_signal)
+            try:
+                prep_value_to_signal = PreparedValueToSignal(
+                    signal=signal, value=value, name=value_to_target.name
+                )
+                prep_step.prepared_actions.append(prep_value_to_signal)
+            except Exception:
+                prep_step.prepare_action_failures.append(value_to_target)
 
         for comp_to_target in step.success_criteria:
             signal = comp_to_target.to_signal()
             comp = comp_to_target.comparison
-            prep_comp = PreparedSignalComparison.from_pvname(
-                pvname=signal.pvname, comparison=comp
-            )
-            prep_step.prepared_criteria.append(prep_comp)
+            try:
+                prep_comp = PreparedSignalComparison.from_pvname(
+                    pvname=signal.pvname, comparison=comp
+                )
+                prep_step.prepared_criteria.append(prep_comp)
+            except Exception as ex:
+                prep_comp_exc = PreparedComparisonException(
+                    exception=ex,
+                    identifier=signal.pvname,
+                    message='Failed to initialize comparison',
+                    comparison=comp,
+                    name=comp.name
+                )
+                prep_step.prepare_criteria_failures.append(prep_comp_exc)
 
         return prep_step
 
 
 @dataclass
 class PreparedValueToSignal:
+    name: str
     signal: ophyd.Signal
     value: PrimitiveType
     result: Result = field(default_factory=incomplete_result)
+
+    async def run(self):
+        try:
+            self.signal.put(value=self.value)
+        except Exception as ex:
+            self.result = Result(severity=Severity.error, reason=ex)
+            return
+
+        self.result = Result()
