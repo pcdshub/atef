@@ -169,11 +169,13 @@ def get_relevant_configs_comps(
 
 def get_prepared_step(
     prepared_file: PreparedProcedureFile,
-    step: ProcedureStep
-) -> List[PreparedProcedureStep]:
+    origin: Union[ProcedureStep, Comparison],
+) -> List[Union[PreparedProcedureStep, PreparedComparison]]:
     """
     Gather all PreparedProcedureStep dataclasses the correspond to the original
     ProcedureStep.
+    If a PreparedProcedureStep also has comparisions, use the walk_comparisons
+    method to check if the "origin" matches any of thoes comparisons
 
     Only relevant for active checkouts.
 
@@ -181,21 +183,27 @@ def get_prepared_step(
     ----------
     prepared_file : PreparedProcedureFile
         the PreparedProcedureFile to search through
-    step : Union[ProcedureStep, ProcedureGroup]
-        the step to match
+    origin : Union[ProcedureStep, Comparison]
+        the step / comparison to match
 
     Returns
     -------
-    List[Union[PreparedProcedureStep, PreparedProcedureGroup]]
-        the PreparedProcedureSteps related to ``step``
+    List[Union[PreparedProcedureStep, PreparedComparison]]
+        the PreparedProcedureStep's or PreparedComparison's related to ``origin``
     """
     # As of the writing of this docstring, this helper is only expected to return
     # lists of length 1.  However in order to match the passive checkout workflow,
-    # we still return a list of relevant steps.
+    # we still return a list of relevant steps or comparisons.
     matched_steps = []
     for pstep in walk_steps(prepared_file.root):
-        if pstep.origin is step:
+        if getattr(pstep, 'origin', None) is origin:
             matched_steps.append(pstep)
+        # check PreparedComparisons, which might be included in some steps
+        if hasattr(pstep, 'walk_comparisons'):
+            for comp in pstep.walk_comparisons():
+                if comp.comparison is origin:
+                    matched_steps.append(comp)
+
     return matched_steps
 
 

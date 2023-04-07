@@ -31,7 +31,7 @@ from bluesky import RunEngine
 
 from atef import util
 from atef.check import Comparison
-from atef.config import (ConfigurationFile, PreparedFile,
+from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
 from atef.enums import GroupResultMode, Severity
 from atef.exceptions import PreparedComparisonException
@@ -630,6 +630,11 @@ class PreparedSetValueStep(PreparedProcedureStep):
     prepared_criteria: Optional[List[PreparedSignalComparison]] = field(
         default_factory=list
     )
+
+    def walk_comparisons(self) -> Generator[PreparedComparison, None, None]:
+        """ Yields PreparedComparisons in this ProcedureStep """
+        for prep_comp in self.prepared_criteria:
+            yield prep_comp
 
     async def _run(self) -> Result:
         """
