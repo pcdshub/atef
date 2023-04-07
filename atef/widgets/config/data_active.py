@@ -909,7 +909,13 @@ class ActionRowWidget(TargetRowWidget):
             self.insert_widget(self.edit_widget, self.value_input_placeholder)
             self.value_button_box.hide()
             return
-        dtype = type(sig.get())
+
+        try:
+            curr_value = sig.get()
+        except TimeoutError:
+            curr_value = 'signal not available'
+
+        dtype = type(curr_value)
         self.edit_widget = QtWidgets.QLineEdit()
 
         if dtype is int:
@@ -920,7 +926,7 @@ class ActionRowWidget(TargetRowWidget):
             validator = None
 
         self.edit_widget.setValidator(validator)
-        self.edit_widget.setPlaceholderText(f'({sig.get()}) ⏎')
+        self.edit_widget.setPlaceholderText(f'({curr_value}) ⏎')
         if self.bridge.value.get() is not None:
             self.edit_widget.setText(str(self.bridge.value.get()))
             self.edit_widget.setToolTip(str(self.bridge.value.get()))
