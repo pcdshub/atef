@@ -154,12 +154,18 @@ class Target:
 
     def to_signal(self) -> ophyd.EpicsSignal:
         """ attempt to use happi first, failing that use stored PV info"""
-        if self.device and self.attr:
-            device = util.get_happi_device_by_name(self.device)
-            signal = getattr(device, self.attr)
-        elif self.pv:
-            signal = ophyd.EpicsSignal(self.pv)
-        else:
+        try:
+            if self.device and self.attr:
+                device = util.get_happi_device_by_name(self.device)
+                signal = getattr(device, self.attr)
+            elif self.pv:
+                signal = ophyd.EpicsSignal(self.pv)
+            else:
+                logger.debug('unable to create signal: insufficient information'
+                             'to specify signal')
+                return
+        except Exception as ex:
+            logger.debug(f'unable to create signal: ({ex})')
             return
 
         return signal
