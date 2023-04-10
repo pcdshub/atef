@@ -818,8 +818,9 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
 
     def confirm_signal(self):
         # signal button is used
-        if self.pv_edit.text() is None:
+        if self.pv_edit.text() == '':
             self.data_updated.emit()
+            return
 
         sig = EpicsSignal(self.pv_edit.text())
         try:
@@ -840,6 +841,7 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
             # look at connecting widget.attributes_selected -> List[OphydAttributeData]
             widget.device_widget.attributes_selected.connect(self.set_signal)
             widget.device_widget.attributes_selected.connect(widget.close)
+
             # prevent multiple selection
             self._search_widget = widget
 
@@ -933,7 +935,11 @@ class ActionRowWidget(TargetRowWidget):
 
         # slot for value update on apply button press
         def update_value():
-            self.bridge.value.put(dtype(self.edit_widget.text()))
+            text = self.edit_widget.text()
+            if text == '':
+                # nothing input, don't try to set any values
+                return
+            self.bridge.value.put(dtype(text))
             self.value_button_box.hide()
             self.edit_widget.setFrame(False)
 
