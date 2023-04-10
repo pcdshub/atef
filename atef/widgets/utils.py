@@ -3,6 +3,7 @@ Non-core utilities. Primarily dynamic styling tools.
 """
 from typing import Optional
 
+from qtpy import QtWidgets
 from qtpy.QtCore import QEvent, QObject
 from qtpy.QtGui import QPalette
 from qtpy.QtWidgets import QLineEdit
@@ -100,3 +101,19 @@ def match_line_edit_text_width(
         text = line_edit.text()
     width = font_metrics.boundingRect(text).width()
     line_edit.setFixedWidth(max(width + buffer, minimum))
+
+
+def insert_widget(widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> None:
+    """
+    Helper function for slotting e.g. data widgets into placeholders.
+    """
+    if placeholder.layout() is None:
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        placeholder.setLayout(layout)
+    else:
+        old_widget = placeholder.layout().takeAt(0).widget()
+        if old_widget is not None:
+            # old_widget.setParent(None)
+            old_widget.deleteLater()
+    placeholder.layout().addWidget(widget)
