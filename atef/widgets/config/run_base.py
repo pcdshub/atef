@@ -207,6 +207,62 @@ def get_prepared_step(
     return matched_steps
 
 
+class ResultStatus(QLabel):
+    """
+    A simple QLabel that changes its icon based on a Result.
+    Holds onto the whole dataclass with a .result field, rather than a singular
+    result.  (which can be discarded at any time)
+
+    Use the .update() slot to request this label update its icon and tooltip
+    """
+    style_icons = {
+        Severity.success: QStyle.SP_DialogApplyButton,
+        Severity.warning : QStyle.SP_TitleBarContextHelpButton,
+        Severity.internal_error: QStyle.SP_DialogCancelButton,
+        Severity.error: QStyle.SP_DialogCancelButton
+    }
+
+    unicode_icons = {
+        # check mark
+        Severity.success: '<span style="color: green;">&#10004;</span>',
+        Severity.warning : '<span style="color: orange;">?</span>',
+        # x mark
+        Severity.internal_error: '<span style="color: red;">&#10008;</span>',
+        Severity.error: '<span style="color: red;">&#10008;</span>',
+    }
+
+    def __init__(self, *args, data: Any, **kwargs):
+        super().__init__(*args, **kwargs)
+        icon = self.style().standardIcon(self.style_icons[Severity.warning])
+        self.setPixmap(icon.pixmap(25, 25))
+        self.data = data
+
+    def update(self) -> None:
+        """ Slot for updating this label """
+        self.update_icon()
+        self.update_tooltip()
+
+    def update_icon(self):
+        """ read the result and update the icon accordingly """
+        chosen_icon = self.style_icons[self.data.result.severity]
+        icon = self.style().standardIcon(chosen_icon)
+        self.setPixmap(icon.pixmap(25, 25))
+
+    def update_tooltip(self) -> None:
+        """ Helper method to update tooltip based on ``results`` """
+        result = self.data.result
+        uni_icon = self.unicode_icons[result.severity]
+        tt = f'<p>{uni_icon}: {result.reason or "-"}<p>'
+        self.setToolTip(tt)
+
+    def event(self, event: QtCore.QEvent) -> bool:
+        """ Overload event method to update tooltips on tooltip-request """
+        # Catch tooltip events to update status tooltip
+        if event.type() == QtCore.QEvent.ToolTip:
+            self.update()
+        return super().event(event)
+
+
 class RunCheck(DesignerDisplay, QWidget):
     """
     Widget to be added to run widgets
