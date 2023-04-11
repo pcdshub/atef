@@ -126,6 +126,13 @@ class SetValueRunWidget(DesignerDisplay, DataWidget):
                 table.setRowHeight(ins_ind, action_row.sizeHint().height())
                 table.setCellWidget(ins_ind, 0, action_row)
 
+    def update_statuses(self):
+        """ slot to be connected to RunCheck button """
+        for table in (self.actions_table, self.checks_table):
+            for i in range(table.rowCount()):
+                row_widget = table.cellWidget(i, 0)
+                row_widget.status_label.update()
+
 
 class ActionRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
     filename = 'action_row_run_widget.ui'

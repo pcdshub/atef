@@ -252,7 +252,7 @@ class ResultStatus(QLabel):
         """ Helper method to update tooltip based on ``results`` """
         result = self.data.result
         uni_icon = self.unicode_icons[result.severity]
-        tt = f'<p>{uni_icon}: {result.reason or "-"}<p>'
+        tt = f'<p>{uni_icon}: {result.reason or "-"}</p>'
         self.setToolTip(tt)
 
     def event(self, event: QtCore.QEvent) -> bool:
