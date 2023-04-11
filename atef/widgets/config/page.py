@@ -34,15 +34,16 @@ from atef.config import (Configuration, ConfigurationGroup,
                          ToolConfiguration)
 from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedDescriptionStep, PreparedPassiveStep,
-                            PreparedProcedureStep, ProcedureGroup,
-                            ProcedureStep, SetValueStep)
+                            PreparedProcedureStep, PreparedSetValueStep,
+                            ProcedureGroup, ProcedureStep, SetValueStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
 from atef.widgets.config.run_active import (DescriptionRunWidget,
-                                            PassiveRunWidget)
+                                            PassiveRunWidget,
+                                            SetValueRunWidget)
 from atef.widgets.config.run_base import RunCheck
 
 from ..core import DesignerDisplay
@@ -1808,7 +1809,8 @@ class RunStepPage(DesignerDisplay, PageWidget):
 
     run_widget_map: ClassVar[Dict[PreparedProcedureStep, DataWidget]] = {
         PreparedDescriptionStep: DescriptionRunWidget,
-        PreparedPassiveStep: PassiveRunWidget
+        PreparedPassiveStep: PassiveRunWidget,
+        PreparedSetValueStep: SetValueRunWidget,
     }
 
     def __init__(self, *args, data, **kwargs):
@@ -2009,7 +2011,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                 parent_widget.name_desc_tags_widget.extra_text_label.text()
             )
             return
-        if isinstance(parent_widget, StepPage):
+        if isinstance(parent_widget, (StepPage, RunStepPage)):
             # No-op to let this be used in active checkouts without
             # passive checkout config files in the parent widget
             return
