@@ -493,6 +493,7 @@ class RunTree(EditTree):
                 run_widget_cls = _edit_to_run_page[type(data)]
                 run_widget = run_widget_cls(data=prepared_data[0])
                 link_page(item, run_widget)
+                run_widget.link_children()
             else:
                 run_widget = make_run_page(item.widget, prepared_data)
                 link_page(item, run_widget)

@@ -1819,14 +1819,24 @@ class RunStepPage(DesignerDisplay, PageWidget):
         self.insert_widget(self.run_check, self.run_check_placeholder)
         # gather run_widget
         run_widget_cls = self.run_widget_map[type(data)]
-        run_widget = run_widget_cls(data=data)
+        self.run_widget = run_widget_cls(data=data)
 
-        self.insert_widget(run_widget, self.run_widget_placeholder)
+        self.insert_widget(self.run_widget, self.run_widget_placeholder)
 
-        if type(data) == PreparedPassiveStep:
-            self.run_check.run_button.clicked.connect(run_widget.run_config)
-        elif type(data) == PreparedSetValueStep:
-            self.run_check.run_button.clicked.connect(run_widget.update_statuses)
+        if isinstance(data, PreparedPassiveStep):
+            self.run_check.run_button.clicked.connect(self.run_widget.run_config)
+        elif isinstance(data, PreparedSetValueStep):
+            self.run_check.run_button.clicked.connect(self.run_widget.update_statuses)
+
+    def link_children(self):
+        if isinstance(self.data, PreparedSetValueStep):
+            # set up children
+            child_items = self.tree_item.takeChildren()
+            n_rows = self.run_widget.checks_table.rowCount()
+            for row_ind, item in zip(range(n_rows), child_items):
+                row_widget = self.run_widget.checks_table.cellWidget(row_ind, 0)
+                self.setup_child_button(row_widget.child_button, item)
+                self.tree_item.addChild(item)
 
 
 PAGE_MAP = {
