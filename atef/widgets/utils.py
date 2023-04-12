@@ -3,7 +3,7 @@ Non-core utilities. Primarily dynamic styling tools.
 """
 from typing import Optional
 
-from qtpy import QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QEvent, QObject
 from qtpy.QtGui import QPalette
 from qtpy.QtWidgets import QLineEdit
@@ -117,3 +117,15 @@ def insert_widget(widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> 
             # old_widget.setParent(None)
             old_widget.deleteLater()
     placeholder.layout().addWidget(widget)
+
+
+def busy_cursor(func):
+    """ Decorator for making the cursor busy while a function is running """
+    def wrapper():
+        # set busy cursor
+        app = QtWidgets.QApplication.instance()
+        app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        func()
+        app.restoreOverrideCursor()
+
+    return wrapper

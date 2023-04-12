@@ -26,6 +26,7 @@ from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
 from atef.result import Result, combine_results
 from atef.widgets.config.utils import TreeItem
 from atef.widgets.core import DesignerDisplay
+from atef.widgets.utils import busy_cursor
 
 # avoid circular imports
 if TYPE_CHECKING:
@@ -339,6 +340,7 @@ class RunCheck(DesignerDisplay, QWidget):
 
     def _make_run_slot(self, configs) -> None:
 
+        @busy_cursor
         def run_slot():
             """ Slot that runs each step in the config list """
             for cfg in configs:
