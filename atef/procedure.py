@@ -769,6 +769,9 @@ class PreparedValueToSignal:
         cls,
         origin: ValueToTarget
     ) -> PreparedValueToSignal:
+        signal = origin.to_signal()
+        if signal is None:
+            raise ValueError('Target specification invalid')
         pvts = cls(
             name=origin.name,
             signal=origin.to_signal(),
