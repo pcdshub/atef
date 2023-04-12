@@ -39,7 +39,9 @@
               "device": null,
               "attr": null,
               "pv": "MY:PREFIX:dt",
-              "value": 1.0
+              "value": 1.0,
+              "timeout": 20.0,
+              "settle_time": 5.0
             }
           ],
           "success_criteria": [

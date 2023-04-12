@@ -176,6 +176,12 @@ class ValueToTarget(Target):
     #: the value to set to the target
     value: Optional[PrimitiveType] = None
 
+    # ophyd.Signal.set() parameters
+    #: connection timeout
+    timeout: Optional[float] = None
+    #: settle time
+    settle_time: Optional[float] = None
+
 
 @dataclass
 class ComparisonToTarget(Target):
@@ -703,11 +709,9 @@ class PreparedSetValueStep(PreparedProcedureStep):
         )
 
         for value_to_target in step.actions:
-            signal = value_to_target.to_signal()
-            value = value_to_target.value
             try:
-                prep_value_to_signal = PreparedValueToSignal(
-                    signal=signal, value=value, name=value_to_target.name
+                prep_value_to_signal = PreparedValueToSignal.from_origin(
+                    origin=value_to_target
                 )
                 prep_step.prepared_actions.append(prep_value_to_signal)
             except Exception:
@@ -739,13 +743,36 @@ class PreparedValueToSignal:
     name: str
     signal: ophyd.Signal
     value: PrimitiveType
+    origin: ValueToTarget
     result: Result = field(default_factory=incomplete_result)
 
     async def run(self):
+        # generate kwargs for set, exclude timeout and settle time if not provided
+        # in order to use ophyd defaults
+        set_kwargs = {'value': self.value}
+        if self.origin.timeout is not None:
+            set_kwargs.update({'timeout': self.origin.timeout})
+        if self.origin.settle_time is not None:
+            set_kwargs.update({'settle_time': self.origin.settle_time})
+
         try:
-            self.signal.put(value=self.value)
+            status = self.signal.set(**set_kwargs)
+            status.wait()
         except Exception as ex:
             self.result = Result(severity=Severity.error, reason=ex)
             return
 
         self.result = Result()
+
+    @classmethod
+    def from_origin(
+        cls,
+        origin: ValueToTarget
+    ) -> PreparedValueToSignal:
+        pvts = cls(
+            name=origin.name,
+            signal=origin.to_signal(),
+            value=origin.value,
+            origin=origin,
+        )
+        return pvts
