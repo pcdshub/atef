@@ -36,11 +36,12 @@ from atef.config import ConfigurationFile
 from atef.result import Result, incomplete_result
 from atef.widgets.config.data_base import DataWidget, SimpleRowWidget
 from atef.widgets.config.run_base import create_tree_items
-from atef.widgets.config.utils import (ConfigTreeModel, TableWidgetWithAddRow,
-                                       TreeItem)
+from atef.widgets.config.utils import (ConfigTreeModel, MultiInputDialog,
+                                       TableWidgetWithAddRow, TreeItem)
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData
+from atef.widgets.utils import match_line_edit_text_width
 
 from ...procedure import (ComparisonToTarget, DescriptionStep, DisplayOptions,
                           PassiveStep, PlanOptions, PlanStep, ProcedureGroup,
@@ -882,6 +883,7 @@ class ActionRowWidget(TargetRowWidget):
 
     value_input_placeholder: QtWidgets.QWidget
     value_button_box: QtWidgets.QDialogButtonBox
+    setting_button: QtWidgets.QToolButton
 
     def __init__(self, data: Optional[ValueToTarget] = None, **kwargs):
         if data is None:
@@ -895,6 +897,8 @@ class ActionRowWidget(TargetRowWidget):
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
         apply_button.setText('')
         self.update_input_placeholder()
+
+        self.setup_setting_button()
 
     def update_target(self):
         super().update_target()
@@ -919,6 +923,11 @@ class ActionRowWidget(TargetRowWidget):
 
         dtype = type(curr_value)
         self.edit_widget = QtWidgets.QLineEdit()
+
+        def on_text_changed(text: str) -> None:
+            match_line_edit_text_width(self.edit_widget, text=text)
+
+        self.edit_widget.textChanged.connect(on_text_changed)
 
         if dtype is int:
             validator = QtGui.QIntValidator()
@@ -953,6 +962,34 @@ class ActionRowWidget(TargetRowWidget):
         self.value_button_box.show()
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
         apply_button.clicked.connect(update_value)
+
+    def setup_setting_button(self):
+        # set up settings button
+        init_dict = {'timeout': self.data.timeout or 0.0,
+                     'settle_time': self.data.settle_time or 0.0}
+        self.setting_button.setIcon(qtawesome.icon('msc.settings'))
+        self.setting_widget = MultiInputDialog(init_values=init_dict)
+        setting_action = QtWidgets.QWidgetAction(self.setting_button)
+        setting_action.setDefaultWidget(self.setting_widget)
+
+        self.setting_menu = QtWidgets.QMenu(self.setting_button)
+        self.setting_menu.addAction(setting_action)
+        self.setting_button.setMenu(self.setting_menu)
+
+        # close menu on ok button click
+        def ok_slot():
+            info = self.setting_widget.get_info()
+            self.bridge.timeout.put(info['timeout'])
+            self.bridge.settle_time.put(info['settle_time'])
+            self.setting_widget.show()
+            self.setting_menu.hide()
+
+        def cancel_slot():
+            self.setting_widget.show()
+            self.setting_menu.hide()
+
+        self.setting_widget.ok_button.clicked.connect(ok_slot)
+        self.setting_widget.cancel_button.clicked.connect(cancel_slot)
 
     def insert_widget(self, widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> None:
         """

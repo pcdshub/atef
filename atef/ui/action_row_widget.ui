@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>598</width>
-    <height>43</height>
+    <height>45</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -47,6 +47,22 @@
      </property>
      <property name="arrowType">
       <enum>Qt::DownArrow</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QToolButton" name="setting_button">
+     <property name="text">
+      <string>...</string>
+     </property>
+     <property name="popupMode">
+      <enum>QToolButton::InstantPopup</enum>
+     </property>
+     <property name="toolButtonStyle">
+      <enum>Qt::ToolButtonIconOnly</enum>
+     </property>
+     <property name="arrowType">
+      <enum>Qt::NoArrow</enum>
      </property>
     </widget>
    </item>
