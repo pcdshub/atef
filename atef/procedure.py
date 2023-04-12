@@ -506,7 +506,7 @@ class PreparedProcedureStep:
                 combined_result=Result(
                     severity=Severity.internal_error,
                     reason=(
-                        f"Failed to instantiate step: {ex}."
+                        f"Failed to instantiate step: {ex}. "
                         f"Step is: {step.name} ({step.description or ''!r})"
                     )
                 )
@@ -728,7 +728,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
             except Exception as ex:
                 prep_comp_exc = PreparedComparisonException(
                     exception=ex,
-                    identifier=signal.pvname,
+                    identifier=getattr(signal, 'pvname', ''),
                     message='Failed to initialize comparison',
                     comparison=comp,
                     name=comp.name
@@ -771,7 +771,8 @@ class PreparedValueToSignal:
     ) -> PreparedValueToSignal:
         signal = origin.to_signal()
         if signal is None:
-            raise ValueError('Target specification invalid')
+            raise ValueError(f'Target specification invalid: {origin}')
+
         pvts = cls(
             name=origin.name,
             signal=origin.to_signal(),
