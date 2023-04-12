@@ -841,13 +841,13 @@ class MultiInputDialog(QtWidgets.QDialog):
         vlayout.addLayout(self.grid_layout)
 
         # add ok, cancel buttons
-        hlayout = QtWidgets.QHBoxLayout()
-        self.ok_button = QtWidgets.QPushButton('Accept')
-        self.cancel_button = QtWidgets.QPushButton('Cancel')
-        hlayout.addWidget(self.ok_button)
-        hlayout.addWidget(self.cancel_button)
-        vlayout.addLayout(hlayout)
+        self.button_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        self.ok_button = self.button_box.button(QtWidgets.QDialogButtonBox.Ok)
+        self.cancel_button = self.button_box.button(QtWidgets.QDialogButtonBox.Cancel)
 
+        vlayout.addWidget(self.button_box)
         self.ok_button.clicked.connect(self.accept)
         self.cancel_button.clicked.connect(self.reject)
 
@@ -880,9 +880,14 @@ class MultiInputDialog(QtWidgets.QDialog):
             return text_edit
         elif isinstance(value, int):
             int_edit = QtWidgets.QSpinBox()
-            int_edit.setMaximum(10)
             int_edit.setValue(value)
             return int_edit
+        elif isinstance(value, float):
+            float_edit = QtWidgets.QDoubleSpinBox()
+            float_edit.setValue(value)
+            return float_edit
+        else:
+            print('something bad happened')
 
     def get_info(self) -> Dict[str, Any]:
         """
@@ -896,7 +901,8 @@ class MultiInputDialog(QtWidgets.QDialog):
             input_widget = self.grid_layout.itemAtPosition(r, 1).widget()
             if isinstance(input_widget, QtWidgets.QLineEdit):
                 value = input_widget.text()
-            elif isinstance(input_widget, QtWidgets.QSpinBox):
+            elif isinstance(input_widget,
+                            (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox)):
                 value = input_widget.value()
 
             unspaced_key = key.replace(' ', '_')
