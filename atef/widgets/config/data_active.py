@@ -846,7 +846,10 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         try:
             sig.wait_for_connection()
         except TimeoutError:
-            logger.error(f'Could not connect to PV: {self.pv_edit.text()}')
+            QtWidgets.QMessageBox.information(
+                self,
+                f'Could not connect to PV: {self.pv_edit.text()}. Resetting target'
+            )
             self.reset_fields()
             return
 

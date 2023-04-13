@@ -22,9 +22,9 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 from weakref import WeakSet, WeakValueDictionary
 
 from qtpy.QtGui import QDropEvent
-from qtpy.QtWidgets import (QComboBox, QMessageBox, QPushButton, QSizePolicy,
-                            QStyle, QTableWidget, QToolButton, QTreeWidget,
-                            QTreeWidgetItem, QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QComboBox, QFrame, QMessageBox, QPushButton,
+                            QSizePolicy, QStyle, QTableWidget, QToolButton,
+                            QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from atef.check import (AnyComparison, AnyValue, Comparison, Equals, Greater,
                         GreaterOrEqual, Less, LessOrEqual, NotEquals, Range,
@@ -37,7 +37,7 @@ from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedProcedureStep, PreparedSetValueStep,
                             ProcedureGroup, ProcedureStep, SetValueStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
-from atef.widgets.config.data_active import (CheckRowWidget,
+from atef.widgets.config.data_active import (CheckRowWidget, ExpandableFrame,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
@@ -1540,7 +1540,7 @@ class StepPage(DesignerDisplay, PageWidget):
 
     specific_procedure_placeholder: QWidget
     specific_procedure_widget: DataWidget
-    general_procedure_placeholder: QWidget
+    general_procedure_placeholder: QFrame
     general_procedure_widget: QWidget
     bottom_spacer: QWidget
 
@@ -1588,9 +1588,11 @@ class StepPage(DesignerDisplay, PageWidget):
         This is accomplished by discarding the old widgets in favor
         of new widgets.
         """
+        general_frame = ExpandableFrame(text='General Settings')
         general_widget = GeneralProcedureWidget(data=step)
+        general_frame.add_widget(general_widget)
         self.insert_widget(
-            general_widget,
+            general_frame,
             self.general_procedure_placeholder,
         )
         SpecificWidgetType = self.step_map[type(step)]
