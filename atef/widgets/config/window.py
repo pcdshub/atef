@@ -23,6 +23,7 @@ from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep)
 from atef.qt_helpers import walk_tree_widget_items
 from atef.report import PassiveAtefReport
+from atef.widgets.utils import busy_cursor
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
@@ -612,6 +613,7 @@ class DualTree(QWidget):
             self.mode = 'edit'
         self.show_widgets()
 
+    @busy_cursor
     def show_widgets(self) -> None:
         """ Show active widget, hide others. (re)generate RunTree if needed """
         # If run_tree requested check if there are changes

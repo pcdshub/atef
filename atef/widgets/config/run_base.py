@@ -243,7 +243,7 @@ class ResultStatus(QLabel):
         self.update_icon()
         self.update_tooltip()
 
-    def update_icon(self):
+    def update_icon(self) -> None:
         """ read the result and update the icon accordingly """
         chosen_icon = self.style_icons[self.data.result.severity]
         icon = self.style().standardIcon(chosen_icon)
@@ -341,7 +341,7 @@ class RunCheck(DesignerDisplay, QWidget):
     def _make_run_slot(self, configs) -> None:
 
         @busy_cursor
-        def run_slot():
+        def run_slot(*args, **kwargs):
             """ Slot that runs each step in the config list """
             for cfg in configs:
                 config_type = infer_step_type(cfg)

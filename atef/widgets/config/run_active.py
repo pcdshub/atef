@@ -104,7 +104,10 @@ class DescriptionRunWidget(DesignerDisplay, DataWidget):
 
 
 class SetValueRunWidget(DesignerDisplay, DataWidget):
-    """ Widget for viewing set value step """
+    """
+    Widget for viewing set value step.  Displays Results alongside their
+    respective actions or checks
+    """
     filename = 'set_value_run_widget.ui'
 
     actions_table: QtWidgets.QTableWidget
@@ -135,6 +138,10 @@ class SetValueRunWidget(DesignerDisplay, DataWidget):
 
 
 class ActionRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
+    """
+    Simple widget displaying information stored in ``PreparedValueToSignal``
+    Does not implement the SimpleRowWidget interface
+    """
     filename = 'action_row_run_widget.ui'
 
     name_label: QtWidgets.QLabel
@@ -152,6 +159,10 @@ class ActionRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
 
 
 class CheckRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
+    """
+    Simple widget displaying information stored in ``PreparedSignalComparison``
+    Does not implement the SimpleRowWidget interface
+    """
     filename = 'check_row_run_widget.ui'
 
     child_button: QtWidgets.QPushButton

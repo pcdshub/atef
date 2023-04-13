@@ -1674,8 +1674,6 @@ class StepPage(DesignerDisplay, PageWidget):
         self.name_desc_tags_widget.init_viewer(attr, config)
 
     def setup_set_value_step(self) -> None:
-        # helpful methods?...
-        # self.setup_child_button
         self.update_subpages()
         self.specific_procedure_widget.bridge.success_criteria.updated.connect(
             self.update_subpages
@@ -1834,7 +1832,11 @@ class RunStepPage(DesignerDisplay, PageWidget):
         elif isinstance(data, PreparedSetValueStep):
             self.run_check.run_button.clicked.connect(self.run_widget.update_statuses)
 
-    def link_children(self):
+    def link_children(self) -> None:
+        """
+        A helper method to link children tree items with their parent.
+        Children can get orphaned during the edit->run transition.
+        """
         if isinstance(self.data, PreparedSetValueStep):
             # set up children
             child_items = self.tree_item.takeChildren()

@@ -153,7 +153,16 @@ class Target:
     pv: Optional[str] = None
 
     def to_signal(self) -> ophyd.EpicsSignal:
-        """ attempt to use happi first, failing that use stored PV info"""
+        """
+        Return the signal described by this Target.  First attempts to use the
+        device + attr information to look up the signal in happi, falling back
+        to the raw PV.
+
+        Returns
+        -------
+        ophyd.EpicsSignal
+            the signal described by this Target
+        """
         try:
             if self.device and self.attr:
                 device = util.get_happi_device_by_name(self.device)
@@ -161,7 +170,7 @@ class Target:
             elif self.pv:
                 signal = ophyd.EpicsSignal(self.pv)
             else:
-                logger.debug('unable to create signal: insufficient information'
+                logger.debug('unable to create signal, insufficient information'
                              'to specify signal')
                 return
         except Exception as ex:
@@ -265,14 +274,6 @@ class PydmDisplayStep(ProcedureStep):
     display: pathlib.Path = field(default_factory=pathlib.Path)
     #: Options for displaying.
     options: DisplayOptions = field(default_factory=DisplayOptions)
-
-
-AnyProcedure = Union[
-    ProcedureGroup,
-    DescriptionStep,
-    TyphosDisplayStep,
-    PydmDisplayStep
-]
 
 
 @dataclass
@@ -519,7 +520,9 @@ class PreparedProcedureGroup(PreparedProcedureStep):
     parent: Optional[Union[PreparedProcedureFile, PreparedProcedureGroup]] = field(
         default=None, repr=False
     )
-    steps: List[AnyProcedure] = field(default_factory=list)
+    #: the steps in this group
+    steps: List[AnyPreparedProcedure] = field(default_factory=list)
+    #: Steps that failed to be prepared
     prepare_failures: List[FailedStep] = field(default_factory=list)
 
     @classmethod
@@ -537,12 +540,16 @@ class PreparedProcedureGroup(PreparedProcedureStep):
             the group to prepare
         parent : Optional[PreparedProcedureGroup  |  PreparedProcedureFile]
             the hierarchical parent of this step, by default None
+
+        Returns
+        -------
+        PreparedProcedureGroup
         """
         prepared = cls(origin=group, parent=parent, steps=[])
 
         for step in group.steps:
             prep_step = PreparedProcedureStep.from_origin(
-                step=cast(AnyProcedure, step),
+                step=cast(AnyPreparedProcedure, step),
                 parent=prepared
             )
             if isinstance(prep_step, FailedStep):
@@ -601,6 +608,7 @@ class PreparedDescriptionStep(PreparedProcedureStep):
 
 @dataclass
 class PreparedPassiveStep(PreparedProcedureStep):
+    #: The prepared passive checkout file, holds Results
     prepared_passive_file: Optional[PreparedFile] = None
 
     async def _run(self) -> Result:
@@ -614,7 +622,22 @@ class PreparedPassiveStep(PreparedProcedureStep):
         cls,
         step: PassiveStep,
         parent: Optional[PreparedProcedureGroup]
-    ):
+    ) -> PreparedPassiveStep:
+        """
+        Prepare a passive checkout step for running.  Requires the passive checkout
+        be accessible for read access
+
+        Parameters
+        ----------
+        step : PassiveStep
+            the original PassiveStep to prepare
+        parent : Optional[PreparedProcedureGroup]
+            the hierarchical parent to assign to this PreparedPassiveStep
+
+        Returns
+        -------
+        PreparedPassiveStep
+        """
         try:
             passive_file = ConfigurationFile.from_filename(step.filepath)
             prep_passive_file = PreparedFile.from_config(file=passive_file)
@@ -632,14 +655,18 @@ class PreparedPassiveStep(PreparedProcedureStep):
 
 @dataclass
 class PreparedSetValueStep(PreparedProcedureStep):
+    #: list of prepared actions to take (values to set to a target)
     prepared_actions: List[PreparedValueToSignal] = field(
         default_factory=list
     )
+    #: list of actions that failed to be prepared, as they were
     prepare_action_failures: List[ValueToTarget] = field(default_factory=list)
-    prepare_criteria_failures: List[PreparedComparisonException] = field(
+    #: list of prepared success criteria (comparisons)
+    prepared_criteria: List[PreparedSignalComparison] = field(
         default_factory=list
     )
-    prepared_criteria: Optional[List[PreparedSignalComparison]] = field(
+    #: list of success criteria that failed to be prepared, as an exception
+    prepare_criteria_failures: List[PreparedComparisonException] = field(
         default_factory=list
     )
 
@@ -652,12 +679,16 @@ class PreparedSetValueStep(PreparedProcedureStep):
         """
         Prepare and execute the actions, record their Results
         Prepare and execute success criteria, record their Results
+
+        Returns
+        -------
+        Result
+            the step_result for this step
         """
         self = cast(SetValueStep, self)
         for prep_action in self.prepared_actions:
-            await prep_action.run()
-            if (self.origin.halt_on_fail
-                    and prep_action.result.severity > Severity.success):
+            action_result = await prep_action.run()
+            if (self.origin.halt_on_fail and action_result.severity > Severity.success):
                 self.step_result = Result(
                     severity=Severity.error,
                     reason=f'action failed ({prep_action.name}), step halted'
@@ -697,10 +728,23 @@ class PreparedSetValueStep(PreparedProcedureStep):
         cls,
         step: SetValueStep,
         parent: Optional[PreparedProcedureGroup]
-    ):
+    ) -> PreparedSetValueStep:
         """
         Prepare a SetValueStep for running.  Gathers and prepares necessary
-        signals and comparisons.
+        signals and comparisons.  Any actions and success criteria that fail
+        to be prepared will be stored under the `prepare_action_failures` and
+        `prepare_criteria_failures` fields respectively
+
+        Parameters
+        ----------
+        step : SetValueStep
+            the original SetValueStep (not prepared)
+        parent : Optional[PreparedProcedureGroup]
+            the hierarchical parent for the prepared step.
+
+        Returns
+        -------
+        PreparedSetValueStep
         """
         prep_step = cls(
             origin=step,
@@ -740,13 +784,26 @@ class PreparedSetValueStep(PreparedProcedureStep):
 
 @dataclass
 class PreparedValueToSignal:
+    #: identifying name
     name: str
+    #: the signal, derived from a Target
     signal: ophyd.Signal
+    #: value to set to the signal
     value: PrimitiveType
+    #: a link to the original ValueToTarget
     origin: ValueToTarget
+    #: The result of the set action
     result: Result = field(default_factory=incomplete_result)
 
-    async def run(self):
+    async def run(self) -> Result:
+        """
+        Set the stored value to the signal, specifying the settle time and timeout
+        if provided.  Returns a Result recording the success of this action
+
+        Returns
+        -------
+        Result
+        """
         # generate kwargs for set, exclude timeout and settle time if not provided
         # in order to use ophyd defaults
         set_kwargs = {'value': self.value}
@@ -757,18 +814,36 @@ class PreparedValueToSignal:
 
         try:
             status = self.signal.set(**set_kwargs)
-            status.wait()
+            status.wait()  # raises not completed successfully
         except Exception as ex:
             self.result = Result(severity=Severity.error, reason=ex)
             return
 
         self.result = Result()
+        return self.result
 
     @classmethod
     def from_origin(
         cls,
         origin: ValueToTarget
     ) -> PreparedValueToSignal:
+        """
+        Prepare the ValueToSignal for running.
+
+        Parameters
+        ----------
+        origin : ValueToTarget
+            the original ValueToTarget
+
+        Returns
+        -------
+        PreparedValueToSignal
+
+        Raises
+        ------
+        ValueError
+            if the target cannot return a valid signal
+        """
         signal = origin.to_signal()
         if signal is None:
             raise ValueError(f'Target specification invalid: {origin}')
@@ -780,3 +855,18 @@ class PreparedValueToSignal:
             origin=origin,
         )
         return pvts
+
+
+AnyProcedure = Union[
+    ProcedureGroup,
+    DescriptionStep,
+    PassiveStep,
+    SetValueStep,
+]
+
+AnyPreparedProcedure = Union[
+    PreparedProcedureGroup,
+    PreparedDescriptionStep,
+    PreparedPassiveStep,
+    PreparedSetValueStep,
+]

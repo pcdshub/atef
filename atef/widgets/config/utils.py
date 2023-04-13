@@ -7,7 +7,7 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
 
 import qtawesome as qta
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import QPoint, QPointF, QRectF, QRegularExpression, Qt
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
@@ -1250,7 +1250,7 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
     - rowCount(): Returns super().rowCount() - 1
     - ... and more as I find more methods
     """
-
+    # TODO: try setting up drag-drop functionality at some point.
     add_row_widget: AddRowWidget
 
     table_updated: ClassVar[QtCore.Signal] = QtCore.Signal()
@@ -1286,6 +1286,15 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
     ) -> None:
         """
         add a new or existing action to the table.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument, by default False
+        data : Optional[Any], optional
+            a Dataclass to initialize the row with, by default None
+            used in initializing the table, not in callbacks
         """
         new_row = self.row_widget_cls(data=data)
         # Insert just above the add-row-row
@@ -1297,6 +1306,15 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         self.table_updated.emit()
 
     def setup_delete_button(self, row: QtWidgets.QWidget) -> None:
+        """
+        Set up the delete button for the specified row.  Assumes `row.delete_button`
+        is a QPushButton
+
+        Parameters
+        ----------
+        row : QtWidgets.QWidget
+            A row widget with a QPushButton in the .delete_button field
+        """
         # row: SimpleRowWidget, but can't import due to module structure
         delete_icon = self.style().standardIcon(
             QtWidgets.QStyle.SP_TitleBarCloseButton
@@ -1308,7 +1326,8 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
 
         row.delete_button.clicked.connect(inner_delete)
 
-    def delete_table_row(self, row: QtWidgets.QWidget):
+    def delete_table_row(self, row: QtWidgets.QWidget) -> None:
+        """ slot for a row's delete button.  Removes it from this table. """
         # get the data
         for row_index in range(self.rowCount()):
             widget = self.cellWidget(row_index, 0)
@@ -1317,48 +1336,3 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
                 break
 
         self.table_updated.emit()
-
-    def table_drop_event(self, event: QtGui.QDropEvent) -> None:
-        """
-        Monkeypatch onto the table to allow us to drag/drop rows.
-
-        if using row widget to add a row, need to make dest_row == -1 a noop
-        Shoutouts to stackoverflow
-        """
-        if event.source() is self:
-            selected_indices = self.selectedIndexes()
-            if not selected_indices:
-                return
-            selected_row = selected_indices[0].row()
-            dest_row = self.indexAt(event.pos()).row()
-            if dest_row == -1:
-                # Cannot move a row below the AddRowWidget
-                return
-            self.move_config_row(selected_row, dest_row)
-
-    def move_config_row(self, source: int, dest: int) -> None:
-        """
-        Move the row at index source to index dest.
-
-        Rearanges the table, the file, and the tree.
-        """
-        # Skip if into the same index
-        if source == dest:
-            return
-
-        config_data = self.data.steps.pop(source)
-        # self.data.steps.insert(dest, config_data)
-        # # Rearrange the tree
-        # config_item = self.tree_item.takeChild(source)
-        # self.tree_item.insertChild(dest, config_item)
-        # Rearrange the table: need a whole new widget or else segfault
-        self.removeRow(source)
-        self.insertRow(dest)
-        config_row = self.row_widget_cls(data=config_data)
-        # self.setup_row_buttons(
-        #     row_widget=config_row,
-        #     item=config_item,
-        #     table=self.procedure_table,
-        # )
-        self.setRowHeight(dest, config_row.sizeHint().height())
-        self.setCellWidget(dest, 0, config_row)

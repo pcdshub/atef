@@ -121,11 +121,11 @@ def insert_widget(widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> 
 
 def busy_cursor(func):
     """ Decorator for making the cursor busy while a function is running """
-    def wrapper():
+    def wrapper(*args, **kwargs):
         # set busy cursor
         app = QtWidgets.QApplication.instance()
         app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-        func()
+        func(*args, **kwargs)
         app.restoreOverrideCursor()
 
     return wrapper
