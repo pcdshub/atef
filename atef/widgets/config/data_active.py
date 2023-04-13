@@ -648,8 +648,8 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
     """
     filename = 'set_value_edit_widget.ui'
 
-    action_success_radio_button: QtWidgets.QRadioButton
-    step_failure_radio_button: QtWidgets.QRadioButton
+    req_action_success_checkbox: QtWidgets.QCheckBox
+    halt_on_fail_checkbox: QtWidgets.QCheckBox
 
     actions_table: TableWidgetWithAddRow
     actions_table_placeholder: QtWidgets.QWidget
@@ -684,6 +684,25 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
             self.actions_table.add_row(data=action)
         for check in data.success_criteria:
             self.checks_table.add_row(data=check)
+
+        # checkboxes
+        self.bridge.halt_on_fail.changed_value.connect(
+            self.halt_on_fail_checkbox.setChecked
+        )
+        self.halt_on_fail_checkbox.clicked.connect(
+            self.bridge.halt_on_fail.put
+        )
+        self.halt_on_fail_checkbox.setChecked(self.bridge.halt_on_fail.get())
+
+        self.bridge.require_action_success.changed_value.connect(
+            self.req_action_success_checkbox.setChecked
+        )
+        self.req_action_success_checkbox.clicked.connect(
+            self.bridge.require_action_success.put
+        )
+        self.req_action_success_checkbox.setChecked(
+            self.bridge.require_action_success.get()
+        )
 
     def update_list(self, table_widget: QtWidgets.QTableWidget, bridge_attr):
         def inner_slot():
@@ -909,6 +928,8 @@ class ActionRowWidget(TargetRowWidget):
         # TODO: expand validator, edit behavior
         # Could use metadata in the future?
         # Enum drop box?
+        self.edit_widget = QtWidgets.QLineEdit()
+
         sig = self.data.to_signal()
         if sig is None:
             self.edit_widget = QtWidgets.QLabel('(no target set)')
@@ -918,14 +939,18 @@ class ActionRowWidget(TargetRowWidget):
 
         try:
             curr_value = sig.get()
+            dtype = type(curr_value)
         except TimeoutError:
-            curr_value = 'signal not available'
-
-        dtype = type(curr_value)
-        self.edit_widget = QtWidgets.QLineEdit()
+            curr_value = 'no data'
+            # fall back to type in dataclass if available
+            stored_value = self.bridge.value.get()
+            if stored_value is not None:
+                dtype = type(stored_value)
+            else:
+                dtype = float
 
         def on_text_changed(text: str) -> None:
-            match_line_edit_text_width(self.edit_widget, text=text)
+            match_line_edit_text_width(self.edit_widget, text=text, minimum=75)
 
         self.edit_widget.textChanged.connect(on_text_changed)
 
@@ -937,7 +962,7 @@ class ActionRowWidget(TargetRowWidget):
             validator = None
 
         self.edit_widget.setValidator(validator)
-        self.edit_widget.setPlaceholderText(f'({curr_value}) ⏎')
+        self.edit_widget.setPlaceholderText(f'({curr_value})')
         if self.bridge.value.get() is not None:
             self.edit_widget.setText(str(self.bridge.value.get()))
             self.edit_widget.setToolTip(str(self.bridge.value.get()))
@@ -1018,3 +1043,18 @@ class CheckRowWidget(TargetRowWidget):
         super().__init__(data=data, **kwargs)
 
         self.name_edit.hide()
+        self.update_summary()
+
+    def update_summary(self):
+        comp = self.bridge.comparison.get()
+        self.check_summary_label.setText(comp.describe())
+
+    def event(self, event: QtCore.QEvent) -> bool:
+        """ Overload event method to update description on tooltip-request """
+        # Catch tooltip events to update comparison summary
+        # Cannot properly subscribe to value field of QDataclassBridge, since
+        # we don't have access to the Comparison Widget (child pages unlinked at init)
+        # if someone has a better way to do this I am all ears
+        if event.type() == QtCore.QEvent.ToolTip:
+            self.update_summary()
+        return super().event(event)

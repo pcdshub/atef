@@ -29,13 +29,13 @@
       {
         "SetValueStep": {
           "name": "set_value_title",
-          "description": null,
+          "description": "set_value_desc",
           "parent": null,
           "verify_required": true,
           "step_success_required": true,
           "actions": [
             {
-              "name": null,
+              "name": "set to 1",
               "device": null,
               "attr": null,
               "pv": "MY:PREFIX:dt",
@@ -53,7 +53,7 @@
               "comparison": {
                 "Equals": {
                   "name": "equal_check",
-                  "description": "equal_check_desc",
+                  "description": "a simple verify",
                   "invert": false,
                   "reduce_period": null,
                   "reduce_method": "average",
@@ -67,7 +67,7 @@
               }
             }
           ],
-          "continue_on_fail": false,
+          "halt_on_fail": true,
           "require_action_success": true
         }
       }

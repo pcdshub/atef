@@ -1789,6 +1789,10 @@ class StepPage(DesignerDisplay, PageWidget):
         )
         table.setCellWidget(found_row, 0, comp_row)
 
+    def remove_table_data(self, data: Any):
+        if isinstance(self.data, SetValueStep):
+            self.data.success_criteria.remove(data)
+
 
 class RunStepPage(DesignerDisplay, PageWidget):
     """

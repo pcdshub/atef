@@ -36,20 +36,17 @@
    </item>
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_2">
-     <property name="topMargin">
-      <number>5</number>
-     </property>
      <item>
-      <widget class="QRadioButton" name="action_success_radio_button">
+      <widget class="QCheckBox" name="req_action_success_checkbox">
        <property name="text">
-        <string>step success require action success</string>
+        <string>step success requires all actions to complete</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QRadioButton" name="step_failure_radio_button">
+      <widget class="QCheckBox" name="halt_on_fail_checkbox">
        <property name="text">
-        <string>halt exection on action failure</string>
+        <string>halt step exection on first action failure</string>
        </property>
       </widget>
      </item>

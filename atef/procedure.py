@@ -133,8 +133,8 @@ class SetValueStep(ProcedureStep):
     actions: List[ValueToTarget] = field(default_factory=list)
     success_criteria: List[ComparisonToTarget] = field(default_factory=list)
 
-    #: Continue performing actions if one fails
-    continue_on_fail: bool = False
+    #: Stop performing actions if one fails
+    halt_on_fail: bool = True
     #: Only mark the step_result as successful if all actions have succeeded
     require_action_success: bool = True
 
@@ -656,13 +656,13 @@ class PreparedSetValueStep(PreparedProcedureStep):
         self = cast(SetValueStep, self)
         for prep_action in self.prepared_actions:
             await prep_action.run()
-            if (not self.origin.continue_on_fail
+            if (self.origin.halt_on_fail
                     and prep_action.result.severity > Severity.success):
                 self.step_result = Result(
                     severity=Severity.error,
                     reason=f'action failed ({prep_action.name}), step halted'
                 )
-                break
+                return self.step_result
         for prep_criteria in self.prepared_criteria:
             await prep_criteria.compare()
 

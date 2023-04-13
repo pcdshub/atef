@@ -166,4 +166,4 @@ class CheckRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
         insert_widget(self.status_label, self.status_label_placeholder)
         self.name_label.setText(data.name)
         self.target_label.setText(data.signal.name)
-        self.check_summary_label.setText(str(type(data.comparison).__name__))
+        self.check_summary_label.setText(data.comparison.describe())
