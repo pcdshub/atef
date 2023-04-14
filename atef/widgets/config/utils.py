@@ -655,6 +655,11 @@ def setup_line_edit_data(
     line_edit.textEdited.connect(update_dataclass)
     value_obj.changed_value.connect(update_widget)
 
+    def disconnect_update():
+        value_obj.changed_value.disconnect(update_widget)
+
+    line_edit.destroyed.connect(disconnect_update)
+
 
 def describe_comparison_context(attr: str, config: Configuration) -> str:
     """

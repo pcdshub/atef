@@ -497,7 +497,6 @@ class RunTree(EditTree):
                 run_widget.link_children()
             else:
                 run_widget = make_run_page(item.widget, prepared_data)
-                link_page(item, run_widget)
 
             if prev_widget:
                 prev_widget.run_check.setup_next_button(item)

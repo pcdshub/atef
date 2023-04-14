@@ -201,6 +201,23 @@ class PageWidget(QWidget):
             )
             self.has_connected_tree = True
 
+    def setup_cleanup(self) -> None:
+        """
+        Disconnect any slots that interact with the tree widget.  These slots
+        can persist on the QDataclassBridge after the tree has been deleted,
+        causing RuntimeErrors.
+
+        In general, need to disconnect slots that connect bridges to tree_items
+
+        Should be invoked at the end of the assign_tree_item, since we want to
+        prepare the cleanup only when we have finished the setup
+        """
+        def disconnect_name_widget():
+            bridge = self.name_desc_tags_widget.bridge
+            bridge.name.changed_value.disconnect(self.set_new_node_name)
+
+        self.full_tree.destroyed.connect(disconnect_name_widget)
+
     def _update_parent_tooltip_from_tree(
         self,
         item: QTreeWidgetItem,
@@ -1574,6 +1591,7 @@ class StepPage(DesignerDisplay, PageWidget):
         # extra setup for SetValueStep.  Reminiscent of AnyComparison
         if isinstance(self.data, SetValueStep):
             self.setup_set_value_step()
+        self.setup_cleanup()
 
     def new_step(self, step: ProcedureStep) -> None:
         """
@@ -1678,6 +1696,18 @@ class StepPage(DesignerDisplay, PageWidget):
         self.specific_procedure_widget.bridge.success_criteria.updated.connect(
             self.update_subpages
         )
+
+    def setup_cleanup(self):
+        super().setup_cleanup()
+        if isinstance(self.data, SetValueStep):
+            def disconnect_subpages():
+                bridge = self.specific_procedure_widget.bridge
+                bridge.success_criteria.updated.disconnect(
+                    self.update_subpages
+                )
+
+            # disconnect all bridge-related signals
+            self.full_tree.destroyed.connect(disconnect_subpages)
 
     def update_subpages(self) -> None:
         """
@@ -1918,6 +1948,8 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.clean_up_any_comparison()
         if isinstance(self.data, AnyComparison):
             self.setup_any_comparison()
+
+        self.setup_cleanup()
 
     def new_comparison(self, comparison: Comparison) -> None:
         """

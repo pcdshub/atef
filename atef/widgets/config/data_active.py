@@ -874,6 +874,7 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         except TimeoutError:
             QtWidgets.QMessageBox.information(
                 self,
+                'Failed to set target',
                 f'Could not connect to PV: {self.pv_edit.text()}. Resetting target'
             )
             self.reset_fields()
