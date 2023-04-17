@@ -1270,6 +1270,7 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         self.verticalHeader().setHidden(True)
         self.row_widget_cls = row_widget_cls
         self.add_add_row_widget(text=add_row_text)
+        self.setSelectionMode(self.NoSelection)
 
     def add_add_row_widget(self, text: str):
         """ add the AddRowWidget to the end of the specified table-widget"""

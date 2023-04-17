@@ -687,12 +687,12 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
             self.checks_table.add_row(data=check)
 
         # update descriptions on selection change for check table
-        def update_all_desc():
+        def update_all_desc(*args, **kwargs):
             for ind in range(self.checks_table.rowCount()):
                 row_widget: CheckRowWidget = self.checks_table.cellWidget(ind, 0)
                 row_widget.update_summary()
 
-        self.checks_table.itemSelectionChanged.connect(update_all_desc)
+        self.checks_table.cellClicked.connect(update_all_desc)
 
         # checkboxes
         self.bridge.halt_on_fail.changed_value.connect(
@@ -973,6 +973,9 @@ class ActionRowWidget(TargetRowWidget):
         self.child_button.hide()
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
         apply_button.setText('')
+        apply_button.setToolTip('Click here to confirm value')
+
+        self.setting_button.setToolTip('Configure action settings')
         self.update_input_placeholder()
 
         self.setup_setting_button()
