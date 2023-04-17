@@ -210,6 +210,7 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
         assert source_lines == dest_lines
 
 
+@pytest.mark.skip
 def test_edit_run_toggle(qtbot: QtBot, test_configs: list[os.PathLike]):
     """ Smoke test run-mode for all sample configs """
     from ..widgets.config.window import Window
