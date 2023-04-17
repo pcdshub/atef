@@ -608,6 +608,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
                 self.add_config_row(config=config)
             self.setup_done = True
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_config_row(
         self,
@@ -738,6 +739,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             data_widget=self.device_config_widget,
         )
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_comparison_row(
         self,
@@ -936,6 +938,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             data_widget=self.pv_configuration_widget,
         )
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_comparison_row(
         self,
@@ -1146,6 +1149,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 self.tool_names[tool.__name__] = tool
             self.tool_select_combo.activated.connect(self.new_tool_selected)
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_comparison_row(
         self,
@@ -1400,6 +1404,7 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
                 self.add_config_row(config=config)
             self.setup_done = True
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_config_row(
         self,
