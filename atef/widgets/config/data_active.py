@@ -767,6 +767,13 @@ class TargetRowWidget(DesignerDisplay, SimpleRowWidget):
         widget_menu.addAction(widget_action)
         self.target_button.setMenu(widget_menu)
 
+        # store a slot on the TargetEntryWidget that reveals the menu
+        # needed to re-reveal the menu after component selection
+        def show_action(*args, **kwargs):
+            self.target_button.showMenu()
+
+        self.target_entry_widget.post_selection_slot = show_action
+
         # update data on target_button update
         self.target_entry_widget.data_updated.connect(self.update_target)
 
@@ -896,15 +903,18 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
             widget.device_widget.attributes_selected.connect(self.set_signal)
             widget.device_widget.attributes_selected.connect(widget.close)
 
+            def run_post_selection_slot(*args, **kwargs):
+                post_selection_slot = getattr(self, 'post_selection_slot', None)
+                if post_selection_slot:
+                    post_selection_slot()
+
+            widget.device_widget.attributes_selected.connect(run_post_selection_slot)
             # prevent multiple selection
             self._search_widget: QtWidgets.QWidget = widget
 
         self._search_widget.show()
         self._search_widget.activateWindow()
         self._search_widget.setWindowState(Qt.WindowActive)
-        # TODO: figure out how to make QMenu not hide / reshow after opening
-        # not really possible to do from this widget, which doesn't know about
-        # the menu it is being spawned from...
         self.pv_edit.hide()
         self.target_button_box.show()
 
