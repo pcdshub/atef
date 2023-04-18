@@ -30,6 +30,7 @@ import yaml
 from bluesky import RunEngine
 
 from atef import util
+from atef.cache import _SignalCache, get_signal_cache
 from atef.check import Comparison
 from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
@@ -152,7 +153,10 @@ class Target:
     #: EPICS PV
     pv: Optional[str] = None
 
-    def to_signal(self) -> Optional[ophyd.EpicsSignal]:
+    def to_signal(
+        self,
+        signal_cache: Optional[_SignalCache] = None
+    ) -> Optional[ophyd.EpicsSignal]:
         """
         Return the signal described by this Target.  First attempts to use the
         device + attr information to look up the signal in happi, falling back
@@ -168,7 +172,9 @@ class Target:
                 device = util.get_happi_device_by_name(self.device)
                 signal = getattr(device, self.attr)
             elif self.pv:
-                signal = ophyd.EpicsSignal(self.pv)
+                if signal_cache is None:
+                    signal_cache = get_signal_cache()
+                signal = signal_cache[self.pv]
             else:
                 logger.debug('unable to create signal, insufficient information'
                              'to specify signal')
@@ -813,10 +819,10 @@ class PreparedValueToSignal:
 
         try:
             status = self.signal.set(**set_kwargs)
-            status.wait()  # raises not completed successfully
+            await util.run_in_executor(executor=None, func=status.wait)
         except Exception as ex:
             self.result = Result(severity=Severity.error, reason=ex)
-            return
+            return self.result
 
         self.result = Result()
         return self.result
