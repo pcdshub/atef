@@ -507,6 +507,9 @@ class RunTree(EditTree):
             run_button: QtWidgets.QPushButton = run_widget.run_check.run_button
             run_button.clicked.connect(self.update_statuses)
 
+        # disable last 'next' button
+        run_widget.run_check.next_button.hide()
+
     def update_statuses(self) -> None:
         """ update every status icon based on stored config result """
         for item in walk_tree_widget_items(self.tree_widget):
