@@ -218,7 +218,7 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
         assert source_lines == dest_lines
 
 
-@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
+# @pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 @pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
 def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike):
     """ Smoke test run-mode for all sample configs """
