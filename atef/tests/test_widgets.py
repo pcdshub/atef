@@ -28,6 +28,9 @@ def config(request, test_configs):
     return test_configs[i]
 
 
+IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
+
+
 parametrized_groups = pytest.mark.parametrize(
     "group",
     [
@@ -215,7 +218,7 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
         assert source_lines == dest_lines
 
 
-@pytest.mark.skip(reason='inconsistent segfaults on CI, passes locally, (04/17/23)')
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 @pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
 def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike):
     """ Smoke test run-mode for all sample configs """
