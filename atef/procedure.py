@@ -152,7 +152,7 @@ class Target:
     #: EPICS PV
     pv: Optional[str] = None
 
-    def to_signal(self) -> ophyd.EpicsSignal:
+    def to_signal(self) -> Optional[ophyd.EpicsSignal]:
         """
         Return the signal described by this Target.  First attempts to use the
         device + attr information to look up the signal in happi, falling back
@@ -186,7 +186,7 @@ class ValueToTarget(Target):
     value: Optional[PrimitiveType] = None
 
     # ophyd.Signal.set() parameters
-    #: connection timeout
+    #: write timeout
     timeout: Optional[float] = None
     #: settle time
     settle_time: Optional[float] = None
@@ -672,8 +672,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
 
     def walk_comparisons(self) -> Generator[PreparedComparison, None, None]:
         """ Yields PreparedComparisons in this ProcedureStep """
-        for prep_comp in self.prepared_criteria:
-            yield prep_comp
+        yield from self.prepared_criteria
 
     async def _run(self) -> Result:
         """
@@ -850,7 +849,7 @@ class PreparedValueToSignal:
 
         pvts = cls(
             name=origin.name,
-            signal=origin.to_signal(),
+            signal=signal,
             value=origin.value,
             origin=origin,
         )

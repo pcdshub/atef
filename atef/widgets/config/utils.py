@@ -892,7 +892,7 @@ class MultiInputDialog(QtWidgets.QDialog):
             float_edit.setValue(value)
             return float_edit
         else:
-            print('something bad happened')
+            raise RuntimeError(f"Unexpected value {value} of type {type(value).__name__}")
 
     def get_info(self) -> Dict[str, Any]:
         """

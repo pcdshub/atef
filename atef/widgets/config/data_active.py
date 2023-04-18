@@ -897,10 +897,11 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
             widget.device_widget.attributes_selected.connect(widget.close)
 
             # prevent multiple selection
-            self._search_widget = widget
+            self._search_widget: QtWidgets.QWidget = widget
 
         self._search_widget.show()
         self._search_widget.activateWindow()
+        self._search_widget.setWindowState(Qt.WindowActive)
         # TODO: figure out how to make QMenu not hide / reshow after opening
         # not really possible to do from this widget, which doesn't know about
         # the menu it is being spawned from...
@@ -979,6 +980,12 @@ class ActionRowWidget(TargetRowWidget):
         self.update_input_placeholder()
 
         self.setup_setting_button()
+
+    def on_name_edit_text_changed(self, **kwargs) -> None:
+        """ overwrite this to adjust minimum length"""
+        match_line_edit_text_width(self.name_edit, minimum=100)
+        if not self.name_edit.hasFocus():
+            self.adjust_edit_filter()
 
     def update_target(self) -> None:
         super().update_target()
