@@ -1071,8 +1071,8 @@ class ActionRowWidget(TargetRowWidget):
     def setup_setting_button(self) -> None:
         """ Set up the settings QToolButton menu for additional settings"""
         # set up settings button
-        init_dict = {'timeout': self.data.timeout or 0.0,
-                     'settle_time': self.data.settle_time or 0.0}
+        init_dict = {'timeout': self.data.timeout or -1.0,
+                     'settle_time': self.data.settle_time or -1.0}
         self.setting_button.setIcon(qtawesome.icon('msc.settings'))
         self.setting_widget = MultiInputDialog(init_values=init_dict)
         setting_action = QtWidgets.QWidgetAction(self.setting_button)
@@ -1085,8 +1085,11 @@ class ActionRowWidget(TargetRowWidget):
         # close menu on ok button click
         def ok_slot():
             info = self.setting_widget.get_info()
-            self.bridge.timeout.put(info['timeout'])
-            self.bridge.settle_time.put(info['settle_time'])
+            for key, value in info.items():
+                if value == -1:
+                    getattr(self.bridge, key).put(None)
+                else:
+                    getattr(self.bridge, key).put(value)
             self.setting_widget.show()
             self.setting_menu.hide()
 

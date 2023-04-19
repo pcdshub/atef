@@ -37,7 +37,7 @@ from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
 from atef.enums import GroupResultMode, Severity
 from atef.exceptions import PreparedComparisonException
 from atef.result import Result, _summarize_result_severity, incomplete_result
-from atef.type_hints import AnyPath, PrimitiveType
+from atef.type_hints import AnyPath, Number, PrimitiveType
 from atef.yaml_support import init_yaml_support
 
 from . import serialization
@@ -193,9 +193,9 @@ class ValueToTarget(Target):
 
     # ophyd.Signal.set() parameters
     #: write timeout
-    timeout: Optional[float] = None
+    timeout: Optional[Number] = None
     #: settle time
-    settle_time: Optional[float] = None
+    settle_time: Optional[Number] = None
 
 
 @dataclass

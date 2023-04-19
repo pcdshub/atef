@@ -880,10 +880,16 @@ class MultiInputDialog(QtWidgets.QDialog):
             return text_edit
         elif isinstance(value, int):
             int_edit = QtWidgets.QSpinBox()
+            int_edit.setMinimum(-1)
+            int_edit.setSpecialValueText('None')
+            int_edit.setToolTip('Input -1 to set value to None')
             int_edit.setValue(value)
             return int_edit
         elif isinstance(value, float):
             float_edit = QtWidgets.QDoubleSpinBox()
+            float_edit.setMinimum(-1)
+            float_edit.setSpecialValueText('None')
+            float_edit.setToolTip('Input -1 to set value to None')
             float_edit.setValue(value)
             return float_edit
         else:
