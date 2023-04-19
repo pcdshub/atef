@@ -1865,7 +1865,9 @@ class RunStepPage(DesignerDisplay, PageWidget):
         if isinstance(data, PreparedPassiveStep):
             self.run_check.run_button.clicked.connect(self.run_widget.run_config)
         elif isinstance(data, PreparedSetValueStep):
-            self.run_check.run_button.clicked.connect(self.run_widget.update_statuses)
+            self.run_check.busy_thread.task_finished.connect(
+                self.run_widget.update_statuses
+            )
 
     def link_children(self) -> None:
         """

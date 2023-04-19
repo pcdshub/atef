@@ -26,7 +26,7 @@ from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
 from atef.result import Result, combine_results
 from atef.widgets.config.utils import TreeItem
 from atef.widgets.core import DesignerDisplay
-from atef.widgets.utils import busy_cursor
+from atef.widgets.utils import BusyCursorThread
 
 # avoid circular imports
 if TYPE_CHECKING:
@@ -340,7 +340,6 @@ class RunCheck(DesignerDisplay, QWidget):
 
     def _make_run_slot(self, configs) -> None:
 
-        @busy_cursor
         def run_slot(*args, **kwargs):
             """ Slot that runs each step in the config list """
             for cfg in configs:
@@ -355,7 +354,13 @@ class RunCheck(DesignerDisplay, QWidget):
 
                 self.update_all_icons_tooltips()
 
-        self.run_button.clicked.connect(run_slot)
+        # send this to a non-gui thread
+        self.busy_thread = BusyCursorThread(func=run_slot)
+
+        def run_thread():
+            self.busy_thread.start()
+
+        self.run_button.clicked.connect(run_thread)
 
     def update_icon(self, label: QLabel, results: List[Result]) -> None:
         """ Helper method to update icon on ``label`` based on ``results`` """

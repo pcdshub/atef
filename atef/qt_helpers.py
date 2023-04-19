@@ -187,7 +187,6 @@ class QDataclassValue(QDataclassElem):
         value : any primitive type
         """
         setattr(self.data, self.attr, value)
-        print(f'{type(self)}: {value} - {type(self.get())}')
         self.changed_value.emit(self.get())
         self.updated.emit()
 
