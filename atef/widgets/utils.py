@@ -164,6 +164,7 @@ class BusyCursorThread(QtCore.QThread):
     """
     task_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
     task_starting: ClassVar[QtCore.Signal] = QtCore.Signal()
+    raised_exception: ClassVar[QtCore.Signal] = QtCore.Signal()
     running: bool
 
     def __init__(self, *args, func, **kwargs):
@@ -177,5 +178,9 @@ class BusyCursorThread(QtCore.QThread):
         # called from .start().  if called directly, will block current thread
         self.task_starting.emit()
         # run the attached method
-        self.func()
-        self.task_finished.emit()
+        try:
+            self.func()
+        except Exception as ex:
+            self.raised_exception.emit(ex)
+        finally:
+            self.task_finished.emit()

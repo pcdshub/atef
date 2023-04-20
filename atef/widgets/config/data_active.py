@@ -25,12 +25,12 @@ import qtawesome
 import typhos
 import typhos.cli
 import typhos.display
-from ophyd import EpicsSignal
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QDialogButtonBox
 
 from atef import util
+from atef.cache import get_signal_cache
 from atef.check import Equals
 from atef.config import ConfigurationFile
 from atef.qt_helpers import QDataclassElem
@@ -875,7 +875,8 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
             self.data_updated.emit()
             return
 
-        sig = EpicsSignal(self.pv_edit.text())
+        signal_cache = get_signal_cache()
+        sig = signal_cache[self.pv_edit.text()]
         try:
             sig.wait_for_connection()
         except TimeoutError:

@@ -770,8 +770,8 @@ class PreparedSetValueStep(PreparedProcedureStep):
             signal = comp_to_target.to_signal()
             comp = comp_to_target.comparison
             try:
-                prep_comp = PreparedSignalComparison.from_pvname(
-                    pvname=signal.pvname, comparison=comp
+                prep_comp = PreparedSignalComparison.from_signal(
+                    signal=signal, comparison=comp
                 )
                 prep_step.prepared_criteria.append(prep_comp)
             except Exception as ex:
