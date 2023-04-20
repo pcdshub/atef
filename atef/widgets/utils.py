@@ -134,14 +134,21 @@ def busy_cursor(func):
     return wrapper
 
 
-def set_cursor_busy():
-    app = QtWidgets.QApplication.instance()
-    app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+class IgnoreInteractionFilter(QObject):
+    interaction_events = (
+        QEvent.KeyPress, QEvent.KeyRelease, QEvent.MouseButtonPress,
+        QEvent.MouseButtonRelease, QEvent.MouseButtonDblClick
+    )
+
+    def eventFilter(self, a0: QObject, a1: QEvent) -> bool:
+        """ ignore all interaction events while this filter is installed """
+        if a1.type() in self.interaction_events:
+            return True
+        else:
+            return super().eventFilter(a0, a1)
 
 
-def reset_cursor():
-    app = QtWidgets.QApplication.instance()
-    app.restoreOverrideCursor()
+FILTER = IgnoreInteractionFilter()
 
 
 class BusyCursorThread(QtCore.QThread):
@@ -165,14 +172,14 @@ class BusyCursorThread(QtCore.QThread):
     task_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
     task_starting: ClassVar[QtCore.Signal] = QtCore.Signal()
     raised_exception: ClassVar[QtCore.Signal] = QtCore.Signal()
-    running: bool
 
-    def __init__(self, *args, func, **kwargs):
+    def __init__(self, *args, func, ignore_events: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
+        self.app = None
         self.func = func
-        self.running = False
-        self.task_starting.connect(set_cursor_busy)
-        self.task_finished.connect(reset_cursor)
+        self.ignore_events = ignore_events
+        self.task_starting.connect(self.set_cursor_busy)
+        self.task_finished.connect(self.reset_cursor)
 
     def run(self) -> None:
         # called from .start().  if called directly, will block current thread
@@ -184,3 +191,15 @@ class BusyCursorThread(QtCore.QThread):
             self.raised_exception.emit(ex)
         finally:
             self.task_finished.emit()
+
+    def set_cursor_busy(self):
+        self.app = QtWidgets.QApplication.instance()
+        self.app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        if self.ignore_events:
+            self.app.installEventFilter(FILTER)
+
+    def reset_cursor(self):
+        self.app = QtWidgets.QApplication.instance()
+        self.app.restoreOverrideCursor()
+        if self.ignore_events:
+            self.app.removeEventFilter(FILTER)

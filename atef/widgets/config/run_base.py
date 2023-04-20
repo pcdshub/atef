@@ -355,7 +355,7 @@ class RunCheck(DesignerDisplay, QWidget):
                 self.update_all_icons_tooltips()
 
         # send this to a non-gui thread
-        self.busy_thread = BusyCursorThread(func=run_slot)
+        self.busy_thread = BusyCursorThread(func=run_slot, ignore_events=True)
 
         def run_thread():
             self.busy_thread.start()
