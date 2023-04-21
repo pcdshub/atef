@@ -20,6 +20,8 @@ from reportlab.platypus.frames import Frame
 from reportlab.platypus.paragraph import Paragraph
 from reportlab.platypus.tableofcontents import TableOfContents
 
+from atef.check import (Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
+                        NotEquals)
 from atef.config import (PreparedComparison, PreparedConfiguration,
                          PreparedDeviceConfiguration, PreparedFile,
                          PreparedGroup, PreparedPVConfiguration,
@@ -27,7 +29,7 @@ from atef.config import (PreparedComparison, PreparedConfiguration,
                          PreparedToolConfiguration)
 from atef.enums import Severity
 from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
-                            PreparedProcedureStep)
+                            PreparedProcedureStep, PreparedSetValueStep)
 from atef.result import Result
 
 h1 = PS(name='Heading1', fontSize=16, leading=20)
@@ -38,6 +40,13 @@ l0 = PS(name='list0', fontSize=12, leading=15, leftIndent=0,
         rightIndent=0, spaceBefore=12, spaceAfter=0)
 
 styles = getSampleStyleSheet()
+
+RESULT_COLOR = {
+    Severity.error: 'red',
+    Severity.internal_error: 'yellow',
+    Severity.success: 'green',
+    Severity.warning: 'orange'
+}
 
 
 def walk_config_file(
@@ -346,14 +355,8 @@ class AtefReport(BaseDocTemplate):
             A formatted, Flowable text object to be inserted into a story
         """
         severity = result.severity
-        result_colors = {
-            Severity.error: 'red',
-            Severity.internal_error: 'yellow',
-            Severity.success: 'green',
-            Severity.warning: 'orange'
-        }
 
-        text = (f'<font color={result_colors[severity]}>'
+        text = (f'<font color={RESULT_COLOR[severity]}>'
                 f'<b>{severity.name}</b>: {result.reason or "-"}</font>')
         return Paragraph(text)
 
@@ -461,12 +464,7 @@ class PassiveAtefReport(AtefReport):
         config : Union[PreparedConfiguration, PreparedComparison]
             the configuration or comparison dataclass
         """
-        # section title and hyperlink
-        desc = getattr(config, 'description', None)
-        if desc:
-            story.append(Paragraph(f'{getattr}'), PS('body'))
-
-        # Settings (and maybe data) table
+        # Build default page, settings (and maybe data) table
         if isinstance(config, (PreparedGroup, PreparedDeviceConfiguration,
                       PreparedPVConfiguration, PreparedToolConfiguration)):
             self.build_default_page(story, config, kind='config')
@@ -664,5 +662,97 @@ class ActiveAtefReport(AtefReport):
         story.append(table)
         story.append(platypus.PageBreak())
 
-    def build_step_page(self, story: List[Flowable], step):
+    def build_step_page(self, story: List[Flowable], step: PreparedProcedureStep):
+        # Build default page, settings (and maybe data) table
+        if isinstance(step, PreparedProcedureGroup):
+            self.build_default_page(story, step)
+        elif isinstance(step, PreparedSetValueStep):
+            self.build_default_page(story, step)
+            # build action/check table?
+            build_comparison_summary(story, step.prepared_criteria[0])
+        elif isinstance(step, PreparedProcedureStep):
+            self.build_default_page(story, step)
+        else:
+            config_type = str(type(step).__name__)
+            header = self.build_linked_header(config_type, h1)
+            story.append(header)
+            story.append(Paragraph('page format not found'))
+
+        # end of section
+        story.append(platypus.PageBreak())
+
+    def build_default_page(self, story: List[Flowable], step: PreparedProcedureStep):
+        header_text = step.origin.name
+        if isinstance(step, PreparedProcedureGroup):
+            style = h1
+        else:
+            style = h2
+
+        story.append(self.build_linked_header(header_text, style))
+        story.append(Paragraph(step.origin.description))
+        story.append(self.get_result_text(step.result))
+        # settings
+        story.append(Paragraph('Settings', l0))
+        settings_data = []
+        for field in fields(step.origin):
+            if field.name not in ['name', 'description']:
+                settings_data.append([
+                    field.name,
+                    Paragraph(str(getattr(step.origin, field.name)), styles['BodyText'])
+                ])
+
+        settings_table = platypus.Table(
+            settings_data,
+            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+        )
+        story.append(settings_table)
+        # results table (step, verify, overall)
+        results_data = []
+        for result_kind in ['step_result', 'verify_result', 'result']:
+            res = getattr(step, result_kind)
+            results_data.append([f'{step.origin.name}', self.get_result_text(res)])
+
+        story.append(Paragraph('Results', l0))
+        results_table = platypus.Table(
+            results_data,
+            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+        )
+        story.append(results_table)
+
+    def build_action_check_table(
+        self,
+        story: List[Flowable],
+        step: PreparedSetValueStep
+    ) -> None:
+        # for
         pass
+
+
+symbol_map = {
+    Equals: '=', NotEquals: '≠', Greater: '>', GreaterOrEqual: '≥', Less: '<',
+    LessOrEqual: '≤'
+}
+
+
+def build_comparison_summary(story: List[Flowable], comp: PreparedSignalComparison):
+    origin = comp.comparison
+    if type(origin) in (Equals, NotEquals):
+        # tolerance format
+        value = origin.value
+        comp_items = [['X', symbol_map[type(origin)], value]]
+        if origin.atol and origin.rtol:
+            tol = origin.atol + (origin.rtol * value)
+            comp_items[0].append(f'± {tol:.3g}')
+    elif type(origin) in (Greater, GreaterOrEqual, Less, LessOrEqual):
+        # no tolerance
+        return
+
+    color = RESULT_COLOR[comp.result.severity]
+    comp_table = platypus.Table(
+        comp_items,
+        style=[('SIZE', (0, 0), (-1, -1), 40),
+               ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+               ('BOX', (0, 0), (-1, -1), 2, color),
+               ('BOTTOMPADDING', (0, 0), (-1, -1), 50)]
+    )
+    story.append(comp_table)
