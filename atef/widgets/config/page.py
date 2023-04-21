@@ -79,6 +79,11 @@ def link_page(item: AtefItem, widget: PageWidget) -> None:
     widget.assign_tree_item(item)
 
 
+def replace_in_list(old: Any, new: Any, item_list: List[Any]):
+    index = item_list.index(old)
+    item_list[index] = new
+
+
 class AtefItem(QTreeWidgetItem):
     """
     A QTreeWidget item with some convenience methods.
@@ -853,14 +858,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
 
         Also finds the row widget and replaces it with a new row widget.
         """
-        def replace_in_list(
-            old: Comparison,
-            new: Comparison,
-            comparison_list: List[Comparison],
-        ):
-            index = comparison_list.index(old)
-            comparison_list[index] = new
-
         try:
             replace_in_list(
                 old=old_comparison,
@@ -1052,14 +1049,6 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
 
         Also finds the row widget and replaces it with a new row widget.
         """
-        def replace_in_list(
-            old: Comparison,
-            new: Comparison,
-            comparison_list: List[Comparison],
-        ):
-            index = comparison_list.index(old)
-            comparison_list[index] = new
-
         try:
             replace_in_list(
                 old=old_comparison,
@@ -1268,14 +1257,6 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
 
         Also finds the row widget and replaces it with a new row widget.
         """
-        def replace_in_list(
-            old: Comparison,
-            new: Comparison,
-            comparison_list: List[Comparison],
-        ):
-            index = comparison_list.index(old)
-            comparison_list[index] = new
-
         try:
             replace_in_list(
                 old=old_comparison,
@@ -1519,14 +1500,6 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         comp_item : AtefItem
             AtefItem holding the old comparison and widget
         """
-        def replace_in_list(
-            old: ProcedureStep,
-            new: ProcedureStep,
-            step_list: List[ProcedureStep]
-        ):
-            index = step_list.index(old)
-            step_list[index] = new
-
         replace_in_list(old_step, new_step, self.data.steps)
 
         # go through rows
@@ -1806,23 +1779,31 @@ class StepPage(DesignerDisplay, PageWidget):
             table: TableWidgetWithAddRow = self.specific_procedure_widget.checks_table
             row_widget_cls = CheckRowWidget
             row_data_cls = ComparisonToTarget
+            data_list = self.data.success_criteria
+            comp_list = [comptotarget.comparison for comptotarget in data_list]
+            index = comp_list.index(old_comparison)
 
         found_row = None
         for row_index in range(table.rowCount()):
             widget = table.cellWidget(row_index, 0)
             if widget.data.comparison is old_comparison:
                 found_row = row_index
-                # prev_attr_index = widget.attr_combo.currentIndex()
                 break
         if found_row is None:
             return
-        comp_row = row_widget_cls(data=row_data_cls(comparison=new_comparison))
+
+        # replace in dataclass
+        new_data = row_data_cls(comparison=new_comparison)
+        data_list[index] = new_data
+        comp_row = row_widget_cls(data=new_data)
+
         self.setup_row_buttons(
             row_widget=comp_row,
             item=comp_item,
             table=table,
         )
         table.setCellWidget(found_row, 0, comp_row)
+        self.update_subpages()
 
     def remove_table_data(self, data: Any):
         if isinstance(self.data, SetValueStep):
@@ -2040,6 +2021,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                 self.specific_combo.setCurrentText(type_name)
                 return
         comparison = cast_dataclass(data=self.data, new_type=new_type)
+        print(self.parent_tree_item.widget)
         self.parent_tree_item.widget.replace_comparison(
             old_comparison=self.data,
             new_comparison=comparison,
@@ -2185,14 +2167,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
 
         This is only valid when our data type is AnyComparison
         """
-        def replace_in_list(
-            old: Comparison,
-            new: Comparison,
-            comparison_list: List[Comparison],
-        ):
-            index = comparison_list.index(old)
-            comparison_list[index] = new
-
         replace_in_list(
             old=old_comparison,
             new=new_comparison,
