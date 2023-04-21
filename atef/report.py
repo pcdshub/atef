@@ -26,6 +26,8 @@ from atef.config import (PreparedComparison, PreparedConfiguration,
                          PreparedSignalComparison, PreparedToolComparison,
                          PreparedToolConfiguration)
 from atef.enums import Severity
+from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
+                            PreparedProcedureStep)
 from atef.result import Result
 
 h1 = PS(name='Heading1', fontSize=16, leading=20)
@@ -36,6 +38,68 @@ l0 = PS(name='list0', fontSize=12, leading=15, leftIndent=0,
         rightIndent=0, spaceBefore=12, spaceAfter=0)
 
 styles = getSampleStyleSheet()
+
+
+def walk_config_file(
+    config: Union[PreparedFile, PreparedConfiguration, PreparedComparison],
+    level: int = 0
+) -> Generator[Tuple[Any, int], None, None]:
+    """
+    Yields each config and comparison and its depth
+    Performs a recursive depth-first search
+
+    Parameters
+    ----------
+    config : Union[PreparedFile, PreparedConfiguration, PreparedComparison]
+        the configuration or comparison to walk
+    level : int, optional
+        the current recursion depth, by default 0
+
+    Yields
+    ------
+    Generator[Tuple[Any, int], None, None]
+    """
+    yield config, level
+    if isinstance(config, PreparedFile):
+        yield from walk_config_file(config.root, level=level+1)
+    elif isinstance(config, PreparedConfiguration):
+        if hasattr(config, 'configs'):
+            for conf in config.configs:
+                yield from walk_config_file(conf, level=level+1)
+        if hasattr(config, 'comparisons'):
+            for comp in config.comparisons:
+                yield from walk_config_file(comp, level=level+1)
+
+
+def walk_procedure_file(
+    config: Union[PreparedProcedureFile, PreparedProcedureStep, PreparedComparison],
+    level: int = 0
+) -> Generator[Tuple[Any, int], None, None]:
+    """
+    Yields each ProcedureStep / Comparison and its depth
+    Performs a recursive depth-first search
+
+    Parameters
+    ----------
+    config : Union[PreparedProcedureFile, PreparedProcedureStep,
+                    PreparedComparison]
+        the item to yield and walk through
+    level : int, optional
+        the current recursion depth, by default 0
+
+    Yields
+    ------
+    Generator[Tuple[Any, int], None, None]
+    """
+    yield config, level
+    if isinstance(config, PreparedProcedureFile):
+        yield from walk_procedure_file(config.root, level=level+1)
+    elif isinstance(config, PreparedProcedureStep):
+        for sub_step in getattr(config, 'steps', []):
+            yield from walk_procedure_file(sub_step, level=level+1)
+        if hasattr(config, 'walk_comparisons'):
+            for sub_comp in config.walk_comparisons():
+                yield from walk_procedure_file(sub_comp, level=level+1)
 
 
 class AtefReport(BaseDocTemplate):
@@ -88,9 +152,9 @@ class AtefReport(BaseDocTemplate):
 
         self.config = config
         self.author = author
-        self.version = version or self.config.file.version
-        self.header_center_text = self.config.root.config.name
-        self.footer_center_text = 'Passive Checkout Report'
+        self.version = version
+        self.header_center_text = ''
+        self.footer_center_text = ''
         self.approval_slots = 1
 
     def afterFlowable(self, flowable: Flowable) -> None:
@@ -266,6 +330,33 @@ class AtefReport(BaseDocTemplate):
         header._bookmark_name = bookmark_name
         return header
 
+    def get_result_text(self, result: Result) -> Paragraph:
+        """
+        Reads a Result and returns a formatted Paragraph instance
+        suitable for insertion into a story or platypus.Table
+
+        Parameters
+        ----------
+        result : Result
+            The result of a comparsion or group of comparisons
+
+        Returns
+        -------
+        Paragraph
+            A formatted, Flowable text object to be inserted into a story
+        """
+        severity = result.severity
+        result_colors = {
+            Severity.error: 'red',
+            Severity.internal_error: 'yellow',
+            Severity.success: 'green',
+            Severity.warning: 'orange'
+        }
+
+        text = (f'<font color={result_colors[severity]}>'
+                f'<b>{severity.name}</b>: {result.reason or "-"}</font>')
+        return Paragraph(text)
+
     def create_report(self) -> None:
         """ Build the final report. """
         raise NotImplementedError()
@@ -275,6 +366,14 @@ class PassiveAtefReport(AtefReport):
     """
     Report for Passive Checkouts.  Assumes specific PreparedFile structure
     """ + AtefReport.__doc__
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # customize some fields based on passive file
+        self.version = self.config.file.version or self.version
+        self.header_center_text = (self.config.root.config.name
+                                   or self.header_center_text)
+        self.footer_center_text = 'Passive Checkout Report'
 
     def create_report(self):
         """
@@ -288,7 +387,7 @@ class PassiveAtefReport(AtefReport):
         # Results summary page
         self.build_summary(story)
         # Individual config / comparison pages
-        for c, _ in self.walk_config_file(self.config.root):
+        for c, _ in walk_config_file(self.config.root):
             self.build_config_page(story, c)
 
         # must build several times to place items then gather info for ToC
@@ -307,7 +406,7 @@ class PassiveAtefReport(AtefReport):
         story.append(self.build_linked_header('Checkout Summary', h1))
         story.append(platypus.Spacer(width=0, height=.5*cm))
         # table with results
-        lines = list(self.walk_config_file(self.config.root))
+        lines = list(walk_config_file(self.config.root))
         table_data = [['Step Name', 'Result']]
         style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
                  ('ALIGN', (0, 0), (1, 0), 'CENTER'),
@@ -342,64 +441,6 @@ class PassiveAtefReport(AtefReport):
 
         story.append(table)
         story.append(platypus.PageBreak())
-
-    def walk_config_file(
-        self,
-        config: Union[PreparedFile, PreparedConfiguration, PreparedComparison],
-        level: int = 0
-    ) -> Generator[Tuple[Any, int], None, None]:
-        """
-        Yields each config and comparison and its depth
-        Performs a recursive depth-first search
-
-        Parameters
-        ----------
-        config : Union[PreparedFile, PreparedConfiguration, PreparedComparison]
-            the configuration or comparison to walk
-        level : int, optional
-            the current recursion depth, by default 0
-
-        Yields
-        ------
-        Generator[Tuple[Any, int], None, None]
-        """
-        yield config, level
-        if isinstance(config, PreparedFile):
-            yield from self.walk_config_file(config.root, level=level+1)
-        elif isinstance(config, PreparedConfiguration):
-            if hasattr(config, 'configs'):
-                for conf in config.configs:
-                    yield from self.walk_config_file(conf, level=level+1)
-            if hasattr(config, 'comparisons'):
-                for comp in config.comparisons:
-                    yield from self.walk_config_file(comp, level=level+1)
-
-    def get_result_text(self, result: Result) -> Paragraph:
-        """
-        Reads a Result and returns a formatted Paragraph instance
-        suitable for insertion into a story or platypus.Table
-
-        Parameters
-        ----------
-        result : Result
-            The result of a comparsion or group of comparisons
-
-        Returns
-        -------
-        Paragraph
-            A formatted, Flowable text object to be inserted into a story
-        """
-        severity = result.severity
-        result_colors = {
-            Severity.error: 'red',
-            Severity.internal_error: 'yellow',
-            Severity.success: 'green',
-            Severity.warning: 'orange'
-        }
-
-        text = (f'<font color={result_colors[severity]}>'
-                f'<b>{severity.name}</b>: {result.reason or "-"}</font>')
-        return Paragraph(text)
 
     def build_config_page(
         self,
@@ -543,3 +584,85 @@ class PassiveAtefReport(AtefReport):
         )
 
         story.append(observed_table)
+
+
+class ActiveAtefReport(AtefReport):
+    """
+    Report for Active Checkouts.
+    Assumes specifically the PreparedProcedureFile structure
+    """ + AtefReport.__doc__
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # customize some fields based on passive file
+        self.version = self.config.file.version or self.version
+        self.header_center_text = (self.config.root.origin.name
+                                   or self.header_center_text)
+        self.footer_center_text = 'Active Checkout Report'
+
+    def create_report(self) -> None:
+        """
+        Top-level method for creating the final report.
+        Uses the stored config and calls various helpers
+        """
+        story = []
+        self.build_cover_page(story)
+
+        self.build_summary(story)
+
+        for step, _ in walk_procedure_file(self.config.root):
+            self.build_step_page(story, step)
+
+        # multi-build to gather items for ToC
+        self.multiBuild(story)
+
+    def build_summary(self, story: List[Flowable]):
+        """
+        Build summary table for checkout
+
+        Parameters
+        ----------
+        story : List[Flowable]
+            a list of components used to render the report.  New items
+            are appended to this directly
+        """
+        story.append(self.build_linked_header('Checkout Summary', h1))
+        story.append(platypus.Spacer(width=0, height=.5*cm))
+        # table with results
+        lines = walk_procedure_file(self.config.root)
+        table_data = [['Step Name', 'Result']]
+        style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                 ('ALIGN', (0, 0), (1, 0), 'CENTER'),
+                 ('BOX', (0, 0), (-1, -1), 1, colors.black),
+                 ('BOX', (0, 0), (0, -1), 1, colors.black)]
+
+        for i, (item, level) in enumerate(lines):
+            # content
+            prefix = '    ' * level
+            if isinstance(item, PreparedProcedureStep):
+                name = item.origin.name
+            elif isinstance(item, PreparedComparison):
+                name = item.comparison.name + ' - ' + item.identifier
+            name = name or type(item).__name__
+            table_data.append(
+                [
+                    prefix + f'{name}',
+                    self.get_result_text(item.result)
+                ]
+            )
+
+            # style
+            if isinstance(item, PreparedProcedureGroup):
+                style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.black])
+            else:
+                style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.lightgrey])
+
+        table = platypus.Table(
+            table_data, style=style
+        )
+
+        story.append(table)
+        story.append(platypus.PageBreak())
+
+    def build_step_page(self, story: List[Flowable], step):
+        pass
