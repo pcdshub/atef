@@ -826,10 +826,17 @@ class MultiInputDialog(QtWidgets.QDialog):
 
     To retrieve the user provided data, call MultiInputDialog.get_info()
     """
-    def __init__(self, *args, init_values: Dict[str, Any], **kwargs):
+    def __init__(
+        self,
+        *args,
+        init_values: Dict[str, Any],
+        units: Optional[List[str]] = None,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
 
         self.init_values = init_values
+        self.units = units
         vlayout = QtWidgets.QVBoxLayout(self)
         self.grid_layout = QtWidgets.QGridLayout()
         # add each name and field
@@ -837,6 +844,12 @@ class MultiInputDialog(QtWidgets.QDialog):
             spaced_key = key.replace('_', ' ')
             self.grid_layout.addWidget(self.make_label(spaced_key), i, 0)
             self.grid_layout.addWidget(self.make_field(value), i, 1)
+            if self.units:
+                try:
+                    unit_label = QtWidgets.QLabel(self.units[i])
+                except IndexError:
+                    continue
+                self.grid_layout.addWidget(unit_label, i, 2)
 
         vlayout.addLayout(self.grid_layout)
 

@@ -1764,6 +1764,19 @@ class StepPage(DesignerDisplay, PageWidget):
             item=item,
         )
 
+        # setup callback to update description if comparison page changes
+        # item.widget will be a ComparisonPage
+        # gets a bit invasive here, assumes links between ComparisonPage and
+        # the atef item have been made
+        desc_update_slot = self.specific_procedure_widget.update_all_desc
+        comp_page_widget = item.widget.specific_comparison_widget
+        # subscribe to the relevant comparison signals
+        for field in ('value', 'low', 'high', 'description'):
+            if hasattr(comp_page_widget.bridge, field):
+                getattr(comp_page_widget.bridge, field).changed_value.connect(
+                    desc_update_slot
+                )
+
     def replace_comparison(
         self,
         old_comparison: Comparison,
@@ -2021,7 +2034,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                 self.specific_combo.setCurrentText(type_name)
                 return
         comparison = cast_dataclass(data=self.data, new_type=new_type)
-        print(self.parent_tree_item.widget)
         self.parent_tree_item.widget.replace_comparison(
             old_comparison=self.data,
             new_comparison=comparison,

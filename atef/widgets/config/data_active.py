@@ -686,13 +686,8 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
         for check in data.success_criteria:
             self.checks_table.add_row(data=check)
 
-        # update descriptions on selection change for check table
-        def update_all_desc(*args, **kwargs):
-            for ind in range(self.checks_table.rowCount()):
-                row_widget: CheckRowWidget = self.checks_table.cellWidget(ind, 0)
-                row_widget.update_summary()
-
-        self.checks_table.cellClicked.connect(update_all_desc)
+        self.checks_table.cellClicked.connect(self.update_all_desc)
+        self.checks_table.table_updated.connect(lambda: print('table updated'))
 
         # checkboxes
         self.bridge.halt_on_fail.changed_value.connect(
@@ -741,6 +736,12 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
             bridge_attr.put(row_data)
 
         return inner_slot
+
+    def update_all_desc(self, *args, **kwargs):
+        # update descriptions on selection change for check table
+        for ind in range(self.checks_table.rowCount()):
+            row_widget: CheckRowWidget = self.checks_table.cellWidget(ind, 0)
+            row_widget.update_summary()
 
 
 class TargetRowWidget(DesignerDisplay, SimpleRowWidget):
@@ -880,13 +881,12 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         try:
             sig.wait_for_connection()
         except TimeoutError:
-            QtWidgets.QMessageBox.information(
+            QtWidgets.QMessageBox.warning(
                 self,
-                'Failed to set target',
-                f'Could not connect to PV: {self.pv_edit.text()}. Resetting target'
+                'Failed to connect to PV',
+                f'Could not connect to PV: {self.pv_edit.text()}. '
+                'Will be unable to read metadata'
             )
-            self.reset_fields()
-            return
 
         self.chosen_target = Target(pv=self.pv_edit.text())
         self.data_updated.emit()
@@ -1075,7 +1075,8 @@ class ActionRowWidget(TargetRowWidget):
         init_dict = {'timeout': self.data.timeout or -1.0,
                      'settle_time': self.data.settle_time or -1.0}
         self.setting_button.setIcon(qtawesome.icon('msc.settings'))
-        self.setting_widget = MultiInputDialog(init_values=init_dict)
+        self.setting_widget = MultiInputDialog(init_values=init_dict,
+                                               units=['s', 's'])
         setting_action = QtWidgets.QWidgetAction(self.setting_button)
         setting_action.setDefaultWidget(self.setting_widget)
 
