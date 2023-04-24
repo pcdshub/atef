@@ -687,7 +687,6 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
             self.checks_table.add_row(data=check)
 
         self.checks_table.cellClicked.connect(self.update_all_desc)
-        self.checks_table.table_updated.connect(lambda: print('table updated'))
 
         # checkboxes
         self.bridge.halt_on_fail.changed_value.connect(

@@ -1765,9 +1765,9 @@ class StepPage(DesignerDisplay, PageWidget):
         )
 
         # setup callback to update description if comparison page changes
-        # item.widget will be a ComparisonPage
         # gets a bit invasive here, assumes links between ComparisonPage and
         # the atef item have been made
+        # item.widget will be a ComparisonPage
         desc_update_slot = self.specific_procedure_widget.update_all_desc
         comp_page_widget = item.widget.specific_comparison_widget
         # subscribe to the relevant comparison signals
