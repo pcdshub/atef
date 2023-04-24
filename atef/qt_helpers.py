@@ -33,7 +33,7 @@ class QDataclassBridge(QObject):
 
     Would allow you to access:
     bridge.field.put(3)
-    bridge.field.value_changed.connect(my_slot)
+    bridge.field.changed_value.connect(my_slot)
     bridge.others.append(OtherClass(4))
 
     This does not recursively dive down the tree of subdataclasses.

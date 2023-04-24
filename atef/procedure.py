@@ -176,7 +176,7 @@ class Target:
                     signal_cache = get_signal_cache()
                 signal = signal_cache[self.pv]
             else:
-                logger.debug('unable to create signal, insufficient information'
+                logger.debug('unable to create signal, insufficient information '
                              'to specify signal')
                 return
         except Exception as ex:
