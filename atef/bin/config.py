@@ -21,20 +21,20 @@ def build_arg_parser(argparser=None):
 
     # Arguments that need to be passed through to Qt
     qt_args = {
-        '-qmljsdebugger': 1,
-        '-reverse': '?',
-        '-stylesheet': 1,
-        '-widgetcount': '?',
-        '-platform': 1,
-        '-platformpluginpath': 1,
-        '-platformtheme': 1,
-        '-plugin': 1,
-        '-qwindowgeometry': 1,
-        '-qwindowicon': 1,
-        '-qwindowtitle': 1,
-        '-session': 1,
-        '-display': 1,
-        '-geometry': 1
+        '--qmljsdebugger': 1,
+        '--reverse': '?',
+        '--stylesheet': 1,
+        '--widgetcount': '?',
+        '--platform': 1,
+        '--platformpluginpath': 1,
+        '--platformtheme': 1,
+        '--plugin': 1,
+        '--qwindowgeometry': 1,
+        '--qwindowicon': 1,
+        '--qwindowtitle': 1,
+        '--session': 1,
+        '--display': 1,
+        '--geometry': 1
     }
 
     for name in qt_args:
@@ -45,7 +45,7 @@ def build_arg_parser(argparser=None):
         )
 
     argparser.add_argument(
-        '-style',
+        '--style',
         type=str,
         choices=QStyleFactory.keys(),
         default='fusion' if sys.platform == 'darwin' else None,
