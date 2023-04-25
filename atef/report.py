@@ -593,8 +593,33 @@ def build_action_check_table(
     story: List[Flowable],
     step: PreparedSetValueStep
 ) -> None:
-    # for
-    pass
+    """ build two tables, one for actions, one for the checks """
+    action_data = [['Name', 'Target', 'Value', 'Result']]
+    for action in step.prepared_actions:
+        # a list of PreparedValueToSignal
+        action_data.append([action.name, action.signal.name,
+                            action.value, get_result_text(action.result)])
+
+    if len(action_data) > 1:
+        story.append(Paragraph('Actions', l0))
+        action_table = platypus.Table(
+            action_data,
+            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+        )
+        story.append(action_table)
+
+    check_data = [['Name', 'Result']]
+    for check in step.prepared_criteria:
+        name = f'{check.comparison.name} - {check.identifier}'
+        check_data.append([name, get_result_text(check.result)])
+
+    if len(check_data) > 1:
+        story.append(Paragraph('Checks', l0))
+        check_table = platypus.Table(
+            check_data,
+            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+        )
+        story.append(check_table)
 
 
 def build_comparison_page(
