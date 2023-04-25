@@ -3,6 +3,7 @@ Report rendering framework
 """
 
 import hashlib
+import logging
 from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
@@ -21,7 +22,7 @@ from reportlab.platypus.paragraph import Paragraph
 from reportlab.platypus.tableofcontents import TableOfContents
 
 from atef.check import (Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
-                        NotEquals)
+                        NotEquals, Range)
 from atef.config import (PreparedComparison, PreparedConfiguration,
                          PreparedDeviceConfiguration, PreparedFile,
                          PreparedGroup, PreparedPVConfiguration,
@@ -31,6 +32,8 @@ from atef.enums import Severity
 from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
                             PreparedProcedureStep, PreparedSetValueStep)
 from atef.result import Result
+
+logger = logging.getLogger(__name__)
 
 h1 = PS(name='Heading1', fontSize=16, leading=20)
 
@@ -339,27 +342,6 @@ class AtefReport(BaseDocTemplate):
         header._bookmark_name = bookmark_name
         return header
 
-    def get_result_text(self, result: Result) -> Paragraph:
-        """
-        Reads a Result and returns a formatted Paragraph instance
-        suitable for insertion into a story or platypus.Table
-
-        Parameters
-        ----------
-        result : Result
-            The result of a comparsion or group of comparisons
-
-        Returns
-        -------
-        Paragraph
-            A formatted, Flowable text object to be inserted into a story
-        """
-        severity = result.severity
-
-        text = (f'<font color={RESULT_COLOR[severity]}>'
-                f'<b>{severity.name}</b>: {result.reason or "-"}</font>')
-        return Paragraph(text)
-
     def create_report(self) -> None:
         """ Build the final report. """
         raise NotImplementedError()
@@ -428,7 +410,7 @@ class PassiveAtefReport(AtefReport):
             table_data.append(
                 [
                     prefix + f'{name}',
-                    self.get_result_text(item.result)
+                    get_result_text(item.result)
                 ]
             )
 
@@ -467,10 +449,17 @@ class PassiveAtefReport(AtefReport):
         # Build default page, settings (and maybe data) table
         if isinstance(config, (PreparedGroup, PreparedDeviceConfiguration,
                       PreparedPVConfiguration, PreparedToolConfiguration)):
-            self.build_default_page(story, config, kind='config')
+            header_text = config.config.name
+            story.append(self.build_linked_header(header_text, style=h2))
+            story.append(Paragraph(config.config.description))
+            omit_keys = ['name', 'description', 'by_pv', 'by_attr', 'shared', 'configs']
+            build_group_page(story, config, omit_keys)
         elif isinstance(config, (PreparedSignalComparison, PreparedToolComparison)):
-            self.build_default_page(story, config, kind='comparison')
-            self.build_data_table(story, config)
+            header_text = config.comparison.name
+            header_text += f' - {config.identifier}'
+            story.append(self.build_linked_header(header_text, style=h2))
+            story.append(Paragraph(config.comparison.description))
+            build_comparison_page(story, config)
         else:
             config_type = str(type(config).__name__)
             header = self.build_linked_header(config_type, h1)
@@ -479,109 +468,6 @@ class PassiveAtefReport(AtefReport):
 
         # end of section
         story.append(platypus.PageBreak())
-
-    def build_default_page(
-        self,
-        story: List[Flowable],
-        config: Union[PreparedConfiguration, PreparedComparison],
-        kind: str
-    ) -> None:
-        """
-        Builds a general purpose page, containing info from the dataclass
-
-        Parameters
-        ----------
-        story : List[Flowable]
-            a list of components used to render the report.  New items
-            are appended to this directly
-        config : Union[PreparedConfiguration, PreparedComparison]
-            the configuration or comparison dataclass
-        kind : str
-            a flag notifying this method of which type of page to build.
-            either 'config' or 'comparison
-        """
-        # Header bit
-        setting_config = getattr(config, kind)
-        header_text = setting_config.name
-        if kind == 'config':
-            style = h1
-        elif kind == 'comparison':
-            style = h2
-            header_text += f' - {config.identifier}'
-        story.append(self.build_linked_header(header_text, style))
-        story.append(Paragraph(setting_config.description))
-        result = getattr(config, 'result', None)
-        if result:
-            story.append(self.get_result_text(result))
-        # settings table
-        story.append(Paragraph('Settings', l0))
-        settings_data = []
-        for field in fields(setting_config):
-            if field.name not in ['name', 'description', 'by_pv',
-                                  'by_attr', 'shared', 'configs']:
-                settings_data.append(
-                    [field.name,
-                     Paragraph(str(getattr(setting_config, field.name)),
-                               styles['BodyText'])]
-                )
-        settings_table = platypus.Table(
-            settings_data,
-            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
-        )
-        story.append(settings_table)
-        # results table
-        results_data = []
-        for comp in getattr(config, 'comparisons', []):
-            results_data.append([f'{comp.comparison.name} - {comp.identifier}',
-                                 self.get_result_text(comp.result)])
-        if results_data:
-            story.append(Paragraph('Results', l0))
-            results_table = platypus.Table(
-                results_data,
-                style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
-            )
-            story.append(results_table)
-
-    def build_data_table(
-        self,
-        story: List[Flowable],
-        config: PreparedComparison
-    ) -> None:
-        """
-        Builds a table describing the data observed at the time the
-        checkout was run
-
-        Parameters
-        ----------
-        story : List[Flowable]
-            a list of components used to render the report.  New items
-            appended to this directly
-        config : PreparedComparison
-            dataclass that can hold a DataCache instance
-        """
-        story.append(Paragraph('Observed Data', l0))
-        # use cached value.
-        observed_value = getattr(config, 'data', 'N/A')
-        if not observed_value:
-            # attr can be set to None
-            observed_value = 'N/A'
-        observed_value = Paragraph(str(observed_value), styles['BodyText'])
-        try:
-            timestamp = datetime.fromtimestamp(config.signal.timestamp).ctime()
-            timestamp = Paragraph(timestamp)
-            source = Paragraph(config.signal.name, styles['BodyText'])
-        except AttributeError:
-            timestamp = 'unknown'
-            source = 'undefined'
-        observed_data = [['Observed Value', 'Timestamp', 'Source'],
-                         [observed_value, timestamp, source]]
-
-        observed_table = platypus.Table(
-            observed_data,
-            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
-        )
-
-        story.append(observed_table)
 
 
 class ActiveAtefReport(AtefReport):
@@ -645,7 +531,7 @@ class ActiveAtefReport(AtefReport):
             table_data.append(
                 [
                     prefix + f'{name}',
-                    self.get_result_text(item.result)
+                    get_result_text(item.result)
                 ]
             )
 
@@ -662,16 +548,37 @@ class ActiveAtefReport(AtefReport):
         story.append(table)
         story.append(platypus.PageBreak())
 
-    def build_step_page(self, story: List[Flowable], step: PreparedProcedureStep):
-        # Build default page, settings (and maybe data) table
+    def build_step_page(
+        self,
+        story: List[Flowable],
+        step: Union[PreparedProcedureStep, PreparedComparison]
+    ) -> None:
+        omit_keys = ['name', 'description', 'actions', 'steps', 'success_criteria']
+        result_attrs = ['step_result', 'verify_result', 'result']
         if isinstance(step, PreparedProcedureGroup):
-            self.build_default_page(story, step)
+            header_text = step.origin.name
+            story.append(self.build_linked_header(header_text, style=h1))
+            story.append(Paragraph(step.origin.description or ''))
+            build_group_page(story, step, omit_keys=omit_keys)
         elif isinstance(step, PreparedSetValueStep):
-            self.build_default_page(story, step)
-            # build action/check table?
-            build_comparison_summary(story, step.prepared_criteria[0])
+            header_text = step.origin.name
+            story.append(self.build_linked_header(header_text, style=h2))
+            story.append(Paragraph(step.origin.description or ''))
+            build_settings_table(story, step.origin, omit_keys=omit_keys)
+            build_action_check_table(story, step)
+            build_results_table(story, step, attr_names=result_attrs)
         elif isinstance(step, PreparedProcedureStep):
-            self.build_default_page(story, step)
+            header_text = step.origin.name
+            story.append(self.build_linked_header(header_text, style=h2))
+            story.append(Paragraph(step.origin.description))
+            build_settings_table(story, step.origin, omit_keys=omit_keys)
+            build_results_table(story, step, attr_names=result_attrs)
+        elif isinstance(step, PreparedComparison):
+            header_text = step.comparison.name
+            header_text += f' - {step.identifier}'
+            story.append(self.build_linked_header(header_text, style=h2))
+            story.append(Paragraph(step.comparison.description or ''))
+            build_comparison_page(story, step)
         else:
             config_type = str(type(step).__name__)
             header = self.build_linked_header(config_type, h1)
@@ -681,71 +588,76 @@ class ActiveAtefReport(AtefReport):
         # end of section
         story.append(platypus.PageBreak())
 
-    def build_default_page(self, story: List[Flowable], step: PreparedProcedureStep):
-        header_text = step.origin.name
-        if isinstance(step, PreparedProcedureGroup):
-            style = h1
-        else:
-            style = h2
 
-        story.append(self.build_linked_header(header_text, style))
-        story.append(Paragraph(step.origin.description))
-        story.append(self.get_result_text(step.result))
-        # settings
-        story.append(Paragraph('Settings', l0))
-        settings_data = []
-        for field in fields(step.origin):
-            if field.name not in ['name', 'description']:
-                settings_data.append([
-                    field.name,
-                    Paragraph(str(getattr(step.origin, field.name)), styles['BodyText'])
-                ])
+def build_action_check_table(
+    story: List[Flowable],
+    step: PreparedSetValueStep
+) -> None:
+    # for
+    pass
 
-        settings_table = platypus.Table(
-            settings_data,
-            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
-        )
-        story.append(settings_table)
-        # results table (step, verify, overall)
-        results_data = []
-        for result_kind in ['step_result', 'verify_result', 'result']:
-            res = getattr(step, result_kind)
-            results_data.append([f'{step.origin.name}', self.get_result_text(res)])
 
-        story.append(Paragraph('Results', l0))
-        results_table = platypus.Table(
-            results_data,
-            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
-        )
-        story.append(results_table)
+def build_comparison_page(
+    story: List[Flowable],
+    comp: Union[PreparedSignalComparison, PreparedToolComparison]
+) -> None:
+    """
+    Build a page that summarizes a comparison and its result.
+    Modifies the story in place, appending flowables to the end of the ``story``
 
-    def build_action_check_table(
-        self,
-        story: List[Flowable],
-        step: PreparedSetValueStep
-    ) -> None:
-        # for
-        pass
+    Parameters
+    ----------
+    story : List[Flowable]
+        List of story objects that compose a reportlab PDF
+    comp : Union[PreparedSignalComparison, PreparedToolComparison]
+        The comparison to build a page for.
+    """
+    result = getattr(comp, 'result', None)
+    if result:
+        story.append(get_result_text(result))
+
+    build_comparison_summary(story, comp)
+
+    # settings table
+    origin = comp.comparison
+    build_settings_table(
+        story, origin,
+        omit_keys=['name', 'description', 'by_pv', 'by_attr', 'shared', 'configs']
+    )
+    # data table
+    build_data_table(story, comp)
 
 
 symbol_map = {
     Equals: '=', NotEquals: '≠', Greater: '>', GreaterOrEqual: '≥', Less: '<',
-    LessOrEqual: '≤'
+    LessOrEqual: '≤', Range: '≤'
 }
 
 
 def build_comparison_summary(story: List[Flowable], comp: PreparedSignalComparison):
+    """ Builds a big visual representation of the comparison """
     origin = comp.comparison
-    if type(origin) in (Equals, NotEquals):
+    try:
+        symbol = symbol_map[type(origin)]
+    except KeyError:
+        logger.debug('unsupported comparison type')
+        return
+    comp_items = [['X', symbol]]
+    if isinstance(origin, (Equals, NotEquals)):
         # tolerance format
         value = origin.value
-        comp_items = [['X', symbol_map[type(origin)], value]]
+        comp_items[0].append(value)
         if origin.atol and origin.rtol:
             tol = origin.atol + (origin.rtol * value)
             comp_items[0].append(f'± {tol:.3g}')
-    elif type(origin) in (Greater, GreaterOrEqual, Less, LessOrEqual):
+    elif isinstance(origin, (Greater, GreaterOrEqual, Less, LessOrEqual)):
         # no tolerance
-        return
+        value = origin.value
+        comp_items[0].append(value)
+    elif isinstance(origin, Range):
+        comp_items[0].insert(0, '≤')
+        comp_items[0].insert(0, origin.low)
+        comp_items[0].append(origin.high)
 
     color = RESULT_COLOR[comp.result.severity]
     comp_table = platypus.Table(
@@ -756,3 +668,144 @@ def build_comparison_summary(story: List[Flowable], comp: PreparedSignalComparis
                ('BOTTOMPADDING', (0, 0), (-1, -1), 50)]
     )
     story.append(comp_table)
+
+
+def get_result_text(result: Result) -> Paragraph:
+    """
+    Reads a Result and returns a formatted Paragraph instance
+    suitable for insertion into a story or platypus.Table
+
+    Parameters
+    ----------
+    result : Result
+        The result of a comparsion or group of comparisons
+
+    Returns
+    -------
+    Paragraph
+        A formatted, Flowable text object to be inserted into a story
+    """
+    severity = result.severity
+
+    text = (f'<font color={RESULT_COLOR[severity]}>'
+            f'<b>{severity.name}</b>: {result.reason or "-"}</font>')
+    return Paragraph(text)
+
+
+def build_data_table(
+    story: List[Flowable],
+    comp: PreparedComparison
+) -> None:
+    """
+    Builds a table describing the data observed at the time the checkout was run
+
+    Parameters
+    ----------
+    story : List[Flowable]
+        a list of components used to render the report.
+        New items appended to this directly.
+    comp : PreparedComparison
+        dataclass that can hold a DataCache instance
+    """
+    story.append(Paragraph('Observed Data', l0))
+    # use cached value.
+    observed_value = getattr(comp, 'data', 'N/A')
+    if not observed_value:
+        # attr can be set to None
+        observed_value = 'N/A'
+    observed_value = Paragraph(str(observed_value), styles['BodyText'])
+    try:
+        timestamp = datetime.fromtimestamp(comp.signal.timestamp).ctime()
+        timestamp = Paragraph(timestamp)
+        source = Paragraph(comp.signal.name, styles['BodyText'])
+    except AttributeError:
+        timestamp = 'unknown'
+        source = 'undefined'
+    observed_data = [['Observed Value', 'Timestamp', 'Source'],
+                     [observed_value, timestamp, source]]
+
+    observed_table = platypus.Table(
+        observed_data,
+        style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+    )
+
+    story.append(observed_table)
+
+
+def build_settings_table(story: List[Flowable], item, omit_keys: List[str]) -> None:
+    """_summary_
+
+    Parameters
+    ----------
+    story : List[Flowable]
+        _description_
+    item : Any
+        The origin of a prepared configuration/group.
+        For passive checkouts this can be either .comparison or .config
+        For active checkouts this typically the .origin field
+    omit_keys : List[str]
+        _description_
+    """
+    # settings table
+    story.append(Paragraph('Settings', l0))
+    settings_data = []
+    for field in fields(item):
+        if field.name not in omit_keys:
+            settings_data.append(
+                [field.name,
+                 Paragraph(str(getattr(item, field.name)), styles['BodyText'])]
+            )
+    settings_table = platypus.Table(
+        settings_data,
+        style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+    )
+    story.append(settings_table)
+
+
+def build_group_page(
+    story: List[Flowable],
+    item: Union[PreparedGroup, PreparedDeviceConfiguration,
+                PreparedPVConfiguration, PreparedToolConfiguration,
+                PreparedProcedureGroup],
+    omit_keys: Optional[List[str]] = None
+) -> None:
+    if isinstance(item, (PreparedGroup, PreparedDeviceConfiguration,
+                         PreparedPVConfiguration, PreparedToolConfiguration)):
+        origin = item.config
+    elif isinstance(item, PreparedProcedureGroup):
+        origin = item.origin
+    # build settings table
+    build_settings_table(story, origin, omit_keys=omit_keys or [])
+    build_results_table(story, item, list_names=['comparisons'])
+
+
+def build_results_table(
+    story: List[Flowable],
+    item: Any,
+    list_names: Optional[List[str]] = None,
+    attr_names: Optional[List[str]] = None
+) -> None:
+    results_data = []
+    # grab results stored in specified attributes
+    for attr in attr_names or []:
+        result = getattr(item, attr)
+        results_data.append([attr.replace('_', ' '), get_result_text(result)])
+
+    # grab results stored in attributes with lists of result-holding objects
+    for list_attr in list_names or []:
+        for list_item in getattr(item, list_attr, []):
+            if isinstance(list_item, PreparedComparison):
+                result_name = f'{list_item.comparison.name} - {list_item.identifier}'
+            else:
+                # e.g. PreparedValueToSignal
+                result_name = list_item.name
+            results_data.append([result_name, get_result_text(list_item.result)])
+
+    # make results a table
+    if results_data:
+        story.append(Paragraph('Results', l0))
+        results_table = platypus.Table(
+            results_data,
+            style=[('GRID', (0, 0), (-1, -1), 1, colors.black)]
+        )
+        story.append(results_table)
