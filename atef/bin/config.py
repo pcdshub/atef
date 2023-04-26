@@ -48,7 +48,7 @@ def build_arg_parser(argparser=None):
         '--style',
         type=str,
         choices=QStyleFactory.keys(),
-        default='fusion' if sys.platform == 'darwin' else None,
+        default='fusion',
         help='Qt style to use for the application'
     )
 
