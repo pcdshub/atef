@@ -8,7 +8,8 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
 
 import qtawesome as qta
 from qtpy import QtCore, QtWidgets
-from qtpy.QtCore import QPoint, QPointF, QRectF, QRegularExpression, Qt
+from qtpy.QtCore import (QPoint, QPointF, QRect, QRectF, QRegularExpression,
+                         QSize, Qt)
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
                         QPaintEvent, QPen, QRegularExpressionValidator)
@@ -535,9 +536,13 @@ class Toggle(QCheckBox):
         # the handle will move along this line
         trailLength = contRect.width() - 2 * handleRadius
         xPos = contRect.x() + handleRadius + trailLength * self._handle_position
-        iconRad = 0.7 * handleRadius
+        iconRad = int(0.7 * handleRadius)
         # center of handle
-        icon_x = xPos - (1.3 * handleRadius) + iconRad
+        icon_x = int(xPos - (1.3 * handleRadius) + iconRad)
+        iconRect = QRect(
+            QPoint(icon_x, round(barRect.center().y()) - iconRad),
+            QSize(2 * iconRad, 2 * iconRad)
+        )
 
         if self.isChecked():
             p.setBrush(self._bar_checked_brush)
@@ -549,8 +554,7 @@ class Toggle(QCheckBox):
             )
             icon = qta.icon(self.checked_icon,
                             color=QColor(self.checked_color).darker())
-            icon.paint(p, icon_x, round(barRect.center().y()) - iconRad,
-                       2 * iconRad, 2 * iconRad)
+            icon.paint(p, iconRect)
 
         else:
             p.setBrush(self._bar_brush)
@@ -562,8 +566,7 @@ class Toggle(QCheckBox):
                 handleRadius, handleRadius
             )
             icon = qta.icon(self.unchecked_icon)
-            icon.paint(p, icon_x, round(barRect.center().y()) - iconRad,
-                       2 * iconRad, 2 * iconRad)
+            icon.paint(p, iconRect)
 
         p.end()
 
