@@ -22,7 +22,7 @@ from atef.config import ConfigurationFile, PreparedFile
 from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep)
 from atef.qt_helpers import walk_tree_widget_items
-from atef.report import PassiveAtefReport
+from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.widgets.utils import busy_cursor
 
 from ..archive_viewer import get_archive_viewer
@@ -535,6 +535,8 @@ class RunTree(EditTree):
         # To differentiate between active and passive checkout reports
         if isinstance(self.prepared_file, PreparedFile):
             doc = PassiveAtefReport(filename, config=self.prepared_file)
+        elif isinstance(self.prepared_file, PreparedProcedureFile):
+            doc = ActiveAtefReport(filename, config=self.prepared_file)
         else:
             raise TypeError('Unsupported data-type for report generation')
 
