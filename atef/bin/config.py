@@ -54,7 +54,9 @@ def build_arg_parser(argparser=None):
 
     argparser.description = """
     Runs the atef configuration GUI, optionally with an existing configuration.
-    Qt arguments are also supported. For a full list, see the Qt docs: https://doc.qt.io/qt-5/qguiapplication.html#supported-command-line-options
+    Qt arguments are also supported. For a full list, see the Qt docs:
+    https://doc.qt.io/qt-5/qapplication.html#QApplication
+    https://doc.qt.io/qt-5/qguiapplication.html#supported-command-line-options
     """
 
     argparser.add_argument(
