@@ -29,9 +29,11 @@ from atef.config import (PreparedComparison, PreparedConfiguration,
                          PreparedSignalComparison, PreparedToolComparison,
                          PreparedToolConfiguration)
 from atef.enums import Severity
-from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
-                            PreparedProcedureStep, PreparedSetValueStep)
+from atef.procedure import (PreparedPassiveStep, PreparedProcedureFile,
+                            PreparedProcedureGroup, PreparedProcedureStep,
+                            PreparedSetValueStep)
 from atef.result import Result
+from atef.type_hints import AnyDataclass
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +144,7 @@ class AtefReport(BaseDocTemplate):
     def __init__(
         self,
         filename: str,
-        config: Union[PreparedFile, Any],
+        config: Union[PreparedFile, PreparedProcedureFile],
         pagesize=pagesizes.letter,
         author: str = 'unknown',
         version: str = '0.0.1',
@@ -391,41 +393,7 @@ class PassiveAtefReport(AtefReport):
         story.append(self.build_linked_header('Checkout Summary', h1))
         story.append(platypus.Spacer(width=0, height=.5*cm))
         # table with results
-        lines = list(walk_config_file(self.config.root))
-        table_data = [['Step Name', 'Result']]
-        style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                 ('ALIGN', (0, 0), (1, 0), 'CENTER'),
-                 ('BOX', (0, 0), (-1, -1), 1, colors.black),
-                 ('BOX', (0, 0), (0, -1), 1, colors.black)]
-
-        for i in range(len(lines)):
-            # content
-            item, level = lines[i]
-            prefix = '    ' * level
-            if isinstance(item, PreparedConfiguration):
-                name = item.config.name
-            elif isinstance(item, PreparedComparison):
-                name = item.comparison.name + ' - ' + item.identifier
-            name = name or type(item).__name__
-            table_data.append(
-                [
-                    prefix + f'{name}',
-                    get_result_text(item.result)
-                ]
-            )
-
-            # style
-            if isinstance(item, PreparedConfiguration):
-                style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.black])
-            else:
-                style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.lightgrey])
-
-        table = platypus.Table(
-            table_data, style=style
-        )
-
-        story.append(table)
-        story.append(platypus.PageBreak())
+        build_passive_summary_table(story, self.config)
 
     def build_config_page(
         self,
@@ -566,6 +534,15 @@ class ActiveAtefReport(AtefReport):
             story.append(Paragraph(step.origin.description or ''))
             build_settings_table(story, step.origin, omit_keys=omit_keys)
             build_action_check_table(story, step)
+            build_results_table(story, step, attr_names=result_attrs,
+                                list_names=['prepared_criteria'])
+        elif isinstance(step, PreparedPassiveStep):
+            header_text = step.origin.name
+            story.append(self.build_linked_header(header_text, style=h2))
+            story.append(Paragraph(step.origin.description or ''))
+            build_settings_table(story, step.origin, omit_keys=omit_keys)
+            story.append(Paragraph('Passive Checkout Results', l0))
+            build_passive_summary_table(story, step.prepared_passive_file)
             build_results_table(story, step, attr_names=result_attrs)
         elif isinstance(step, PreparedProcedureStep):
             header_text = step.origin.name
@@ -589,16 +566,55 @@ class ActiveAtefReport(AtefReport):
         story.append(platypus.PageBreak())
 
 
+def build_passive_summary_table(story: List[Flowable], prep_file: PreparedFile):
+    lines = list(walk_config_file(prep_file.root))
+    table_data = [['Step Name', 'Result']]
+    style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
+             ('ALIGN', (0, 0), (1, 0), 'CENTER'),
+             ('BOX', (0, 0), (-1, -1), 1, colors.black),
+             ('BOX', (0, 0), (0, -1), 1, colors.black)]
+
+    for i in range(len(lines)):
+        # content
+        item, level = lines[i]
+        prefix = '    ' * level
+        name = None
+        if isinstance(item, PreparedConfiguration):
+            name = item.config.name
+        elif isinstance(item, PreparedComparison):
+            name = item.comparison.name + ' - ' + item.identifier
+        name = name or type(item).__name__
+        table_data.append(
+            [
+                prefix + f'{name}',
+                get_result_text(item.result)
+            ]
+        )
+
+        # style
+        if isinstance(item, PreparedConfiguration):
+            style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.black])
+        else:
+            style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.lightgrey])
+
+    table = platypus.Table(
+        table_data, style=style
+    )
+
+    story.append(table)
+
+
 def build_action_check_table(
     story: List[Flowable],
     step: PreparedSetValueStep
 ) -> None:
     """ build two tables, one for actions, one for the checks """
-    action_data = [['Name', 'Target', 'Value', 'Result']]
+    action_data = [['Name', 'Target', 'Value', 'Timestamp', 'Result']]
     for action in step.prepared_actions:
         # a list of PreparedValueToSignal
-        action_data.append([action.name, action.signal.name,
-                            action.value, get_result_text(action.result)])
+        timestamp = action.result.timestamp.ctime()
+        action_data.append([action.name, action.signal.name, action.value,
+                            timestamp, get_result_text(action.result)])
 
     if len(action_data) > 1:
         story.append(Paragraph('Actions', l0))
@@ -608,10 +624,11 @@ def build_action_check_table(
         )
         story.append(action_table)
 
-    check_data = [['Name', 'Result']]
+    check_data = [['Name', 'Timestamp', 'Result']]
     for check in step.prepared_criteria:
         name = f'{check.comparison.name} - {check.identifier}'
-        check_data.append([name, get_result_text(check.result)])
+        timestamp = check.result.timestamp.ctime()
+        check_data.append([name, timestamp, get_result_text(check.result)])
 
     if len(check_data) > 1:
         story.append(Paragraph('Checks', l0))
@@ -740,8 +757,7 @@ def build_data_table(
         observed_value = 'N/A'
     observed_value = Paragraph(str(observed_value), styles['BodyText'])
     try:
-        timestamp = datetime.fromtimestamp(comp.signal.timestamp).ctime()
-        timestamp = Paragraph(timestamp)
+        timestamp = comp.signal.timestamp.ctime()
         source = Paragraph(comp.signal.name, styles['BodyText'])
     except AttributeError:
         timestamp = 'unknown'
@@ -757,19 +773,28 @@ def build_data_table(
     story.append(observed_table)
 
 
-def build_settings_table(story: List[Flowable], item, omit_keys: List[str]) -> None:
-    """_summary_
+def build_settings_table(
+    story: List[Flowable],
+    item: AnyDataclass,
+    omit_keys: List[str]
+) -> None:
+    """
+    Auto-generate the settings for a given item.  Simply lists the field name
+    and value of all fields in ``item``, unless the field name is listed in
+    ``omit_keys``
 
     Parameters
     ----------
     story : List[Flowable]
-        _description_
-    item : Any
+        a list of components used to render the report.  New items
+        are appended to this directly
+    item : AnyDataclass
         The origin of a prepared configuration/group.
         For passive checkouts this can be either .comparison or .config
         For active checkouts this typically the .origin field
     omit_keys : List[str]
-        _description_
+        Fields of ``item`` to ignore.  Specify a field here if it contains objects
+        with excessively long reprs, or will be handled later in the report
     """
     # settings table
     story.append(Paragraph('Settings', l0))
@@ -789,32 +814,81 @@ def build_settings_table(story: List[Flowable], item, omit_keys: List[str]) -> N
 
 def build_group_page(
     story: List[Flowable],
-    item: Union[PreparedGroup, PreparedDeviceConfiguration,
-                PreparedPVConfiguration, PreparedToolConfiguration,
-                PreparedProcedureGroup],
+    item: Union[PreparedConfiguration, PreparedProcedureGroup],
     omit_keys: Optional[List[str]] = None
 ) -> None:
-    if isinstance(item, (PreparedGroup, PreparedDeviceConfiguration,
-                         PreparedPVConfiguration, PreparedToolConfiguration)):
+    """
+    Build a group page's contents.  Groups are the parents of dataclasses that
+    hold results, so we try to summarize them here.
+
+    Parameters
+    ----------
+    story : List[Flowable]
+        A list of components used to render the report.  New items
+        are appended to this directly
+    item : Union[PreparedConfiguration, PreparedProcedureGroup]
+        A prepared configuration or procedure group.
+    omit_keys : Optional[List[str]], optional
+        Fields of ``item`` to ignore.  Specify a field here if it contains objects
+        with excessively long reprs, or will be handled later in the report.
+        In this case should include the sub-steps or sub-comparisons of ``item``,
+        since they will be summarized in the results table.
+        By default None.
+
+    Raises
+    ------
+    TypeError
+        If ``item`` is not recognized as a group
+    """
+    if isinstance(item, PreparedConfiguration):
         origin = item.config
+        sub_steps = ['comparisons']
     elif isinstance(item, PreparedProcedureGroup):
         origin = item.origin
+        sub_steps = ['steps']
+    else:
+        raise TypeError(f'Step type ({type(item)}) not recognized as a group')
     # build settings table
     build_settings_table(story, origin, omit_keys=omit_keys or [])
-    build_results_table(story, item, list_names=['comparisons'])
+    build_results_table(story, item, list_names=sub_steps)
 
 
 def build_results_table(
     story: List[Flowable],
-    item: Any,
+    item: AnyDataclass,
+    attr_names: Optional[List[str]] = None,
     list_names: Optional[List[str]] = None,
-    attr_names: Optional[List[str]] = None
 ) -> None:
+    """
+    Builds a table with the results contained in this ``item``.
+    If attr_names is provided, it is assumed that each string in ``attr_names``
+    corresponds to a field holding a relevant Result.
+    If list_names is provided, it is assumed that each string in ``list_names``
+    corresponds to a field holding a list of other dataclasses, that in turn
+    hold a Result.
+
+    All of the aforementioned Results will be included in the table.
+
+    Parameters
+    ----------
+    story : List[Flowable]
+        A list of components used to render the report.  New items
+        are appended to this directly
+    item : AnyDataclass
+        A dataclass that involves Results
+    list_names : Optional[List[str]], optional
+        The names of fields that hold lists of dataclasses that in turn hold Results,
+        by default None
+    attr_names : Optional[List[str]], optional
+        The names of fields that hold Results, by default None
+    """
     results_data = []
     # grab results stored in specified attributes
     for attr in attr_names or []:
-        result = getattr(item, attr)
-        results_data.append([attr.replace('_', ' '), get_result_text(result)])
+        result: Result = getattr(item, attr)
+        timestamp = result.timestamp.ctime()
+        results_data.append([attr.replace('_', ' '), timestamp,
+                             get_result_text(result)])
 
     # grab results stored in attributes with lists of result-holding objects
     for list_attr in list_names or []:
@@ -824,7 +898,9 @@ def build_results_table(
             else:
                 # e.g. PreparedValueToSignal
                 result_name = list_item.name
-            results_data.append([result_name, get_result_text(list_item.result)])
+            timestamp = list_item.result.timestamp.ctime()
+            results_data.append([result_name, timestamp,
+                                 get_result_text(list_item.result)])
 
     # make results a table
     if results_data:
