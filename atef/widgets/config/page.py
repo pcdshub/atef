@@ -862,7 +862,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             replace_in_list(
                 old=old_comparison,
                 new=new_comparison,
-                comparison_list=self.data.shared,
+                item_list=self.data.shared,
             )
         except ValueError:
             for comp_list in self.data.by_attr.values():
@@ -870,7 +870,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                     replace_in_list(
                         old=old_comparison,
                         new=new_comparison,
-                        comparison_list=comp_list,
+                        item_list=comp_list,
                     )
                 except ValueError:
                     continue
@@ -1053,7 +1053,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             replace_in_list(
                 old=old_comparison,
                 new=new_comparison,
-                comparison_list=self.data.shared,
+                item_list=self.data.shared,
             )
         except ValueError:
             for comp_list in self.data.by_pv.values():
@@ -1061,7 +1061,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                     replace_in_list(
                         old=old_comparison,
                         new=new_comparison,
-                        comparison_list=comp_list,
+                        item_list=comp_list,
                     )
                 except ValueError:
                     continue
@@ -1261,7 +1261,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             replace_in_list(
                 old=old_comparison,
                 new=new_comparison,
-                comparison_list=self.data.shared,
+                item_list=self.data.shared,
             )
         except ValueError:
             for comp_list in self.data.by_attr.values():
@@ -1269,7 +1269,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                     replace_in_list(
                         old=old_comparison,
                         new=new_comparison,
-                        comparison_list=comp_list,
+                        item_list=comp_list,
                     )
                 except ValueError:
                     continue
@@ -2182,7 +2182,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         replace_in_list(
             old=old_comparison,
             new=new_comparison,
-            comparison_list=self.data.comparisons,
+            item_list=self.data.comparisons,
         )
         self.specific_comparison_widget.replace_row_widget(
             old_comparison=old_comparison,
