@@ -195,14 +195,12 @@ class BusyCursorThread(QtCore.QThread):
             self.task_finished.emit()
 
     def set_cursor_busy(self):
-        print('set_cursor')
         self.app = QtWidgets.QApplication.instance()
         self.app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
         if self.ignore_events:
             self.app.installEventFilter(FILTER)
 
     def reset_cursor(self):
-        print('reset_cursor')
         self.app = QtWidgets.QApplication.instance()
         self.app.restoreOverrideCursor()
         if self.ignore_events:
