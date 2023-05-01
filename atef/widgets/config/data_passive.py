@@ -1305,7 +1305,7 @@ class AnyValueWidget(DesignerDisplay, DataWidget):
         self.values_table.insertRow(new_row)
         value = value if value is not None else ''
         value_item = QTableWidgetItem()
-        value_item.setText(value)
+        value_item.setText(str(value))
         type_readback_widget = QLabel()
         type_readback_widget.setMargin(3)
         self.values_table.setItem(new_row, 0, value_item)
