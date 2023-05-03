@@ -1,8 +1,9 @@
 """
 Non-core utilities. Primarily dynamic styling tools.
 """
-from typing import Optional
+from typing import ClassVar, Optional
 
+from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QEvent, QObject
 from qtpy.QtGui import QPalette
 from qtpy.QtWidgets import QLineEdit
@@ -100,3 +101,107 @@ def match_line_edit_text_width(
         text = line_edit.text()
     width = font_metrics.boundingRect(text).width()
     line_edit.setFixedWidth(max(width + buffer, minimum))
+
+
+def insert_widget(widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> None:
+    """
+    Helper function for slotting e.g. data widgets into placeholders.
+    """
+    if placeholder.layout() is None:
+        layout = QtWidgets.QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        placeholder.setLayout(layout)
+    else:
+        old_widget = placeholder.layout().takeAt(0).widget()
+        if old_widget is not None:
+            # old_widget.setParent(None)
+            old_widget.deleteLater()
+    placeholder.layout().addWidget(widget)
+
+
+def busy_cursor(func):
+    """
+    Decorator for making the cursor busy while a function is running
+    Will run in the GUI thread, therefore blocking GUI interaction
+    """
+    def wrapper(*args, **kwargs):
+        # set busy cursor
+        app = QtWidgets.QApplication.instance()
+        app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        try:
+            func(*args, **kwargs)
+        finally:
+            app.restoreOverrideCursor()
+
+    return wrapper
+
+
+class IgnoreInteractionFilter(QObject):
+    interaction_events = (
+        QEvent.KeyPress, QEvent.KeyRelease, QEvent.MouseButtonPress,
+        QEvent.MouseButtonRelease, QEvent.MouseButtonDblClick
+    )
+
+    def eventFilter(self, a0: QObject, a1: QEvent) -> bool:
+        """ ignore all interaction events while this filter is installed """
+        if a1.type() in self.interaction_events:
+            return True
+        else:
+            return super().eventFilter(a0, a1)
+
+
+FILTER = IgnoreInteractionFilter()
+
+
+class BusyCursorThread(QtCore.QThread):
+    """
+    Thread to switch the cursor while a task is running.  Pushes the task to a
+    thread, allowing GUI interaction in the main thread.
+
+    To use, you should initialize this thread with the function/slot you want to
+    run in the thread.  Note the .start method used to kick off this thread must
+    be wrapped in a function in order to run... for some reason...
+
+    ``` python
+    busy_thread = BusyCursorThread(func=slot_to_run)
+
+    def run_thread():
+        busy_thread.start()
+
+    button.clicked.connect(run_thread)
+    ```
+    """
+    task_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
+    task_starting: ClassVar[QtCore.Signal] = QtCore.Signal()
+    raised_exception: ClassVar[QtCore.Signal] = QtCore.Signal()
+
+    def __init__(self, *args, func, ignore_events: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.app = None
+        self.func = func
+        self.ignore_events = ignore_events
+        self.task_starting.connect(self.set_cursor_busy)
+        self.task_finished.connect(self.reset_cursor)
+
+    def run(self) -> None:
+        # called from .start().  if called directly, will block current thread
+        self.task_starting.emit()
+        # run the attached method
+        try:
+            self.func()
+        except Exception as ex:
+            self.raised_exception.emit(ex)
+        finally:
+            self.task_finished.emit()
+
+    def set_cursor_busy(self):
+        self.app = QtWidgets.QApplication.instance()
+        self.app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        if self.ignore_events:
+            self.app.installEventFilter(FILTER)
+
+    def reset_cursor(self):
+        self.app = QtWidgets.QApplication.instance()
+        self.app.restoreOverrideCursor()
+        if self.ignore_events:
+            self.app.removeEventFilter(FILTER)

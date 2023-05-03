@@ -634,7 +634,10 @@ class OphydDeviceTableView(QtWidgets.QTableView):
                 select_action.triggered.connect(select_attr)
 
             # Insert the standard actions above the custom ones
-            self.menu.insertActions(self.menu.actions()[0], standard_actions)
+            if not self.menu.actions():
+                self.menu.insertActions(None, standard_actions)
+            else:
+                self.menu.insertActions(self.menu.actions()[0], standard_actions)
 
         self.menu.exec_(self.mapToGlobal(pos))
 

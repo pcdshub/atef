@@ -10,7 +10,7 @@ import functools
 import logging
 import platform
 from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
-                    Tuple, Type, Union, get_args, get_origin, get_type_hints)
+                    Tuple, Type, get_args, get_origin, get_type_hints)
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QObject
@@ -33,7 +33,7 @@ class QDataclassBridge(QObject):
 
     Would allow you to access:
     bridge.field.put(3)
-    bridge.field.value_changed.connect(my_slot)
+    bridge.field.changed_value.connect(my_slot)
     bridge.others.append(OtherClass(4))
 
     This does not recursively dive down the tree of subdataclasses.
@@ -91,12 +91,10 @@ class QDataclassBridge(QObject):
             # Make sure we have list manipulation methods
             NestedClass = QDataclassList
             dtype = args[0]
-        elif origin is Union and (type(None) in args):
-            # Optional, strip Union and recurse
-            self.set_field_from_data(name, args[0], data)
-            return
         else:
             # some complex Union? e.g. Union[str, int, bool, float]
+            # Optional hints also need to have a general signal to emit NoneType
+            # (technically QSignal(str) works, but is it worth the special case?)
             NestedClass = QDataclassValue
             dtype = object
 

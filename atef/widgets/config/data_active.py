@@ -16,8 +16,8 @@ import datetime
 import logging
 import pathlib
 import pprint
-from typing import (Dict, Generator, List, Optional, Sequence, Type, TypeVar,
-                    Union)
+from typing import (Callable, ClassVar, Dict, Generator, List, Optional,
+                    Sequence, Type, TypeVar, Union)
 
 import pydm
 import pydm.display
@@ -25,19 +25,29 @@ import qtawesome
 import typhos
 import typhos.cli
 import typhos.display
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
+from qtpy.QtWidgets import QDialogButtonBox
 
+from atef import util
+from atef.cache import get_signal_cache
+from atef.check import Equals
 from atef.config import ConfigurationFile
+from atef.qt_helpers import QDataclassElem
 from atef.result import Result, incomplete_result
-from atef.widgets.config.data_base import DataWidget
+from atef.widgets.config.data_base import DataWidget, SimpleRowWidget
 from atef.widgets.config.run_base import create_tree_items
-from atef.widgets.config.utils import ConfigTreeModel, TreeItem
+from atef.widgets.config.utils import (ConfigTreeModel, MultiInputDialog,
+                                       TableWidgetWithAddRow, TreeItem)
 from atef.widgets.core import DesignerDisplay
+from atef.widgets.happi import HappiDeviceComponentWidget
+from atef.widgets.ophyd import OphydAttributeData
+from atef.widgets.utils import insert_widget, match_line_edit_text_width
 
-from ...procedure import (DescriptionStep, DisplayOptions, PassiveStep,
-                          PlanOptions, PlanStep, ProcedureGroup, ProcedureStep,
-                          PydmDisplayStep, TyphosDisplayStep)
+from ...procedure import (ComparisonToTarget, DescriptionStep, DisplayOptions,
+                          PassiveStep, PlanOptions, PlanStep, ProcedureGroup,
+                          ProcedureStep, PydmDisplayStep, SetValueStep, Target,
+                          TyphosDisplayStep, ValueToTarget)
 
 # TODO:  CodeStep, ConfigurationCheckStep,
 
@@ -626,3 +636,490 @@ class PlanEditPage(DesignerDisplay, DataWidget):
     """
     filename = ''
     pass
+
+
+class SetValueEditWidget(DesignerDisplay, DataWidget):
+    """
+    Widget for creating and editing a SetValueStep.
+    Contains a table of actions and a table of checks to execute after actions
+    have completed
+
+    actions_table will be filled with ActionRowWidget
+    checks_table will be filled with CheckRowWidget
+    """
+    filename = 'set_value_edit_widget.ui'
+
+    req_action_success_checkbox: QtWidgets.QCheckBox
+    halt_on_fail_checkbox: QtWidgets.QCheckBox
+
+    actions_table: TableWidgetWithAddRow
+    actions_table_placeholder: QtWidgets.QWidget
+    checks_table: TableWidgetWithAddRow
+    checks_table_placeholder: QtWidgets.QWidget
+
+    def __init__(self, *args, data=SetValueStep, **kwargs):
+        super().__init__(*args, data=data, **kwargs)
+
+        self.actions_table = TableWidgetWithAddRow(
+            add_row_text='Add new action',
+            title_text='Actions',
+            row_widget_cls=ActionRowWidget
+        )
+        self.actions_table.table_updated.connect(
+            self.make_update_list_slot(self.actions_table, self.bridge.actions)
+        )
+        insert_widget(self.actions_table, self.actions_table_placeholder)
+
+        self.checks_table = TableWidgetWithAddRow(
+            add_row_text='Add new check',
+            title_text='Checks',
+            row_widget_cls=CheckRowWidget
+        )
+        self.checks_table.table_updated.connect(
+            self.make_update_list_slot(self.checks_table, self.bridge.success_criteria)
+        )
+        insert_widget(self.checks_table, self.checks_table_placeholder)
+
+        # add existing actions to table
+        for action in data.actions:
+            self.actions_table.add_row(data=action)
+        for check in data.success_criteria:
+            self.checks_table.add_row(data=check)
+
+        self.checks_table.cellClicked.connect(self.update_all_desc)
+
+        # checkboxes
+        self.bridge.halt_on_fail.changed_value.connect(
+            self.halt_on_fail_checkbox.setChecked
+        )
+        self.halt_on_fail_checkbox.clicked.connect(
+            self.bridge.halt_on_fail.put
+        )
+        self.halt_on_fail_checkbox.setChecked(self.bridge.halt_on_fail.get())
+
+        self.bridge.require_action_success.changed_value.connect(
+            self.req_action_success_checkbox.setChecked
+        )
+        self.req_action_success_checkbox.clicked.connect(
+            self.bridge.require_action_success.put
+        )
+        self.req_action_success_checkbox.setChecked(
+            self.bridge.require_action_success.get()
+        )
+
+    def make_update_list_slot(
+        self,
+        table_widget: QtWidgets.QTableWidget,
+        bridge_attr: QDataclassElem
+    ) -> Callable[[None], None]:
+        """
+        Returns a slot to be connected to a table_updated signal.
+        The slot will update the dataclass linked to the QDataclassElem with
+        the contents of the ``table_widget``.
+
+        Parameters
+        ----------
+        table_widget : QtWidgets.QTableWidget
+            table holding information
+        bridge_attr : QDataclassElem
+            dataclass bridge field holding the list related to ``table_widget``
+        """
+        def inner_slot():
+            row_data = []
+            for row_index in range(table_widget.rowCount()):
+                row_widget = table_widget.cellWidget(row_index, 0)
+                data = getattr(row_widget, 'data', None)
+                if data:
+                    row_data.append(data)
+
+            bridge_attr.put(row_data)
+
+        return inner_slot
+
+    def update_all_desc(self, *args, **kwargs):
+        # update descriptions on selection change for check table
+        for ind in range(self.checks_table.rowCount()):
+            row_widget: CheckRowWidget = self.checks_table.cellWidget(ind, 0)
+            row_widget.update_summary()
+
+
+class TargetRowWidget(DesignerDisplay, SimpleRowWidget):
+    """ Base widget with target selection """
+    filename = 'action_row_widget.ui'
+
+    target_button: QtWidgets.QToolButton
+
+    def __init__(self, data: Target, **kwargs):
+        super().__init__(data=data, **kwargs)
+        self.setup_row()
+        self.setup_ui()
+        if data.to_signal() is not None:
+            self.target_entry_widget.chosen_target = data
+            self.target_entry_widget.data_updated.emit()
+
+    def setup_ui(self) -> None:
+        # target entry widget dropdown from target_button
+        self.target_entry_widget = TargetEntryWidget()
+        widget_action = QtWidgets.QWidgetAction(self.target_button)
+        widget_action.setDefaultWidget(self.target_entry_widget)
+
+        widget_menu = QtWidgets.QMenu(self.target_button)
+        widget_menu.addAction(widget_action)
+        self.target_button.setMenu(widget_menu)
+
+        # store a slot on the TargetEntryWidget that reveals the menu
+        # needed to re-reveal the menu after component selection
+        def show_action(*args, **kwargs):
+            self.target_button.showMenu()
+
+        self.target_entry_widget.post_selection_slot = show_action
+
+        # update data on target_button update
+        self.target_entry_widget.data_updated.connect(self.update_target)
+
+    def update_target(self) -> None:
+        """
+        Slot for updating data and display widgets based on the target_entry_widget.
+        Resets data and widgets if there is no chosen target.
+
+        Raises
+        ------
+        ValueError
+            if a target cannot be set given the information provided
+        """
+        if self.target_entry_widget.chosen_target is None:
+            self.bridge.name.put(None)
+            self.bridge.device.put(None)
+            self.bridge.attr.put(None)
+            self.bridge.pv.put(None)
+            self.target_button.setText('select a target')
+            self.target_button.setToolTip('')
+        else:
+            target = self.target_entry_widget.chosen_target
+            self.bridge.name.put(target.name)
+            self.bridge.device.put(target.device)
+            self.bridge.attr.put(target.attr)
+            self.bridge.pv.put(target.pv)
+
+            if target.device is not None and target.attr is not None:
+                self.target_button.setText(f'{target.device}.{target.attr}')
+                self.target_button.setToolTip(f'{target.device}.{target.attr}')
+            elif target.pv is not None:
+                self.target_button.setText(target.pv)
+                self.target_button.setToolTip(target.pv)
+            else:
+                raise ValueError(
+                    f'insufficient information to specifiy target: {target}'
+                )
+
+
+class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
+    """
+    Simple text entry widget to prompt for a signal, via PV or ophyd device signal
+
+    resets with each open action, clicking apply emits to signal_selected which
+    should be connected to.
+
+    Switches between two modes
+    - an initial selection mode (shows pv LineEdit and signal QPushButton)
+    - a confirmation mode (shows confirm/reset button box and the previously
+      selected edit)
+    """
+    filename = 'target_entry_widget.ui'
+
+    data_updated: ClassVar[QtCore.Signal] = QtCore.Signal()
+    chosen_target: Optional[Target] = None
+
+    _search_widget: Optional[HappiDeviceComponentWidget] = None
+    pv_edit: QtWidgets.QLineEdit
+    signal_button: QtWidgets.QPushButton
+    target_button_box: QDialogButtonBox
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # button box setup
+        reset_button = self.target_button_box.button(QDialogButtonBox.Reset)
+        reset_button.clicked.connect(self.reset_fields)
+        apply_button = self.target_button_box.button(QDialogButtonBox.Apply)
+        apply_button.clicked.connect(self.confirm_signal)
+        # signal select setup
+        self.signal_button.clicked.connect(self.pick_signal)
+        # PV edit setup
+        regexp = QtCore.QRegularExpression(r'^\w+(:\w+)+(\.\w+)*$')
+        validator = QtGui.QRegularExpressionValidator(regexp)
+        self.pv_edit.setValidator(validator)
+        self.pv_edit.textChanged.connect(self.pick_pv)
+
+        self.reset_fields()
+
+    def reset_fields(self) -> None:
+        """
+        Reset all data entry fields, display widgets, and return widget to its
+        initial state.  (hiding the reset/confirm button box)
+        """
+        self.chosen_target = None
+        self.target_button_box.hide()
+        self.signal_button.show()
+        self.pv_edit.show()
+        self.pv_edit.clear()
+        self.signal_button.setText('pick a device_signal')
+        self.signal_button.setToolTip('')
+        self.data_updated.emit()
+
+    def confirm_signal(self) -> None:
+        """
+        Slot for confirm button.  Resets the widget if the signal cannot be reached
+        """
+        # signal button is used
+        if self.pv_edit.text() == '':
+            self.data_updated.emit()
+            return
+
+        signal_cache = get_signal_cache()
+        sig = signal_cache[self.pv_edit.text()]
+        try:
+            sig.wait_for_connection()
+        except TimeoutError:
+            QtWidgets.QMessageBox.warning(
+                self,
+                'Failed to connect to PV',
+                f'Could not connect to PV: {self.pv_edit.text()}. '
+                'Will be unable to read metadata'
+            )
+
+        self.chosen_target = Target(pv=self.pv_edit.text())
+        self.data_updated.emit()
+
+    def pick_signal(self) -> None:
+        """
+        Slot for signal_button.  Opens the HappiDeviceComponentWidget and
+        configures it to send the signal selection to this widget
+        """
+        if self._search_widget is None:
+            widget = HappiDeviceComponentWidget(
+                client=util.get_happi_client()
+            )
+            # look at connecting widget.attributes_selected -> List[OphydAttributeData]
+            widget.device_widget.attributes_selected.connect(self.set_signal)
+            widget.device_widget.attributes_selected.connect(widget.close)
+
+            def run_post_selection_slot(*args, **kwargs):
+                post_selection_slot = getattr(self, 'post_selection_slot', None)
+                if post_selection_slot:
+                    post_selection_slot()
+
+            widget.device_widget.attributes_selected.connect(run_post_selection_slot)
+            # prevent multiple selection
+            self._search_widget: QtWidgets.QWidget = widget
+
+        self._search_widget.show()
+        self._search_widget.activateWindow()
+        self._search_widget.setWindowState(Qt.WindowActive)
+        self.pv_edit.hide()
+        self.target_button_box.show()
+
+    def set_signal(self, attr_selected: List[OphydAttributeData]) -> None:
+        """
+        Slot to be connected to
+        HappiDeviceComponentWidget.device_widget.attributes_selected.
+        Sets the desired information as the chosen_target and updates displays
+        """
+        attr = attr_selected[0]
+        logger.debug(f'found attr: {attr}')
+        self.signal_button.setText(attr.signal.name)
+        self.signal_button.setToolTip(attr.signal.name)
+        self.chosen_target = self.attr_to_target(attr)
+
+    def pick_pv(self) -> None:
+        """
+        Slot to be connected to pv_edit.  Transitions widget to confirmation mode
+        """
+        # prompt for confirmation
+        self.signal_button.hide()
+        self.target_button_box.show()
+
+    def attr_to_target(self, attr: OphydAttributeData) -> Target:
+        """
+        Takes OphydAttributeData and coerces it into a Target
+
+        Parameters
+        ----------
+        attr : OphydAttributeData
+            Ophyd signal data selected from the HappiDeviceComponentWidget
+
+        Returns
+        -------
+        Target
+            Target dataclass holding signal specification
+        """
+        # surely there's a better way...
+        full_name = attr.signal.name
+        dot_attr = attr.attr
+        _attr = '_' + dot_attr.replace('.', '_')
+        dev_name = full_name[:-len(_attr)]
+
+        return Target(device=dev_name, attr=dot_attr, pv=attr.pvname)
+
+
+class ActionRowWidget(TargetRowWidget):
+    """
+    A ``TargetRowWidget`` that describes a ``ValueToTarget``.  Features an additional
+    setting button for timeout/settle time, and a value input edit widget that
+    attempts to enforce the type of the signal being set.
+    """
+    filename = 'action_row_widget.ui'
+
+    value_input_placeholder: QtWidgets.QWidget
+    value_button_box: QtWidgets.QDialogButtonBox
+    setting_button: QtWidgets.QToolButton
+
+    def __init__(self, data: Optional[ValueToTarget] = None, **kwargs):
+        if data is None:
+            data = ValueToTarget()
+        super().__init__(data=data, **kwargs)
+
+    def setup_ui(self) -> None:
+        # Called by TargetRowWidget.__init__
+        super().setup_ui()
+        self.child_button.hide()
+        apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
+        apply_button.setText('')
+        apply_button.setToolTip('Click here to confirm value')
+
+        self.setting_button.setToolTip('Configure action settings')
+        self.update_input_placeholder()
+
+        self.setup_setting_button()
+
+    def on_name_edit_text_changed(self, **kwargs) -> None:
+        """ overwrite this to adjust minimum length"""
+        match_line_edit_text_width(self.name_edit, minimum=100)
+        if not self.name_edit.hasFocus():
+            self.adjust_edit_filter()
+
+    def update_target(self) -> None:
+        super().update_target()
+
+        self.update_input_placeholder()
+
+    def update_input_placeholder(self) -> None:
+        """
+        Updates value input widget with a QLineEdit with the approriate validator
+        given the target's datatype
+        """
+        # TODO: Enum drop box?
+        self.edit_widget = QtWidgets.QLineEdit()
+
+        sig = self.data.to_signal()
+        if sig is None:
+            self.edit_widget = QtWidgets.QLabel('(no target set)')
+            insert_widget(self.edit_widget, self.value_input_placeholder)
+            self.value_button_box.hide()
+            return
+
+        try:
+            curr_value = sig.get()
+            dtype = type(curr_value)
+        except TimeoutError:
+            curr_value = 'no data'
+            # fall back to type in dataclass if available
+            stored_value = self.bridge.value.get()
+            if stored_value is not None:
+                dtype = type(stored_value)
+            else:
+                dtype = float
+
+        def on_text_changed(text: str) -> None:
+            match_line_edit_text_width(self.edit_widget, text=text, minimum=75)
+
+        self.edit_widget.textChanged.connect(on_text_changed)
+
+        if dtype is int:
+            validator = QtGui.QIntValidator()
+        elif dtype is float:
+            validator = QtGui.QDoubleValidator()
+        else:
+            validator = None
+
+        self.edit_widget.setValidator(validator)
+        self.edit_widget.setPlaceholderText(f'({curr_value})')
+        if self.bridge.value.get() is not None:
+            self.edit_widget.setText(str(self.bridge.value.get()))
+            self.edit_widget.setToolTip(str(self.bridge.value.get()))
+
+        # slot for value update on apply button press
+        def update_value():
+            text = self.edit_widget.text()
+            if text == '':
+                # nothing input, don't try to set any values
+                return
+            self.bridge.value.put(dtype(text))
+            self.value_button_box.hide()
+            self.edit_widget.setFrame(False)
+
+        def value_changed():
+            self.value_button_box.show()
+            self.edit_widget.setFrame(True)
+
+        self.edit_widget.textChanged.connect(value_changed)
+
+        insert_widget(self.edit_widget, self.value_input_placeholder)
+        self.value_button_box.show()
+        apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
+        apply_button.clicked.connect(update_value)
+
+    def setup_setting_button(self) -> None:
+        """ Set up the settings QToolButton menu for additional settings"""
+        # set up settings button
+        init_dict = {'timeout': self.data.timeout or -1.0,
+                     'settle_time': self.data.settle_time or -1.0}
+        self.setting_button.setIcon(qtawesome.icon('msc.settings'))
+        self.setting_widget = MultiInputDialog(init_values=init_dict,
+                                               units=['s', 's'])
+        setting_action = QtWidgets.QWidgetAction(self.setting_button)
+        setting_action.setDefaultWidget(self.setting_widget)
+
+        self.setting_menu = QtWidgets.QMenu(self.setting_button)
+        self.setting_menu.addAction(setting_action)
+        self.setting_button.setMenu(self.setting_menu)
+
+        # close menu on ok button click
+        def ok_slot():
+            info = self.setting_widget.get_info()
+            for key, value in info.items():
+                if value == -1:
+                    getattr(self.bridge, key).put(None)
+                else:
+                    getattr(self.bridge, key).put(value)
+            self.setting_widget.show()
+            self.setting_menu.hide()
+
+        def cancel_slot():
+            self.setting_widget.show()
+            self.setting_menu.hide()
+
+        self.setting_widget.ok_button.clicked.connect(ok_slot)
+        self.setting_widget.cancel_button.clicked.connect(cancel_slot)
+
+
+class CheckRowWidget(TargetRowWidget):
+    """
+    A ``TargetRowWidget`` that describes a ``ComparisonToTarget``.
+    Features a check_summary label that displays the Comparison description
+    """
+    filename = 'check_row_widget.ui'
+
+    check_summary_label: QtWidgets.QLabel
+
+    def __init__(self, data: Optional[ComparisonToTarget] = None, **kwargs):
+        if data is None:
+            data = ComparisonToTarget(name='untitled_check', comparison=Equals())
+        super().__init__(data=data, **kwargs)
+
+        self.name_edit.hide()
+        self.update_summary()
+
+    def update_summary(self) -> None:
+        """ Update the summary label with the contianed Comparison's description """
+        comp = self.bridge.comparison.get()
+        self.check_summary_label.setText(comp.describe())

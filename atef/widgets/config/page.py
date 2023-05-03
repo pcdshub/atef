@@ -22,9 +22,9 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 from weakref import WeakSet, WeakValueDictionary
 
 from qtpy.QtGui import QDropEvent
-from qtpy.QtWidgets import (QComboBox, QMessageBox, QPushButton, QSizePolicy,
-                            QStyle, QTableWidget, QToolButton, QTreeWidget,
-                            QTreeWidgetItem, QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QComboBox, QFrame, QMessageBox, QPushButton,
+                            QSizePolicy, QStyle, QTableWidget, QToolButton,
+                            QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from atef.check import (AnyComparison, AnyValue, Comparison, Equals, Greater,
                         GreaterOrEqual, Less, LessOrEqual, NotEquals, Range,
@@ -32,15 +32,18 @@ from atef.check import (AnyComparison, AnyValue, Comparison, Equals, Greater,
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
                          ToolConfiguration)
-from atef.procedure import (DescriptionStep, PassiveStep,
+from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedDescriptionStep, PreparedPassiveStep,
-                            PreparedProcedureStep, ProcedureGroup,
-                            ProcedureStep)
+                            PreparedProcedureStep, PreparedSetValueStep,
+                            ProcedureGroup, ProcedureStep, SetValueStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
-from atef.widgets.config.data_active import (GeneralProcedureWidget,
-                                             PassiveEditWidget)
+from atef.widgets.config.data_active import (CheckRowWidget, ExpandableFrame,
+                                             GeneralProcedureWidget,
+                                             PassiveEditWidget,
+                                             SetValueEditWidget)
 from atef.widgets.config.run_active import (DescriptionRunWidget,
-                                            PassiveRunWidget)
+                                            PassiveRunWidget,
+                                            SetValueRunWidget)
 from atef.widgets.config.run_base import RunCheck
 
 from ..core import DesignerDisplay
@@ -53,8 +56,8 @@ from .data_passive import (AnyComparisonWidget, AnyValueWidget,
                            LessOrEqualWidget, LessWidget, NotEqualsWidget,
                            PingWidget, PVConfigurationWidget, RangeWidget,
                            ValueSetWidget)
-from .utils import (cast_dataclass, describe_comparison_context,
-                    describe_step_context)
+from .utils import (TableWidgetWithAddRow, cast_dataclass,
+                    describe_comparison_context, describe_step_context)
 
 
 def link_page(item: AtefItem, widget: PageWidget) -> None:
@@ -74,6 +77,11 @@ def link_page(item: AtefItem, widget: PageWidget) -> None:
     """
     item.assign_widget(widget)
     widget.assign_tree_item(item)
+
+
+def replace_in_list(old: Any, new: Any, item_list: List[Any]):
+    index = item_list.index(old)
+    item_list[index] = new
 
 
 class AtefItem(QTreeWidgetItem):
@@ -197,6 +205,23 @@ class PageWidget(QWidget):
                 self._update_parent_tooltip_from_tree,
             )
             self.has_connected_tree = True
+
+    def setup_cleanup(self) -> None:
+        """
+        Disconnect any slots that interact with the tree widget.  These slots
+        can persist on the QDataclassBridge after the tree has been deleted,
+        causing RuntimeErrors.
+
+        In general, need to disconnect slots that connect bridges to tree_items
+
+        Should be invoked at the end of the assign_tree_item, since we want to
+        prepare the cleanup only when we have finished the setup
+        """
+        def disconnect_name_widget():
+            bridge = self.name_desc_tags_widget.bridge
+            bridge.name.changed_value.disconnect(self.set_new_node_name)
+
+        self.full_tree.destroyed.connect(disconnect_name_widget)
 
     def _update_parent_tooltip_from_tree(
         self,
@@ -588,6 +613,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
                 self.add_config_row(config=config)
             self.setup_done = True
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_config_row(
         self,
@@ -718,6 +744,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             data_widget=self.device_config_widget,
         )
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_comparison_row(
         self,
@@ -831,19 +858,11 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
 
         Also finds the row widget and replaces it with a new row widget.
         """
-        def replace_in_list(
-            old: Comparison,
-            new: Comparison,
-            comparison_list: List[Comparison],
-        ):
-            index = comparison_list.index(old)
-            comparison_list[index] = new
-
         try:
             replace_in_list(
                 old=old_comparison,
                 new=new_comparison,
-                comparison_list=self.data.shared,
+                item_list=self.data.shared,
             )
         except ValueError:
             for comp_list in self.data.by_attr.values():
@@ -851,7 +870,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                     replace_in_list(
                         old=old_comparison,
                         new=new_comparison,
-                        comparison_list=comp_list,
+                        item_list=comp_list,
                     )
                 except ValueError:
                     continue
@@ -916,6 +935,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             data_widget=self.pv_configuration_widget,
         )
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_comparison_row(
         self,
@@ -1029,19 +1049,11 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
 
         Also finds the row widget and replaces it with a new row widget.
         """
-        def replace_in_list(
-            old: Comparison,
-            new: Comparison,
-            comparison_list: List[Comparison],
-        ):
-            index = comparison_list.index(old)
-            comparison_list[index] = new
-
         try:
             replace_in_list(
                 old=old_comparison,
                 new=new_comparison,
-                comparison_list=self.data.shared,
+                item_list=self.data.shared,
             )
         except ValueError:
             for comp_list in self.data.by_pv.values():
@@ -1049,7 +1061,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                     replace_in_list(
                         old=old_comparison,
                         new=new_comparison,
-                        comparison_list=comp_list,
+                        item_list=comp_list,
                     )
                 except ValueError:
                     continue
@@ -1126,6 +1138,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 self.tool_names[tool.__name__] = tool
             self.tool_select_combo.activated.connect(self.new_tool_selected)
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_comparison_row(
         self,
@@ -1244,19 +1257,11 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
 
         Also finds the row widget and replaces it with a new row widget.
         """
-        def replace_in_list(
-            old: Comparison,
-            new: Comparison,
-            comparison_list: List[Comparison],
-        ):
-            index = comparison_list.index(old)
-            comparison_list[index] = new
-
         try:
             replace_in_list(
                 old=old_comparison,
                 new=new_comparison,
-                comparison_list=self.data.shared,
+                item_list=self.data.shared,
             )
         except ValueError:
             for comp_list in self.data.by_attr.values():
@@ -1264,7 +1269,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                     replace_in_list(
                         old=old_comparison,
                         new=new_comparison,
-                        comparison_list=comp_list,
+                        item_list=comp_list,
                     )
                 except ValueError:
                     continue
@@ -1347,7 +1352,8 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         cls.__name__: cls for cls in (
             ProcedureGroup,
             DescriptionStep,
-            PassiveStep
+            PassiveStep,
+            SetValueStep
         )
     }
 
@@ -1379,6 +1385,7 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
                 self.add_config_row(config=config)
             self.setup_done = True
         self.setup_name_desc_tags_link()
+        self.setup_cleanup()
 
     def add_config_row(
         self,
@@ -1464,7 +1471,7 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
 
         Shoutouts to stackoverflow
         """
-        if event.source() is self.config_table:
+        if event.source() is self.procedure_table:
             selected_indices = self.procedure_table.selectedIndexes()
             if not selected_indices:
                 return
@@ -1493,14 +1500,6 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         comp_item : AtefItem
             AtefItem holding the old comparison and widget
         """
-        def replace_in_list(
-            old: ProcedureStep,
-            new: ProcedureStep,
-            step_list: List[ProcedureStep]
-        ):
-            index = step_list.index(old)
-            step_list[index] = new
-
         replace_in_list(old_step, new_step, self.data.steps)
 
         # go through rows
@@ -1528,12 +1527,15 @@ class StepPage(DesignerDisplay, PageWidget):
 
     Contains a selector, placeholder for the specific step,
     and general verification settings
+
+    Carries many methods that may or may not apply to active checkout steps.
+    Consider refactoring in the future?
     """
     filename = 'step_page.ui'
 
     specific_procedure_placeholder: QWidget
     specific_procedure_widget: DataWidget
-    general_procedure_placeholder: QWidget
+    general_procedure_placeholder: QFrame
     general_procedure_widget: QWidget
     bottom_spacer: QWidget
 
@@ -1541,7 +1543,8 @@ class StepPage(DesignerDisplay, PageWidget):
 
     step_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
         DescriptionStep: None,
-        PassiveStep: PassiveEditWidget
+        PassiveStep: PassiveEditWidget,
+        SetValueStep: SetValueEditWidget
     }
     step_types: Dict[str, ProcedureStep]
 
@@ -1563,6 +1566,11 @@ class StepPage(DesignerDisplay, PageWidget):
         super().assign_tree_item(item)
         self.setup_name_desc_tags_link()
 
+        # extra setup for SetValueStep.  Reminiscent of AnyComparison
+        if isinstance(self.data, SetValueStep):
+            self.setup_set_value_step()
+        self.setup_cleanup()
+
     def new_step(self, step: ProcedureStep) -> None:
         """
         Set up the widgets for a new step and save it as self.data.
@@ -1576,9 +1584,11 @@ class StepPage(DesignerDisplay, PageWidget):
         This is accomplished by discarding the old widgets in favor
         of new widgets.
         """
+        general_frame = ExpandableFrame(text='General Settings')
         general_widget = GeneralProcedureWidget(data=step)
+        general_frame.add_widget(general_widget)
         self.insert_widget(
-            general_widget,
+            general_frame,
             self.general_procedure_placeholder,
         )
         SpecificWidgetType = self.step_map[type(step)]
@@ -1659,6 +1669,159 @@ class StepPage(DesignerDisplay, PageWidget):
         self.name_desc_tags_widget.extra_text_label.setToolTip(desc)
         self.name_desc_tags_widget.init_viewer(attr, config)
 
+    def setup_set_value_step(self) -> None:
+        self.update_subpages()
+        self.specific_procedure_widget.bridge.success_criteria.updated.connect(
+            self.update_subpages
+        )
+
+    def setup_cleanup(self):
+        super().setup_cleanup()
+        if isinstance(self.data, SetValueStep):
+            def disconnect_subpages():
+                bridge = self.specific_procedure_widget.bridge
+                bridge.success_criteria.updated.disconnect(
+                    self.update_subpages
+                )
+
+            # disconnect all bridge-related signals
+            self.full_tree.destroyed.connect(disconnect_subpages)
+
+    def update_subpages(self) -> None:
+        """
+        Update nodes based on the current SetValueStep state.
+
+        This may add or remove pages as appropriate.
+
+        The node order should match the sequence in the table
+        """
+        # Cache the previous selection
+        pre_selected = self.full_tree.selectedItems()
+        display_order = OrderedDict()
+        table = self.specific_procedure_widget.checks_table
+        for row_index in range(table.rowCount()):
+            widget = table.cellWidget(row_index, 0)
+            comp = widget.data.comparison
+            display_order[id(comp)] = comp
+        # Pull off all of the existing items
+        old_items = self.tree_item.takeChildren()
+        old_item_map = {
+            id(item.widget.data): item for item in old_items
+        }
+        # Add items back as needed, may be a mix of old and new
+        new_item = None
+        for ident, comp in display_order.items():
+            try:
+                item = old_item_map[ident]
+            except KeyError:
+                # Need to make a new page/item
+                new_item = self.add_sub_comparison_node(comp)
+            else:
+                # An old item existed, add it again
+                self.tree_item.addChild(item)
+        # Fix selection if it changed
+        post_selected = self.full_tree.selectedItems()
+        if (
+            new_item is not None
+            and pre_selected
+            and post_selected
+            and pre_selected[0] is not post_selected[0]
+        ):
+            # Selection normal and changed, usually the new item
+            self.full_tree.setCurrentItem(new_item)
+
+    def add_sub_comparison_node(self, comparison: Comparison) -> AtefItem:
+        """
+        For the AnyComparison, add a sub-comparison.
+        """
+        page = ComparisonPage(data=comparison)
+        item = AtefItem(
+            tree_parent=self.tree_item,
+            name=comparison.name,
+            func_name=type(comparison).__name__,
+        )
+        link_page(item=item, widget=page)
+        self.setup_set_value_check_row_buttons(
+            comparison=comparison,
+            item=item,
+        )
+        return item
+
+    def setup_set_value_check_row_buttons(
+        self,
+        comparison: Comparison,
+        item: AtefItem
+    ) -> None:
+        table: QTableWidget = self.specific_procedure_widget.checks_table
+        for index in range(table.rowCount()):
+            row_widget = table.cellWidget(index, 0)
+            if row_widget.data.comparison is comparison:
+                break
+        if row_widget.data.comparison is not comparison:
+            return
+        self.setup_child_button(
+            button=row_widget.child_button,
+            item=item,
+        )
+
+        # setup callback to update description if comparison page changes
+        # gets a bit invasive here, assumes links between ComparisonPage and
+        # the atef item have been made
+        # item.widget will be a ComparisonPage
+        desc_update_slot = self.specific_procedure_widget.update_all_desc
+        comp_page_widget = item.widget.specific_comparison_widget
+        # subscribe to the relevant comparison signals
+        for field in ('value', 'low', 'high', 'description'):
+            if hasattr(comp_page_widget.bridge, field):
+                getattr(comp_page_widget.bridge, field).changed_value.connect(
+                    desc_update_slot
+                )
+
+    def replace_comparison(
+        self,
+        old_comparison: Comparison,
+        new_comparison: Comparison,
+        comp_item: AtefItem,
+    ) -> None:
+        """
+        Find old_comparison and replace it with new_comparison.
+
+        Also finds the row widget and replaces it with a new row widget.
+        """
+        if isinstance(self.specific_procedure_widget, SetValueEditWidget):
+            table: TableWidgetWithAddRow = self.specific_procedure_widget.checks_table
+            row_widget_cls = CheckRowWidget
+            row_data_cls = ComparisonToTarget
+            data_list = self.data.success_criteria
+            comp_list = [comptotarget.comparison for comptotarget in data_list]
+            index = comp_list.index(old_comparison)
+
+        found_row = None
+        for row_index in range(table.rowCount()):
+            widget = table.cellWidget(row_index, 0)
+            if widget.data.comparison is old_comparison:
+                found_row = row_index
+                break
+        if found_row is None:
+            return
+
+        # replace in dataclass
+        new_data = row_data_cls(comparison=new_comparison)
+        data_list[index] = new_data
+        comp_row = row_widget_cls(data=new_data)
+
+        self.setup_row_buttons(
+            row_widget=comp_row,
+            item=comp_item,
+            table=table,
+        )
+        table.setCellWidget(found_row, 0, comp_row)
+        self.update_subpages()
+
+    def remove_table_data(self, data: Any):
+        if isinstance(self.data, SetValueStep):
+            self.data.success_criteria.remove(data)
+
 
 class RunStepPage(DesignerDisplay, PageWidget):
     """
@@ -1679,7 +1842,8 @@ class RunStepPage(DesignerDisplay, PageWidget):
 
     run_widget_map: ClassVar[Dict[PreparedProcedureStep, DataWidget]] = {
         PreparedDescriptionStep: DescriptionRunWidget,
-        PreparedPassiveStep: PassiveRunWidget
+        PreparedPassiveStep: PassiveRunWidget,
+        PreparedSetValueStep: SetValueRunWidget,
     }
 
     def __init__(self, *args, data, **kwargs):
@@ -1688,12 +1852,30 @@ class RunStepPage(DesignerDisplay, PageWidget):
         self.insert_widget(self.run_check, self.run_check_placeholder)
         # gather run_widget
         run_widget_cls = self.run_widget_map[type(data)]
-        run_widget = run_widget_cls(data=data)
+        self.run_widget = run_widget_cls(data=data)
 
-        self.insert_widget(run_widget, self.run_widget_placeholder)
+        self.insert_widget(self.run_widget, self.run_widget_placeholder)
 
-        if type(data) == PassiveStep:
-            self.run_check.run_button.clicked.connect(run_widget.run_config)
+        if isinstance(data, PreparedPassiveStep):
+            self.run_check.run_button.clicked.connect(self.run_widget.run_config)
+        elif isinstance(data, PreparedSetValueStep):
+            self.run_check.busy_thread.task_finished.connect(
+                self.run_widget.update_statuses
+            )
+
+    def link_children(self) -> None:
+        """
+        A helper method to link children tree items with their parent.
+        Children can get orphaned during the edit->run transition.
+        """
+        if isinstance(self.data, PreparedSetValueStep):
+            # set up children
+            child_items = self.tree_item.takeChildren()
+            n_rows = self.run_widget.checks_table.rowCount()
+            for row_ind, item in zip(range(n_rows), child_items):
+                row_widget = self.run_widget.checks_table.cellWidget(row_ind, 0)
+                self.setup_child_button(row_widget.child_button, item)
+                self.tree_item.addChild(item)
 
 
 PAGE_MAP = {
@@ -1705,7 +1887,8 @@ PAGE_MAP = {
     # Active Pages
     ProcedureGroup: ProcedureGroupPage,
     DescriptionStep: StepPage,
-    PassiveStep: StepPage
+    PassiveStep: StepPage,
+    SetValueStep: StepPage
 }
 
 
@@ -1766,6 +1949,8 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.clean_up_any_comparison()
         if isinstance(self.data, AnyComparison):
             self.setup_any_comparison()
+
+        self.setup_cleanup()
 
     def new_comparison(self, comparison: Comparison) -> None:
         """
@@ -1879,6 +2064,11 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                 parent_widget.name_desc_tags_widget.extra_text_label.text()
             )
             return
+        if isinstance(parent_widget, (StepPage, RunStepPage)):
+            # No-op to let this be used in active checkouts without
+            # passive checkout config files in the parent widget
+            return
+
         config = self.parent_tree_item.widget.data
         attr = ''
         if self.data in config.shared:
@@ -1989,18 +2179,10 @@ class ComparisonPage(DesignerDisplay, PageWidget):
 
         This is only valid when our data type is AnyComparison
         """
-        def replace_in_list(
-            old: Comparison,
-            new: Comparison,
-            comparison_list: List[Comparison],
-        ):
-            index = comparison_list.index(old)
-            comparison_list[index] = new
-
         replace_in_list(
             old=old_comparison,
             new=new_comparison,
-            comparison_list=self.data.comparisons,
+            item_list=self.data.comparisons,
         )
         self.specific_comparison_widget.replace_row_widget(
             old_comparison=old_comparison,

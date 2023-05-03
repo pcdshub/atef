@@ -9,6 +9,7 @@ from pytestqt.qtbot import QtBot
 
 from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
                          PydmDisplayStep, TyphosDisplayStep)
+from ..widgets.config.window import Window
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,12 @@ def test_configs() -> list[pathlib.Path]:
     test_config_path = pathlib.Path(__file__).parent / 'configs'
     config_paths = [test_config_path / fn for fn in filenames]
     return config_paths
+
+
+@pytest.fixture
+def config(request, test_configs):
+    i = request.param
+    return test_configs[i]
 
 
 parametrized_groups = pytest.mark.parametrize(
@@ -184,7 +191,6 @@ def test_config_window_basic(qtbot: QtBot):
     """
     Pass if the config gui can open
     """
-    from ..widgets.config.window import Window
     window = Window(show_welcome=False)
     qtbot.addWidget(window)
 
@@ -193,7 +199,6 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
     """
     Pass if the config gui can open a file and save the same file back
     """
-    from ..widgets.config.window import Window
     window = Window(show_welcome=False)
     qtbot.addWidget(window)
     test_configs = pathlib.Path(__file__).parent / 'configs'
@@ -210,13 +215,12 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
         assert source_lines == dest_lines
 
 
-def test_edit_run_toggle(qtbot: QtBot, test_configs: list[os.PathLike]):
+@pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
+def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike):
     """ Smoke test run-mode for all sample configs """
-    from ..widgets.config.window import Window
     window = Window(show_welcome=False)
+    window.open_file(filename=str(config))
+    toggle = window.tab_widget.widget(0).toggle
+    toggle.setChecked(True)
+    toggle.setChecked(False)
     qtbot.addWidget(window)
-    for idx, filename in enumerate(test_configs):
-        window.open_file(filename=str(filename))
-        toggle = window.tab_widget.widget(idx).toggle
-        toggle.setChecked(True)
-        toggle.setChecked(False)

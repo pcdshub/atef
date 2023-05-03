@@ -423,7 +423,7 @@ class Greater(Comparison):
     value: Number = 0
 
     def describe(self) -> str:
-        return f"> {self.value}"
+        return f"> {self.value}: {self.description}"
 
     def _compare(self, value: Number) -> bool:
         return value > self.value
@@ -435,7 +435,7 @@ class GreaterOrEqual(Comparison):
     value: Number = 0
 
     def describe(self) -> str:
-        return f">= {self.value}"
+        return f">= {self.value}: {self.description}"
 
     def _compare(self, value: Number) -> bool:
         return value >= self.value
@@ -447,7 +447,7 @@ class Less(Comparison):
     value: Number = 0
 
     def describe(self) -> str:
-        return f"< {self.value}"
+        return f"< {self.value}: {self.description}"
 
     def _compare(self, value: Number) -> bool:
         return value < self.value
@@ -459,7 +459,7 @@ class LessOrEqual(Comparison):
     value: Number = 0
 
     def describe(self) -> str:
-        return f"<= {self.value}"
+        return f"<= {self.value}: {self.description}"
 
     def _compare(self, value: Number) -> bool:
         return value <= self.value
