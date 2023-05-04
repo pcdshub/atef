@@ -140,7 +140,9 @@ def get_result_text(result: Result) -> Paragraph:
 
     text = (f'<font color={RESULT_COLOR[severity]}>'
             f'<b>{severity.name}</b>: {result.reason or "-"}</font>')
-    return Paragraph(text)
+    para = Paragraph(text)
+    para.wrap(1.5*units.inch, 10*units.inch)
+    return para
 
 
 def build_passive_summary_table(story: List[Flowable], prep_file: PreparedFile):
