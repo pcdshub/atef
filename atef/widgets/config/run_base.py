@@ -8,7 +8,8 @@ from __future__ import annotations
 import asyncio
 import itertools
 import logging
-from typing import TYPE_CHECKING, Any, Generator, List, Optional, Union
+from typing import (TYPE_CHECKING, Any, ClassVar, Generator, List, Optional,
+                    Union)
 
 from qtpy import QtCore
 from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLayout, QLineEdit,
@@ -287,6 +288,8 @@ class RunCheck(DesignerDisplay, QWidget):
     run_next_spacer: QSpacerItem
     next_button: QPushButton
 
+    results_updated: ClassVar[QtCore.Signal] = QtCore.Signal()
+
     style_icons = {
         Severity.success: QStyle.SP_DialogApplyButton,
         Severity.warning : QStyle.SP_TitleBarContextHelpButton,
@@ -352,6 +355,7 @@ class RunCheck(DesignerDisplay, QWidget):
                     raise TypeError('incompatible type found: '
                                     f'{config_type}, {cfg}')
 
+                self.results_updated.emit()
                 self.update_all_icons_tooltips()
 
         # send this to a non-gui thread
@@ -452,7 +456,6 @@ class RunCheck(DesignerDisplay, QWidget):
             # Hide verify_run_spacer, not exposed by DesignerDisplay
             self.layout().itemAt(5).changeSize(0, 0)
         else:
-            # TODO: verify functionality for active checkouts
             # Set up verify button depending on settings
             widget = VerifyEntryWidget()
 
@@ -480,9 +483,11 @@ class RunCheck(DesignerDisplay, QWidget):
 
             def verify_success_slot():
                 set_verify(True)
+                self.results_updated.emit()
 
             def verify_fail_slot():
                 set_verify(False)
+                self.results_updated.emit()
 
             widget.verify_button_box.accepted.connect(verify_success_slot)
             widget.verify_button_box.rejected.connect(verify_fail_slot)
