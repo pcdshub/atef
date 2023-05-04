@@ -538,7 +538,7 @@ class Toggle(QCheckBox):
         xPos = contRect.x() + handleRadius + trailLength * self._handle_position
         iconRad = int(0.7 * handleRadius)
         # center of handle
-        icon_x = int(xPos - (1.3 * handleRadius) + iconRad)
+        icon_x = int(xPos - (1.3 * handleRadius) + (1.3 * iconRad))
         iconRect = QRect(
             QPoint(icon_x, round(barRect.center().y()) - iconRad),
             QSize(2 * iconRad, 2 * iconRad)
