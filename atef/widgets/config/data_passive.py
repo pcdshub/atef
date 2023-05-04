@@ -699,11 +699,11 @@ class EqualsMixin:
             to_str=str,
         )
         starting_value = self.bridge.value.get()
+        self.data_type_combo.currentTextChanged.connect(self.new_gui_type)
         self.data_type_combo.setCurrentText(
             self.type_to_label[type(starting_value)]
         )
         self.update_range_label(starting_value)
-        self.data_type_combo.currentTextChanged.connect(self.new_gui_type)
         self.bridge.value.changed_value.connect(self.update_range_label)
         self.bridge.atol.changed_value.connect(self.update_range_label)
         self.bridge.rtol.changed_value.connect(self.update_range_label)
@@ -1305,7 +1305,7 @@ class AnyValueWidget(DesignerDisplay, DataWidget):
         self.values_table.insertRow(new_row)
         value = value if value is not None else ''
         value_item = QTableWidgetItem()
-        value_item.setText(value)
+        value_item.setText(str(value))
         type_readback_widget = QLabel()
         type_readback_widget.setMargin(3)
         self.values_table.setItem(new_row, 0, value_item)

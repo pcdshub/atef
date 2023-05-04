@@ -153,6 +153,14 @@ class HappiSearchWidget(DesignerDisplay, QWidget):
             tree_selection_changed
         )
 
+        def item_double_clicked(index: QtCore.QModelIndex):
+            if index.parent().data() is None:
+                return  # skip top-level items
+
+            self.happi_items_chosen.emit([index.data()])
+
+        view.doubleClicked.connect(item_double_clicked)
+
         view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         view.customContextMenuRequested.connect(self._tree_view_context_menu)
 
