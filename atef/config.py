@@ -342,7 +342,7 @@ class PreparedConfiguration:
     #: The comparisons that failed to be prepared.
     prepare_failures: List[PreparedComparisonException] = field(default_factory=list)
     #: The result of all comparisons.
-    result: Result = field(default_factory=incomplete_result)
+    combined_result: Result = field(default_factory=incomplete_result)
 
     @classmethod
     def from_config(
@@ -457,7 +457,25 @@ class PreparedConfiguration:
             severity = _summarize_result_severity(GroupResultMode.all_, results)
             result = Result(severity=severity)
 
-        self.result = result
+        self.combined_result = result
+        return result
+
+    @property
+    def result(self):
+        # read results without running steps
+        results = []
+        for config in self.comparisons:
+            results.append(config.result)
+
+        if self.prepare_failures:
+            result = Result(
+                severity=Severity.error,
+                reason="At least one configuration failed to initialize",
+            )
+        else:
+            severity = _summarize_result_severity(GroupResultMode.all_, results)
+            result = Result(severity=severity)
+        self.combined_result = result
         return result
 
 
@@ -472,8 +490,6 @@ class PreparedGroup(PreparedConfiguration):
     configs: List[AnyPreparedConfiguration] = field(default_factory=list)
     #: The configs that failed to prepare.
     prepare_failures: List[FailedConfiguration] = field(default_factory=list)
-    #: Result of all comparisons.
-    result: Result = field(default_factory=incomplete_result)
 
     def get_value_by_name(self, name: str) -> Any:
         """
@@ -608,7 +624,28 @@ class PreparedGroup(PreparedConfiguration):
             result = Result(
                 severity=severity
             )
-        self.result = result
+        self.combined_result = result
+        return result
+
+    @property
+    def result(self):
+        # read results without running steps
+        results = []
+        for config in self.configs:
+            if isinstance(config, PreparedConfiguration):
+                results.append(config.result)
+
+        if self.prepare_failures:
+            result = Result(
+                severity=Severity.error,
+                reason="At least one configuration failed to initialize",
+            )
+        else:
+            severity = _summarize_result_severity(self.config.mode, results)
+            result = Result(
+                severity=severity
+            )
+        self.combined_result = result
         return result
 
 
