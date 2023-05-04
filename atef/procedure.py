@@ -583,6 +583,26 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         self.step_result = result
         return self.result
 
+    @property
+    def result(self):
+        # gather step result before re-computing overall result, without running
+        results = []
+        for step in self.steps:
+            results.append(step.result)
+
+        if self.prepare_failures:
+            result = Result(
+                severity=Severity.error,
+                reason='At least one step failed to initialize'
+            )
+        else:
+            severity = _summarize_result_severity(GroupResultMode.all_, results)
+            result = Result(severity=severity)
+
+        self.step_result = result
+
+        return super().result
+
 
 @dataclass
 class PreparedDescriptionStep(PreparedProcedureStep):
