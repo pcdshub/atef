@@ -156,6 +156,8 @@ def build_passive_summary_table(story: List[Flowable], prep_file: PreparedFile):
     prep_file : PreparedFile
         A prepared (and preferably run) passive checkout
     """
+    if not prep_file:
+        return
     lines = list(walk_config_file(prep_file.root))
     table_data = [['Step Name', 'Result']]
     style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -349,7 +351,7 @@ def build_data_table(
     observed_value = Paragraph(str(observed_value), styles['BodyText'])
     try:
         timestamp = comp.signal.timestamp.ctime()
-        source = Paragraph(comp.signal.name, styles['BodyText'])
+        source = Paragraph(getattr(comp.signal, 'name', ''), styles['BodyText'])
     except AttributeError:
         timestamp = 'unknown'
         source = 'undefined'
@@ -807,14 +809,14 @@ class PassiveAtefReport(AtefReport):
                       PreparedPVConfiguration, PreparedToolConfiguration)):
             header_text = config.config.name
             story.append(self.build_linked_header(header_text, style=h2))
-            story.append(Paragraph(config.config.description))
+            story.append(Paragraph(config.config.description or ''))
             omit_keys = ['name', 'description', 'by_pv', 'by_attr', 'shared', 'configs']
             build_group_page(story, config, omit_keys)
         elif isinstance(config, (PreparedSignalComparison, PreparedToolComparison)):
             header_text = config.comparison.name
             header_text += f' - {config.identifier}'
             story.append(self.build_linked_header(header_text, style=h2))
-            story.append(Paragraph(config.comparison.description))
+            story.append(Paragraph(config.comparison.description or ''))
             build_comparison_page(story, config)
         else:
             config_type = str(type(config).__name__)
@@ -935,7 +937,7 @@ class ActiveAtefReport(AtefReport):
         elif isinstance(step, PreparedProcedureStep):
             header_text = step.origin.name
             story.append(self.build_linked_header(header_text, style=h2))
-            story.append(Paragraph(step.origin.description))
+            story.append(Paragraph(step.origin.description or ''))
             build_settings_table(story, step.origin, omit_keys=omit_keys)
             build_results_table(story, step, attr_names=result_attrs)
         elif isinstance(step, PreparedComparison):
