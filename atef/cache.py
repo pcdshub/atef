@@ -21,20 +21,20 @@ _CacheSignalType = TypeVar("_CacheSignalType", bound=ophyd.Signal)
 
 
 logger = logging.getLogger(__name__)
-_signal_cache: Optional[_SignalCache[ophyd.EpicsSignalRO]] = None
+_signal_cache: Optional[_SignalCache[ophyd.EpicsSignal]] = None
 
 
-def get_signal_cache() -> _SignalCache[ophyd.EpicsSignalRO]:
+def get_signal_cache() -> _SignalCache[ophyd.EpicsSignal]:
     """Get the global EpicsSignal cache."""
     global _signal_cache
     if _signal_cache is None:
-        _signal_cache = _SignalCache[ophyd.EpicsSignalRO](ophyd.EpicsSignalRO)
+        _signal_cache = _SignalCache[ophyd.EpicsSignal](ophyd.EpicsSignal)
     return _signal_cache
 
 
 @dataclass
 class _SignalCache(Mapping[str, _CacheSignalType]):
-    signal_type_cls: Type[ophyd.EpicsSignalRO]
+    signal_type_cls: Type[ophyd.EpicsSignal]
     pv_to_signal: Dict[str, _CacheSignalType] = field(default_factory=dict)
 
     def __getitem__(self, pv: str) -> _CacheSignalType:
@@ -115,7 +115,7 @@ def _freeze(data):
 @dataclass
 class DataCache:
     signal_data: Dict[ophyd.Signal, Dict[DataKey, Any]] = field(default_factory=dict)
-    signals: _SignalCache[ophyd.EpicsSignalRO] = field(
+    signals: _SignalCache[ophyd.EpicsSignal] = field(
         default_factory=get_signal_cache
     )
     tool_data: Dict[ToolKey, Any] = field(

@@ -11,12 +11,15 @@ import pathlib
 import qtawesome
 from qtpy import QtWidgets
 
-from atef.config import ConfigurationFile, PreparedFile, run_passive_step
-from atef.procedure import PreparedDescriptionStep, PreparedPassiveStep
+from atef.config import (ConfigurationFile, PreparedFile,
+                         PreparedSignalComparison, run_passive_step)
+from atef.procedure import (PreparedDescriptionStep, PreparedPassiveStep,
+                            PreparedSetValueStep, PreparedValueToSignal)
 from atef.widgets.config.data_base import DataWidget
-from atef.widgets.config.run_base import create_tree_items
+from atef.widgets.config.run_base import ResultStatus, create_tree_items
 from atef.widgets.config.utils import ConfigTreeModel, TreeItem
 from atef.widgets.core import DesignerDisplay
+from atef.widgets.utils import insert_widget
 
 logger = logging.getLogger(__name__)
 
@@ -98,3 +101,80 @@ class DescriptionRunWidget(DesignerDisplay, DataWidget):
     def _setup_ui(self) -> None:
         self.title_label.setText(self.bridge.origin.get().name)
         self.desc_label.setText(self.bridge.origin.get().description)
+
+
+class SetValueRunWidget(DesignerDisplay, DataWidget):
+    """
+    Widget for viewing set value step.  Displays Results alongside their
+    respective actions or checks
+    """
+    filename = 'set_value_run_widget.ui'
+
+    actions_table: QtWidgets.QTableWidget
+    checks_table: QtWidgets.QTableWidget
+
+    def __init__(self, *args, data: PreparedSetValueStep, **kwargs):
+        super().__init__(*args, data=data, **kwargs)
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        for table, field, cls in [
+            (self.actions_table, self.data.prepared_actions, ActionRowRunWidget),
+            (self.checks_table, self.data.prepared_criteria, CheckRowRunWidget)
+        ]:
+            for item in field:
+                ins_ind = table.rowCount()
+                action_row = cls(data=item)
+                table.insertRow(ins_ind)
+                table.setRowHeight(ins_ind, action_row.sizeHint().height())
+                table.setCellWidget(ins_ind, 0, action_row)
+
+    def update_statuses(self):
+        """ slot to be connected to RunCheck button """
+        for table in (self.actions_table, self.checks_table):
+            for i in range(table.rowCount()):
+                row_widget = table.cellWidget(i, 0)
+                row_widget.status_label.update()
+
+
+class ActionRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
+    """
+    Simple widget displaying information stored in ``PreparedValueToSignal``
+    Does not implement the SimpleRowWidget interface
+    """
+    filename = 'action_row_run_widget.ui'
+
+    name_label: QtWidgets.QLabel
+    target_label: QtWidgets.QLabel
+    value_label: QtWidgets.QLabel
+    status_label_placeholder: QtWidgets.QWidget
+
+    def __init__(self, *args, data: PreparedValueToSignal, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.status_label = ResultStatus(data=data)
+        insert_widget(self.status_label, self.status_label_placeholder)
+        self.name_label.setText(data.name)
+        self.target_label.setText(data.signal.name)
+        self.value_label.setText(str(data.value))
+
+
+class CheckRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
+    """
+    Simple widget displaying information stored in ``PreparedSignalComparison``
+    Does not implement the SimpleRowWidget interface
+    """
+    filename = 'check_row_run_widget.ui'
+
+    child_button: QtWidgets.QPushButton
+    name_label: QtWidgets.QLabel
+    target_label: QtWidgets.QLabel
+    check_summary_label: QtWidgets.QLabel
+    status_label_placeholder: QtWidgets.QLabel
+
+    def __init__(self, *args, data: PreparedSignalComparison, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.status_label = ResultStatus(data=data)
+        insert_widget(self.status_label, self.status_label_placeholder)
+        self.name_label.setText(data.name)
+        self.target_label.setText(data.signal.name)
+        self.check_summary_label.setText(data.comparison.describe())

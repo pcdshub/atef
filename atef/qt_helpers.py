@@ -9,8 +9,9 @@ from __future__ import annotations
 import functools
 import logging
 import platform
+from collections.abc import Sequence
 from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
-                    Tuple, Type, Union, get_args, get_origin, get_type_hints)
+                    Tuple, Type, get_args, get_origin, get_type_hints)
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QObject
@@ -33,7 +34,7 @@ class QDataclassBridge(QObject):
 
     Would allow you to access:
     bridge.field.put(3)
-    bridge.field.value_changed.connect(my_slot)
+    bridge.field.changed_value.connect(my_slot)
     bridge.others.append(OtherClass(4))
 
     This does not recursively dive down the tree of subdataclasses.
@@ -87,16 +88,16 @@ class QDataclassBridge(QObject):
             # Use dataclass value and override to object type
             NestedClass = QDataclassValue
             dtype = object
-        elif origin is list:
+        elif origin in (list, Sequence):
             # Make sure we have list manipulation methods
+            # Sequence resolved as from collections.abc (even if defined from typing)
             NestedClass = QDataclassList
             dtype = args[0]
-        elif origin is Union and (type(None) in args):
-            # Optional, strip Union and recurse
-            self.set_field_from_data(name, args[0], data)
-            return
         else:
             # some complex Union? e.g. Union[str, int, bool, float]
+            # Optional hints also need to have a general signal to emit NoneType
+            # (technically QSignal(str) works, but is it worth the special case?)
+            logger.debug(f'Unable to parse type hint: {type_hint} - ({origin}, {args})')
             NestedClass = QDataclassValue
             dtype = object
 

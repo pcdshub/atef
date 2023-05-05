@@ -26,6 +26,7 @@ from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
 from atef.result import Result, combine_results
 from atef.widgets.config.utils import TreeItem
 from atef.widgets.core import DesignerDisplay
+from atef.widgets.utils import BusyCursorThread
 
 # avoid circular imports
 if TYPE_CHECKING:
@@ -169,11 +170,13 @@ def get_relevant_configs_comps(
 
 def get_prepared_step(
     prepared_file: PreparedProcedureFile,
-    step: ProcedureStep
-) -> List[PreparedProcedureStep]:
+    origin: Union[ProcedureStep, Comparison],
+) -> List[Union[PreparedProcedureStep, PreparedComparison]]:
     """
     Gather all PreparedProcedureStep dataclasses the correspond to the original
     ProcedureStep.
+    If a PreparedProcedureStep also has comparisions, use the walk_comparisons
+    method to check if the "origin" matches any of thoes comparisons
 
     Only relevant for active checkouts.
 
@@ -181,22 +184,84 @@ def get_prepared_step(
     ----------
     prepared_file : PreparedProcedureFile
         the PreparedProcedureFile to search through
-    step : Union[ProcedureStep, ProcedureGroup]
-        the step to match
+    origin : Union[ProcedureStep, Comparison]
+        the step / comparison to match
 
     Returns
     -------
-    List[Union[PreparedProcedureStep, PreparedProcedureGroup]]
-        the PreparedProcedureSteps related to ``step``
+    List[Union[PreparedProcedureStep, PreparedComparison]]
+        the PreparedProcedureStep's or PreparedComparison's related to ``origin``
     """
     # As of the writing of this docstring, this helper is only expected to return
     # lists of length 1.  However in order to match the passive checkout workflow,
-    # we still return a list of relevant steps.
+    # we still return a list of relevant steps or comparisons.
     matched_steps = []
     for pstep in walk_steps(prepared_file.root):
-        if pstep.origin is step:
+        if getattr(pstep, 'origin', None) is origin:
             matched_steps.append(pstep)
+        # check PreparedComparisons, which might be included in some steps
+        if hasattr(pstep, 'walk_comparisons'):
+            for comp in pstep.walk_comparisons():
+                if comp.comparison is origin:
+                    matched_steps.append(comp)
+
     return matched_steps
+
+
+class ResultStatus(QLabel):
+    """
+    A simple QLabel that changes its icon based on a Result.
+    Holds onto the whole dataclass with a .result field, rather than a singular
+    result.  (which can be discarded at any time)
+
+    Use the .update() slot to request this label update its icon and tooltip
+    """
+    style_icons = {
+        Severity.success: QStyle.SP_DialogApplyButton,
+        Severity.warning : QStyle.SP_TitleBarContextHelpButton,
+        Severity.internal_error: QStyle.SP_DialogCancelButton,
+        Severity.error: QStyle.SP_DialogCancelButton
+    }
+
+    unicode_icons = {
+        # check mark
+        Severity.success: '<span style="color: green;">&#10004;</span>',
+        Severity.warning : '<span style="color: orange;">?</span>',
+        # x mark
+        Severity.internal_error: '<span style="color: red;">&#10008;</span>',
+        Severity.error: '<span style="color: red;">&#10008;</span>',
+    }
+
+    def __init__(self, *args, data: Any, **kwargs):
+        super().__init__(*args, **kwargs)
+        icon = self.style().standardIcon(self.style_icons[Severity.warning])
+        self.setPixmap(icon.pixmap(25, 25))
+        self.data = data
+
+    def update(self) -> None:
+        """ Slot for updating this label """
+        self.update_icon()
+        self.update_tooltip()
+
+    def update_icon(self) -> None:
+        """ read the result and update the icon accordingly """
+        chosen_icon = self.style_icons[self.data.result.severity]
+        icon = self.style().standardIcon(chosen_icon)
+        self.setPixmap(icon.pixmap(25, 25))
+
+    def update_tooltip(self) -> None:
+        """ Helper method to update tooltip based on ``results`` """
+        result = self.data.result
+        uni_icon = self.unicode_icons[result.severity]
+        tt = f'<p>{uni_icon}: {result.reason or "-"}</p>'
+        self.setToolTip(tt)
+
+    def event(self, event: QtCore.QEvent) -> bool:
+        """ Overload event method to update tooltips on tooltip-request """
+        # Catch tooltip events to update status tooltip
+        if event.type() == QtCore.QEvent.ToolTip:
+            self.update()
+        return super().event(event)
 
 
 class RunCheck(DesignerDisplay, QWidget):
@@ -275,7 +340,7 @@ class RunCheck(DesignerDisplay, QWidget):
 
     def _make_run_slot(self, configs) -> None:
 
-        def run_slot():
+        def run_slot(*args, **kwargs):
             """ Slot that runs each step in the config list """
             for cfg in configs:
                 config_type = infer_step_type(cfg)
@@ -289,7 +354,13 @@ class RunCheck(DesignerDisplay, QWidget):
 
                 self.update_all_icons_tooltips()
 
-        self.run_button.clicked.connect(run_slot)
+        # send this to a non-gui thread
+        self.busy_thread = BusyCursorThread(func=run_slot, ignore_events=True)
+
+        def run_thread():
+            self.busy_thread.start()
+
+        self.run_button.clicked.connect(run_thread)
 
     def update_icon(self, label: QLabel, results: List[Result]) -> None:
         """ Helper method to update icon on ``label`` based on ``results`` """

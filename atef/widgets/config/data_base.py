@@ -4,7 +4,7 @@ Widgets used for manipulating the configuration data.
 from __future__ import annotations
 
 import logging
-from typing import ClassVar, Dict, List, Protocol, Tuple
+from typing import ClassVar, List, Tuple
 from weakref import WeakValueDictionary
 
 from qtpy.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
@@ -13,6 +13,7 @@ from qtpy.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
 
 from atef.config import Configuration, ToolConfiguration
 from atef.qt_helpers import QDataclassBridge, QDataclassList
+from atef.type_hints import AnyDataclass
 from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
@@ -20,13 +21,6 @@ from atef.widgets.utils import FrameOnEditFilter, match_line_edit_text_width
 from .utils import get_relevant_pvs
 
 logger = logging.getLogger(__name__)
-
-
-class AnyDataclass(Protocol):
-    """
-    Protocol stub shamelessly lifted from stackoverflow to hint at dataclass
-    """
-    __dataclass_fields__: Dict
 
 
 class DataWidget(QWidget):

@@ -20,9 +20,10 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, PreparedFile
 from atef.procedure import (DescriptionStep, PassiveStep,
-                            PreparedProcedureFile, ProcedureFile)
+                            PreparedProcedureFile, ProcedureFile, SetValueStep)
 from atef.qt_helpers import walk_tree_widget_items
-from atef.report import PassiveAtefReport
+from atef.report import ActiveAtefReport, PassiveAtefReport
+from atef.widgets.utils import busy_cursor
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
@@ -423,7 +424,8 @@ class EditTree(DesignerDisplay, QWidget):
 
 _edit_to_run_page: Dict[type, PageWidget] = {
     DescriptionStep: RunStepPage,
-    PassiveStep: RunStepPage
+    PassiveStep: RunStepPage,
+    SetValueStep: RunStepPage,
 }
 
 
@@ -492,9 +494,9 @@ class RunTree(EditTree):
                 run_widget_cls = _edit_to_run_page[type(data)]
                 run_widget = run_widget_cls(data=prepared_data[0])
                 link_page(item, run_widget)
+                run_widget.link_children()
             else:
                 run_widget = make_run_page(item.widget, prepared_data)
-                link_page(item, run_widget)
 
             if prev_widget:
                 prev_widget.run_check.setup_next_button(item)
@@ -504,6 +506,9 @@ class RunTree(EditTree):
             # update all statuses every time a step is run
             run_button: QtWidgets.QPushButton = run_widget.run_check.run_button
             run_button.clicked.connect(self.update_statuses)
+
+        # disable last 'next' button
+        run_widget.run_check.next_button.hide()
 
     def update_statuses(self) -> None:
         """ update every status icon based on stored config result """
@@ -530,6 +535,8 @@ class RunTree(EditTree):
         # To differentiate between active and passive checkout reports
         if isinstance(self.prepared_file, PreparedFile):
             doc = PassiveAtefReport(filename, config=self.prepared_file)
+        elif isinstance(self.prepared_file, PreparedProcedureFile):
+            doc = ActiveAtefReport(filename, config=self.prepared_file)
         else:
             raise TypeError('Unsupported data-type for report generation')
 
@@ -610,6 +617,7 @@ class DualTree(QWidget):
             self.mode = 'edit'
         self.show_widgets()
 
+    @busy_cursor
     def show_widgets(self) -> None:
         """ Show active widget, hide others. (re)generate RunTree if needed """
         # If run_tree requested check if there are changes

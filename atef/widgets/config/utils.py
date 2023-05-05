@@ -829,10 +829,17 @@ class MultiInputDialog(QtWidgets.QDialog):
 
     To retrieve the user provided data, call MultiInputDialog.get_info()
     """
-    def __init__(self, *args, init_values: Dict[str, Any], **kwargs):
+    def __init__(
+        self,
+        *args,
+        init_values: Dict[str, Any],
+        units: Optional[List[str]] = None,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
 
         self.init_values = init_values
+        self.units = units
         vlayout = QtWidgets.QVBoxLayout(self)
         self.grid_layout = QtWidgets.QGridLayout()
         # add each name and field
@@ -840,17 +847,23 @@ class MultiInputDialog(QtWidgets.QDialog):
             spaced_key = key.replace('_', ' ')
             self.grid_layout.addWidget(self.make_label(spaced_key), i, 0)
             self.grid_layout.addWidget(self.make_field(value), i, 1)
+            if self.units:
+                try:
+                    unit_label = QtWidgets.QLabel(self.units[i])
+                except IndexError:
+                    continue
+                self.grid_layout.addWidget(unit_label, i, 2)
 
         vlayout.addLayout(self.grid_layout)
 
         # add ok, cancel buttons
-        hlayout = QtWidgets.QHBoxLayout()
-        self.ok_button = QtWidgets.QPushButton('Accept')
-        self.cancel_button = QtWidgets.QPushButton('Cancel')
-        hlayout.addWidget(self.ok_button)
-        hlayout.addWidget(self.cancel_button)
-        vlayout.addLayout(hlayout)
+        self.button_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        self.ok_button = self.button_box.button(QtWidgets.QDialogButtonBox.Ok)
+        self.cancel_button = self.button_box.button(QtWidgets.QDialogButtonBox.Cancel)
 
+        vlayout.addWidget(self.button_box)
         self.ok_button.clicked.connect(self.accept)
         self.cancel_button.clicked.connect(self.reject)
 
@@ -883,9 +896,20 @@ class MultiInputDialog(QtWidgets.QDialog):
             return text_edit
         elif isinstance(value, int):
             int_edit = QtWidgets.QSpinBox()
-            int_edit.setMaximum(10)
+            int_edit.setMinimum(-1)
+            int_edit.setSpecialValueText('None')
+            int_edit.setToolTip('Input -1 to set value to None')
             int_edit.setValue(value)
             return int_edit
+        elif isinstance(value, float):
+            float_edit = QtWidgets.QDoubleSpinBox()
+            float_edit.setMinimum(-1)
+            float_edit.setSpecialValueText('None')
+            float_edit.setToolTip('Input -1 to set value to None')
+            float_edit.setValue(value)
+            return float_edit
+        else:
+            raise RuntimeError(f"Unexpected value {value} of type {type(value).__name__}")
 
     def get_info(self) -> Dict[str, Any]:
         """
@@ -899,7 +923,8 @@ class MultiInputDialog(QtWidgets.QDialog):
             input_widget = self.grid_layout.itemAtPosition(r, 1).widget()
             if isinstance(input_widget, QtWidgets.QLineEdit):
                 value = input_widget.text()
-            elif isinstance(input_widget, QtWidgets.QSpinBox):
+            elif isinstance(input_widget,
+                            (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox)):
                 value = input_widget.value()
 
             unspaced_key = key.replace(' ', '_')
@@ -1215,3 +1240,122 @@ class TreeItem:
         child._row = len(self._children)
         self._children.append(child)
         self._columncount = max(child.columnCount(), self._columncount)
+
+
+class AddRowWidget(DesignerDisplay, QWidget):
+    """
+    A simple row widget with an add button.  To be used when space is precious
+    Connect a new-row slot to the add_button signal to create new rows
+    """
+    filename = 'add_row_widget.ui'
+
+    add_button: QtWidgets.QToolButton
+    row_label: QtWidgets.QLabel
+
+    def __init__(self, *args, text='Add new row', **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_button.setIcon(qta.icon('ri.add-circle-line'))
+        self.row_label.setText(text)
+
+
+class TableWidgetWithAddRow(QtWidgets.QTableWidget):
+    """
+    A standard QTableWidget with an AddRowWidget.
+    Intended to be a n x 1 table, with each row being a SimpleRowWidget.
+    allows drag-and-drop to re-order rows
+    Emits table_updated when the table contents change.
+
+    use .add_row() to initialize a new row with an optional dataclass.
+
+    The AddRowWidget is not treated as a row, and as such the following methods
+    are modified.
+    - rowCount(): Returns super().rowCount() - 1
+    - ... and more as I find more methods
+    """
+    # TODO: try setting up drag-drop functionality at some point.
+    add_row_widget: AddRowWidget
+
+    table_updated: ClassVar[QtCore.Signal] = QtCore.Signal()
+
+    def __init__(self, *args, add_row_text: str, title_text: str, row_widget_cls: QtWidgets.QWidget, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # self.dropEvent = self.table_drop_event
+        self.setColumnCount(1)
+        self.horizontalHeader().setStretchLastSection(True)
+        self.setHorizontalHeaderLabels([title_text])
+        self.verticalHeader().setHidden(True)
+        self.row_widget_cls = row_widget_cls
+        self.add_add_row_widget(text=add_row_text)
+        self.setSelectionMode(self.NoSelection)
+
+    def add_add_row_widget(self, text: str):
+        """ add the AddRowWidget to the end of the specified table-widget"""
+        self.add_row_widget = AddRowWidget(text=text)
+        self.insertRow(0)
+        self.setRowHeight(0, self.add_row_widget.sizeHint().height())
+        self.setCellWidget(0, 0, self.add_row_widget)
+        self.add_row_widget.add_button.clicked.connect(self.add_row)
+
+    def rowCount(self) -> int:
+        # exclude add-row in row counts
+        return super().rowCount() - 1
+
+    def add_row(
+        self,
+        checked: bool = False,
+        data: Optional[Any] = None,
+        **kwargs
+    ) -> None:
+        """
+        add a new or existing action to the table.
+
+        Parameters
+        ----------
+        checked : bool, optional
+            Unused. Button "clicked" signals often pass this as the first
+            positional argument, by default False
+        data : Optional[Any], optional
+            a Dataclass to initialize the row with, by default None
+            used in initializing the table, not in callbacks
+        """
+        new_row = self.row_widget_cls(data=data)
+        # Insert just above the add-row-row
+        ins_ind = self.rowCount()
+        self.insertRow(ins_ind)
+        self.setRowHeight(ins_ind, new_row.sizeHint().height())
+        self.setCellWidget(ins_ind, 0, new_row)
+        self.setup_delete_button(new_row)
+        self.table_updated.emit()
+
+    def setup_delete_button(self, row: QtWidgets.QWidget) -> None:
+        """
+        Set up the delete button for the specified row.  Assumes `row.delete_button`
+        is a QPushButton
+
+        Parameters
+        ----------
+        row : QtWidgets.QWidget
+            A row widget with a QPushButton in the .delete_button field
+        """
+        # row: SimpleRowWidget, but can't import due to module structure
+        delete_icon = self.style().standardIcon(
+            QtWidgets.QStyle.SP_TitleBarCloseButton
+        )
+        row.delete_button.setIcon(delete_icon)
+
+        def inner_delete(*args, **kwargs):
+            self.delete_table_row(row)
+
+        row.delete_button.clicked.connect(inner_delete)
+
+    def delete_table_row(self, row: QtWidgets.QWidget) -> None:
+        """ slot for a row's delete button.  Removes it from this table. """
+        # get the data
+        for row_index in range(self.rowCount()):
+            widget = self.cellWidget(row_index, 0)
+            if widget is row:
+                self.removeRow(row_index)
+                break
+
+        self.table_updated.emit()

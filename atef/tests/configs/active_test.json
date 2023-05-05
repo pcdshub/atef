@@ -25,6 +25,51 @@
           "step_success_required": true,
           "filepath": "."
         }
+      },
+      {
+        "SetValueStep": {
+          "name": "set_value_title",
+          "description": "set_value_desc",
+          "parent": null,
+          "verify_required": true,
+          "step_success_required": true,
+          "actions": [
+            {
+              "name": "set to 1",
+              "device": null,
+              "attr": null,
+              "pv": "MY:PREFIX:dt",
+              "value": 1.0,
+              "timeout": 20.0,
+              "settle_time": 5.0
+            }
+          ],
+          "success_criteria": [
+            {
+              "name": null,
+              "device": null,
+              "attr": null,
+              "pv": "MY:PREFIX:dt",
+              "comparison": {
+                "Equals": {
+                  "name": "equal_check",
+                  "description": "a simple verify",
+                  "invert": false,
+                  "reduce_period": null,
+                  "reduce_method": "average",
+                  "string": null,
+                  "severity_on_failure": 2,
+                  "if_disconnected": 2,
+                  "value": 1.0,
+                  "rtol": null,
+                  "atol": null
+                }
+              }
+            }
+          ],
+          "halt_on_fail": true,
+          "require_action_success": true
+        }
       }
     ]
   }

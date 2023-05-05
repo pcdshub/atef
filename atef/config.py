@@ -1238,6 +1238,49 @@ class PreparedSignalComparison(PreparedComparison):
             parent=parent,
         )
 
+    @classmethod
+    def from_signal(
+        cls,
+        signal: ophyd.Signal,
+        comparison: Comparison,
+        name: Optional[str] = None,
+        parent: Optional[PreparedPVConfiguration] = None,
+        cache: Optional[DataCache] = None,
+    ) -> PreparedSignalComparison:
+        """
+        Create a PreparedSignalComparison from a signal directly
+
+        Parameters
+        ----------
+        signal : ophyd.Signal
+            The signal to compare
+        comparison : Comparison
+            The comparison instance to run on the PV.
+        name : str, optional
+            The name of this comparison.
+        parent : PreparedPVConfiguration, optional
+            The parent configuration, if available.
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Returns
+        -------
+        PreparedSignalComparison
+        """
+        if cache is None:
+            cache = DataCache()
+
+        return cls(
+            identifier=signal.name,
+            device=None,
+            signal=signal,
+            comparison=comparison,
+            name=name,
+            cache=cache,
+            parent=parent,
+        )
+
 
 @dataclass
 class PreparedToolComparison(PreparedComparison):
