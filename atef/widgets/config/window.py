@@ -504,8 +504,7 @@ class RunTree(EditTree):
             prev_widget = run_widget
 
             # update all statuses every time a step is run
-            run_button: QtWidgets.QPushButton = run_widget.run_check.run_button
-            run_button.clicked.connect(self.update_statuses)
+            run_widget.run_check.results_updated.connect(self.update_statuses)
 
         # disable last 'next' button
         run_widget.run_check.next_button.hide()
