@@ -173,7 +173,7 @@ class BusyCursorThread(QtCore.QThread):
     """
     task_finished: ClassVar[QtCore.Signal] = QtCore.Signal()
     task_starting: ClassVar[QtCore.Signal] = QtCore.Signal()
-    raised_exception: ClassVar[QtCore.Signal] = QtCore.Signal()
+    raised_exception: ClassVar[QtCore.Signal] = QtCore.Signal(Exception)
 
     def __init__(self, *args, func, ignore_events: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
