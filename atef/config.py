@@ -461,7 +461,8 @@ class PreparedConfiguration:
         return result
 
     @property
-    def result(self):
+    def result(self) -> Result:
+        """ Re-compute the combined result and return it """
         # read results without running steps
         results = []
         for config in self.comparisons:
@@ -628,7 +629,8 @@ class PreparedGroup(PreparedConfiguration):
         return result
 
     @property
-    def result(self):
+    def result(self) -> Result:
+        """ Re-compute the combined result and return it """
         # read results without running steps
         results = []
         for config in self.configs:

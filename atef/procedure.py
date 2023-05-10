@@ -584,8 +584,8 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         return self.result
 
     @property
-    def result(self):
-        # gather step result before re-computing overall result, without running
+    def result(self) -> Result:
+        """ Re-compute the combined result and return it """
         results = []
         for step in self.steps:
             results.append(step.result)
