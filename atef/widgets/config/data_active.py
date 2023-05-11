@@ -42,7 +42,8 @@ from atef.widgets.config.utils import (ConfigTreeModel, MultiInputDialog,
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData
-from atef.widgets.utils import insert_widget, match_line_edit_text_width
+from atef.widgets.utils import (BusyCursorThread, insert_widget,
+                                match_line_edit_text_width)
 
 from ...procedure import (ComparisonToTarget, DescriptionStep, DisplayOptions,
                           PassiveStep, PlanOptions, PlanStep, ProcedureGroup,
@@ -877,15 +878,22 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
 
         signal_cache = get_signal_cache()
         sig = signal_cache[self.pv_edit.text()]
-        try:
-            sig.wait_for_connection()
-        except TimeoutError:
-            QtWidgets.QMessageBox.warning(
-                self,
-                'Failed to connect to PV',
-                f'Could not connect to PV: {self.pv_edit.text()}. '
-                'Will be unable to read metadata'
-            )
+
+        def timeout_warning(ex: Exception):
+            if isinstance(ex, TimeoutError):
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    'Failed to connect to PV',
+                    f'Could not connect to PV: {self.pv_edit.text()}. '
+                    'Will be unable to read metadata'
+                )
+            else:
+                raise ex
+
+        self.busy_thread = BusyCursorThread(func=sig.wait_for_connection,
+                                            ignore_events=True)
+        self.busy_thread.raised_exception.connect(timeout_warning)
+        self.busy_thread.start()
 
         self.chosen_target = Target(pv=self.pv_edit.text())
         self.data_updated.emit()
