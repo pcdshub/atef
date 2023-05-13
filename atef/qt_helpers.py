@@ -11,7 +11,7 @@ import logging
 import platform
 from collections.abc import Sequence
 from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
-                    Tuple, Type, get_args, get_origin, get_type_hints)
+                    Tuple, Type, Union, get_args, get_origin, get_type_hints)
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QObject
@@ -58,7 +58,8 @@ class QDataclassBridge(QObject):
         self,
         name: str,
         type_hint: Any,
-        data: Any
+        data: Any,
+        optional: bool = False
     ):
         """
         Set a field for this bridge based on the data and its type
@@ -93,11 +94,19 @@ class QDataclassBridge(QObject):
             # Sequence resolved as from collections.abc (even if defined from typing)
             NestedClass = QDataclassList
             dtype = args[0]
+        elif (origin is Union) and (type(None) in args):
+            # Optional, need to add nonetype to changed_value signal emit
+            if len(args) > 2:
+                # Optional + many other types, dispatch to complex Union case
+                self.set_field_from_data(name, args[:-1], data, optional=True)
+            else:
+                self.set_field_from_data(name, args[0], data, optional=True)
+            return
         else:
             # some complex Union? e.g. Union[str, int, bool, float]
             # Optional hints also need to have a general signal to emit NoneType
             # (technically QSignal(str) works, but is it worth the special case?)
-            logger.debug(f'Unable to parse type hint: {type_hint} - ({origin}, {args})')
+            logger.debug(f'Complex type hint found: {type_hint} - ({origin}, {args})')
             NestedClass = QDataclassValue
             dtype = object
 
@@ -114,6 +123,10 @@ class QDataclassBridge(QObject):
                 parent=self,
             ),
         )
+
+        if optional:
+            # allow NoneType in emitted types while retaining other methods
+            setattr(self, f'{name}.changed_value', QSignal(object))
 
 
 class QDataclassElem:
