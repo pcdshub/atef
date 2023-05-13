@@ -122,9 +122,10 @@ class DeviceColumn(enum.IntEnum):
     attribute = 0
     readback = 1
     setpoint = 2
-    pvname = 3
+    read_pvname = 3
+    set_pvname = 4
 
-    total_columns = 4
+    total_columns = 5
 
 
 class _DevicePollThread(QtCore.QThread):
@@ -343,7 +344,8 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
             "Attribute",
             "Readback",
             "Setpoint",
-            "PV Name",
+            "Read PV Name",
+            "Setpoint PV Name"
         ]
         self.start()
 
@@ -409,7 +411,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         else:
             self.dataChanged.emit(
                 self.createIndex(row, DeviceColumn.readback),
-                self.createIndex(row, DeviceColumn.pvname),
+                self.createIndex(row, DeviceColumn.read_pvname),
             )
 
     def get_data_for_row(self, row: int) -> Optional[OphydAttributeData]:
@@ -501,8 +503,10 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
                 return f"{info.readback} {units}"
             if column == DeviceColumn.setpoint:
                 return f"{info.setpoint}"
-            if column == DeviceColumn.pvname:
+            if column == DeviceColumn.read_pvname:
                 return info.pvname
+            if column == DeviceColumn.set_pvname:
+                return getattr(info.signal, 'setpoint_pvname', 'None')
             return ""
 
         if role == Qt.ToolTipRole:
