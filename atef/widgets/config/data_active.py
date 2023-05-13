@@ -1015,9 +1015,6 @@ class ActionRowWidget(TargetRowWidget):
         Updates value input widget with a QLineEdit with the approriate validator
         given the target's datatype
         """
-        # TODO: Enum drop box?
-        self.edit_widget = QtWidgets.QLineEdit()
-
         sig = self.data.to_signal()
         if sig is None:
             self.edit_widget = QtWidgets.QLabel('(no target set)')
@@ -1037,40 +1034,65 @@ class ActionRowWidget(TargetRowWidget):
             else:
                 dtype = float
 
-        def on_text_changed(text: str) -> None:
-            match_line_edit_text_width(self.edit_widget, text=text, minimum=75)
+        # Enum Case
+        if getattr(sig, 'enum_strs', None) is not None:
+            self.edit_widget = QtWidgets.QComboBox()
+            self.edit_widget.setEditable(False)
+            for enum_str in sig.enum_strs:
+                self.edit_widget.addItem(enum_str)
 
-        self.edit_widget.textChanged.connect(on_text_changed)
+            def update_value():
+                value = self.edit_widget.currentText()
+                self.bridge.value.put(value)
+                self.value_button_box.hide()
 
-        if dtype is int:
-            validator = QtGui.QIntValidator()
-        elif dtype is float:
-            validator = QtGui.QDoubleValidator()
+            def value_changed():
+                self.value_button_box.show()
+
+            self.edit_widget.currentTextChanged.connect(value_changed)
+
+            if curr_value != 'no data':
+                self.edit_widget.setCurrentIndex(curr_value)
+
+        # Use a line edit to catch free-entry numerics, strings
         else:
-            validator = None
+            self.edit_widget = QtWidgets.QLineEdit()
 
-        self.edit_widget.setValidator(validator)
-        self.edit_widget.setPlaceholderText(f'({curr_value})')
-        if self.bridge.value.get() is not None:
-            self.edit_widget.setText(str(self.bridge.value.get()))
-            self.edit_widget.setToolTip(str(self.bridge.value.get()))
+            def on_text_changed(text: str) -> None:
+                match_line_edit_text_width(self.edit_widget, text=text, minimum=75)
 
-        # slot for value update on apply button press
-        def update_value():
-            text = self.edit_widget.text()
-            if text == '':
-                # nothing input, don't try to set any values
-                return
-            self.bridge.value.put(dtype(text))
-            self.value_button_box.hide()
-            self.edit_widget.setFrame(False)
+            self.edit_widget.textChanged.connect(on_text_changed)
 
-        def value_changed():
-            self.value_button_box.show()
-            self.edit_widget.setFrame(True)
+            if dtype is int:
+                validator = QtGui.QIntValidator()
+            elif dtype is float:
+                validator = QtGui.QDoubleValidator()
+            else:
+                validator = None
 
-        self.edit_widget.textChanged.connect(value_changed)
+            self.edit_widget.setValidator(validator)
+            self.edit_widget.setPlaceholderText(f'({curr_value})')
+            if self.bridge.value.get() is not None:
+                self.edit_widget.setText(str(self.bridge.value.get()))
+                self.edit_widget.setToolTip(str(self.bridge.value.get()))
 
+            # slot for value update on apply button press
+            def update_value():
+                text = self.edit_widget.text()
+                if text == '':
+                    # nothing input, don't try to set any values
+                    return
+                self.bridge.value.put(dtype(text))
+                self.value_button_box.hide()
+                self.edit_widget.setFrame(False)
+
+            def value_changed():
+                self.value_button_box.show()
+                self.edit_widget.setFrame(True)
+
+            self.edit_widget.textChanged.connect(value_changed)
+
+        # install common slots and finish common setup
         insert_widget(self.edit_widget, self.value_input_placeholder)
         self.value_button_box.show()
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
