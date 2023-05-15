@@ -12,6 +12,7 @@ Features
 Bugfixes
 --------
 - Fixes optional type hint handling in ``QDataclassBridge`` (again)
+- Improve missing field handling in report generation
 
 Maintenance
 -----------

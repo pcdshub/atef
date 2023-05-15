@@ -786,8 +786,7 @@ class AtefReport(BaseDocTemplate):
             name of field in ``config`` that holds the name to be used in this header
             can be a dotted attribute (e.g. "origin.name" etc)
         default_header : Optional[str]
-            default header text.  If provided, this method will not try to
-            autogenerate a header from the config
+            default header text, will be used if ``field`` cannot be found on ``config``
         style : PS
             style to apply to the header Paragraph flowable
         """
