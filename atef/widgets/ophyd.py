@@ -411,7 +411,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
         else:
             self.dataChanged.emit(
                 self.createIndex(row, DeviceColumn.readback),
-                self.createIndex(row, DeviceColumn.read_pvname),
+                self.createIndex(row, DeviceColumn.setpoint_pvname),
             )
 
     def get_data_for_row(self, row: int) -> Optional[OphydAttributeData]:

@@ -982,6 +982,7 @@ class ActionRowWidget(TargetRowWidget):
     setting_button: QtWidgets.QToolButton
 
     def __init__(self, data: Optional[ValueToTarget] = None, **kwargs):
+        self.curr_val_thread = None
         if data is None:
             data = ValueToTarget()
         super().__init__(data=data, **kwargs)
@@ -1046,7 +1047,7 @@ class ActionRowWidget(TargetRowWidget):
             self.setup_input_widget(self._curr_value, self._dtype,
                                     enum_strs=self._enum_strs)
 
-        if hasattr(self, 'curr_val_thread') and self.curr_val_thread.isRunning():
+        if self.curr_val_thread and self.curr_val_thread.isRunning():
             logger.debug('thread is still running.  Ignore..')
             return
 

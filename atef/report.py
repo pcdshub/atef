@@ -773,7 +773,7 @@ class AtefReport(BaseDocTemplate):
         Currently the top-level header-building helper method.
 
         Build a linked header with the attribute from the config if possible
-        create a placehodler title otherwise. Link it at the end
+        create a placeholder title otherwise. Link it at the end
 
         Parameters
         ----------
