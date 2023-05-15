@@ -6,6 +6,7 @@ import hashlib
 import logging
 from dataclasses import fields
 from datetime import datetime
+from operator import attrgetter
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
@@ -736,6 +737,75 @@ class AtefReport(BaseDocTemplate):
         header._bookmark_name = bookmark_name
         return header
 
+    def num_times_called(self, text: str) -> int:
+        """
+        Returns the number of times this method has been called with ``text``
+
+        Parameters
+        ----------
+        text : str
+            string to track
+
+        Returns
+        -------
+        int
+            number of times ``text`` has been called in this method
+        """
+        if not hasattr(self, 'text_called_count'):
+            self.text_called_count = {}
+
+        if text in self.text_called_count:
+            self.text_called_count[text] += 1
+        else:
+            self.text_called_count[text] = 1
+
+        return self.text_called_count[text]
+
+    def build_header_with_default(
+        self,
+        story: List[Flowable],
+        config: AnyDataclass,
+        field: str,
+        default_header: Optional[str] = None,
+        style: PS = h2
+    ) -> None:
+        """
+        Currently the top-level header-building helper method.
+
+        Build a linked header with the attribute from the config if possible
+        create a placehodler title otherwise. Link it at the end
+
+        Parameters
+        ----------
+        story : List[Flowable]
+            a list of components used to render the report.  New items
+            are appended to this directly
+        config : AnyDataclass
+            an atef dataclass with attribute ``field``
+        field : str
+            name of field in ``config`` that holds the name to be used in this header
+            can be a dotted attribute (e.g. "origin.name" etc)
+        default_header : Optional[str]
+            default header text.  If provided, this method will not try to
+            autogenerate a header from the config
+        style : PS
+            style to apply to the header Paragraph flowable
+        """
+        try:
+            name = attrgetter(field)(config)
+        except AttributeError:
+            name = None
+
+        if not name and default_header:
+            header_text = default_header
+        if not name:
+            header_text = f'Untitled {type(config).__name__} '
+            header_text += f'#{self.num_times_called(header_text)}'
+        else:
+            header_text = name
+
+        story.append(self.build_linked_header(header_text, style=style))
+
     def create_report(self) -> None:
         """ Build the final report. """
         raise NotImplementedError()
@@ -809,14 +879,13 @@ class PassiveAtefReport(AtefReport):
         # Build default page, settings (and maybe data) table
         if isinstance(config, (PreparedGroup, PreparedDeviceConfiguration,
                       PreparedPVConfiguration, PreparedToolConfiguration)):
-            header_text = config.config.name
-            story.append(self.build_linked_header(header_text, style=h2))
+            self.build_header_with_default(story, config, 'config.name', style=h2)
             story.append(Paragraph(config.config.description or ''))
             omit_keys = ['name', 'description', 'by_pv', 'by_attr', 'shared', 'configs']
             build_group_page(story, config, omit_keys)
         elif isinstance(config, (PreparedSignalComparison, PreparedToolComparison)):
-            header_text = config.comparison.name
-            header_text += f' - {config.identifier}'
+            header_text = config.comparison.name or ''
+            header_text += f' - {config.identifier or ""}'
             story.append(self.build_linked_header(header_text, style=h2))
             story.append(Paragraph(config.comparison.description or ''))
             build_comparison_page(story, config)
@@ -916,42 +985,36 @@ class ActiveAtefReport(AtefReport):
         omit_keys = ['name', 'description', 'actions', 'steps', 'success_criteria']
         result_attrs = ['step_result', 'verify_result', 'result']
         if isinstance(step, PreparedProcedureGroup):
-            header_text = step.origin.name
-            story.append(self.build_linked_header(header_text, style=h1))
+            self.build_header_with_default(story, step, 'origin.name', style=h1)
             story.append(Paragraph(step.origin.description or ''))
             build_group_page(story, step, omit_keys=omit_keys)
         elif isinstance(step, PreparedSetValueStep):
-            header_text = step.origin.name
-            story.append(self.build_linked_header(header_text, style=h2))
+            self.build_header_with_default(story, step, 'origin.name', style=h2)
             story.append(Paragraph(step.origin.description or ''))
             build_settings_table(story, step.origin, omit_keys=omit_keys)
             build_action_check_table(story, step)
             build_results_table(story, step, attr_names=result_attrs,
                                 list_names=['prepared_criteria'])
         elif isinstance(step, PreparedPassiveStep):
-            header_text = step.origin.name
-            story.append(self.build_linked_header(header_text, style=h2))
+            self.build_header_with_default(story, step, 'origin.name', style=h2)
             story.append(Paragraph(step.origin.description or ''))
             build_settings_table(story, step.origin, omit_keys=omit_keys)
             story.append(Paragraph('Passive Checkout Results', l0))
             build_passive_summary_table(story, step.prepared_passive_file)
             build_results_table(story, step, attr_names=result_attrs)
         elif isinstance(step, PreparedProcedureStep):
-            header_text = step.origin.name
-            story.append(self.build_linked_header(header_text, style=h2))
+            self.build_header_with_default(story, step, 'origin.name', style=h2)
             story.append(Paragraph(step.origin.description or ''))
             build_settings_table(story, step.origin, omit_keys=omit_keys)
             build_results_table(story, step, attr_names=result_attrs)
         elif isinstance(step, PreparedComparison):
-            header_text = step.comparison.name
-            header_text += f' - {step.identifier}'
+            header_text = step.comparison.name or ''
+            header_text += f' - {step.identifier or ""}'
             story.append(self.build_linked_header(header_text, style=h2))
             story.append(Paragraph(step.comparison.description or ''))
             build_comparison_page(story, step)
         else:
-            config_type = str(type(step).__name__)
-            header = self.build_linked_header(config_type, h1)
-            story.append(header)
+            self.build_header_with_default(story, step, 'origin.name', style=h1)
             story.append(Paragraph('page format not found'))
 
         # end of section
