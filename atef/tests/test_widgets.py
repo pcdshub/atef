@@ -222,5 +222,4 @@ def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike):
     window.open_file(filename=str(config))
     toggle = window.tab_widget.widget(0).toggle
     toggle.setChecked(True)
-    toggle.setChecked(False)
     qtbot.addWidget(window)
