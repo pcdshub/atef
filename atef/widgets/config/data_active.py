@@ -980,6 +980,7 @@ class ActionRowWidget(TargetRowWidget):
     value_input_placeholder: QtWidgets.QWidget
     value_button_box: QtWidgets.QDialogButtonBox
     setting_button: QtWidgets.QToolButton
+    curr_val_thread: Optional[BusyCursorThread]
 
     def __init__(self, data: Optional[ValueToTarget] = None, **kwargs):
         self.curr_val_thread = None
