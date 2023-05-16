@@ -17,7 +17,7 @@ from typing import Dict, Optional, Union
 import qtawesome
 from apischema import ValidationError, deserialize, serialize
 from qtpy import QtWidgets
-from qtpy.QtCore import QTimer
+from qtpy.QtCore import Qt, QTimer
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
                             QTabWidget, QTreeWidget, QWidget)
 
@@ -79,7 +79,14 @@ class Window(DesignerDisplay, QMainWindow):
         self.action_print_report.triggered.connect(self.print_report)
         self.action_clear_results.triggered.connect(self.clear_results)
 
-        self.tab_widget.tabBar().setUsesScrollButtons(True)
+        tab_bar = self.tab_widget.tabBar()
+        # always use scroll area and never truncate file names
+        tab_bar.setUsesScrollButtons(True)
+        tab_bar.setElideMode(Qt.ElideNone)
+        # ensure tabbar close button on right, run toggle will be on left
+        tab_bar.setStyleSheet(
+            "QTabBar::close-button { subcontrol-position: right}"
+        )
 
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
