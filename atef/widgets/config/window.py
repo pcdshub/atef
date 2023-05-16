@@ -103,7 +103,7 @@ class Window(DesignerDisplay, QMainWindow):
             self.open_file, filename=TEST_CONFIG_PATH / 'active_test.json'
         ))
 
-        widget.sample_active_button.clicked.connect(partial(
+        widget.sample_passive_button.clicked.connect(partial(
             self.open_file, filename=TEST_CONFIG_PATH / 'all_fields.json'
         ))
 
