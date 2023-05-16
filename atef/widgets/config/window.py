@@ -79,6 +79,8 @@ class Window(DesignerDisplay, QMainWindow):
         self.action_print_report.triggered.connect(self.print_report)
         self.action_clear_results.triggered.connect(self.clear_results)
 
+        self.tab_widget.tabBar().setUsesScrollButtons(True)
+
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
 
