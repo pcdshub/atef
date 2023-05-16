@@ -79,11 +79,6 @@ class Window(DesignerDisplay, QMainWindow):
         self.action_print_report.triggered.connect(self.print_report)
         self.action_clear_results.triggered.connect(self.clear_results)
 
-        self.tab_widget.setTabsClosable(True)
-        self.tab_widget.tabCloseRequested.connect(
-            lambda idx: self.tab_widget.removeTab(idx)
-        )
-
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
 
@@ -244,7 +239,11 @@ class Window(DesignerDisplay, QMainWindow):
         # set up edit-run toggle
         tab_bar = self.tab_widget.tabBar()
         widget.toggle.stateChanged.connect(widget.switch_mode)
-        tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.RightSide, widget.toggle)
+        tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.LeftSide, widget.toggle)
+        # set up close button
+        self.tab_widget.tabCloseRequested.connect(
+            lambda idx: self.tab_widget.removeTab(idx)
+        )
 
     def save(self, *args, **kwargs):
         """
