@@ -619,7 +619,7 @@ class RunTree(EditTree):
 
     def show_report_cust_prompt(self, info):
         """ generate a window allowing user to customize information """
-        msg = MultiInputDialog(init_values=info)
+        msg = MultiInputDialog(parent=self, init_values=info)
         msg.exec()
         return msg
 

@@ -16,7 +16,7 @@ import datetime
 import logging
 import pathlib
 import pprint
-from typing import (Callable, ClassVar, Dict, Generator, List, Optional,
+from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
                     Sequence, Type, TypeVar, Union)
 
 import pydm
@@ -980,8 +980,10 @@ class ActionRowWidget(TargetRowWidget):
     value_input_placeholder: QtWidgets.QWidget
     value_button_box: QtWidgets.QDialogButtonBox
     setting_button: QtWidgets.QToolButton
+    curr_val_thread: Optional[BusyCursorThread]
 
     def __init__(self, data: Optional[ValueToTarget] = None, **kwargs):
+        self.curr_val_thread = None
         if data is None:
             data = ValueToTarget()
         super().__init__(data=data, **kwargs)
@@ -995,7 +997,6 @@ class ActionRowWidget(TargetRowWidget):
         apply_button.setToolTip('Click here to confirm value')
 
         self.setting_button.setToolTip('Configure action settings')
-        self.update_input_placeholder()
 
         self.setup_setting_button()
 
@@ -1015,9 +1016,6 @@ class ActionRowWidget(TargetRowWidget):
         Updates value input widget with a QLineEdit with the approriate validator
         given the target's datatype
         """
-        # TODO: Enum drop box?
-        self.edit_widget = QtWidgets.QLineEdit()
-
         sig = self.data.to_signal()
         if sig is None:
             self.edit_widget = QtWidgets.QLabel('(no target set)')
@@ -1025,52 +1023,118 @@ class ActionRowWidget(TargetRowWidget):
             self.value_button_box.hide()
             return
 
-        try:
-            curr_value = sig.get()
-            dtype = type(curr_value)
-        except TimeoutError:
-            curr_value = 'no data'
+        self._curr_value = None
+        self._dtype = None
+        self._enum_strs = None
+
+        def get_curr_value():
+            self._curr_value = sig.get()
+            self._dtype = type(self._curr_value)
+            self._enum_strs = getattr(sig, 'enum_strs', None)
+
+        def fail_get_value(ex: Exception):
+            logger.debug(f'failed to get signal data for input widget: {ex}')
+            self._curr_value = 'no data'
             # fall back to type in dataclass if available
             stored_value = self.bridge.value.get()
             if stored_value is not None:
-                dtype = type(stored_value)
+                self._dtype = type(stored_value)
             else:
-                dtype = float
+                self._dtype = float
 
-        def on_text_changed(text: str) -> None:
-            match_line_edit_text_width(self.edit_widget, text=text, minimum=75)
+            run_setup_input_widget()
 
-        self.edit_widget.textChanged.connect(on_text_changed)
+        def run_setup_input_widget():
+            self.setup_input_widget(self._curr_value, self._dtype,
+                                    enum_strs=self._enum_strs)
 
-        if dtype is int:
-            validator = QtGui.QIntValidator()
-        elif dtype is float:
-            validator = QtGui.QDoubleValidator()
+        if self.curr_val_thread and self.curr_val_thread.isRunning():
+            logger.debug('thread is still running.  Ignore..')
+            return
+
+        self.curr_val_thread = BusyCursorThread(func=get_curr_value)
+        self.curr_val_thread.raised_exception.connect(fail_get_value)
+        self.curr_val_thread.task_finished.connect(run_setup_input_widget)
+        self.curr_val_thread.start()
+
+    def setup_input_widget(
+        self,
+        curr_value: Any,
+        dtype: Any,
+        enum_strs: Optional[List[str]] = None
+    ) -> None:
+        """
+        Update the input widget given information from a signal
+
+        Parameters
+        ----------
+        curr_value : Any
+            the current value to set to the widget
+        dtype : Any
+            type of input expected
+        enum_strs : Optional[List[str]], optional
+            enum strings, by default None
+        """
+        # Enum Case
+        if enum_strs is not None:
+            self.edit_widget = QtWidgets.QComboBox()
+            self.edit_widget.setEditable(False)
+            for enum_str in enum_strs:
+                self.edit_widget.addItem(enum_str)
+
+            def update_value():
+                value = self.edit_widget.currentText()
+                self.bridge.value.put(value)
+                self.value_button_box.hide()
+
+            def value_changed():
+                self.value_button_box.show()
+
+            self.edit_widget.currentTextChanged.connect(value_changed)
+
+            if curr_value != 'no data':
+                self.edit_widget.setCurrentIndex(curr_value)
+
+        # Use a line edit to catch free-entry numerics, strings
         else:
-            validator = None
+            self.edit_widget = QtWidgets.QLineEdit()
 
-        self.edit_widget.setValidator(validator)
-        self.edit_widget.setPlaceholderText(f'({curr_value})')
-        if self.bridge.value.get() is not None:
-            self.edit_widget.setText(str(self.bridge.value.get()))
-            self.edit_widget.setToolTip(str(self.bridge.value.get()))
+            def on_text_changed(text: str) -> None:
+                match_line_edit_text_width(self.edit_widget, text=text, minimum=75)
 
-        # slot for value update on apply button press
-        def update_value():
-            text = self.edit_widget.text()
-            if text == '':
-                # nothing input, don't try to set any values
-                return
-            self.bridge.value.put(dtype(text))
-            self.value_button_box.hide()
-            self.edit_widget.setFrame(False)
+            self.edit_widget.textChanged.connect(on_text_changed)
 
-        def value_changed():
-            self.value_button_box.show()
-            self.edit_widget.setFrame(True)
+            if dtype is int:
+                validator = QtGui.QIntValidator()
+            elif dtype is float:
+                validator = QtGui.QDoubleValidator()
+            else:
+                validator = None
 
-        self.edit_widget.textChanged.connect(value_changed)
+            self.edit_widget.setValidator(validator)
+            self.edit_widget.setPlaceholderText(f'({curr_value})')
+            if self.bridge.value.get() is not None:
+                if isinstance(self.bridge.value.get(), dtype):
+                    self.edit_widget.setText(str(self.bridge.value.get()))
+                    self.edit_widget.setToolTip(str(self.bridge.value.get()))
 
+            # slot for value update on apply button press
+            def update_value():
+                text = self.edit_widget.text()
+                if text == '':
+                    # nothing input, don't try to set any values
+                    return
+                self.bridge.value.put(dtype(text))
+                self.value_button_box.hide()
+                self.edit_widget.setFrame(False)
+
+            def value_changed():
+                self.value_button_box.show()
+                self.edit_widget.setFrame(True)
+
+            self.edit_widget.textChanged.connect(value_changed)
+
+        # install common slots and finish common setup
         insert_widget(self.edit_widget, self.value_input_placeholder)
         self.value_button_box.show()
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
