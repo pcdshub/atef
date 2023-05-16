@@ -7,13 +7,17 @@ import json
 import logging
 import os
 import os.path
+import webbrowser
 from copy import deepcopy
+from functools import partial
+from pathlib import Path
 from pprint import pprint
 from typing import Dict, Optional, Union
 
+import qtawesome
 from apischema import ValidationError, deserialize, serialize
 from qtpy import QtWidgets
-from qtpy.QtCore import QTimer
+from qtpy.QtCore import Qt, QTimer
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
                             QTabWidget, QTreeWidget, QWidget)
 
@@ -34,6 +38,8 @@ from .run_base import (get_prepared_step, get_relevant_configs_comps,
 from .utils import MultiInputDialog, Toggle, clear_results
 
 logger = logging.getLogger(__name__)
+
+TEST_CONFIG_PATH = Path(__file__).parent.parent.parent / 'tests' / 'configs'
 
 
 class Window(DesignerDisplay, QMainWindow):
@@ -72,24 +78,50 @@ class Window(DesignerDisplay, QMainWindow):
         )
         self.action_print_report.triggered.connect(self.print_report)
         self.action_clear_results.triggered.connect(self.clear_results)
+
+        tab_bar = self.tab_widget.tabBar()
+        # always use scroll area and never truncate file names
+        tab_bar.setUsesScrollButtons(True)
+        tab_bar.setElideMode(Qt.ElideNone)
+        # ensure tabbar close button on right, run toggle will be on left
+        tab_bar.setStyleSheet(
+            "QTabBar::close-button { subcontrol-position: right}"
+        )
+
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
 
     def welcome_user(self):
         """
         On open, ask the user what they'd like to do (new config? load?)
+
+        Set up the landing page
         """
-        welcome_box = QMessageBox(self)
-        welcome_box.setIcon(QMessageBox.Question)
-        welcome_box.setWindowTitle('Welcome')
-        welcome_box.setText('Welcome to atef config!')
-        welcome_box.setInformativeText('Please select a startup action')
-        open_button = welcome_box.addButton(QMessageBox.Open)
-        new_button = welcome_box.addButton('New', QMessageBox.AcceptRole)
-        welcome_box.addButton(QMessageBox.Close)
-        open_button.clicked.connect(self.open_file)
-        new_button.clicked.connect(self.new_file)
-        welcome_box.exec()
+        widget = LandingPage()
+        self.tab_widget.addTab(widget, 'Welcome to Atef!')
+        curr_idx = self.tab_widget.count() - 1
+        self.tab_widget.setCurrentIndex(curr_idx)
+
+        widget.new_passive_button.clicked.connect(
+            partial(self.new_file, checkout_type='passive')
+        )
+        widget.new_active_button.clicked.connect(
+            partial(self.new_file, checkout_type='active')
+        )
+        widget.sample_active_button.clicked.connect(partial(
+            self.open_file, filename=TEST_CONFIG_PATH / 'active_test.json'
+        ))
+
+        widget.sample_passive_button.clicked.connect(partial(
+            self.open_file, filename=TEST_CONFIG_PATH / 'all_fields.json'
+        ))
+
+        widget.open_button.clicked.connect(self.open_file)
+        widget.exit_button.clicked.connect(self.close_all)
+
+    def close_all(self):
+        qapp = QtWidgets.QApplication.instance()
+        qapp.closeAllWindows()
 
     def _passive_or_active(self) -> str:
         """
@@ -139,14 +171,15 @@ class Window(DesignerDisplay, QMainWindow):
         """
         return self.tab_widget.currentWidget().get_tree()
 
-    def new_file(self, *args, **kwargs):
+    def new_file(self, *args, checkout_type: Optional[str] = None, **kwargs):
         """
         Create and populate a new edit tab.
 
         The parameters are open as to accept inputs from any signal.
         """
         # prompt user to select checkout type
-        checkout_type = self._passive_or_active()
+        if checkout_type is None:
+            checkout_type = self._passive_or_active()
         if checkout_type == 'passive':
             data = ConfigurationFile()
         elif checkout_type == 'active':
@@ -215,7 +248,11 @@ class Window(DesignerDisplay, QMainWindow):
         # set up edit-run toggle
         tab_bar = self.tab_widget.tabBar()
         widget.toggle.stateChanged.connect(widget.switch_mode)
-        tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.RightSide, widget.toggle)
+        tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.LeftSide, widget.toggle)
+        # set up close button
+        self.tab_widget.tabCloseRequested.connect(
+            lambda idx: self.tab_widget.removeTab(idx)
+        )
 
     def save(self, *args, **kwargs):
         """
@@ -327,6 +364,39 @@ class Window(DesignerDisplay, QMainWindow):
                 clear_results(config_file)
 
             current_tree.update_statuses()
+
+
+class LandingPage(DesignerDisplay, QWidget):
+    """ Landing Page for selecting a subsequent action """
+    filename = 'landing_page.ui'
+
+    new_passive_button: QtWidgets.QPushButton
+    new_active_button: QtWidgets.QPushButton
+    open_button: QtWidgets.QPushButton
+    exit_button: QtWidgets.QPushButton
+
+    sample_passive_button: QtWidgets.QPushButton
+    sample_active_button: QtWidgets.QPushButton
+    docs_button: QtWidgets.QPushButton
+    source_button: QtWidgets.QPushButton
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_ui()
+
+    def setup_ui(self):
+        # icons for buttons
+        self.open_button.setIcon(qtawesome.icon('fa.folder-open-o'))
+        self.exit_button.setIcon(qtawesome.icon('fa.close'))
+        self.new_passive_button.setIcon(qtawesome.icon('fa.file-text-o'))
+        self.new_active_button.setIcon(qtawesome.icon('fa.file-code-o'))
+        # links for buttons... maybe
+        self.docs_button.clicked.connect(
+            lambda: webbrowser.open('https://confluence.slac.stanford.edu/display/PCDS/atef')
+        )
+        self.source_button.clicked.connect(
+            lambda: webbrowser.open('https://github.com/pcdshub/atef/tree/master')
+        )
 
 
 class EditTree(DesignerDisplay, QWidget):
