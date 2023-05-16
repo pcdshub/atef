@@ -4,6 +4,7 @@ Report rendering framework
 
 import hashlib
 import logging
+from collections import defaultdict
 from dataclasses import fields
 from datetime import datetime
 from operator import attrgetter
@@ -563,6 +564,8 @@ class AtefReport(BaseDocTemplate):
         self.header_center_text = ''
         self.footer_center_text = ''
         self.approval_slots = 1
+        # for tracking untitled steps
+        self._text_called_count = defaultdict(lambda: 0)
 
     def afterFlowable(self, flowable: Flowable) -> None:
         """
@@ -751,15 +754,9 @@ class AtefReport(BaseDocTemplate):
         int
             number of times ``text`` has been called in this method
         """
-        if not hasattr(self, 'text_called_count'):
-            self.text_called_count = {}
+        self._text_called_count[text] += 1
 
-        if text in self.text_called_count:
-            self.text_called_count[text] += 1
-        else:
-            self.text_called_count[text] = 1
-
-        return self.text_called_count[text]
+        return self._text_called_count[text]
 
     def build_header_with_default(
         self,
