@@ -95,7 +95,7 @@ class QDataclassBridge(QObject):
             NestedClass = QDataclassList
             dtype = args[0]
         elif (origin is Union) and (type(None) in args):
-            # Optional, need to add nonetype to changed_value signal emit
+            # Optional, need to allow NoneType to be emitted by changed_value signal
             if len(args) > 2:
                 # Optional + many other types, dispatch to complex Union case
                 self.set_field_from_data(name, args[:-1], data, optional=True)
@@ -104,8 +104,6 @@ class QDataclassBridge(QObject):
             return
         else:
             # some complex Union? e.g. Union[str, int, bool, float]
-            # Optional hints also need to have a general signal to emit NoneType
-            # (technically QSignal(str) works, but is it worth the special case?)
             logger.debug(f'Complex type hint found: {type_hint} - ({origin}, {args})')
             NestedClass = QDataclassValue
             dtype = object
@@ -117,16 +115,12 @@ class QDataclassBridge(QObject):
         setattr(
             self,
             name,
-            NestedClass.of_type(dtype)(
+            NestedClass.of_type(dtype, optional=optional)(
                 data,
                 name,
                 parent=self,
             ),
         )
-
-        if optional:
-            # allow NoneType in emitted types while retaining other methods
-            setattr(self, f'{name}.changed_value', QSignal(object))
 
 
 class QDataclassElem:
@@ -165,18 +159,28 @@ class QDataclassValue(QDataclassElem):
     _registry = {}
 
     @classmethod
-    def of_type(cls, data_type: type) -> Type[QDataclassValue]:
+    def of_type(
+        cls,
+        data_type: type,
+        optional: bool = False
+    ) -> Type[QDataclassValue]:
         """
         Create a QDataclass with a specific QSignal
 
         Parameters
         ----------
         data_type : any primitive type
+        optional : bool
+            if the value is optional, True if ``None`` is a valid value
         """
+        if optional:
+            data_type = object
+
         try:
-            return cls._registry[data_type]
+            return cls._registry[(data_type, optional)]
         except KeyError:
             ...
+
         new_class = type(
             f'QDataclassValueFor{data_type.__name__}',
             (cls, QObject),
@@ -185,7 +189,7 @@ class QDataclassValue(QDataclassElem):
                 'changed_value': QSignal(data_type),
             },
         )
-        cls._registry[data_type] = new_class
+        cls._registry[(data_type, optional)] = new_class
         return new_class
 
     def get(self) -> Any:
@@ -221,18 +225,30 @@ class QDataclassList(QDataclassElem):
     _registry = {}
 
     @classmethod
-    def of_type(cls, data_type: type) -> Type[QDataclassList]:
+    def of_type(
+        cls,
+        data_type: type,
+        optional: bool = False
+    ) -> Type[QDataclassList]:
         """
         Create a QDataclass with a specific QSignal
 
         Parameters
         ----------
         data_type : any primitive type
+        optional : bool
+            if the value is optional, True if ``None`` is a valid value
         """
+        if optional:
+            changed_value_type = object
+        else:
+            changed_value_type = data_type
+
         try:
-            return cls._registry[data_type]
+            return cls._registry[(data_type, optional)]
         except KeyError:
             ...
+
         new_class = type(
             f'QDataclassListFor{data_type.__name__}',
             (cls, QObject),
@@ -242,11 +258,11 @@ class QDataclassList(QDataclassElem):
                 'added_index': QSignal(int),
                 'removed_value': QSignal(data_type),
                 'removed_index': QSignal(int),
-                'changed_value': QSignal(data_type),
+                'changed_value': QSignal(changed_value_type),
                 'changed_index': QSignal(int),
             },
         )
-        cls._registry[data_type] = new_class
+        cls._registry[(data_type, optional)] = new_class
         return new_class
 
     def get(self) -> List[Any]:
