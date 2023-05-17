@@ -177,7 +177,7 @@ def build_passive_summary_table(story: List[Flowable], prep_file: PreparedFile):
         if isinstance(item, PreparedConfiguration):
             name = item.config.name
         elif isinstance(item, PreparedComparison):
-            name = item.comparison.name + ' - ' + item.identifier
+            name = str(item.comparison.name) + ' - ' + str(item.identifier)
         name = name or type(item).__name__
         table_data.append(
             [
@@ -951,7 +951,7 @@ class ActiveAtefReport(AtefReport):
             if isinstance(item, PreparedProcedureStep):
                 name = item.origin.name
             elif isinstance(item, PreparedComparison):
-                name = item.comparison.name + ' - ' + item.identifier
+                name = str(item.comparison.name) + ' - ' + str(item.identifier)
             name = name or type(item).__name__
             table_data.append(
                 [

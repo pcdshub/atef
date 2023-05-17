@@ -1138,6 +1138,8 @@ class ActionRowWidget(TargetRowWidget):
         insert_widget(self.edit_widget, self.value_input_placeholder)
         self.value_button_box.show()
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
+        # disconnect all old update_value slots
+        apply_button.clicked.disconnect()
         apply_button.clicked.connect(update_value)
 
     def setup_setting_button(self) -> None:
