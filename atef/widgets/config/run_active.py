@@ -155,7 +155,11 @@ class ActionRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
         insert_widget(self.status_label, self.status_label_placeholder)
         self.name_label.setText(data.name)
         self.target_label.setText(data.signal.name)
-        self.value_label.setText(str(data.value))
+        enum_strs = getattr(data.signal, 'enum_strs')
+        if enum_strs:
+            self.value_label.setText(str(enum_strs[int(data.value)]))
+        else:
+            self.value_label.setText(str(data.value))
 
 
 class CheckRowRunWidget(DesignerDisplay, QtWidgets.QWidget):

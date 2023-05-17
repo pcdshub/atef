@@ -1083,8 +1083,8 @@ class ActionRowWidget(TargetRowWidget):
                 self.edit_widget.addItem(enum_str)
 
             def update_value():
-                value = self.edit_widget.currentText()
-                self.bridge.value.put(value)
+                int_value = self.edit_widget.currentIndex()
+                self.bridge.value.put(int_value)
                 self.value_button_box.hide()
 
             def value_changed():
