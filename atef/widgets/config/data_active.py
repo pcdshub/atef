@@ -1187,7 +1187,8 @@ class CheckRowWidget(TargetRowWidget):
 
     def __init__(self, data: Optional[ComparisonToTarget] = None, **kwargs):
         if data is None:
-            data = ComparisonToTarget(name='untitled_check', comparison=Equals())
+            data = ComparisonToTarget(name='untitled_check',
+                                      comparison=Equals(name='untitled'))
         super().__init__(data=data, **kwargs)
 
         self.name_edit.hide()
