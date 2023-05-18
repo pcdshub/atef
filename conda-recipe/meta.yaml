@@ -27,7 +27,6 @@ requirements:
   - archapp >=1.1.0
   - bluesky
   - bluesky-widgets
-  - bluesky-queueserver
   - happi
   - ipython
   - numpy
