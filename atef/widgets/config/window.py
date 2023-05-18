@@ -88,6 +88,10 @@ class Window(DesignerDisplay, QMainWindow):
             "QTabBar::close-button { subcontrol-position: right}"
         )
 
+        self.tab_widget.tabCloseRequested.connect(
+            self.tab_widget.removeTab
+        )
+
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
 
@@ -249,10 +253,6 @@ class Window(DesignerDisplay, QMainWindow):
         tab_bar = self.tab_widget.tabBar()
         widget.toggle.stateChanged.connect(widget.switch_mode)
         tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.LeftSide, widget.toggle)
-        # set up close button
-        self.tab_widget.tabCloseRequested.connect(
-            lambda idx: self.tab_widget.removeTab(idx)
-        )
 
     def save(self, *args, **kwargs):
         """
