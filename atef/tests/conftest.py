@@ -15,13 +15,14 @@ CONFIG_PATH = TEST_PATH / "configs"
 
 
 def passive_checkout_configs() -> List[pathlib.Path]:
-    filenames = ['lfe.json', 'all_fields.json', 'ping_localhost.json']
+    filenames = ['lfe.json', 'all_fields.json', 'blank_passive.json',
+                 'ping_localhost.json']
     config_paths = [CONFIG_PATH / fn for fn in filenames]
     return config_paths
 
 
 def active_checkout_configs() -> List[pathlib.Path]:
-    filenames = ['active_test.json']
+    filenames = ['active_test.json', 'blank_active.json']
     config_paths = [CONFIG_PATH / fn for fn in filenames]
     return config_paths
 

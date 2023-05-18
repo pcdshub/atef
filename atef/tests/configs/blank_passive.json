@@ -1,0 +1,188 @@
+{
+  "version": 0,
+  "root": {
+    "name": "root",
+    "description": null,
+    "tags": null,
+    "configs": [
+      {
+        "ConfigurationGroup": {
+          "name": null,
+          "description": null,
+          "tags": null,
+          "configs": [],
+          "values": {},
+          "mode": "all"
+        }
+      },
+      {
+        "DeviceConfiguration": {
+          "name": null,
+          "description": null,
+          "tags": null,
+          "devices": [],
+          "by_attr": {},
+          "shared": [
+            {
+              "NotEquals": {
+                "name": "untitled",
+                "description": null,
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "value": 0.0,
+                "rtol": null,
+                "atol": null
+              }
+            },
+            {
+              "Greater": {
+                "name": "untitled",
+                "description": null,
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "value": 0.0
+              }
+            },
+            {
+              "GreaterOrEqual": {
+                "name": "untitled",
+                "description": null,
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "value": 0.0
+              }
+            },
+            {
+              "Less": {
+                "name": "untitled",
+                "description": null,
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "value": 0.0
+              }
+            },
+            {
+              "LessOrEqual": {
+                "name": "untitled",
+                "description": null,
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "value": 0.0
+              }
+            },
+            {
+              "Range": {
+                "name": "untitled",
+                "description": null,
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "low": 0,
+                "high": 0,
+                "warn_low": null,
+                "warn_high": null,
+                "inclusive": true
+              }
+            },
+            {
+              "AnyValue": {
+                "name": "untitled",
+                "description": null,
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "values": []
+              }
+            },
+            {
+              "ValueSet": {
+                "name": "untitled",
+                "description": null,
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "values": []
+              }
+            },
+            {
+              "Equals": {
+                "name": "untitled",
+                "description": null,
+                "invert": false,
+                "reduce_period": null,
+                "reduce_method": "average",
+                "string": null,
+                "severity_on_failure": 2,
+                "if_disconnected": 2,
+                "value": 0.0,
+                "rtol": null,
+                "atol": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "PVConfiguration": {
+          "name": null,
+          "description": null,
+          "tags": null,
+          "by_pv": {},
+          "shared": []
+        }
+      },
+      {
+        "ToolConfiguration": {
+          "name": null,
+          "description": null,
+          "tags": null,
+          "tool": {
+            "Ping": {
+              "hosts": [],
+              "count": 3,
+              "encoding": "utf-8"
+            }
+          },
+          "by_attr": {
+            "max_time": [],
+            "min_time": [],
+            "num_alive": [],
+            "num_unresponsive": []
+          },
+          "shared": []
+        }
+      }
+    ],
+    "values": {},
+    "mode": "all"
+  }
+}
