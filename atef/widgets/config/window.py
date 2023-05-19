@@ -12,12 +12,13 @@ from copy import deepcopy
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Dict, Optional, Union
+from typing import ClassVar, Dict, Optional, Union
 
 import qtawesome
 from apischema import ValidationError, deserialize, serialize
 from qtpy import QtWidgets
 from qtpy.QtCore import Qt, QTimer
+from qtpy.QtCore import Signal as QSignal
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
                             QTabWidget, QTreeWidget, QWidget)
 
@@ -27,7 +28,7 @@ from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep)
 from atef.qt_helpers import walk_tree_widget_items
 from atef.report import ActiveAtefReport, PassiveAtefReport
-from atef.widgets.utils import busy_cursor
+from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
@@ -628,6 +629,7 @@ class DualTree(QWidget):
     """
     A widget that exposes one of two tree widgets depending on the mode
     """
+    mode_switch_finished: ClassVar[QSignal] = QSignal()
 
     def __init__(
         self,
@@ -680,13 +682,20 @@ class DualTree(QWidget):
     def switch_mode(self) -> None:
         """ Switch tree modes between 'edit' and 'run' """
         # TODO: can this switching be made more elegant?
-        if self.mode == 'edit':
-            self.mode = 'run'
-        else:
-            self.mode = 'edit'
-        self.show_widgets()
+        set_wait_cursor()
+        try:
+            self.mode_switch_finished.connect(reset_cursor)
+            if self.mode == 'edit':
+                self.mode = 'run'
+            else:
+                self.mode = 'edit'
+            self.show_widgets()
+        except Exception as ex:
+            logger.exception(ex)
+        finally:
+            self.mode_switch_finished.emit()
+            self.mode_switch_finished.disconnect(reset_cursor)
 
-    @busy_cursor
     def show_widgets(self) -> None:
         """ Show active widget, hide others. (re)generate RunTree if needed """
         # If run_tree requested check if there are changes
