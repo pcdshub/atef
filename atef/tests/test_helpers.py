@@ -18,7 +18,7 @@ def sample_dataclass() -> AnyDataclass:
         other_field: Any = False
         complex_field: Union[str, int, float] = '2/3'
 
-        sequence_field: Sequence[int] = field(default_factory=list)
+        sequence_field: Sequence[bool] = field(default_factory=list)
         list_str_field: List[str] = field(default_factory=lambda: ['a', 'b'])
         list_int_field: List[int] = field(default_factory=lambda: [1, 2])
         list_many_field: List[Union[str, int]] = field(
@@ -45,6 +45,7 @@ def sample_bridge(sample_dataclass) -> QDataclassBridge:
     ['bool_field', QDataclassValue, 'bool'],
     ['complex_field', QDataclassValue, 'object'],
     ['dict_field', QDataclassValue, 'object'],
+    ['sequence_field', QDataclassList, 'bool'],
     ['list_int_field', QDataclassList, 'int'],
     ['list_str_field', QDataclassList, 'str'],
     ['optional_list', QDataclassList, 'object'],

@@ -1,12 +1,20 @@
 import contextlib
 import datetime
+import json
 import pathlib
+import tempfile
 from typing import Any, Dict, List, Optional
 
+import happi
 import pydm
 import pydm.exception
 import pytest
+import simplejson
+from apischema import ValidationError, deserialize
 from qtpy import QtWidgets
+
+from atef.config import ConfigurationFile
+from atef.procedure import ProcedureFile
 
 from ..archive_device import ArchivedValue, ArchiverHelper
 
@@ -109,3 +117,76 @@ def non_interactive_qt_application(monkeypatch):
     monkeypatch.setattr(
         pydm.exception, 'raise_to_operator', lambda *_, **__: None
     )
+
+
+@pytest.fixture
+def load_config():
+    def load_config_fn(config_path: pathlib.Path):
+        with open(config_path, 'r') as fd:
+            serialized = json.load(fd)
+
+        try:
+            data = deserialize(ConfigurationFile, serialized)
+        except ValidationError:
+            try:
+                data = deserialize(ProcedureFile, serialized)
+            except Exception as ex:
+                raise RuntimeError(f'failed to open checkout {ex}')
+
+        return data
+
+    return load_config_fn
+
+
+@pytest.fixture
+def sim_db() -> List[happi.OphydItem]:
+    items = []
+    sim1 = {
+        'name': 'motor1',
+        'z': 400,
+        '_id': 'motor1',
+        'prefix': 'MY:MOTOR1',
+        'beamline': 'LCLS',
+        'type': 'OphydItem',
+        'device_class': 'ophyd.sim.SynAxis',
+        'args': list(),
+        'kwargs': {'name': '{{name}}', 'prefix': '{{prefix}}'},
+        'location_group': 'LOC',
+        'functional_group': 'FUNC',
+    }
+
+    sim2 = {
+        'name': 'motor2',
+        'z': 200,
+        '_id': 'motor2',
+        'prefix': 'MY:MOTOR2',
+        'beamline': 'LCLS',
+        'type': 'OphydItem',
+        'device_class': 'ophyd.sim.SynAxis',
+        'args': list(),
+        'kwargs': {'name': '{{name}}', 'prefix': '{{prefix}}'},
+        'location_group': 'LOC',
+        'functional_group': 'FUNC',
+    }
+    for info in [sim1, sim2]:
+        items.append(happi.OphydItem(**info))
+    return items
+
+
+@pytest.fixture(scope='function')
+def mockjsonclient():
+    # Write underlying database
+    with tempfile.NamedTemporaryFile(mode='w') as handle:
+        simplejson.dump({}, handle)
+        handle.flush()  # flush buffer to write file
+        # Return handle name
+        db = happi.backends.json_db.JSONBackend(handle.name)
+        yield happi.Client(database=db)
+        # tempfile will be deleted once context manager is resolved
+
+
+@pytest.fixture
+def happi_client(mockjsonclient: happi.Client, sim_db: List[happi.OphydItem]):
+    for item in sim_db:
+        mockjsonclient.add_item(item)
+    return mockjsonclient

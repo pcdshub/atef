@@ -6,6 +6,9 @@ import apischema
 import pytest
 import yaml
 from pytestqt.qtbot import QtBot
+from qtpy import QtCore
+
+from atef.widgets.happi import HappiDeviceComponentWidget
 
 from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
                          PydmDisplayStep, TyphosDisplayStep)
@@ -223,3 +226,17 @@ def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike):
     toggle = window.tab_widget.widget(0).toggle
     toggle.setChecked(True)
     qtbot.addWidget(window)
+
+
+def test_open_happi_viewer(qtbot: QtBot, happi_client):
+    happi_widget = HappiDeviceComponentWidget(client=happi_client)
+    search_widget = happi_widget.item_search_widget
+
+    def search_finished():
+        # wait until HappiSearchWidget.refresh_happi's update_gui callback finished
+        # refresh button gets disabled until this happens
+        assert search_widget.button_refresh.isEnabled()
+
+    qtbot.mouseClick(search_widget.button_refresh, QtCore.Qt.LeftButton)
+    qtbot.wait_until(search_finished)
+    qtbot.addWidget(happi_widget)
