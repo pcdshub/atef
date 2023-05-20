@@ -749,6 +749,7 @@ class TargetRowWidget(DesignerDisplay, SimpleRowWidget):
     filename = 'action_row_widget.ui'
 
     target_button: QtWidgets.QToolButton
+    target_entry_widget: TargetEntryWidget
 
     def __init__(self, data: Target, **kwargs):
         super().__init__(data=data, **kwargs)
@@ -982,8 +983,11 @@ class ActionRowWidget(TargetRowWidget):
     setting_button: QtWidgets.QToolButton
     curr_val_thread: Optional[BusyCursorThread]
 
+    edit_widget = ClassVar[Optional[QtWidgets.QWidget]]
+
     def __init__(self, data: Optional[ValueToTarget] = None, **kwargs):
         self.curr_val_thread = None
+        self.edit_widget = None
         if data is None:
             data = ValueToTarget()
         super().__init__(data=data, **kwargs)
@@ -992,6 +996,7 @@ class ActionRowWidget(TargetRowWidget):
         # Called by TargetRowWidget.__init__
         super().setup_ui()
         self.child_button.hide()
+        self.value_button_box.hide()
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
         apply_button.setText('')
         apply_button.setToolTip('Click here to confirm value')
