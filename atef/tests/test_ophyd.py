@@ -1,5 +1,6 @@
+from unittest import mock
+
 import happi
-import mock
 import pytest
 from pytestqt.qtbot import QtBot
 from qtpy import QtWidgets
@@ -9,6 +10,7 @@ from atef.widgets.ophyd import OphydAttributeData
 
 
 def test_ophyd_attribute_data(happi_client):
+    """ Pass if OphydAttributeData creation is successful """
     dev = happi_client.search()[0].get()
     OphydAttributeData.from_device_attribute(dev, 'setpoint')
     OphydAttributeData.from_device_attribute(dev, 'acceleration')
@@ -19,7 +21,7 @@ def test_ophyd_attribute_data(happi_client):
 @pytest.mark.parametrize('dev_name, attr, widget_type, data_type', [
     ['motor1', 'setpoint', QtWidgets.QLineEdit, int],
 ])
-@mock.patch('happi.Client.from_config')
+@mock.patch('atef.util.get_happi_client')
 def test_action_target_set(
     mock_from_config,
     qtbot: QtBot,
@@ -29,8 +31,11 @@ def test_action_target_set(
     widget_type: QtWidgets.QWidget,
     data_type: type
 ):
+    """
+    Pass if we can set attribute data for an ActionRow and verify the type of
+    resulting input widget
+    """
     mock_from_config.return_value = happi_client
-
     action_row = ActionRowWidget()
     dev = happi_client.search(name=dev_name)[0].get()
     attr_data = OphydAttributeData.from_device_attribute(dev, attr)
