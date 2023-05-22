@@ -6,14 +6,16 @@ from pytestqt.qtbot import QtBot
 from qtpy import QtWidgets
 
 from atef.widgets.config.data_active import ActionRowWidget
-from atef.widgets.ophyd import OphydAttributeData
+from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
 
 
 def test_ophyd_attribute_data(happi_client):
-    """ Pass if OphydAttributeData creation is successful """
+    """ Pass if OphydAttributeData/Summary creation is successful """
     dev = happi_client.search()[0].get()
     OphydAttributeData.from_device_attribute(dev, 'setpoint')
-    OphydAttributeData.from_device_attribute(dev, 'acceleration')
+    odata = OphydAttributeData.from_device_attribute(dev, 'acceleration')
+
+    OphydAttributeDataSummary.from_attr_data(odata)
 
 
 # TODO: Figure out how to get sim Enum.  SynGauss has one but requires a device
