@@ -13,8 +13,15 @@ import simplejson
 from apischema import ValidationError, deserialize
 from qtpy import QtWidgets
 
-from atef.config import ConfigurationFile
+from atef.check import Equals, Greater, GreaterOrEqual, LessOrEqual, NotEquals
+from atef.config import (ConfigurationFile, ConfigurationGroup,
+                         DeviceConfiguration, PVConfiguration,
+                         ToolConfiguration)
 from atef.procedure import ProcedureFile
+from atef.tools import Ping
+from atef.type_hints import AnyDataclass
+from atef.widgets.config.page import (PAGE_MAP, AtefItem, ComparisonPage,
+                                      PageWidget, link_page)
 
 from ..archive_device import ArchivedValue, ArchiverHelper
 
@@ -190,3 +197,72 @@ def happi_client(mockjsonclient: happi.Client, sim_db: List[happi.OphydItem]):
     for item in sim_db:
         mockjsonclient.add_item(item)
     return mockjsonclient
+
+
+@pytest.fixture
+def configuration_group():
+    group = ConfigurationGroup(
+        name='config_group',
+        configs=[
+            PVConfiguration(
+                name='pv config 1',
+                by_pv={"GDET:FEE1:241:ENRC": [Greater(value=-10)]}
+            ),
+            PVConfiguration(
+                name='pv config 2',
+                shared=[NotEquals(value=0)]
+            ),
+        ]
+    )
+    return group
+
+
+@pytest.fixture
+def make_page():
+    def make_page_fn(cfg: AnyDataclass) -> PageWidget:
+        page_cls = PAGE_MAP[type(cfg)]
+        cfg_page = page_cls(cfg)
+        cfg_item = AtefItem(QtWidgets.QTreeWidget(), name='root',
+                            func_name=page_cls.__name__)
+        link_page(item=cfg_item, widget=cfg_page)
+        return cfg_page
+
+    return make_page_fn
+
+
+@pytest.fixture
+def pv_configuration():
+    group = PVConfiguration(
+        name='pv config 1',
+        by_pv={"MY:PREFIX:hello": [Greater(value=-10), Equals(value=.1)]},
+        shared=[LessOrEqual(value=44)]
+    )
+    return group
+
+
+@pytest.fixture
+def device_configuration():
+    group = DeviceConfiguration(
+        name='device config 1',
+        devices=['im1l0', 'im2l0', 'im3l0'],
+        by_attr={"cam_power": [Equals(value=1)],
+                 "detector.event_rate": [GreaterOrEqual(value=1.0)]},
+        shared=[]
+    )
+    return group
+
+
+@pytest.fixture
+def tool_configuration():
+    group = ToolConfiguration(
+        name='ping tool',
+        tool=Ping(hosts=['psbuild-rhel7', 'localhost']),
+        shared=[Equals(value=3)]
+    )
+    return group
+
+
+@pytest.fixture
+def comparison_page():
+    comp = Equals(value=3)
+    return ComparisonPage(comp)
