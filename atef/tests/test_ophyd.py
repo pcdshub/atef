@@ -6,7 +6,8 @@ from pytestqt.qtbot import QtBot
 from qtpy import QtWidgets
 
 from atef.widgets.config.data_active import ActionRowWidget
-from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
+from atef.widgets.ophyd import (OphydAttributeData, OphydAttributeDataSummary,
+                                PolledDeviceModel)
 
 
 def test_ophyd_attribute_data(happi_client):
@@ -48,3 +49,20 @@ def test_action_target_set(
     qtbot.wait_until(lambda: not action_row.value_button_box.isHidden())
     assert isinstance(action_row.edit_widget, widget_type)
     assert action_row._dtype is data_type
+
+
+def test_polling_thread(qtbot: QtBot, happi_client: happi.Client):
+    dev = happi_client.search()[0].get()
+    model = PolledDeviceModel(dev)
+    thread = model._poll_thread
+    qtbot.wait_until(lambda: model._poll_thread.running)
+    # assert model._poll_thread.running
+
+    old_value = dev.position
+    dev.set(old_value + 4)
+
+    # raise if this is not emitted within 5s timeout
+    qtbot.wait_signal(model._poll_thread.data_changed)
+    # stop and clean up thread
+    model.stop()
+    qtbot.wait_until(lambda: thread.isFinished())
