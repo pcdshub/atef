@@ -227,9 +227,10 @@ def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike):
     """
     window = Window(show_welcome=False)
     window.open_file(filename=str(config))
+    qtbot.addWidget(window)
     toggle = window.tab_widget.widget(0).toggle
     toggle.setChecked(True)
-    qtbot.addWidget(window)
+    qtbot.waitSignal(window.tab_widget.currentWidget().mode_switch_finished)
 
 
 def test_open_happi_viewer(qtbot: QtBot, happi_client: happi.Client):
