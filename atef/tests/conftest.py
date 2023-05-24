@@ -13,6 +13,7 @@ import simplejson
 from apischema import ValidationError, deserialize
 from qtpy import QtWidgets
 
+import atef
 from atef.check import Equals, Greater, GreaterOrEqual, LessOrEqual, NotEquals
 from atef.config import (ConfigurationFile, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
@@ -180,7 +181,7 @@ def sim_db() -> List[happi.OphydItem]:
     return items
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture()
 def mockjsonclient():
     # Write underlying database
     with tempfile.NamedTemporaryFile(mode='w') as handle:
@@ -197,6 +198,11 @@ def happi_client(mockjsonclient: happi.Client, sim_db: List[happi.OphydItem]):
     for item in sim_db:
         mockjsonclient.add_item(item)
     return mockjsonclient
+
+
+@pytest.fixture(scope='function', autouse=True)
+def mock_happi(monkeypatch, happi_client):
+    monkeypatch.setattr(atef.util, 'get_happi_client', lambda: happi_client)
 
 
 @pytest.fixture
@@ -244,9 +250,9 @@ def pv_configuration():
 def device_configuration():
     group = DeviceConfiguration(
         name='device config 1',
-        devices=['im1l0', 'im2l0', 'im3l0'],
-        by_attr={"cam_power": [Equals(value=1)],
-                 "detector.event_rate": [GreaterOrEqual(value=1.0)]},
+        devices=['motor1', 'motor2'],
+        by_attr={"setpoint": [Equals(value=5)],
+                 "readback": [GreaterOrEqual(value=9.4)]},
         shared=[]
     )
     return group
