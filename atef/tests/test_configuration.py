@@ -3,7 +3,9 @@ from typing import Callable
 
 import pytest
 
-from atef.config import ConfigurationFile, PreparedFile
+from atef.config import (ConfigurationFile, DeviceConfiguration, PreparedFile,
+                         PVConfiguration)
+from atef.widgets.config.utils import get_relevant_pvs
 
 
 @pytest.mark.asyncio
@@ -26,3 +28,17 @@ def test_yaml_equal_json(all_config_path: pathlib.Path, load_config: Callable, t
 
     yaml_config = type(json_config).from_filename(yaml_path)
     assert json_config == yaml_config
+
+
+def test_gather_pvs(
+    pv_configuration: PVConfiguration,
+    device_configuration: DeviceConfiguration
+):
+    # only one pv in pv_configuration, will just grab all PV's
+    assert len(get_relevant_pvs('MY:PREFIX:hello', pv_configuration)) == 1
+    assert len(get_relevant_pvs('shared', pv_configuration)) == 1
+
+    # 2 devices, 2 attrs
+    assert len(get_relevant_pvs('fjdslka', device_configuration)) == 0
+    assert len(get_relevant_pvs('shared', device_configuration)) == 4
+    assert len(get_relevant_pvs('setpoint', device_configuration)) == 2
