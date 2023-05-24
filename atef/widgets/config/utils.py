@@ -789,9 +789,11 @@ def get_relevant_pvs(
         for device_name in config.devices:
             dev = util.get_happi_device_by_name(device_name)
             for curr_attr in attrs:
-                pv = getattr(getattr(dev, curr_attr), 'pvname', None)
-                if pv:
+                try:
+                    pv = getattr(getattr(dev, curr_attr), 'pvname', None)
                     pv_list.append((pv, device_name + '.' + curr_attr))
+                except AttributeError:
+                    continue
 
         return pv_list
 
