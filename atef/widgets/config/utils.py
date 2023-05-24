@@ -957,7 +957,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
     tooltips, icons, etc.  This model is READ-ONLY, and does not implement
     the ``setData`` method.
 
-    Expects the item to specifically TreeItem, which each holds a
+    Expects the item to be specifically a TreeItem, which each holds a
     Configuration or Comparison
     """
     def __init__(self, *args, data: TreeItem, **kwargs):
