@@ -201,7 +201,14 @@ def happi_client(mockjsonclient: happi.Client, sim_db: List[happi.OphydItem]):
 
 
 @pytest.fixture(scope='function', autouse=True)
-def mock_happi(monkeypatch, happi_client):
+def mock_happi(monkeypatch: Any, happi_client: happi.Client):
+    # give `pvname` to all the components, since they don't exist on sim devices
+    for result in happi_client.search():
+        dev = result.get()
+        for cpt_name in dev.component_names:
+            cpt = getattr(dev, cpt_name)
+            if not hasattr(cpt, 'pvname'):
+                setattr(cpt, 'pvname', f'{dev.prefix}:{cpt_name}')
     monkeypatch.setattr(atef.util, 'get_happi_client', lambda: happi_client)
 
 

@@ -157,7 +157,10 @@ class ActionRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
         self.target_label.setText(data.signal.name)
         enum_strs = getattr(data.signal, 'enum_strs')
         if enum_strs:
-            self.value_label.setText(str(enum_strs[int(data.value)]))
+            try:
+                self.value_label.setText(str(enum_strs[int(data.value)]))
+            except IndexError:
+                self.value_label.setText(str(data.value))
         else:
             self.value_label.setText(str(data.value))
 

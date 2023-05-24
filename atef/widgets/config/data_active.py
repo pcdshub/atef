@@ -983,7 +983,7 @@ class ActionRowWidget(TargetRowWidget):
     setting_button: QtWidgets.QToolButton
     curr_val_thread: Optional[BusyCursorThread]
 
-    edit_widget = ClassVar[Optional[QtWidgets.QWidget]]
+    edit_widget: Optional[QtWidgets.QWidget] = None
 
     def __init__(self, data: Optional[ValueToTarget] = None, **kwargs):
         self.curr_val_thread = None

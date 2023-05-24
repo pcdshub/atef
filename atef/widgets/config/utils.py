@@ -791,9 +791,10 @@ def get_relevant_pvs(
             for curr_attr in attrs:
                 try:
                     pv = getattr(getattr(dev, curr_attr), 'pvname', None)
-                    pv_list.append((pv, device_name + '.' + curr_attr))
                 except AttributeError:
                     continue
+                if pv:
+                    pv_list.append((pv, device_name + '.' + curr_attr))
 
         return pv_list
 

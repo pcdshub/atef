@@ -177,7 +177,7 @@ def build_passive_summary_table(story: List[Flowable], prep_file: PreparedFile):
         if isinstance(item, PreparedConfiguration):
             name = item.config.name
         elif isinstance(item, PreparedComparison):
-            name = str(item.comparison.name) + ' - ' + str(item.identifier)
+            name = f'{item.comparison.name} - {item.identifier}'
         name = name or type(item).__name__
         table_data.append(
             [
