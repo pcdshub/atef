@@ -1,5 +1,5 @@
 import random
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 from pytestqt.qtbot import QtBot
@@ -45,7 +45,7 @@ def test_add_delete_config(
     qtbot: QtBot,
     monkeypatch: Any,
     configuration_group: ConfigurationGroupPage,
-    make_page: callable
+    make_page: Callable
 ):
     configuration_group_page = make_page(configuration_group)
     original_row_number = len(configuration_group_page.data.configs)
@@ -78,7 +78,7 @@ def test_add_delete_comparison(
     monkeypatch: Any,
     qtbot: QtBot,
     group: AnyDataclass,
-    make_page: callable,
+    make_page: Callable,
 ):
     cfg = request.getfixturevalue(group)
     group_page = make_page(cfg)
@@ -106,10 +106,10 @@ def test_add_delete_comparison(
     ['pv_configuration', 'device_configuration', 'tool_configuration']
 )
 def test_change_attr(
-    request,
+    request: Any,
     qtbot: QtBot,
     group: AnyDataclass,
-    make_page: callable,
+    make_page: Callable,
 ):
     cfg = request.getfixturevalue(group)
     orig_comps = gather_comparisons(cfg)
@@ -137,7 +137,7 @@ def test_change_comparison(
     monkeypatch: Any,
     qtbot: QtBot,
     group: AnyDataclass,
-    make_page: callable
+    make_page: Callable
 ):
     cfg = request.getfixturevalue(group)
     group_page = make_page(cfg)

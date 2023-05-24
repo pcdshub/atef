@@ -8,7 +8,7 @@ from atef.widgets.ophyd import (OphydAttributeData, OphydAttributeDataSummary,
                                 PolledDeviceModel)
 
 
-def test_ophyd_attribute_data(happi_client):
+def test_ophyd_attribute_data(happi_client: happi.Client):
     """ Pass if OphydAttributeData/Summary creation is successful """
     dev = happi_client.search()[0].get()
     OphydAttributeData.from_device_attribute(dev, 'setpoint')

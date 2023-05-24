@@ -9,14 +9,18 @@ from atef.widgets.config.utils import get_relevant_pvs
 
 
 @pytest.mark.asyncio
-async def test_prepared_config(passive_config_path):
+async def test_prepared_config(passive_config_path: pathlib.Path):
     # Quick smoke test to make sure we can prepare our configs
     config_file = ConfigurationFile.from_filename(passive_config_path)
     prepared_file = PreparedFile.from_config(config_file)
     await prepared_file.compare()
 
 
-def test_yaml_equal_json(all_config_path: pathlib.Path, load_config: Callable, tmp_path):
+def test_yaml_equal_json(
+    tmp_path: pathlib.Path,
+    all_config_path: pathlib.Path,
+    load_config: Callable,
+):
     """ Read json, dump to yaml, compare dataclasses """
     json_config = load_config(all_config_path)
 
