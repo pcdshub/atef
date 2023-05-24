@@ -1,5 +1,5 @@
 import random
-from unittest import mock
+from typing import Any
 
 import pytest
 from pytestqt.qtbot import QtBot
@@ -43,6 +43,7 @@ def pick_different_combo_option(combo_box: QtWidgets.QComboBox) -> int:
 
 def test_add_delete_config(
     qtbot: QtBot,
+    monkeypatch: Any,
     configuration_group: ConfigurationGroupPage,
     make_page: callable
 ):
@@ -61,9 +62,9 @@ def test_add_delete_config(
     widget = configuration_group_page.config_table.cellWidget(2, 0)
 
     # mock to auto-confirm deletion
-    with mock.patch.object(QtWidgets.QMessageBox, 'question') as qbox:
-        qbox.return_value = QtWidgets.QMessageBox.Yes
-        qtbot.mouseClick(widget.delete_button, QtCore.Qt.LeftButton)
+    monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
+                        lambda *args, **kwargs: QtWidgets.QMessageBox.Yes)
+    qtbot.mouseClick(widget.delete_button, QtCore.Qt.LeftButton)
 
     assert first_config not in configuration_group_page.data.configs
 
@@ -73,7 +74,8 @@ def test_add_delete_config(
     ['pv_configuration', 'device_configuration', 'tool_configuration']
 )
 def test_add_delete_comparison(
-    request,
+    request: Any,
+    monkeypatch: Any,
     qtbot: QtBot,
     group: AnyDataclass,
     make_page: callable,
@@ -91,9 +93,9 @@ def test_add_delete_comparison(
     deleted_comparison = widget.data
 
     # mock to auto-confirm deletion
-    with mock.patch.object(QtWidgets.QMessageBox, 'question') as qbox:
-        qbox.return_value = QtWidgets.QMessageBox.Yes
-        qtbot.mouseClick(widget.delete_button, QtCore.Qt.LeftButton)
+    monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
+                        lambda *args, **kwargs: QtWidgets.QMessageBox.Yes)
+    qtbot.mouseClick(widget.delete_button, QtCore.Qt.LeftButton)
 
     final_comp_list = gather_comparisons(cfg)
     assert deleted_comparison not in final_comp_list
@@ -131,7 +133,8 @@ def test_change_attr(
     ['pv_configuration', 'device_configuration', 'tool_configuration']
 )
 def test_change_comparison(
-    request,
+    request: Any,
+    monkeypatch: Any,
     qtbot: QtBot,
     group: AnyDataclass,
     make_page: callable
@@ -149,10 +152,10 @@ def test_change_comparison(
     assert isinstance(comp_page, ComparisonPage)
     new_idx = pick_different_combo_option(comp_page.specific_combo)
 
-    with mock.patch.object(QtWidgets.QMessageBox, 'question') as qbox:
-        qbox.return_value = QtWidgets.QMessageBox.Yes
-        comp_page.specific_combo.setCurrentIndex(new_idx)
-        comp_page.specific_combo.activated.emit(new_idx)
+    monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
+                        lambda *args, **kwargs: QtWidgets.QMessageBox.Yes)
+    comp_page.specific_combo.setCurrentIndex(new_idx)
+    comp_page.specific_combo.activated.emit(new_idx)
 
     new_comp = group_page.comparisons_table.cellWidget(0, 0).data
     assert new_comp != old_comp
