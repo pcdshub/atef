@@ -13,15 +13,18 @@ def gather_comparisons(cfg: AnyDataclass):
     """ Returns a list of comparisons in any of the possible fields """
     comps = []
     if hasattr(cfg, 'shared'):
-        comps.extend(cfg.shared)
+        for comp in cfg.shared:
+            comps.append(('shared', comp))
 
     if hasattr(cfg, 'by_pv'):
-        for comp_list in cfg.by_pv.values():
-            comps.extend(comp_list)
+        for key, comp_list in cfg.by_pv.items():
+            for comp in comp_list:
+                comps.append((f'by_pv: {key}', comp))
 
     if hasattr(cfg, 'by_attr'):
-        for comp_list in cfg.by_attr.values():
-            comps.extend(comp_list)
+        for key, comp_list in cfg.by_attr.items():
+            for comp in comp_list:
+                comps.append((f'by_attr: {key}', comp))
     return comps
 
 
@@ -116,10 +119,11 @@ def test_change_attr(
     if not new_idx:
         return
 
+    row_widget.attr_combo.setCurrentIndex(new_idx)
     row_widget.attr_combo.activated.emit(new_idx)
     new_comps = gather_comparisons(cfg)
     assert len(new_comps) == len(orig_comps)
-    assert new_comps == orig_comps  # order should have changed
+    assert new_comps != orig_comps
 
 
 @pytest.mark.parametrize(
