@@ -6,6 +6,7 @@ import tempfile
 from typing import Any, Dict, List, Optional
 
 import happi
+import ophyd
 import pydm
 import pydm.exception
 import pytest
@@ -120,8 +121,12 @@ def qapp(pytestconfig):
 
 
 @pytest.fixture(scope='session', autouse=True)
-def ophyd_cleanup_on_teardown():
-    """Clean up ophyd - avoid teardown errors by stopping callbacks."""
+def ophyd_setup_teardown():
+    """
+    Set up ophyd to not spend a long time waiting for connections
+    Clean up ophyd - avoid teardown errors by stopping callbacks.
+    """
+    ophyd.signal.EpicsSignalBase.set_defaults(connection_timeout=0.25)
     yield
     ophyd_cleanup()
 
