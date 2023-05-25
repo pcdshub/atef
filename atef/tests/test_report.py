@@ -1,26 +1,24 @@
 from pathlib import Path
-from typing import Callable
 
 from atef.cache import get_signal_cache
 from atef.config import ConfigurationFile, PreparedFile
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.report import ActiveAtefReport, PassiveAtefReport
+from atef.type_hints import AnyDataclass
 
 
 def test_demo_report(
-    all_config_path: Path,
+    all_loaded_config: AnyDataclass,
     tmp_path: Path,
-    load_config: Callable,
 ):
     """ smoke test to check that reports can be generated """
-    cfg = load_config(all_config_path)
     save_path = tmp_path / 'tmp.pdf'
     save_path.touch()
-    if isinstance(cfg, ConfigurationFile):
-        prepared_file = PreparedFile.from_config(cfg)
+    if isinstance(all_loaded_config, ConfigurationFile):
+        prepared_file = PreparedFile.from_config(all_loaded_config)
         doc = PassiveAtefReport(str(save_path), config=prepared_file)
-    elif isinstance(cfg, ProcedureFile):
-        prepared_file = PreparedProcedureFile.from_origin(cfg)
+    elif isinstance(all_loaded_config, ProcedureFile):
+        prepared_file = PreparedProcedureFile.from_origin(all_loaded_config)
         doc = ActiveAtefReport(str(save_path), config=prepared_file)
 
     doc.create_report()

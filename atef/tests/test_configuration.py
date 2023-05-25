@@ -1,10 +1,10 @@
 import pathlib
-from typing import Callable
 
 import pytest
 
 from atef.config import (ConfigurationFile, DeviceConfiguration, PreparedFile,
                          PVConfiguration)
+from atef.type_hints import AnyDataclass
 from atef.widgets.config.utils import get_relevant_pvs
 
 
@@ -18,20 +18,19 @@ async def test_prepared_config(passive_config_path: pathlib.Path):
 
 def test_yaml_equal_json(
     tmp_path: pathlib.Path,
-    all_config_path: pathlib.Path,
-    load_config: Callable,
+    all_loaded_config: AnyDataclass
 ):
     """ Read json, dump to yaml, compare dataclasses """
-    json_config = load_config(all_config_path)
+    all_loaded_config
 
     yaml_path = tmp_path / 'cfg.yaml'
     yaml_path.touch()
     with open(yaml_path, 'w') as fy:
-        fy.write(json_config.to_yaml())
+        fy.write(all_loaded_config.to_yaml())
         fy.write('\n')
 
-    yaml_config = type(json_config).from_filename(yaml_path)
-    assert json_config == yaml_config
+    yaml_config = type(all_loaded_config).from_filename(yaml_path)
+    assert all_loaded_config == yaml_config
 
 
 def test_gather_pvs(

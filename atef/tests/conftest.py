@@ -6,7 +6,6 @@ import tempfile
 from typing import Any, Dict, List, Optional
 
 import happi
-import ophyd
 import pydm
 import pydm.exception
 import pytest
@@ -22,6 +21,7 @@ from atef.config import (ConfigurationFile, ConfigurationGroup,
 from atef.procedure import ProcedureFile
 from atef.tools import Ping
 from atef.type_hints import AnyDataclass
+from atef.util import ophyd_cleanup
 from atef.widgets.config.page import (PAGE_MAP, AtefItem, ComparisonPage,
                                       PageWidget, link_page)
 
@@ -120,12 +120,10 @@ def qapp(pytestconfig):
 
 
 @pytest.fixture(scope='session', autouse=True)
-def ophyd_cleanup():
+def ophyd_cleanup_on_teardown():
     """Clean up ophyd - avoid teardown errors by stopping callbacks."""
     yield
-    dispatcher = ophyd.cl.get_dispatcher()
-    if dispatcher is not None:
-        dispatcher.stop()
+    ophyd_cleanup()
 
 
 @pytest.fixture(scope='function', autouse=True)
@@ -137,23 +135,34 @@ def non_interactive_qt_application(monkeypatch):
     )
 
 
-@pytest.fixture
-def load_config():
-    def load_config_fn(config_path: pathlib.Path):
-        with open(config_path, 'r') as fd:
-            serialized = json.load(fd)
+def load_config(config_path):
+    with open(config_path, 'r') as fd:
+        serialized = json.load(fd)
 
+    try:
+        data = deserialize(ConfigurationFile, serialized)
+    except ValidationError:
         try:
-            data = deserialize(ConfigurationFile, serialized)
-        except ValidationError:
-            try:
-                data = deserialize(ProcedureFile, serialized)
-            except Exception as ex:
-                raise RuntimeError(f'failed to open checkout {ex}')
+            data = deserialize(ProcedureFile, serialized)
+        except Exception as ex:
+            raise RuntimeError(f'failed to open checkout {ex}')
 
-        return data
+    return data
 
-    return load_config_fn
+
+@pytest.fixture(params=ALL_CONFIG_PATHS)
+def all_loaded_config(request):
+    return load_config(request.param)
+
+
+@pytest.fixture(params=PASSIVE_CONFIG_PATHS)
+def passive_loaded_config(request):
+    return load_config(request.param)
+
+
+@pytest.fixture(params=ACTIVE_CONFIG_PATHS)
+def active_loaded_config(request):
+    return load_config(request.param)
 
 
 @pytest.fixture
