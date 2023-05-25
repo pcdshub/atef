@@ -21,6 +21,7 @@ def test_ophyd_attribute_data(happi_client: happi.Client):
 # as input ... how to do that in happi?
 @pytest.mark.parametrize('dev_name, attr, widget_type, data_type', [
     ['motor1', 'setpoint', QtWidgets.QLineEdit, int],
+    ['enum1', 'enum', QtWidgets.QComboBox, int],
 ])
 def test_action_target_set(
     qtbot: QtBot,

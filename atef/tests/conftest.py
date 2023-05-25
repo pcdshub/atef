@@ -3,6 +3,7 @@ import datetime
 import json
 import pathlib
 import tempfile
+from functools import partial
 from typing import Any, Dict, List, Optional
 
 import happi
@@ -170,6 +171,18 @@ def active_loaded_config(request):
     return load_config(request.param)
 
 
+class EnumDevice(ophyd.sim.SynAxis):
+    enum = ophyd.Component(ophyd.sim.EnumSignal, value='OUT',
+                           enum_strings=('OUT', 'YAG', 'UNKNOWN'), kind='hinted')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The sim signal doesn't have self.enum_strs, just self._enum_strs
+        setattr(self.enum, 'enum_strs', self.enum._enum_strs)
+        # our signals appear to return ints, instead of strings by default
+        self.enum.get = partial(self.enum.get, as_string=False)
+
+
 @pytest.fixture
 def sim_db() -> List[happi.OphydItem]:
     items = []
@@ -200,7 +213,22 @@ def sim_db() -> List[happi.OphydItem]:
         'location_group': 'LOC',
         'functional_group': 'FUNC',
     }
-    for info in [sim1, sim2]:
+
+    sim3 = {
+        'name': 'enum1',
+        'z': 500,
+        '_id': 'enum1',
+        'prefix': 'MY:MOTORENUM',
+        'beamline': 'LCLS',
+        'type': 'OphydItem',
+        'device_class': 'atef.tests.conftest.EnumDevice',
+        'args': list(),
+        'kwargs': {'name': '{{name}}', 'prefix': '{{prefix}}'},
+        'location_group': 'LOC',
+        'functional_group': 'FUNC',
+    }
+
+    for info in [sim1, sim2, sim3]:
         items.append(happi.OphydItem(**info))
     return items
 
