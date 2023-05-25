@@ -6,6 +6,7 @@ import tempfile
 from typing import Any, Dict, List, Optional
 
 import happi
+import ophyd
 import pydm
 import pydm.exception
 import pytest
@@ -116,6 +117,15 @@ def qapp(pytestconfig):
     if application is None:
         application = pydm.PyDMApplication(use_main_window=False)
     return application
+
+
+@pytest.fixture(scope='session', autouse=True)
+def ophyd_cleanup():
+    """Clean up ophyd - avoid teardown errors by stopping callbacks."""
+    yield
+    dispatcher = ophyd.cl.get_dispatcher()
+    if dispatcher is not None:
+        dispatcher.stop()
 
 
 @pytest.fixture(scope='function', autouse=True)
