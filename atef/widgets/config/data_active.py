@@ -1033,7 +1033,7 @@ class ActionRowWidget(TargetRowWidget):
         self._enum_strs = None
 
         def get_curr_value():
-            self._curr_value = sig.get()
+            self._curr_value = self.bridge.value.get() or sig.get()
             self._dtype = type(self._curr_value)
             self._enum_strs = getattr(sig, 'enum_strs', None)
 
