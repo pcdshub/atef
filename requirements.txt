@@ -1,8 +1,8 @@
 apischema
 archapp>=1.1.0
 bluesky
-bluesky-queueserver
 bluesky-widgets
+databroker
 happi
 ipython
 numpy

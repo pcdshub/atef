@@ -119,19 +119,27 @@ def insert_widget(widget: QtWidgets.QWidget, placeholder: QtWidgets.QWidget) -> 
     placeholder.layout().addWidget(widget)
 
 
+def set_wait_cursor():
+    app = QtWidgets.QApplication.instance()
+    app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+
+
+def reset_cursor():
+    app = QtWidgets.QApplication.instance()
+    app.restoreOverrideCursor()
+
+
 def busy_cursor(func):
     """
     Decorator for making the cursor busy while a function is running
     Will run in the GUI thread, therefore blocking GUI interaction
     """
     def wrapper(*args, **kwargs):
-        # set busy cursor
-        app = QtWidgets.QApplication.instance()
-        app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        set_wait_cursor()
         try:
             func(*args, **kwargs)
         finally:
-            app.restoreOverrideCursor()
+            reset_cursor()
 
     return wrapper
 
@@ -195,13 +203,13 @@ class BusyCursorThread(QtCore.QThread):
             self.task_finished.emit()
 
     def set_cursor_busy(self):
-        self.app = QtWidgets.QApplication.instance()
-        self.app.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        set_wait_cursor()
         if self.ignore_events:
+            self.app = QtWidgets.QApplication.instance()
             self.app.installEventFilter(FILTER)
 
     def reset_cursor(self):
-        self.app = QtWidgets.QApplication.instance()
-        self.app.restoreOverrideCursor()
+        reset_cursor()
         if self.ignore_events:
+            self.app = QtWidgets.QApplication.instance()
             self.app.removeEventFilter(FILTER)

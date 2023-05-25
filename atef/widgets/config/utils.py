@@ -789,7 +789,10 @@ def get_relevant_pvs(
         for device_name in config.devices:
             dev = util.get_happi_device_by_name(device_name)
             for curr_attr in attrs:
-                pv = getattr(getattr(dev, curr_attr), 'pvname', None)
+                try:
+                    pv = getattr(getattr(dev, curr_attr), 'pvname', None)
+                except AttributeError:
+                    continue
                 if pv:
                     pv_list.append((pv, device_name + '.' + curr_attr))
 
@@ -955,7 +958,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
     tooltips, icons, etc.  This model is READ-ONLY, and does not implement
     the ``setData`` method.
 
-    Expects the item to specifically TreeItem, which each holds a
+    Expects the item to be specifically a TreeItem, which each holds a
     Configuration or Comparison
     """
     def __init__(self, *args, data: TreeItem, **kwargs):

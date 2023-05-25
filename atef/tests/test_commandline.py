@@ -26,7 +26,8 @@ def test_help_module(monkeypatch, subcommand):
 @pytest.mark.asyncio
 async def test_check_pv_smoke(mock_signal_cache):  # noqa: F811
     await bin_check.main(
-        filename=str(CONFIG_PATH / "pv_based.yml"), signal_cache=mock_signal_cache
+        filename=str(CONFIG_PATH / "pv_based.yml"), signal_cache=mock_signal_cache,
+        cleanup=False
     )
 
 
@@ -37,9 +38,10 @@ async def test_check_device_smoke(monkeypatch, at2l0):  # noqa: F811
 
     monkeypatch.setattr(util, "get_happi_device_by_name", get_happi_device_by_name)
     monkeypatch.setattr(happi.Client, "from_config", lambda: None)
-    await bin_check.main(filename=str(CONFIG_PATH / "device_based.yml"))
+    await bin_check.main(filename=str(CONFIG_PATH / "device_based.yml"), cleanup=False)
 
 
 @pytest.mark.asyncio
 async def test_check_ping_localhost_smoke():  # noqa: F811
-    await bin_check.main(filename=str(CONFIG_PATH / "ping_localhost.json"))
+    await bin_check.main(filename=str(CONFIG_PATH / "ping_localhost.json"),
+                         cleanup=False)

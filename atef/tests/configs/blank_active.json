@@ -2,15 +2,25 @@
   "version": 0,
   "root": {
     "name": "root",
-    "description": "sample active test checkout",
+    "description": null,
     "parent": null,
     "verify_required": true,
     "step_success_required": true,
     "steps": [
       {
+        "ProcedureGroup": {
+          "name": null,
+          "description": null,
+          "parent": null,
+          "verify_required": true,
+          "step_success_required": true,
+          "steps": []
+        }
+      },
+      {
         "DescriptionStep": {
-          "name": "desc_title",
-          "description": "description for description step",
+          "name": null,
+          "description": null,
           "parent": null,
           "verify_required": true,
           "step_success_required": true
@@ -18,8 +28,8 @@
       },
       {
         "PassiveStep": {
-          "name": "passive_title",
-          "description": "description for passive step",
+          "name": null,
+          "description": null,
           "parent": null,
           "verify_required": true,
           "step_success_required": true,
@@ -28,48 +38,29 @@
       },
       {
         "SetValueStep": {
-          "name": "set_value_title",
-          "description": "set_value_desc",
+          "name": null,
+          "description": null,
           "parent": null,
           "verify_required": true,
           "step_success_required": true,
-          "actions": [
-            {
-              "name": "set to 1",
-              "device": null,
-              "attr": null,
-              "pv": "MY:PREFIX:dt",
-              "value": 1.0,
-              "timeout": 20.0,
-              "settle_time": 5.0
-            },
-            {
-              "name": null,
-              "device": "im3k4",
-              "attr": "target.state",
-              "pv": "IM3K4:PPM:MMS:STATE:GET_RBV",
-              "value": 4,
-              "timeout": null,
-              "settle_time": null
-            }
-          ],
+          "actions": [],
           "success_criteria": [
             {
               "name": null,
               "device": null,
               "attr": null,
-              "pv": "MY:PREFIX:dt",
+              "pv": "dummypv",
               "comparison": {
                 "Equals": {
-                  "name": "equal_check",
-                  "description": "a simple verify",
+                  "name": "untitled",
+                  "description": null,
                   "invert": false,
                   "reduce_period": null,
                   "reduce_method": "average",
                   "string": null,
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
-                  "value": 1.0,
+                  "value": 0.0,
                   "rtol": null,
                   "atol": null
                 }

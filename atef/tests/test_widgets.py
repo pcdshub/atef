@@ -3,9 +3,14 @@ import os
 import pathlib
 
 import apischema
+import happi
 import pytest
 import yaml
 from pytestqt.qtbot import QtBot
+from qtpy import QtCore
+
+from atef.widgets.happi import HappiDeviceComponentWidget
+from atef.widgets.ophyd import OphydDeviceTableWidget
 
 from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
                          PydmDisplayStep, TyphosDisplayStep)
@@ -23,7 +28,7 @@ def test_configs() -> list[pathlib.Path]:
 
 
 @pytest.fixture
-def config(request, test_configs):
+def config(request, test_configs: list[pathlib.Path]):
     i = request.param
     return test_configs[i]
 
@@ -217,9 +222,43 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
 
 @pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
 def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike):
-    """ Smoke test run-mode for all sample configs """
+    """
+    Pass if the RunTree can be created from an EditTree
+    """
     window = Window(show_welcome=False)
     window.open_file(filename=str(config))
+    qtbot.addWidget(window)
     toggle = window.tab_widget.widget(0).toggle
     toggle.setChecked(True)
-    qtbot.addWidget(window)
+    qtbot.waitSignal(window.tab_widget.currentWidget().mode_switch_finished)
+
+
+def test_open_happi_viewer(qtbot: QtBot, happi_client: happi.Client):
+    """
+    Pass if HappiDeviceComponentWidget can be created and refreshed without error
+    """
+    happi_widget = HappiDeviceComponentWidget(client=happi_client)
+    search_widget = happi_widget.item_search_widget
+
+    def search_finished():
+        # wait until HappiSearchWidget.refresh_happi's update_gui callback finished
+        # refresh button gets disabled until this happens
+        assert search_widget.button_refresh.isEnabled()
+
+    qtbot.mouseClick(search_widget.button_refresh, QtCore.Qt.LeftButton)
+    qtbot.wait_until(search_finished)
+    qtbot.addWidget(happi_widget)
+
+
+def test_device_table(qtbot: QtBot, happi_client: happi.Client):
+    dev = happi_client.search()[0].get()
+    otable = OphydDeviceTableWidget(device=dev)
+    otable.button_update_data.clicked.emit()
+    qtbot.wait_until(lambda: otable.device_table_view.current_model.rowCount() != 0)
+    assert otable.device_table_view.current_model.rowCount() == len(dev.component_names)
+
+    # set new device
+    new_dev = happi_client.search()[1].get()
+    otable.device = new_dev
+    assert otable.windowTitle() == new_dev.name
+    qtbot.addWidget(otable)

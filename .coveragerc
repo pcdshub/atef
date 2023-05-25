@@ -9,3 +9,4 @@ omit =
     #tests
     *test*
     atef/tests/*
+    atef/re_widgets.py

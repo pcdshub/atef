@@ -749,6 +749,7 @@ class TargetRowWidget(DesignerDisplay, SimpleRowWidget):
     filename = 'action_row_widget.ui'
 
     target_button: QtWidgets.QToolButton
+    target_entry_widget: TargetEntryWidget
 
     def __init__(self, data: Target, **kwargs):
         super().__init__(data=data, **kwargs)
@@ -982,8 +983,11 @@ class ActionRowWidget(TargetRowWidget):
     setting_button: QtWidgets.QToolButton
     curr_val_thread: Optional[BusyCursorThread]
 
+    edit_widget: Optional[QtWidgets.QWidget] = None
+
     def __init__(self, data: Optional[ValueToTarget] = None, **kwargs):
         self.curr_val_thread = None
+        self.edit_widget = None
         if data is None:
             data = ValueToTarget()
         super().__init__(data=data, **kwargs)
@@ -992,6 +996,7 @@ class ActionRowWidget(TargetRowWidget):
         # Called by TargetRowWidget.__init__
         super().setup_ui()
         self.child_button.hide()
+        self.value_button_box.hide()
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
         apply_button.setText('')
         apply_button.setToolTip('Click here to confirm value')
@@ -1028,7 +1033,7 @@ class ActionRowWidget(TargetRowWidget):
         self._enum_strs = None
 
         def get_curr_value():
-            self._curr_value = sig.get()
+            self._curr_value = self.bridge.value.get() or sig.get()
             self._dtype = type(self._curr_value)
             self._enum_strs = getattr(sig, 'enum_strs', None)
 
@@ -1083,8 +1088,8 @@ class ActionRowWidget(TargetRowWidget):
                 self.edit_widget.addItem(enum_str)
 
             def update_value():
-                value = self.edit_widget.currentText()
-                self.bridge.value.put(value)
+                int_value = self.edit_widget.currentIndex()
+                self.bridge.value.put(int_value)
                 self.value_button_box.hide()
 
             def value_changed():
@@ -1138,6 +1143,8 @@ class ActionRowWidget(TargetRowWidget):
         insert_widget(self.edit_widget, self.value_input_placeholder)
         self.value_button_box.show()
         apply_button = self.value_button_box.button(QDialogButtonBox.Apply)
+        # disconnect all old update_value slots
+        apply_button.clicked.disconnect()
         apply_button.clicked.connect(update_value)
 
     def setup_setting_button(self) -> None:
@@ -1185,7 +1192,8 @@ class CheckRowWidget(TargetRowWidget):
 
     def __init__(self, data: Optional[ComparisonToTarget] = None, **kwargs):
         if data is None:
-            data = ComparisonToTarget(name='untitled_check', comparison=Equals())
+            data = ComparisonToTarget(name='untitled_check',
+                                      comparison=Equals(name='untitled'))
         super().__init__(data=data, **kwargs)
 
         self.name_edit.hide()
