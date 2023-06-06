@@ -349,15 +349,18 @@ def build_data_table(
     story.append(Paragraph('Observed Data', l0))
     # use cached value.
     observed_value = getattr(comp, 'data', 'N/A')
-    if not observed_value:
+    if observed_value is None:
         # attr can be set to None
         observed_value = 'N/A'
     observed_value = Paragraph(str(observed_value), styles['BodyText'])
     try:
-        timestamp = comp.signal.timestamp.ctime()
-        source = Paragraph(getattr(comp.signal, 'name', ''), styles['BodyText'])
+        timestamp = datetime.fromtimestamp(comp.signal.timestamp).ctime()
     except AttributeError:
         timestamp = 'unknown'
+
+    try:
+        source = Paragraph(getattr(comp.signal, 'name', ''), styles['BodyText'])
+    except AttributeError:
         source = 'undefined'
     observed_data = [['Observed Value', 'Timestamp', 'Source'],
                      [observed_value, timestamp, source]]
