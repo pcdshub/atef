@@ -115,11 +115,11 @@ class Window(DesignerDisplay, QMainWindow):
             partial(self.new_file, checkout_type='active')
         )
         widget.sample_active_button.clicked.connect(partial(
-            self.open_file, filename=TEST_CONFIG_PATH / 'active_test.json'
+            self.open_file, filename=str(TEST_CONFIG_PATH / 'active_test.json')
         ))
 
         widget.sample_passive_button.clicked.connect(partial(
-            self.open_file, filename=TEST_CONFIG_PATH / 'all_fields.json'
+            self.open_file, filename=str(TEST_CONFIG_PATH / 'all_fields.json')
         ))
 
         widget.open_button.clicked.connect(self.open_file)
