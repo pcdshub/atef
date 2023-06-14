@@ -1,5 +1,7 @@
 import pytest
 
+from atef.cache import DataCache
+
 from .. import check
 from ..check import Comparison, Equals, NotEquals, PrimitiveType, Severity
 from ..result import Result
@@ -31,9 +33,11 @@ success = Result(severity=Severity.success)
     [1, Severity.success],
     [0, Severity.error],
 )
-def test_equality_basic(
+async def test_equality_basic(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -43,9 +47,11 @@ def test_equality_basic(
     [0, Severity.success],
     [1, Severity.error],
 )
-def test_equality_inverted(
+async def test_equality_inverted(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -55,9 +61,11 @@ def test_equality_inverted(
     [1, Severity.error],
     [0, Severity.success],
 )
-def test_not_equals_basic(
+async def test_not_equals_basic(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -69,9 +77,11 @@ def test_not_equals_basic(
     [2, Severity.success],
     [-1, Severity.error],
 )
-def test_equality_with_atol(
+async def test_equality_with_atol(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -90,9 +100,11 @@ def test_equality_with_atol(
     [3, Severity.success],
     [4, Severity.error],
 )
-def test_any_comparison(
+async def test_any_comparison(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -107,9 +119,11 @@ def test_any_comparison(
     [3, Severity.success],
     [4, Severity.error],
 )
-def test_any_value(
+async def test_any_value(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -121,9 +135,11 @@ def test_any_value(
     [3, Severity.success],
     [4, Severity.success],
 )
-def test_greater(
+async def test_greater(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -135,9 +151,11 @@ def test_greater(
     [3, Severity.success],
     [4, Severity.success],
 )
-def test_greater_equal(
+async def test_greater_equal(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -154,9 +172,11 @@ def test_greater_equal(
     [6, Severity.warning],
     [7, Severity.error],
 )
-def test_range_inclusive(
+async def test_range_inclusive(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -173,9 +193,11 @@ def test_range_inclusive(
     [6, Severity.error],
     [7, Severity.error],
 )
-def test_range_exclusive(
+async def test_range_exclusive(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
 
@@ -207,8 +229,47 @@ def test_range_exclusive(
     [2, Severity.warning],
     [3, Severity.error],
 )
-def test_value_set(
+async def test_value_set(
     comparison: Comparison, value: PrimitiveType, result: Severity
 ):
+    cache = DataCache()
+    await comparison.prepare(cache)
+    assert comparison(value).severity == result
+    print(comparison(value).reason)
+
+
+@_parametrize(
+    check.Equals(
+        value_dynamic=check.HappiValue(
+            device_name='motor1',
+            signal_attr='velocity',
+        ),
+    ),
+    [-1, Severity.error],
+    [1, Severity.success],
+)
+async def test_happi_value(
+    comparison: Comparison, value: PrimitiveType, result: Severity,
+):
+    cache = DataCache()
+    await comparison.prepare(cache)
+    assert comparison(value).severity == result
+    print(comparison(value).reason)
+
+
+@_parametrize(
+    check.Equals(
+        value_dynamic=check.EpicsValue(
+            pvname='MY:PV',
+        ),
+    ),
+    [11, Severity.error],
+    [1, Severity.success],
+)
+async def test_epics_value(
+    comparison: Comparison, value: PrimitiveType, result: Severity, mock_pv
+):
+    cache = DataCache()
+    await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
