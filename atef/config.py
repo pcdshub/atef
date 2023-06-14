@@ -1040,7 +1040,7 @@ class PreparedComparison:
         """
         Get the data according to the comparison's configuration.
 
-        To be immplemented in subclass.
+        To be implemented in subclass.
 
         Returns
         -------
@@ -1066,6 +1066,28 @@ class PreparedComparison:
         Result
             The result of the comparison.
         """
+        try:
+            if hasattr(self.comparison, 'prepare'):
+                await self.comparison.prepare(self.cache)
+        except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
+            result = Result(
+                severity=self.comparison.if_disconnected,
+                reason=("Unable to read dynamic value for the comparison: "
+                        f"{self.identifier}")
+            )
+            self.result = result
+            return result
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Reading dynamic value for {self.identifier!r} comparison "
+                    f"{self.comparison} raised {ex.__class__.__name__}: {ex}"
+                ),
+            )
+            self.result = result
+            return result
+
         try:
             data = await self.get_data_async()
         except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
