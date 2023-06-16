@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import dataclasses
 from collections import OrderedDict
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
+from typing import (Any, ClassVar, Dict, Generator, List, Optional, Tuple,
+                    Type, Union)
 from weakref import WeakSet, WeakValueDictionary
 
 from qtpy.QtGui import QDropEvent
@@ -46,6 +47,7 @@ from atef.widgets.config.run_active import (DescriptionRunWidget,
                                             PassiveRunWidget,
                                             SetValueRunWidget)
 from atef.widgets.config.run_base import RunCheck
+from atef.widgets.utils import insert_widget
 
 from ..core import DesignerDisplay
 from .data_base import DataWidget, NameDescTagsWidget
@@ -57,8 +59,16 @@ from .data_passive import (AnyComparisonWidget, AnyValueWidget,
                            LessOrEqualWidget, LessWidget, NotEqualsWidget,
                            PingWidget, PVConfigurationWidget, RangeWidget,
                            ValueSetWidget)
-from .utils import (TableWidgetWithAddRow, cast_dataclass,
-                    describe_comparison_context, describe_step_context)
+from .utils import (MultiModeValueEdit, TableWidgetWithAddRow, cast_dataclass,
+                    describe_comparison_context, describe_step_context,
+                    gather_relevant_identifiers)
+
+
+def walk_tree_items(item: AtefItem) -> Generator[AtefItem, None, None]:
+    yield item
+
+    for child_idx in range(item.childCount()):
+        yield from walk_tree_items(item.child(child_idx))
 
 
 def link_page(item: AtefItem, widget: PageWidget) -> None:
@@ -155,6 +165,85 @@ class AtefItem(QTreeWidgetItem):
             ancestor = ancestor.parent_tree_item
 
         return None
+
+
+def setup_multi_mode_edit_widget(
+    page: PageWidget,
+    target_widget: QWidget,
+    value_name: str = "value",
+    dynamic_name: str = "value_dynamic",
+) -> None:
+    # Find the current node
+    curr_parent = page
+    node = None
+    while curr_parent is not None:
+        try:
+            node = curr_parent.tree_item
+            break
+        except AttributeError:
+            curr_parent = curr_parent.parent()
+    if node is None:
+        raise RuntimeError(
+            "Could not find link to file tree nodes."
+        )
+    # Travel up the node tree to find the id and devices
+    devices = None
+    comp = page.specific_comparison_widget.bridge.data
+    # TODO: This is kinda ick, hard coded, will have to change for Active checkouts
+    group_node = node.find_ancestor_by_widget(
+        (DeviceConfigurationPage, PVConfigurationPage, ToolConfigurationPage)
+    )
+    group = group_node.widget.data
+
+    def gather_ids():
+        return gather_relevant_identifiers(comp, group)
+
+    if isinstance(group, DeviceConfiguration):
+        devices = group.devices
+
+    page.value_widget = MultiModeValueEdit(
+        bridge=page.specific_comparison_widget.bridge,
+        value_name=value_name,
+        dynamic_name=dynamic_name,
+        id_fn=gather_ids,
+        devices=devices,
+        font_pt_size=16,
+    )
+
+    if hasattr(page.specific_comparison_widget, 'set_tolerance_visible'):
+        page.value_widget.mode_changed.connect(
+            page.specific_comparison_widget.set_tolerance_visible
+        )
+    insert_widget(page.value_widget, target_widget)
+
+
+def setup_multi_mode_for_widget(page: PageWidget, specific_widget: QWidget) -> None:
+    """
+    initializes MultiModeInputWidget for various specific comparison widgets
+    Includes: (Equals, NotEquals, GtLtBase, Range) Widgets
+    """
+    if isinstance(specific_widget, RangeWidget):
+        setup_multi_mode_edit_widget(
+            page=page, target_widget=specific_widget.low_widget,
+            value_name='low', dynamic_name='low_dynamic'
+        )
+        setup_multi_mode_edit_widget(
+            page=page, target_widget=specific_widget.high_widget,
+            value_name='high', dynamic_name='high_dynamic'
+        )
+        setup_multi_mode_edit_widget(
+            page=page, target_widget=specific_widget.warn_low_widget,
+            value_name='warn_low', dynamic_name='warn_low_dynamic'
+        )
+        setup_multi_mode_edit_widget(
+            page=page, target_widget=specific_widget.warn_high_widget,
+            value_name='warn_high', dynamic_name='warn_high_dynamic'
+        )
+    elif not isinstance(specific_widget,
+                        (ValueSetWidget, AnyValueWidget, AnyComparisonWidget)):
+        setup_multi_mode_edit_widget(
+            page=page, target_widget=specific_widget.value_widget
+        )
 
 
 class PageWidget(QWidget):
@@ -770,6 +859,11 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             func_name=type(comparison).__name__,
         )
         link_page(item=comp_item, widget=comp_page)
+        # set up value_widget now that link exists
+        setup_multi_mode_for_widget(
+            page=comp_page, specific_widget=comp_page.specific_comparison_widget
+        )
+
         self.setup_row_buttons(
             row_widget=comp_row,
             item=comp_item,
@@ -961,6 +1055,11 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             func_name=type(comparison).__name__,
         )
         link_page(item=comp_item, widget=comp_page)
+        # set up value_widget now that link exists
+        setup_multi_mode_for_widget(
+            page=comp_page, specific_widget=comp_page.specific_comparison_widget
+        )
+
         self.setup_row_buttons(
             row_widget=comp_row,
             item=comp_item,
@@ -1164,6 +1263,11 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             func_name=type(comparison).__name__,
         )
         link_page(item=comp_item, widget=comp_page)
+        # set up value_widget now that link exists
+        setup_multi_mode_for_widget(
+            page=comp_page, specific_widget=comp_page.specific_comparison_widget
+        )
+
         self.setup_row_buttons(
             row_widget=comp_row,
             item=comp_item,
@@ -1742,6 +1846,11 @@ class StepPage(DesignerDisplay, PageWidget):
             func_name=type(comparison).__name__,
         )
         link_page(item=item, widget=page)
+        # set up value_widget now that link exists
+        setup_multi_mode_for_widget(
+            page=page, specific_widget=page.specific_comparison_widget
+        )
+
         self.setup_set_value_check_row_buttons(
             comparison=comparison,
             item=item,
@@ -1988,6 +2097,10 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         else:
             # Reinitialize this for the new name/desc/tags widget
             self.assign_tree_item(item)
+            setup_multi_mode_for_widget(
+                page=self, specific_widget=self.specific_comparison_widget
+            )
+
         # Fix the layout spacing, some comparisons want spacing and some don't
         if isinstance(comparison, (ValueSet, AnyValue, AnyComparison)):
             # Maximum = "shrink spacer to the size hint (0, 0)"
@@ -2160,6 +2273,10 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             func_name=type(comparison).__name__,
         )
         link_page(item=item, widget=page)
+        # set up value_widget now that link exists
+        setup_multi_mode_for_widget(
+            page=page, specific_widget=page.specific_comparison_widget
+        )
         self.setup_any_comparison_row_buttons(
             comparison=comparison,
             item=item,
