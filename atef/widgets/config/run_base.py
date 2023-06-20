@@ -259,8 +259,8 @@ class ResultStatus(QLabel):
 
     def event(self, event: QtCore.QEvent) -> bool:
         """ Overload event method to update tooltips on tooltip-request """
-        # Catch tooltip events to update status tooltip
-        if event.type() == QtCore.QEvent.ToolTip:
+        # Catch relevant events to update status tooltip
+        if event.type() in (QtCore.QEvent.ToolTip, QtCore.QEvent.Paint):
             self.update()
         return super().event(event)
 
