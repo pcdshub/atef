@@ -90,6 +90,8 @@ class Value:
         return value == self.value
 
 
+@dataclass
+@serialization.as_tagged_union
 class DynamicValue:
     """
     A primitive value from an external source that may change over time.
@@ -135,7 +137,7 @@ class DynamicValue:
         raise NotImplementedError()
 
 
-@dataclass()
+@dataclass
 class EpicsValue(DynamicValue):
     """
     A primitive value sourced from an EPICS PV.
@@ -161,7 +163,7 @@ class EpicsValue(DynamicValue):
         self.value = data
 
 
-@dataclass()
+@dataclass
 class HappiValue(DynamicValue):
     """
     A primitive value sourced from a specific happi device signal.
