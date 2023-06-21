@@ -231,6 +231,7 @@ def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike):
     toggle = window.tab_widget.widget(0).toggle
     toggle.setChecked(True)
     qtbot.waitSignal(window.tab_widget.currentWidget().mode_switch_finished)
+    assert window.tab_widget.widget(0).mode == 'run'
 
 
 def test_open_happi_viewer(qtbot: QtBot, happi_client: happi.Client):

@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import os.path
+import traceback
 import webbrowser
 from copy import deepcopy
 from functools import partial
@@ -679,19 +680,36 @@ class DualTree(QWidget):
 
         return self.trees[mode]
 
-    def switch_mode(self) -> None:
+    def switch_mode(self, value) -> None:
         """ Switch tree modes between 'edit' and 'run' """
-        # TODO: can this switching be made more elegant?
+        if (not value and self.mode == 'edit') or (value and self.mode == 'run'):
+            return
+
         set_wait_cursor()
         try:
             self.mode_switch_finished.connect(reset_cursor)
-            if self.mode == 'edit':
+            prev_toggle_state = not self.toggle.isChecked()
+            if value:
                 self.mode = 'run'
             else:
                 self.mode = 'edit'
             self.show_widgets()
         except Exception as ex:
             logger.exception(ex)
+            # reset toggle and mode
+
+            def reset_to_edit():
+                self.toggle.setChecked(prev_toggle_state)
+                self.show_widgets()
+
+            warning_msg = QMessageBox(QMessageBox.Critical, 'Warning',
+                                      'Mode Switch Failed')
+            warning_msg.setInformativeText('Your checkout may be misconfigured.')
+            warning_msg.setDetailedText(
+                ''.join(traceback.format_exception(None, ex, ex.__traceback__))
+            )
+            warning_msg.exec()
+            QTimer.singleShot(0, reset_to_edit)
         finally:
             self.mode_switch_finished.emit()
             self.mode_switch_finished.disconnect(reset_cursor)
