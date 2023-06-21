@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import os.path
+import traceback
 import webbrowser
 from copy import deepcopy
 from functools import partial
@@ -701,6 +702,13 @@ class DualTree(QWidget):
                 self.toggle.setChecked(prev_toggle_state)
                 self.show_widgets()
 
+            warning_msg = QMessageBox(QMessageBox.Critical, 'Warning',
+                                      'Mode Switch Failed')
+            warning_msg.setInformativeText('Your checkout may be misconfigured.')
+            warning_msg.setDetailedText(
+                ''.join(traceback.format_exception(None, ex, ex.__traceback__))
+            )
+            warning_msg.exec()
             QTimer.singleShot(0, reset_to_edit)
         finally:
             self.mode_switch_finished.emit()
