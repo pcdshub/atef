@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Release History &mdash; atef  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/docs-versions-menu.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Upcoming Changes" href="upcoming_changes.html" />
+    <link rel="prev" title="atef.procedure" href="generated/atef.procedure.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            atef
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="api.html">ATEF API</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Release History</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#v1-0-0-2023-06-22">v1.0.0 (2023-06-22)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#features">Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bugfixes">Bugfixes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#maintenance">Maintenance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#contributors">Contributors</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="upcoming_changes.html">Upcoming Changes</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/pcdshub/atef">Github Repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">atef</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Release History</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/releases.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="release-history">
+<h1>Release History<a class="headerlink" href="#release-history" title="Permalink to this heading"></a></h1>
+<section id="v1-0-0-2023-06-22">
+<h2>v1.0.0 (2023-06-22)<a class="headerlink" href="#v1-0-0-2023-06-22" title="Permalink to this heading"></a></h2>
+<p>Many changes have taken place since the last tag (08/2022).  Checkouts can now
+be run inside the GUI, and active checkouts have been prototyped.</p>
+<p>Notably the structure of the checkout files changed, and checkouts before that
+tag must be converted to the modern format.  Most users will not have issues
+with this.</p>
+<p>Shoutout to all the contributors who helped before the pre-release notes framework
+was added.</p>
+<section id="features">
+<h3>Features<a class="headerlink" href="#features" title="Permalink to this heading"></a></h3>
+<ul class="simple">
+<li><p>Replaces the welcome dialog with a welcome landing tab</p></li>
+<li><p>Enable the close-tab button</p></li>
+<li><p>adds run and edit widgets for <code class="docutils literal notranslate"><span class="pre">PassiveStep</span></code>, a step that allows passive checkouts to be run as a component of an active checkout</p></li>
+<li><p>Adds Enum support to the <code class="docutils literal notranslate"><span class="pre">SetValueStep</span></code>’s actions</p></li>
+<li><p>Adds SetValueStep tothe active checkout suite, allowing for a list of actions to be taken (setting values to targets), followed by a list of checks (Comparisons) for verifying the actions succeeded.</p></li>
+<li><p>Adds a <code class="docutils literal notranslate"><span class="pre">TableWidgetWithAddRow</span></code>, a subclass of <code class="docutils literal notranslate"><span class="pre">QTableWidget</span></code> that includes a AddRowWidget. This add row contains a button for adding rows of a specified widget. (for better space efficiency)</p></li>
+<li><p>Adds GUI support for placing a <code class="docutils literal notranslate"><span class="pre">Comparison</span></code> within a <code class="docutils literal notranslate"><span class="pre">ProcedureStep</span></code></p></li>
+<li><p>Adds a busy cursor Thread worker (disables click interaction and changes to a wait cursor while a function runs) and a busy cursor decorator (not recommended, but necessary when wrapping slots that create widgets)</p></li>
+<li><p>Adds report generation for active checkouts</p></li>
+</ul>
+</section>
+<section id="bugfixes">
+<h3>Bugfixes<a class="headerlink" href="#bugfixes" title="Permalink to this heading"></a></h3>
+<ul class="simple">
+<li><p>Fixes a bug where False-y observed values would fail to be reported</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">BusyCursorThread.raised_exception</span></code> now properly expects to emit an <code class="docutils literal notranslate"><span class="pre">Exception</span></code></p></li>
+<li><p>fixes more NoneType handling bugs during report generation.</p></li>
+<li><p>only subscribe the close-tab function once.</p></li>
+<li><p>disconnect update_value slots in <code class="docutils literal notranslate"><span class="pre">ActionRowWidget</span></code>, preventing them from piling up whenever signal type changes.</p></li>
+<li><p>Fixes optional type hint handling in <code class="docutils literal notranslate"><span class="pre">QDataclassBridge</span></code> (again)</p></li>
+<li><p>Improve missing field handling in report generation</p></li>
+<li><p>fixes type hint parsing in <code class="docutils literal notranslate"><span class="pre">QDataclassBridge</span></code> for Optional type hints.</p></li>
+<li><p>carefully unsubscribes callbacks that might persist after toggling between run and edit mode, avoiding slots from referencing deleted RunTree widgets</p></li>
+<li><p>Cast values read from the config to a string in AnyValue widget</p></li>
+<li><p>Properly identify up Sequences in <code class="docutils literal notranslate"><span class="pre">QDataclassBridge</span></code></p></li>
+<li><p>Sets the comparison widget type based on the loaded datatype</p></li>
+<li><p>Allows device selection via double-click in the <code class="docutils literal notranslate"><span class="pre">HappiSearchWidget</span></code> tree-view</p></li>
+</ul>
+</section>
+<section id="maintenance">
+<h3>Maintenance<a class="headerlink" href="#maintenance" title="Permalink to this heading"></a></h3>
+<ul class="simple">
+<li><p>Improves <code class="docutils literal notranslate"><span class="pre">ResultStatus</span></code> refresh handling, now also updates on paint events</p></li>
+<li><p>In the case of errors during a mode switch, the error will be revealed to the user and the switch will be reverted.</p></li>
+<li><p>Improve result icon refresh behavior by emitting a sigal whenever a step is run.</p></li>
+<li><p>Add result property to passive checkout configurations in order to re-compute the overall_result when .result is requested.</p></li>
+<li><p>places a stray sig.wait_for_connection call into a <code class="docutils literal notranslate"><span class="pre">BusyCursorThread</span></code></p></li>
+<li><p>fleshes out the test suite, adding fixtures where appropriate.</p></li>
+<li><p>display enum strings in <code class="docutils literal notranslate"><span class="pre">SetValueStep</span></code> run view.</p></li>
+<li><p>Differentiates between read and write (set) PV’s in <code class="docutils literal notranslate"><span class="pre">OphydDeviceTableView</span></code></p></li>
+<li><p>Wraps signal.get call used for setting input type validators in <code class="docutils literal notranslate"><span class="pre">BusyCursorThread</span></code></p></li>
+</ul>
+</section>
+<section id="contributors">
+<h3>Contributors<a class="headerlink" href="#contributors" title="Permalink to this heading"></a></h3>
+<ul class="simple">
+<li><p>tangkong</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="generated/atef.procedure.html" class="btn btn-neutral float-left" title="atef.procedure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="upcoming_changes.html" class="btn btn-neutral float-right" title="Upcoming Changes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, SLAC National Accelerator Laboratory.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
