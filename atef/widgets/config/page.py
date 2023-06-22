@@ -191,7 +191,7 @@ def setup_multi_mode_edit_widget(
     comp = page.specific_comparison_widget.bridge.data
     # TODO: This is kinda ick, hard coded, will have to change for Active checkouts
     group_node = node.find_ancestor_by_widget(
-        (DeviceConfigurationPage, PVConfigurationPage, ToolConfigurationPage)
+        (DeviceConfigurationPage, PVConfigurationPage, ToolConfigurationPage, StepPage)
     )
     group = group_node.widget.data
 

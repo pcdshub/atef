@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import logging
 import time
@@ -14,7 +15,7 @@ import qtawesome as qta
 from ophyd import EpicsSignal, EpicsSignalRO
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import (QPoint, QPointF, QRect, QRectF, QRegularExpression,
-                         QSize, Qt)
+                         QSize, Qt, QTimer)
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
                         QPaintEvent, QPen, QRegularExpressionValidator)
@@ -24,15 +25,17 @@ from qtpy.QtWidgets import (QCheckBox, QComboBox, QInputDialog, QLabel,
                             QWidget)
 
 from atef import util
-from atef.cache import get_signal_cache
+from atef.cache import DataCache, get_signal_cache
 from atef.check import Comparison, EpicsValue, Equals, HappiValue, Range
 from atef.config import (Configuration, DeviceConfiguration,
                          PreparedComparison, PreparedConfiguration,
                          PreparedFile, PVConfiguration, ToolConfiguration)
 from atef.enums import Severity
 from atef.exceptions import MissingHappiDeviceError
-from atef.procedure import ProcedureFile, ProcedureStep, walk_steps
-from atef.qt_helpers import QDataclassBridge, QDataclassList, QDataclassValue
+from atef.procedure import (ProcedureFile, ProcedureStep, SetValueStep,
+                            walk_steps)
+from atef.qt_helpers import (QDataclassBridge, QDataclassList, QDataclassValue,
+                             ThreadWorker)
 from atef.result import combine_results, incomplete_result
 from atef.tools import Ping
 from atef.type_hints import Number
@@ -1478,6 +1481,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.font_pt_size = font_pt_size
         self.happi_select_widget = None
         self._last_device_name = ""
+        self._prep_dynamic_thread: Optional[ThreadWorker] = None
         self.setup_widgets()
         self.set_mode_from_data()
         self.setSizePolicy(
@@ -1596,9 +1600,21 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         """
         When the user asks for a new value, get a value from EPICS.
         """
-        value = self.dynamic_value.get().get()
-        self.epics_value_preview.setText(str(value))
-        self.refreshed.emit()
+        # Prepare each time to get updated value
+        def _prepare_value():
+            value = self.dynamic_value.get()
+            asyncio.run(value.prepare(DataCache()))
+            self.epics_value_preview.setText(str(value.get()))
+            self.refreshed.emit()
+
+        if self._prep_dynamic_thread:
+            if self._prep_dynamic_thread.isRunning():
+                # TODO: Consider threadpools for this and other threading apps?
+                for i in range(10):
+                    QTimer.singleShot(1, self.update_epics_preview)
+
+        self._prep_dynamic_thread = ThreadWorker(_prepare_value)
+        self._prep_dynamic_thread.start()
 
     def select_happi_cpt(self) -> None:
         """
@@ -1668,39 +1684,63 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         """
         When the user asks for a new value, query happi and make a device.
         """
-        value = self.dynamic_value.get().get()
-        self.happi_value_preview.setText(str(value))
-        self.refreshed.emit()
+        def _prepare_value():
+            value = self.dynamic_value.get()
+            asyncio.run(value.prepare(DataCache()))
+            self.happi_value_preview.setText(str(value.get()))
+            self.refreshed.emit()
+
+        if self._prep_dynamic_thread:
+            if self._prep_dynamic_thread.isRunning():
+                # TODO: Consider threadpools for this and other threading apps?
+                for i in range(10):
+                    QTimer.singleShot(1, self.update_happi_preview)
+
+        self._prep_dynamic_thread = ThreadWorker(_prepare_value)
+        self._prep_dynamic_thread.start()
 
     def set_mode_from_data(self) -> None:
         """
         Set the expected mode from the current data.
         """
         mode = None
-        dynamic = self.dynamic_value.get()
+        dynamic = self.dynamic_value.get()  # get from QDataclassBridge
         if dynamic is not None:
             if isinstance(dynamic, EpicsValue):
                 mode = EditMode.EPICS
-            if isinstance(dynamic, HappiValue):
+            elif isinstance(dynamic, HappiValue):
                 mode = EditMode.HAPPI
-            raise TypeError(
-                f"Unexpected dynamic value {dynamic}."
-            )
-        static = self.value.get()
-        if isinstance(static, bool):
-            mode = EditMode.BOOL
-        elif isinstance(static, float):
-            mode = EditMode.FLOAT
-        elif isinstance(static, int):
-            mode = EditMode.INT
-        elif isinstance(static, str):
-            self.setup_enums(set_mode=True)
-            return
+            else:
+                raise TypeError(
+                    f"Unexpected dynamic value {dynamic}."
+                )
+
+            # prepare dynamic value
+            def prep_dynamic_value() -> Any:
+                # TODO: Get the cache in here
+                # TODO: make available for all other methods that want it
+                asyncio.run(dynamic.prepare(DataCache()))
+                self.set_mode(mode)
+
+            self.prep_dynamic_thread = ThreadWorker(prep_dynamic_value)
+            self.prep_dynamic_thread.start()
         else:
-            raise TypeError(
-                f"Unexpected static value {static}"
-            )
-        self.set_mode(mode)
+            static = self.value.get()
+            if isinstance(static, bool):
+                mode = EditMode.BOOL
+            elif isinstance(static, float):
+                mode = EditMode.FLOAT
+            elif isinstance(static, int):
+                mode = EditMode.INT
+            elif isinstance(static, str):
+                self.setup_enums(set_mode=True)
+                return
+            else:
+                raise TypeError(
+                    f"Unexpected static value {static}"
+                )
+
+            self.set_mode(mode)
 
     def setup_enums(self, set_mode: bool = False) -> None:
         """
@@ -1855,7 +1895,7 @@ def disable_widget(widget: QWidget) -> QWidget:
 
 def gather_relevant_identifiers(
     comp: Comparison,
-    group: Union[DeviceConfiguration, PVConfiguration, ToolConfiguration]
+    group: Union[DeviceConfiguration, PVConfiguration, ToolConfiguration, SetValueStep]
 ) -> list[str]:
     """
     Gathers identifiers for ``comp`` from its parent ``group``.  ``comp`` must
@@ -1892,5 +1932,11 @@ def gather_relevant_identifiers(
             for comparison in comparisons + group.shared:
                 if comparison == comp:
                     identifiers.append(result_key)
+    elif isinstance(group, SetValueStep):
+        for check in group.success_criteria:
+            if check.comparison == comp:
+                signal = check.to_signal()
+                if signal:
+                    identifiers.append(signal.pvname)
 
     return identifiers
