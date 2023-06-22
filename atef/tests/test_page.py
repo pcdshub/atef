@@ -155,4 +155,5 @@ def test_change_comparison(
         comp_page.specific_combo.activated.emit(idx)
 
         new_comp = group_page.comparisons_table.cellWidget(0, 0).data
+        qtbot.waitUntil(lambda: new_comp != old_comp, timeout=10000)
         assert new_comp != old_comp
