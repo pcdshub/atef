@@ -1432,6 +1432,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     mode_changed: ClassVar[QSignal] = QSignal(int)
     refreshed: ClassVar[QSignal] = QSignal()
 
+    # Input widgets
     select_mode_button: QToolButton
     bool_input: QComboBox
     enum_input: QComboBox
@@ -1447,6 +1448,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     int_input: QSpinBox
     str_input: QLineEdit
 
+    # metadata
     bridge: QDataclassBridge
     value_name: str
     value: QDataclassValue
@@ -1457,6 +1459,8 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     devices: Optional[QDataclassValue]
     happi_select_widget: Optional[HappiDeviceComponentWidget]
     _last_device_name: str
+    _is_number: bool
+    _prep_dynamic_thread: Optional[ThreadWorker]
 
     def __init__(
         self,
@@ -1481,7 +1485,8 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.font_pt_size = font_pt_size
         self.happi_select_widget = None
         self._last_device_name = ""
-        self._prep_dynamic_thread: Optional[ThreadWorker] = None
+        self._is_number = False
+        self._prep_dynamic_thread = None
         self.setup_widgets()
         self.set_mode_from_data()
         self.setSizePolicy(
@@ -1513,7 +1518,6 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
                 set_widget_font_size(widget, self.font_pt_size)
 
         # Hide bool/str if "Number" annotation.
-        number_anno = False
         for field in fields(self.bridge.data):
             if field.name == self.value_name:
                 if field.type in (
@@ -1522,12 +1526,12 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
                     Optional[Number],
                     "Optional[Number]",
                 ):
-                    number_anno = True
+                    self._is_number = True
                 break
 
         # Select mode
         menu = QMenu()
-        if not number_anno:
+        if not self._is_number:
             use_bool = menu.addAction("&Bool")
             use_bool.triggered.connect(partial(self.set_mode, EditMode.BOOL)),
             use_enum = menu.addAction("&Enum")
@@ -1536,7 +1540,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         use_float.triggered.connect(partial(self.set_mode, EditMode.FLOAT))
         use_int = menu.addAction("&Int")
         use_int.triggered.connect(partial(self.set_mode, EditMode.INT))
-        if not number_anno:
+        if not self._is_number:
             use_str = menu.addAction("&String")
             use_str.triggered.connect(partial(self.set_mode, EditMode.STR))
         use_epics = menu.addAction("EPI&CS")
@@ -1735,6 +1739,11 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             elif isinstance(static, str):
                 self.setup_enums(set_mode=True)
                 return
+            elif static is None:
+                if self._is_number:
+                    mode = EditMode.INT
+                else:
+                    mode = EditMode.STR
             else:
                 raise TypeError(
                     f"Unexpected static value {static}"
