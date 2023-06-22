@@ -2,7 +2,7 @@ Release History
 ###############
 
 
-v1.0.0-beta (2023-06-22)
+v1.0.0 (2023-06-22)
 ========================
 Many changes have taken place since the last tag (08/2022).  Checkouts can now
 be run inside the GUI, and active checkouts have been prototyped.
