@@ -10,7 +10,7 @@ import numpy as np
 import ophyd
 
 from . import reduce, serialization, util
-from .cache import DataCache, get_signal_cache
+from .cache import DataCache
 from .enums import Severity
 from .exceptions import (ComparisonError, ComparisonException,
                          ComparisonWarning, DynamicValueError,
@@ -152,10 +152,8 @@ class EpicsValue(DynamicValue):
     async def prepare(self, cache: DataCache) -> None:
         if not self.pvname:
             raise DynamicValueError('No PV specified')
-        pv_cache = get_signal_cache()
-        signal = pv_cache[self.pvname]
-        data = await cache.get_signal_data(
-            signal,
+        data = await cache.get_pv_data(
+            self.pvname,
             reduce_period=self.reduce_period,
             reduce_method=self.reduce_method,
             string=self.string or False,
