@@ -200,24 +200,25 @@ def test_config_window_basic(qtbot: QtBot):
     qtbot.addWidget(window)
 
 
-def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path):
+# @pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
+def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path,
+                                 all_config_path: os.PathLike):
     """
     Pass if the config gui can open a file and save the same file back
     """
     window = Window(show_welcome=False)
     qtbot.addWidget(window)
-    test_configs = pathlib.Path(__file__).parent / 'configs'
-    for filename in ('lfe.json', 'all_fields.json', 'active_test.json'):
-        config_path = test_configs / filename
-        source = str(config_path)
-        dest = str(tmp_path / filename)
-        window.open_file(filename=source)
-        window.save_as(filename=dest)
-        with open(source, 'r') as fd:
-            source_lines = fd.readlines()
-        with open(dest, 'r') as fd:
-            dest_lines = fd.readlines()
-        assert source_lines == dest_lines
+    config = pathlib.Path(all_config_path)
+    filename = config.name
+    source = str(config)
+    dest = str(tmp_path / filename)
+    window.open_file(filename=source)
+    window.save_as(filename=dest)
+    with open(source, 'r') as fd:
+        source_lines = fd.readlines()
+    with open(dest, 'r') as fd:
+        dest_lines = fd.readlines()
+    assert source_lines == dest_lines
 
 
 @pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
