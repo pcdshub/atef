@@ -42,7 +42,7 @@ from atef.widgets.config.utils import (ConfigTreeModel, MultiInputDialog,
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData
-from atef.widgets.utils import (BusyCursorThread, insert_widget,
+from atef.widgets.utils import (BusyCursorThread, PV_validator, insert_widget,
                                 match_line_edit_text_width)
 
 from ...procedure import (ComparisonToTarget, DescriptionStep, DisplayOptions,
@@ -847,9 +847,7 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         # signal select setup
         self.signal_button.clicked.connect(self.pick_signal)
         # PV edit setup
-        regexp = QtCore.QRegularExpression(r'^\w+(:\w+)+(\.\w+)*$')
-        validator = QtGui.QRegularExpressionValidator(regexp)
-        self.pv_edit.setValidator(validator)
+        self.pv_edit.setValidator(PV_validator)
         self.pv_edit.textChanged.connect(self.pick_pv)
 
         self.reset_fields()

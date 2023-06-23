@@ -16,11 +16,11 @@ from typing import Any, ClassVar, Dict, List, Optional
 from archapp.interactive import EpicsArchive
 from pydm.widgets.archiver_time_plot import PyDMArchiverTimePlot
 from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import QRegularExpression, Qt
-from qtpy.QtGui import QRegularExpressionValidator
+from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QStyle, QWidget
 
 from atef.widgets.core import DesignerDisplay
+from atef.widgets.utils import PV_validator
 
 logger = logging.getLogger(__name__)
 archive_viewer_singleton = None
@@ -236,9 +236,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         Attempts to pass pv name to ``ArchiveViewerWidget.add_signal()``
         """
         # validate PV form, returnPressed unless valid
-        regexp = QRegularExpression(r'^\w+(:\w+)+(\.\w+)*$')
-        validator = QRegularExpressionValidator(regexp)
-        self.input_field.setValidator(validator)
+        self.input_field.setValidator(PV_validator)
 
         def _add_item():
             """ slot for input_field submission """

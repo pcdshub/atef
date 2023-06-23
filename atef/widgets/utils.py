@@ -4,9 +4,12 @@ Non-core utilities. Primarily dynamic styling tools.
 from typing import ClassVar, Optional
 
 from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import QEvent, QObject
-from qtpy.QtGui import QPalette
+from qtpy.QtCore import QEvent, QObject, QRegularExpression
+from qtpy.QtGui import QPalette, QRegularExpressionValidator
 from qtpy.QtWidgets import QLineEdit
+
+PV_regexp = QRegularExpression(r'^\w+(:\w+)+(\.\w+)*$')
+PV_validator = QRegularExpressionValidator(PV_regexp)
 
 
 class FrameOnEditFilter(QObject):
