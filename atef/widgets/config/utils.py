@@ -19,8 +19,8 @@ from qtpy.QtCore import (QPoint, QPointF, QRect, QRectF, QRegularExpression,
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
                         QPaintEvent, QPen, QRegularExpressionValidator)
-from qtpy.QtWidgets import (QCheckBox, QComboBox, QInputDialog, QLabel,
-                            QLayout, QLineEdit, QMenu, QPushButton,
+from qtpy.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QInputDialog,
+                            QLabel, QLayout, QLineEdit, QMenu, QPushButton,
                             QSizePolicy, QSpinBox, QStyle, QToolButton,
                             QWidget)
 
@@ -43,7 +43,8 @@ from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
-from atef.widgets.utils import BusyCursorThread, match_line_edit_text_width
+from atef.widgets.utils import (BusyCursorThread, PV_validator,
+                                match_line_edit_text_width)
 
 logger = logging.getLogger(__name__)
 
@@ -1444,7 +1445,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     happi_select_component: QPushButton
     happi_value_preview: QLabel
     happi_refresh: QToolButton
-    float_input: QLineEdit
+    float_input: QDoubleSpinBox
     int_input: QSpinBox
     str_input: QLineEdit
 
@@ -1509,9 +1510,12 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.happi_select_component.clicked.connect(self.select_happi_cpt)
         self.happi_refresh.clicked.connect(self.update_happi_preview)
         self.setup_refresh_icon(self.happi_refresh)
-        self.float_input.textEdited.connect(self.update_from_float)
+        self.float_input.valueChanged.connect(self.update_from_float)
         self.int_input.valueChanged.connect(self.update_normal)
         self.str_input.textEdited.connect(self.update_normal)
+
+        # Data Validators
+        self.epics_input.setValidator(PV_validator)
 
         for widget in self.children():
             if hasattr(widget, "font"):
@@ -1572,17 +1576,11 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         text = self.enum_input.itemText(index)
         self.value.put(text)
 
-    def update_from_float(self, text: str) -> None:
+    def update_from_float(self, value: float) -> None:
         """
         When the float widget is updated by the user, save a float.
         """
-        try:
-            value = float(text)
-        except ValueError:
-            pass
-        else:
-            match_line_edit_text_width(self.float_input, minimum=30, buffer=10)
-            self.value.put(value)
+        self.value.put(float(value))
 
     def update_normal(self, value: Any) -> None:
         """
@@ -1870,7 +1868,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
                 value = float(self.value.get())
             except (ValueError, TypeError):
                 value = 0.0
-            self.float_input.setText(str(value))
+            self.float_input.setValue(value)
             self.float_input.show()
         elif mode == EditMode.INT:
             try:
