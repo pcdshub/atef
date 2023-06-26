@@ -31,7 +31,7 @@ from atef.config import (Configuration, DeviceConfiguration,
                          PreparedComparison, PreparedConfiguration,
                          PreparedFile, PVConfiguration, ToolConfiguration)
 from atef.enums import Severity
-from atef.exceptions import MissingHappiDeviceError
+from atef.exceptions import DynamicValueError, MissingHappiDeviceError
 from atef.procedure import (ProcedureFile, ProcedureStep, SetValueStep,
                             walk_steps)
 from atef.qt_helpers import (QDataclassBridge, QDataclassList, QDataclassValue,
@@ -831,11 +831,12 @@ def cast_dataclass(data: Any, new_type: Type) -> Any:
     casted_data : instance of new_type
         The new dataclass instance.
     """
+    data_fields = dataclasses.fields(data)
     new_fields = dataclasses.fields(new_type)
     field_names = set(field.name for field in new_fields)
     new_kwargs = {
-        key: value for key, value in dataclasses.asdict(data).items()
-        if key in field_names
+        dfield.name: getattr(data, dfield.name) for dfield in data_fields
+        if dfield.name in field_names
     }
     return new_type(**new_kwargs)
 
@@ -1609,6 +1610,17 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             self.epics_value_preview.setText(str(value.get()))
             self.refreshed.emit()
 
+        def _handle_errors(ex: Exception):
+            if isinstance(ex, DynamicValueError):
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    'Failed to connect to PV',
+                    'Unable to gather PV information for preview. '
+                    'PV may not exist or be inaccessible',
+                )
+            else:
+                raise ex
+
         if self._prep_dynamic_thread:
             if self._prep_dynamic_thread.isRunning():
                 # TODO: Consider threadpools for this and other threading apps?
@@ -1616,6 +1628,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
                     QTimer.singleShot(1, self.update_epics_preview)
 
         self._prep_dynamic_thread = ThreadWorker(_prepare_value)
+        self._prep_dynamic_thread.error_raised.connect(_handle_errors)
         self._prep_dynamic_thread.start()
 
     def select_happi_cpt(self) -> None:
@@ -1692,6 +1705,17 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             self.happi_value_preview.setText(str(value.get()))
             self.refreshed.emit()
 
+        def _handle_errors(ex: Exception):
+            if isinstance(ex, DynamicValueError):
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    'Failed to connect to device',
+                    'Unable to gather information from happi device for preview. '
+                    'Device might be unset or failed to connect',
+                )
+            else:
+                raise ex
+
         if self._prep_dynamic_thread:
             if self._prep_dynamic_thread.isRunning():
                 # TODO: Consider threadpools for this and other threading apps?
@@ -1699,6 +1723,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
                     QTimer.singleShot(1, self.update_happi_preview)
 
         self._prep_dynamic_thread = ThreadWorker(_prepare_value)
+        self._prep_dynamic_thread.error_raised.connect(_handle_errors)
         self._prep_dynamic_thread.start()
 
     def set_mode_from_data(self) -> None:
@@ -1719,9 +1744,13 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
 
             # prepare dynamic value
             def prep_dynamic_value() -> Any:
-                # TODO: Get the cache in here
-                # TODO: make available for all other methods that want it
-                asyncio.run(dynamic.prepare(DataCache()))
+                try:
+                    asyncio.run(dynamic.prepare(DataCache()))
+                except DynamicValueError as ex:
+                    logger.warning('Unable to prepare dynamic value during '
+                                   f'input widget initialization: {ex}')
+                    self.set_mode(EditMode.STR)
+                    return
                 self.set_mode(mode)
 
             self.prep_dynamic_thread = ThreadWorker(prep_dynamic_value)
