@@ -1430,7 +1430,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     font_pt_size : int, optional
         The size of the font to use for the widget.
     """
-    filename = 'config_value_edit.ui'
+    filename = 'multi_mode_value_edit.ui'
     mode_changed: ClassVar[QSignal] = QSignal(int)
     refreshed: ClassVar[QSignal] = QSignal()
 
@@ -1694,6 +1694,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             else:
                 text = f"{happi_value.device_name}.{happi_value.signal_attr}"
             self.happi_select_component.setText(text)
+            self.happi_select_component.setToolTip(text)
 
     def update_happi_preview(self) -> None:
         """

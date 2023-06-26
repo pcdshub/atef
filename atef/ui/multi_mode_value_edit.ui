@@ -107,6 +107,9 @@
         </property>
         <item>
          <widget class="QPushButton" name="happi_select_component">
+          <property name="styleSheet">
+           <string notr="true">text-align:left;</string>
+          </property>
           <property name="text">
            <string>click to select</string>
           </property>
