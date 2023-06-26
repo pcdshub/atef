@@ -116,7 +116,8 @@ class DynamicValue:
     string: Optional[bool] = None
 
     def __str__(self) -> str:
-        kwds = (f"{key}={value}" for key, value in asdict(self).items())
+        kwds = (f"{key}={value}" for key, value in asdict(self).items()
+                if (value is not None))
         return f"{type(self).__name__}({', '.join(kwds)}) [{self.value}]"
 
     def get(self) -> PrimitiveType:
