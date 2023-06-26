@@ -28,6 +28,7 @@ def _parametrize(comparison, *value_and_result):
 success = Result(severity=Severity.success)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     Equals(value=1),
     [1, Severity.success],
@@ -42,6 +43,7 @@ async def test_equality_basic(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     Equals(value=1, invert=True),
     [0, Severity.success],
@@ -56,6 +58,7 @@ async def test_equality_inverted(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     NotEquals(value=1),
     [1, Severity.error],
@@ -70,6 +73,7 @@ async def test_not_equals_basic(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     Equals(value=1, atol=1),
     [0, Severity.success],
@@ -86,6 +90,7 @@ async def test_equality_with_atol(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     check.AnyComparison(
         comparisons=[
@@ -109,6 +114,7 @@ async def test_any_comparison(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     check.AnyValue(
         values=[1, 2, 3],
@@ -128,6 +134,7 @@ async def test_any_value(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     check.Greater(value=2),
     [1, Severity.error],
@@ -144,6 +151,7 @@ async def test_greater(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     check.GreaterOrEqual(value=2),
     [1, Severity.error],
@@ -160,6 +168,7 @@ async def test_greater_equal(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     # < 1 error, 1 ~ 3 warn, 5 ~ 6 warn, > 6 error
     check.Range(low=1, warn_low=3, warn_high=5, high=6, inclusive=True),
@@ -181,6 +190,7 @@ async def test_range_inclusive(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     # < 1 error, 1 ~ 3 warn, 5 ~ 6 warn, > 6 error
     check.Range(low=1, warn_low=3, warn_high=5, high=6, inclusive=False),
@@ -202,6 +212,7 @@ async def test_range_exclusive(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     # < 1 error, 1 ~ 3 warn, 5 ~ 6 warn, > 6 error
     check.ValueSet(
@@ -238,6 +249,7 @@ async def test_value_set(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     check.Equals(
         value_dynamic=check.HappiValue(
@@ -257,6 +269,7 @@ async def test_happi_value(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @_parametrize(
     check.Equals(
         value_dynamic=check.EpicsValue(
