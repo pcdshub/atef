@@ -1,5 +1,6 @@
 """
-Widgets used for manipulating Passive Checkout Data
+Widgets used for manipulating Passive Checkout Data.  Contains mostly DataWidget's
+that will exist as a child of PageWidget's.
 """
 
 from collections import defaultdict
@@ -662,8 +663,6 @@ class EqualsMixin:
     atol_edit: QLineEdit
     rtol_label: QLabel
     rtol_edit: QLineEdit
-    # data_type_label: QLabel
-    # data_type_combo: QComboBox
 
     def setup_equals_widget(self) -> None:
         """
@@ -856,22 +855,7 @@ class RangeWidget(DesignerDisplay, DataWidget):
         - Set up the symbols based on the inclusive checkbox
         - Set up the dynamic behavior of the visualization
         """
-        # Line edits and visualization
-        # for ident in ('low', 'high', 'warn_low', 'warn_high'):
-        #     line_edit = getattr(self, f'{ident}_edit')
-        #     value_obj = getattr(self.bridge, ident)
-        #     # Copy all changes to the visualization labels
-        #     label = getattr(self, f'{ident}_label')
-        #     line_edit.textChanged.connect(label.setText)
-        #     # Trigger the visualization update on any update
-        #     value_obj.changed_value.connect(self.update_visualization)
-        #     # Standard setup and initialization
-        #     setup_line_edit_data(
-        #         line_edit=line_edit,
-        #         value_obj=value_obj,
-        #         from_str=float,
-        #         to_str=str,
-        #     )
+        # Line edits and visualization hooked up after link-time
         # Checkbox
         self.bridge.inclusive.changed_value.connect(
             self.inclusive_check.setChecked

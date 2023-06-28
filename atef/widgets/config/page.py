@@ -65,6 +65,19 @@ from .utils import (MultiModeValueEdit, TableWidgetWithAddRow, cast_dataclass,
 
 
 def walk_tree_items(item: AtefItem) -> Generator[AtefItem, None, None]:
+    """
+    Walk the tree depth first, starting at `item`.
+
+    Parameters
+    ----------
+    item : AtefItem
+        the root node of the tree to walk
+
+    Yields
+    ------
+    Generator[AtefItem, None, None]
+        Yields AtefItems from the the tree.
+    """
     yield item
 
     for child_idx in range(item.childCount()):
@@ -172,7 +185,36 @@ def setup_multi_mode_edit_widget(
     target_widget: QWidget,
     value_name: str = "value",
     dynamic_name: str = "value_dynamic",
+    specific_widget: str = "specific_comparison_widget"
 ) -> None:
+    """
+    Set up a `MultiModeValueEdit`` widget, replacing `target_widget` in `page`.`specific_widget`
+    Hook up the input fields to the `value_name` and `dynamic_name` attributes
+    on the QDataclassBridge on `page.specific_comparison_widget`.
+
+    Parameters
+    ----------
+    page : PageWidget
+        the page widget containing `target_widget` and the identifiers
+        (PVs, device/components, etc) needed to specify the comparison.
+    target_widget : QWidget
+        the placeholder widget in `page`.`specific_widget` to replace.
+    value_name : str, optional
+        an attribute name corresponding to the static value field on
+        `specific_widget.bridge`, by default "value".
+    dynamic_name : str, optional
+        an attribute name corresponding to the dynamic value field on
+        `specific_widget.bridge`, by default "value_dynamic".
+    specific_widget : str, optional
+        an attribute name. child widget of `page` that contains `target_widget` and
+        the :class:`QDataclassBridge` used for updating dataclasses. This widget's
+        data should be a Comparison, by default "specific_comparison_widget".
+
+    Raises
+    ------
+    RuntimeError
+        if the `page` is not linked to a tree node (:class:`AtefItem`)
+    """
     # Find the current node
     curr_parent = page
     node = None
@@ -188,7 +230,8 @@ def setup_multi_mode_edit_widget(
         )
     # Travel up the node tree to find the id and devices
     devices = None
-    comp = page.specific_comparison_widget.bridge.data
+    spec_widget = getattr(page, specific_widget)
+    comp = spec_widget.bridge.data
     # TODO: This is kinda ick, hard coded, will have to change for Active checkouts
     group_node = node.find_ancestor_by_widget(
         (DeviceConfigurationPage, PVConfigurationPage, ToolConfigurationPage, StepPage)
@@ -201,8 +244,8 @@ def setup_multi_mode_edit_widget(
     if isinstance(group, DeviceConfiguration):
         devices = group.devices
 
-    page.value_widget = MultiModeValueEdit(
-        bridge=page.specific_comparison_widget.bridge,
+    value_widget = MultiModeValueEdit(
+        bridge=spec_widget.bridge,
         value_name=value_name,
         dynamic_name=dynamic_name,
         id_fn=gather_ids,
@@ -211,16 +254,28 @@ def setup_multi_mode_edit_widget(
     )
 
     if hasattr(page.specific_comparison_widget, 'set_tolerance_visible'):
-        page.value_widget.mode_changed.connect(
+        value_widget.mode_changed.connect(
             page.specific_comparison_widget.set_tolerance_visible
         )
-    insert_widget(page.value_widget, target_widget)
+
+    # Finally replace the old placeholder widget with the configured value_widget
+    insert_widget(value_widget, target_widget)
 
 
 def setup_multi_mode_for_widget(page: PageWidget, specific_widget: QWidget) -> None:
     """
-    initializes MultiModeInputWidget for various specific comparison widgets
-    Includes: (Equals, NotEquals, GtLtBase, Range) Widgets
+    Initializes MultiModeInputWidget for various specific comparison widgets.
+    Wraps `setup_multi_mode_edit_widget`, providing widget specific information
+
+    Currently supports: (Equals, NotEquals, GtLtBase, Range) widgets
+
+    Parameters
+    ----------
+    page : PageWidget
+        the page holding the `specific_widget` that needs a
+        :class:`MultiModeValueEdit` set up.
+    specific_widget : QWidget
+        the widget that needs a `MultiModeValueEdit` set up for data entry.
     """
     if isinstance(specific_widget, RangeWidget):
         setup_multi_mode_edit_widget(

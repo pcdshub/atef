@@ -1940,6 +1940,8 @@ def gather_relevant_identifiers(
 
     Identifiers are typically device+attribute pairs, or raw EPICS PVs
 
+    This function will need to be updated when new configurations or steps are added
+
     Parameters
     ----------
     comp : Comparison

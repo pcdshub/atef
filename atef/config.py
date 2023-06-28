@@ -1,3 +1,9 @@
+"""
+Contains "Configuration" dataclasses for organizing ``Comparisons``.
+Also contains "Prepared" variants of ``Comparison`` and ``Configuration`` classes,
+which link ``Comparisons`` to specific identifiers and hold ``Result`` objects.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -1350,12 +1356,13 @@ class PreparedToolComparison(PreparedComparison):
 
     Each PreparedToolComparison has a single leaf in the configuration tree,
     comprised of:
+
     * A configuration
     * The tool configuration (i.e., a :class:`tools.Tool` instance)
     * Identifiers to compare are dependent on the tool type
     * A comparison to run
-        - For example, a :class:`tools.Ping` has keys described in
-          :class:`tools.PingResult`.
+        - For example, a :class:`atef.tools.Ping` has keys described in
+          :class:`~atef.tools.PingResult`.
     """
     #: The device the comparison applies to, if applicable.
     tool: tools.Tool = field(default_factory=lambda: tools.Ping(hosts=[]))

@@ -1,3 +1,9 @@
+"""
+Dataclasses for describing comparisons.  Comparisons generally subclass ``Comparison``,
+which hold ``Value`` and ``DynamicValue`` objects.  Comparisons involving
+``DynamicValue`` must be prepared before comparisons can be run.
+"""
+
 from __future__ import annotations
 
 import concurrent.futures
@@ -76,7 +82,7 @@ class Value:
         return value_desc
 
     def get(self) -> PrimitiveType:
-        """ get the value from this container. """
+        """Get the value from this container."""
         return self.value
 
     def compare(self, value: PrimitiveType) -> bool:
@@ -97,7 +103,7 @@ class DynamicValue:
     A primitive value from an external source that may change over time.
     This necessarily picks up a runtime performance cost and getting
     the value is not guaranteed to be successful. If unsuccessful,
-    This will raise a DynamicValueError from the original exception.
+    this will raise a DynamicValueError from the original exception.
 
     Includes settings for reduction of multiple samples.
 
@@ -150,9 +156,28 @@ class EpicsValue(DynamicValue):
     #: The EPICS PV to use.
     pvname: str = ''
 
-    async def prepare(self, cache: DataCache) -> None:
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare the EpicsValue.  Accesses the EPICS PV using the data
+        cache provided.
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Raises
+        ------
+        DynamicValueError
+            if the EpicsValue does not have a pv specified
+        """
         if not self.pvname:
             raise DynamicValueError('No PV specified')
+
+        if cache is None:
+            cache = DataCache()
+
         data = await cache.get_pv_data(
             self.pvname,
             reduce_period=self.reduce_period,
@@ -174,9 +199,28 @@ class HappiValue(DynamicValue):
     #: The attr name of the signal to get from.
     signal_attr: str = ''
 
-    async def prepare(self, cache: DataCache) -> None:
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare the HappiValue. Accesses the specified device and component
+        from the happi database.
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Raises
+        ------
+        DynamicValueError
+            if the EpicsValue does not have a pv specified
+        """
         if not self.device_name or not self.signal_attr:
             raise DynamicValueError('Happi value is unspecified')
+
+        if cache is None:
+            cache = DataCache()
+
         device = util.get_happi_device_by_name(self.device_name)
         signal = getattr(device, self.signal_attr)
         data = await cache.get_signal_data(
@@ -421,7 +465,7 @@ class Comparison:
             executor=executor,
         )
 
-    def prepare(self, cache: DataCache) -> None:
+    def prepare(self, cache: Optional[DataCache] = None) -> None:
         """
         Implement in subclass to grab and cache dynamic values.
         This is expected to set self.is_prepared to True if
@@ -436,7 +480,16 @@ class Comparison:
 class BasicDynamic(Comparison):
     value_dynamic: Optional[DynamicValue] = None
 
-    async def prepare(self, cache: DataCache) -> None:
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  If a value_dynamic is specified,
+        prepare its data
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
         if self.value_dynamic is not None:
             await self.value_dynamic.prepare(cache)
             self.value = self.value_dynamic.get()
@@ -532,7 +585,16 @@ class ValueSet(Comparison):
                 return True
         return False
 
-    async def prepare(self, cache: DataCache) -> None:
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  If a value_dynamic is specified,
+        prepare its data
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
         # TODO revisit this logic, seems to overwrite normal values.
         # How are these populated?  is there a value for every dynamic?
         for value, dynamic in zip(self.values, self.values_dynamic):
@@ -562,7 +624,16 @@ class AnyValue(Comparison):
     def _compare(self, value: PrimitiveType) -> bool:
         return value in self.values
 
-    async def prepare(self, cache: DataCache) -> None:
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  Prepares each DynamicValue in the
+        value_dynamic list, if specified.
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
         for index, dynamic in enumerate(self.values_dynamic):
             if dynamic is not None:
                 await dynamic.prepare(cache)
@@ -589,9 +660,18 @@ class AnyComparison(Comparison):
             for comparison in self.comparisons
         )
 
-    async def prepare(self, cache: DataCache) -> None:
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  Prepares all comparisons contained
+        in this comparison.
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
         # TODO make sure all comparisons have a prepare?  Or allow for case where
-        # non-dynamic comparisons that dont' have prepare
+        # non-dynamic comparisons that don't have prepare
         for comp in self.comparisons:
             await comp.prepare(cache)
         self.is_prepared = True
@@ -738,7 +818,17 @@ class Range(Comparison):
 
         return True
 
-    async def prepare(self, cache: DataCache) -> None:
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  If a value_dynamic is specified,
+        prepare its data.  Prepares the high/low limits along with dynamic high/low
+        warning values if they exist
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
         if self.low_dynamic is not None:
             await self.low_dynamic.prepare(cache)
             self.low = self.low_dynamic.get()
