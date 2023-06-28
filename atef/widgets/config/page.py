@@ -254,7 +254,7 @@ def setup_multi_mode_edit_widget(
     )
 
     if hasattr(page.specific_comparison_widget, 'set_tolerance_visible'):
-        value_widget.mode_changed.connect(
+        value_widget.show_tolerance.connect(
             page.specific_comparison_widget.set_tolerance_visible
         )
 

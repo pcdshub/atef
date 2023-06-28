@@ -1431,7 +1431,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         The size of the font to use for the widget.
     """
     filename = 'multi_mode_value_edit.ui'
-    mode_changed: ClassVar[QSignal] = QSignal(int)
+    show_tolerance: ClassVar[QSignal] = QSignal(bool)
     refreshed: ClassVar[QSignal] = QSignal()
 
     # Input widgets
@@ -1488,6 +1488,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.happi_select_widget = None
         self._last_device_name = ""
         self._is_number = False
+        self._show_tol = False
         self._prep_dynamic_thread = None
         self.setup_widgets()
         self.set_mode_from_data()
@@ -1597,6 +1598,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         When the EPICS widget is updated by the user, save the PV name.
         """
         match_line_edit_text_width(self.epics_input, text=text, minimum=50, buffer=10)
+        self.epics_input.setToolTip(text)
         self.dynamic_bridge.pvname.put(text)
 
     def update_epics_preview(self) -> None:
@@ -1608,6 +1610,11 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             value = self.dynamic_value.get()
             asyncio.run(value.prepare(DataCache()))
             self.epics_value_preview.setText(str(value.get()))
+            if isinstance(value.get(), (float, int)):
+                self._show_tol = True
+            else:
+                self._show_tol = False
+            self.show_tolerance.emit(self._show_tol)
             self.refreshed.emit()
 
         def _handle_errors(ex: Exception):
@@ -1704,6 +1711,12 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             value = self.dynamic_value.get()
             asyncio.run(value.prepare(DataCache()))
             self.happi_value_preview.setText(str(value.get()))
+            if isinstance(value.get(), (float, int)):
+                self._show_tol = True
+            else:
+                self._show_tol = False
+
+            self.show_tolerance.emit(self._show_tol)
             self.refreshed.emit()
 
         def _handle_errors(ex: Exception):
@@ -1889,15 +1902,18 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             self.dynamic_bridge = None
         if mode == EditMode.BOOL:
             self.bool_input.setCurrentIndex(int(bool(self.value.get())))
+            self._show_tol = False
             self.bool_input.show()
         elif mode == EditMode.ENUM:
             self.setup_enums()
+            self._show_tol = False
             self.enum_input.show()
         elif mode == EditMode.FLOAT:
             try:
                 value = float(self.value.get())
             except (ValueError, TypeError):
                 value = 0.0
+            self._show_tol = True
             self.float_input.setValue(value)
             self.float_input.show()
         elif mode == EditMode.INT:
@@ -1905,15 +1921,18 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
                 value = int(self.value.get())
             except (ValueError, TypeError):
                 value = 0
+            self._show_tol = True
             self.int_input.setValue(value)
             self.int_input.show()
         elif mode == EditMode.STR:
+            self._show_tol = False
             self.str_input.setText(str(self.value.get()))
             self.str_input.show()
+
         self.select_mode_button.setToolTip(
             f"Current mode: {mode.name}"
         )
-        self.mode_changed.emit(mode)
+        self.show_tolerance.emit(self._show_tol)
 
 
 def disable_widget(widget: QWidget) -> QWidget:

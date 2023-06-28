@@ -23,8 +23,7 @@ from atef.reduce import ReduceMethod
 from atef.tools import Ping
 from atef.widgets.config.data_base import DataWidget, SimpleRowWidget
 from atef.widgets.config.utils import (BulkListWidget, ComponentListWidget,
-                                       DeviceListWidget, EditMode,
-                                       setup_line_edit_data,
+                                       DeviceListWidget, setup_line_edit_data,
                                        user_string_to_bool)
 from atef.widgets.core import DesignerDisplay
 
@@ -718,16 +717,12 @@ class EqualsMixin:
             text = f'± {diff:.3g}'
         self.range_label.setText(text)
 
-    def set_tolerance_visible(self, mode: int) -> None:
-        tol_vis = mode in (EditMode.INT, EditMode.FLOAT)
+    def set_tolerance_visible(self, tol_vis: bool) -> None:
         self.range_label.setVisible(tol_vis)
         self.atol_label.setVisible(tol_vis)
         self.atol_edit.setVisible(tol_vis)
         self.rtol_label.setVisible(tol_vis)
         self.rtol_edit.setVisible(tol_vis)
-
-        range_vis = mode in (EditMode.INT, EditMode.FLOAT, EditMode.BOOL)
-        self.range_label.setVisible(range_vis)
 
 
 class EqualsWidget(DesignerDisplay, EqualsMixin, DataWidget):
