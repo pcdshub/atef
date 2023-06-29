@@ -464,7 +464,7 @@ class Comparison:
             executor=executor,
         )
 
-    def prepare(self, cache: Optional[DataCache] = None) -> None:
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
         """
         Implement in subclass to grab and cache dynamic values.
         This is expected to set self.is_prepared to True if
