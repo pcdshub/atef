@@ -1,6 +1,6 @@
 """
-Widgets used for manipulating Passive Checkout Data.  Contains mostly DataWidget's
-that will exist as a child of PageWidget's.
+Widgets used for manipulating Passive Checkout Data.  Contains mostly `DataWidget`s
+that will exist as a child of a `PageWidget`.
 """
 
 from collections import defaultdict
