@@ -128,8 +128,7 @@ class DynamicValue:
 
     def get(self) -> PrimitiveType:
         """
-        Call the child's get routine and wrap for error handling.
-        This also sets up a cached last value to use in the repr.
+        Return the cached value from `prepare`, or raise a `DynamicValueError` if there is no such value.
         """
         if self.value is not None:
             return self.value
