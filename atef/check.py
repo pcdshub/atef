@@ -178,7 +178,7 @@ class EpicsValue(DynamicValue):
             cache = DataCache()
 
         data = await cache.get_pv_data(
-            self.pvname,
+            self.pvname.strip(),
             reduce_period=self.reduce_period,
             reduce_method=self.reduce_method,
             string=self.string or False,

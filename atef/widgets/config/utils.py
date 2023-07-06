@@ -1599,7 +1599,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         """
         match_line_edit_text_width(self.epics_input, text=text, minimum=50, buffer=10)
         self.epics_input.setToolTip(text)
-        self.dynamic_bridge.pvname.put(text)
+        self.dynamic_bridge.pvname.put(text.strip())
 
     def update_epics_preview(self) -> None:
         """

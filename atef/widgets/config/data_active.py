@@ -876,14 +876,15 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
             return
 
         signal_cache = get_signal_cache()
-        sig = signal_cache[self.pv_edit.text()]
+        pvname = self.pv_edit.text().strip()
+        sig = signal_cache[pvname]
 
         def timeout_warning(ex: Exception):
             if isinstance(ex, TimeoutError):
                 QtWidgets.QMessageBox.warning(
                     self,
                     'Failed to connect to PV',
-                    f'Could not connect to PV: {self.pv_edit.text()}. '
+                    f'Could not connect to PV: {pvname}. '
                     'Will be unable to read metadata'
                 )
             else:
@@ -894,7 +895,7 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.busy_thread.raised_exception.connect(timeout_warning)
         self.busy_thread.start()
 
-        self.chosen_target = Target(pv=self.pv_edit.text())
+        self.chosen_target = Target(pv=pvname)
         self.data_updated.emit()
 
     def pick_signal(self) -> None:

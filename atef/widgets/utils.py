@@ -8,7 +8,7 @@ from qtpy.QtCore import QEvent, QObject, QRegularExpression
 from qtpy.QtGui import QPalette, QRegularExpressionValidator
 from qtpy.QtWidgets import QLineEdit
 
-PV_regexp = QRegularExpression(r'^\w+(:\w+)+(\.\w+)*$')
+PV_regexp = QRegularExpression(r'.*')
 PV_validator = QRegularExpressionValidator(PV_regexp)
 
 

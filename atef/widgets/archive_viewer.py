@@ -244,7 +244,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             pv = self.input_field.text()
 
             # add item
-            self.add_signal(pv)
+            self.add_signal(pv.strip())
 
         self.input_field.returnPressed.connect(_add_item)
 
