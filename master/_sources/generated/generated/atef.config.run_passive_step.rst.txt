@@ -1,0 +1,6 @@
+atef.config.run\_passive\_step
+==============================
+
+.. currentmodule:: atef.config
+
+.. autofunction:: run_passive_step

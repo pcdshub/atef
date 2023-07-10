@@ -1,0 +1,33 @@
+atef.procedure.SetValueStep
+===========================
+
+.. currentmodule:: atef.procedure
+
+.. autoclass:: SetValueStep
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: allow_verify
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: description
+    .. autoattribute:: halt_on_fail
+    .. autoattribute:: name
+    .. autoattribute:: parent
+    .. autoattribute:: require_action_success
+    .. autoattribute:: step_success_required
+    .. autoattribute:: verify_required
+    .. autoattribute:: actions
+    .. autoattribute:: success_criteria
+    
+    

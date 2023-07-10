@@ -1,0 +1,32 @@
+atef.config.PreparedFile
+========================
+
+.. currentmodule:: atef.config
+
+.. autoclass:: PreparedFile
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: compare
+    .. automethod:: fill_cache
+    .. automethod:: from_config
+    .. automethod:: walk_comparisons
+    .. automethod:: walk_groups
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: cache
+    .. autoattribute:: file
+    .. autoattribute:: client
+    .. autoattribute:: root
+    
+    

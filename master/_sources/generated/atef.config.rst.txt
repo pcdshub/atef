@@ -5,13 +5,10 @@
 
    
    
-   
-
-   
-   
    .. rubric:: Functions
 
    .. autosummary::
+      :toctree: generated
    
       get_result_from_comparison
       run_passive_step
@@ -23,6 +20,7 @@
    .. rubric:: Classes
 
    .. autosummary::
+      :toctree: generated
    
       Configuration
       ConfigurationFile
@@ -46,6 +44,3 @@
    
    
    
-
-
-

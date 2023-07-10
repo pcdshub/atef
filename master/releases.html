@@ -12,17 +12,17 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script src="_static/jquery.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
-        <script src="_static/docs-versions-menu.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="_static/docs-versions-menu.js?v=3d6a1aea"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Upcoming Changes" href="upcoming_changes.html" />
-    <link rel="prev" title="atef.procedure" href="generated/atef.procedure.html" /> 
+    <link rel="prev" title="atef.tools.ToolResult" href="generated/generated/atef.tools.ToolResult.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -48,11 +48,18 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="api.html">ATEF API</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Release History</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#v1-0-0-2023-06-22">v1.0.0 (2023-06-22)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#v1-1-0-2023-09-14">v1.1.0 (2023-09-14)</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#features">Features</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#bugfixes">Bugfixes</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#maintenance">Maintenance</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#contributors">Contributors</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#v1-0-0-2023-06-22">v1.0.0 (2023-06-22)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id2">Bugfixes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3">Maintenance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id4">Contributors</a></li>
 </ul>
 </li>
 </ul>
@@ -89,9 +96,45 @@
            <div itemprop="articleBody">
              
   <section id="release-history">
-<h1>Release History<a class="headerlink" href="#release-history" title="Permalink to this heading"></a></h1>
+<h1>Release History<a class="headerlink" href="#release-history" title="Link to this heading"></a></h1>
+<section id="v1-1-0-2023-09-14">
+<h2>v1.1.0 (2023-09-14)<a class="headerlink" href="#v1-1-0-2023-09-14" title="Link to this heading"></a></h2>
+<section id="features">
+<h3>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Adds find-replace functionality and helpers.  These procedures walk through the dataclass, rather than blindly modifying serialized json.</p></li>
+<li><p>Adds a simple find-replace widget and more fully-featured fill-template page.</p></li>
+<li><p>Adds backend dataclasses for running Bluesky plans in active checkouts.</p></li>
+<li><p>Prototypes auto-generated plan argument entry widgets.</p></li>
+<li><p>Annotates built-in Bluesky plans with bluesky-queueserver compatible type hints.</p></li>
+<li><p>Adds <a class="reference internal" href="generated/generated/atef.check.DynamicValue.html#atef.check.DynamicValue" title="atef.check.DynamicValue"><code class="xref py py-class docutils literal notranslate"><span class="pre">DynamicValue</span></code></a> (and subclasses <a class="reference internal" href="generated/generated/atef.check.HappiValue.html#atef.check.HappiValue" title="atef.check.HappiValue"><code class="xref py py-class docutils literal notranslate"><span class="pre">HappiValue</span></code></a>, <a class="reference internal" href="generated/generated/atef.check.EpicsValue.html#atef.check.EpicsValue" title="atef.check.EpicsValue"><code class="xref py py-class docutils literal notranslate"><span class="pre">EpicsValue</span></code></a>) for comparing to dynamically changing data sources.</p></li>
+<li><p>Adds <code class="xref py py-class docutils literal notranslate"><span class="pre">MultiModeValueEdit</span></code> widget for modifying values give a specified type, including dynamic values.</p></li>
+</ul>
+</section>
+<section id="bugfixes">
+<h3>Bugfixes<a class="headerlink" href="#bugfixes" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Ensure filenames get cast as strings properly.</p></li>
+<li><p>Allow cast_dataclass to transfer objects from old to new dataclass, previously nested dataclasses would be converted to dicts.</p></li>
+</ul>
+</section>
+<section id="maintenance">
+<h3>Maintenance<a class="headerlink" href="#maintenance" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Adds bluesky-queueserver dependency and pins databroker.</p></li>
+<li><p>Add sphinx templates for autogenerated documentation.</p></li>
+<li><p>Reduce randomness in test suite, try all combo box options when available.</p></li>
+</ul>
+</section>
+<section id="contributors">
+<h3>Contributors<a class="headerlink" href="#contributors" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>tangkong</p></li>
+</ul>
+</section>
+</section>
 <section id="v1-0-0-2023-06-22">
-<h2>v1.0.0 (2023-06-22)<a class="headerlink" href="#v1-0-0-2023-06-22" title="Permalink to this heading"></a></h2>
+<h2>v1.0.0 (2023-06-22)<a class="headerlink" href="#v1-0-0-2023-06-22" title="Link to this heading"></a></h2>
 <p>Many changes have taken place since the last tag (08/2022).  Checkouts can now
 be run inside the GUI, and active checkouts have been prototyped.</p>
 <p>Notably the structure of the checkout files changed, and checkouts before that
@@ -99,8 +142,8 @@ tag must be converted to the modern format.  Most users will not have issues
 with this.</p>
 <p>Shoutout to all the contributors who helped before the pre-release notes framework
 was added.</p>
-<section id="features">
-<h3>Features<a class="headerlink" href="#features" title="Permalink to this heading"></a></h3>
+<section id="id1">
+<h3>Features<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Replaces the welcome dialog with a welcome landing tab</p></li>
 <li><p>Enable the close-tab button</p></li>
@@ -113,8 +156,8 @@ was added.</p>
 <li><p>Adds report generation for active checkouts</p></li>
 </ul>
 </section>
-<section id="bugfixes">
-<h3>Bugfixes<a class="headerlink" href="#bugfixes" title="Permalink to this heading"></a></h3>
+<section id="id2">
+<h3>Bugfixes<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Fixes a bug where False-y observed values would fail to be reported</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">BusyCursorThread.raised_exception</span></code> now properly expects to emit an <code class="docutils literal notranslate"><span class="pre">Exception</span></code></p></li>
@@ -131,8 +174,8 @@ was added.</p>
 <li><p>Allows device selection via double-click in the <code class="docutils literal notranslate"><span class="pre">HappiSearchWidget</span></code> tree-view</p></li>
 </ul>
 </section>
-<section id="maintenance">
-<h3>Maintenance<a class="headerlink" href="#maintenance" title="Permalink to this heading"></a></h3>
+<section id="id3">
+<h3>Maintenance<a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Improves <code class="docutils literal notranslate"><span class="pre">ResultStatus</span></code> refresh handling, now also updates on paint events</p></li>
 <li><p>In the case of errors during a mode switch, the error will be revealed to the user and the switch will be reverted.</p></li>
@@ -145,8 +188,8 @@ was added.</p>
 <li><p>Wraps signal.get call used for setting input type validators in <code class="docutils literal notranslate"><span class="pre">BusyCursorThread</span></code></p></li>
 </ul>
 </section>
-<section id="contributors">
-<h3>Contributors<a class="headerlink" href="#contributors" title="Permalink to this heading"></a></h3>
+<section id="id4">
+<h3>Contributors<a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>tangkong</p></li>
 </ul>
@@ -158,7 +201,7 @@ was added.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="generated/atef.procedure.html" class="btn btn-neutral float-left" title="atef.procedure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="generated/generated/atef.tools.ToolResult.html" class="btn btn-neutral float-left" title="atef.tools.ToolResult" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="upcoming_changes.html" class="btn btn-neutral float-right" title="Upcoming Changes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

@@ -9,20 +9,21 @@
 
    
    
-   
-
-   
-   
    .. rubric:: Classes
 
    .. autosummary::
+      :toctree: generated
    
       AnyComparison
       AnyValue
+      BasicDynamic
       Comparison
+      DynamicValue
+      EpicsValue
       Equals
       Greater
       GreaterOrEqual
+      HappiValue
       Less
       LessOrEqual
       NotEquals
@@ -36,6 +37,3 @@
    
    
    
-
-
-
