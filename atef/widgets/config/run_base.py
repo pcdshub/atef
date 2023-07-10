@@ -8,13 +8,12 @@ from __future__ import annotations
 import asyncio
 import itertools
 import logging
-from typing import (TYPE_CHECKING, Any, ClassVar, Generator, List, Optional,
-                    Union)
+from typing import TYPE_CHECKING, Any, ClassVar, List, Optional, Union
 
 from qtpy import QtCore
-from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLayout, QLineEdit,
-                            QMenu, QPushButton, QSpacerItem, QStyle,
-                            QToolButton, QVBoxLayout, QWidget, QWidgetAction)
+from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLineEdit, QMenu,
+                            QPushButton, QSpacerItem, QStyle, QToolButton,
+                            QVBoxLayout, QWidget, QWidgetAction)
 
 from atef.check import Comparison
 from atef.config import (AnyPreparedConfiguration, Configuration,
@@ -25,7 +24,7 @@ from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
                             PreparedProcedureStep, ProcedureFile,
                             ProcedureStep, walk_steps)
 from atef.result import Result, combine_results
-from atef.widgets.config.utils import TreeItem
+from atef.widgets.config.utils import TreeItem, disable_widget
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import BusyCursorThread
 
@@ -34,13 +33,6 @@ if TYPE_CHECKING:
     from atef.widgets.config.page import AtefItem
 
 logger = logging.getLogger(__name__)
-
-
-def walk_tree_items(item: AtefItem) -> Generator[AtefItem, None, None]:
-    yield item
-
-    for child_idx in range(item.childCount()):
-        yield from walk_tree_items(item.child(child_idx))
 
 
 FileType = Union[ProcedureFile, ConfigurationFile]
@@ -102,20 +94,6 @@ def make_run_page(
 
     widget.run_check = check_widget
 
-    return widget
-
-
-def disable_widget(widget: QWidget) -> QWidget:
-    """ Disable widget, recurse through layouts """
-    # TODO: revisit, is there a better way to do this?
-    for idx in range(widget.layout().count()):
-        layout_item = widget.layout().itemAt(idx)
-        if isinstance(layout_item, QLayout):
-            disable_widget(layout_item)
-        else:
-            wid = layout_item.widget()
-            if wid:
-                wid.setEnabled(False)
     return widget
 
 

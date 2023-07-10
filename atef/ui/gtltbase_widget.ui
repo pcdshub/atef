@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>31</height>
+    <height>35</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -54,17 +54,12 @@
     </widget>
    </item>
    <item>
-    <widget class="QLineEdit" name="value_edit">
-     <property name="font">
-      <font>
-       <pointsize>16</pointsize>
-      </font>
-     </property>
-     <property name="text">
-      <string/>
-     </property>
-     <property name="placeholderText">
-      <string>0.0</string>
+    <widget class="QWidget" name="value_widget" native="true">
+     <property name="minimumSize">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
      </property>
     </widget>
    </item>

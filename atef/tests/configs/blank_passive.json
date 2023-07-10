@@ -33,6 +33,7 @@
                 "string": null,
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
+                "value_dynamic": null,
                 "value": 0.0,
                 "rtol": null,
                 "atol": null
@@ -48,6 +49,7 @@
                 "string": null,
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
+                "value_dynamic": null,
                 "value": 0.0
               }
             },
@@ -61,6 +63,7 @@
                 "string": null,
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
+                "value_dynamic": null,
                 "value": 0.0
               }
             },
@@ -74,6 +77,7 @@
                 "string": null,
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
+                "value_dynamic": null,
                 "value": 0.0
               }
             },
@@ -87,6 +91,7 @@
                 "string": null,
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
+                "value_dynamic": null,
                 "value": 0.0
               }
             },
@@ -101,9 +106,13 @@
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
                 "low": 0,
+                "low_dynamic": null,
                 "high": 0,
+                "high_dynamic": null,
                 "warn_low": null,
+                "warn_low_dynamic": null,
                 "warn_high": null,
+                "warn_high_dynamic": null,
                 "inclusive": true
               }
             },
@@ -117,7 +126,8 @@
                 "string": null,
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
-                "values": []
+                "values": [],
+                "values_dynamic": []
               }
             },
             {
@@ -130,7 +140,8 @@
                 "string": null,
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
-                "values": []
+                "values": [],
+                "values_dynamic": []
               }
             },
             {
@@ -143,6 +154,7 @@
                 "string": null,
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
+                "value_dynamic": null,
                 "value": 0.0,
                 "rtol": null,
                 "atol": null

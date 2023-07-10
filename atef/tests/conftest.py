@@ -16,6 +16,7 @@ from apischema import ValidationError, deserialize
 from qtpy import QtWidgets
 
 import atef
+from atef.cache import get_signal_cache
 from atef.check import Equals, Greater, GreaterOrEqual, LessOrEqual, NotEquals
 from atef.config import (ConfigurationFile, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
@@ -262,6 +263,17 @@ def mock_happi(monkeypatch: Any, happi_client: happi.Client):
             if not hasattr(cpt, 'pvname'):
                 setattr(cpt, 'pvname', f'{dev.prefix}:{cpt_name}')
     monkeypatch.setattr(atef.util, 'get_happi_client', lambda: happi_client)
+
+
+@pytest.fixture(scope='function')
+def mock_pv(monkeypatch: Any):
+    # Register the PV "MY:PV" to the signal cache
+    sig_cache = get_signal_cache()
+    signal = sig_cache['MY:PV']
+    monkeypatch.setattr(signal, 'get', lambda: 1)
+    monkeypatch.setattr(signal, 'read', lambda: {
+        'MY:PV': {'value': 1, 'timestamp': datetime.datetime.now().timestamp()}
+    })
 
 
 @pytest.fixture

@@ -60,6 +60,7 @@
                   "string": null,
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
+                  "value_dynamic": null,
                   "value": 0.0,
                   "rtol": null,
                   "atol": null

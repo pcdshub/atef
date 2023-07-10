@@ -51,6 +51,16 @@ class ComparisonWarning(ComparisonException):
     severity = Severity.warning
 
 
+class DynamicValueError(ComparisonError):
+    """Raise this when a dynamic value cannot be resolved."""
+    ...
+
+
+class UnpreparedComparisonException(ComparisonException):
+    """Raise this when a a comparison is attempted before being prepared."""
+    ...
+
+
 class PreparedComparisonException(Exception):
     """Exception caught during preparation of comparisons."""
     #: The exception instance itself.

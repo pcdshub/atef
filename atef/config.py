@@ -1,3 +1,9 @@
+"""
+Contains "Configuration" dataclasses for organizing ``Comparisons``.
+Also contains "Prepared" variants of ``Comparison`` and ``Configuration`` classes,
+which link ``Comparisons`` to specific identifiers and hold ``Result`` objects.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -1040,7 +1046,7 @@ class PreparedComparison:
         """
         Get the data according to the comparison's configuration.
 
-        To be immplemented in subclass.
+        To be implemented in subclass.
 
         Returns
         -------
@@ -1066,6 +1072,28 @@ class PreparedComparison:
         Result
             The result of the comparison.
         """
+        try:
+            if hasattr(self.comparison, 'prepare'):
+                await self.comparison.prepare(self.cache)
+        except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
+            result = Result(
+                severity=self.comparison.if_disconnected,
+                reason=("Unable to read dynamic value for the comparison: "
+                        f"{self.identifier}")
+            )
+            self.result = result
+            return result
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Reading dynamic value for {self.identifier!r} comparison "
+                    f"{self.comparison} raised {ex.__class__.__name__}: {ex}"
+                ),
+            )
+            self.result = result
+            return result
+
         try:
             data = await self.get_data_async()
         except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
@@ -1328,12 +1356,13 @@ class PreparedToolComparison(PreparedComparison):
 
     Each PreparedToolComparison has a single leaf in the configuration tree,
     comprised of:
+
     * A configuration
     * The tool configuration (i.e., a :class:`tools.Tool` instance)
     * Identifiers to compare are dependent on the tool type
     * A comparison to run
-        - For example, a :class:`tools.Ping` has keys described in
-          :class:`tools.PingResult`.
+        - For example, a :class:`atef.tools.Ping` has keys described in
+          :class:`~atef.tools.PingResult`.
     """
     #: The device the comparison applies to, if applicable.
     tool: tools.Tool = field(default_factory=lambda: tools.Ping(hosts=[]))

@@ -1,4 +1,3 @@
-import random
 from typing import Any, Callable
 
 import pytest
@@ -28,17 +27,13 @@ def gather_comparisons(cfg: AnyDataclass):
     return comps
 
 
-def pick_different_combo_option(combo_box: QtWidgets.QComboBox) -> int:
+def get_different_combo_options(combo_box: QtWidgets.QComboBox) -> list[int]:
     idx = combo_box.currentIndex()
     count = combo_box.count()
     new_idxs = list(range(count))
     new_idxs.remove(idx)
-    try:
-        new_idx = random.choice(new_idxs)
-    except IndexError:
-        return
-
-    return new_idx
+    print(f'curr: {idx}, {new_idxs}')
+    return new_idxs
 
 
 def test_add_delete_config(
@@ -117,15 +112,16 @@ def test_change_attr(
     qtbot.addWidget(group_page)
 
     row_widget = group_page.comparisons_table.cellWidget(0, 0)
-    new_idx = pick_different_combo_option(row_widget.attr_combo)
-    if not new_idx:
+    new_idxs = get_different_combo_options(row_widget.attr_combo)
+    if not new_idxs:
         return
 
-    row_widget.attr_combo.setCurrentIndex(new_idx)
-    row_widget.attr_combo.activated.emit(new_idx)
-    new_comps = gather_comparisons(cfg)
-    assert len(new_comps) == len(orig_comps)
-    assert new_comps != orig_comps
+    for idx in new_idxs:
+        row_widget.attr_combo.setCurrentIndex(idx)
+        row_widget.attr_combo.activated.emit(idx)
+        new_comps = gather_comparisons(cfg)
+        assert len(new_comps) == len(orig_comps)
+        assert new_comps != orig_comps
 
 
 @pytest.mark.parametrize(
@@ -150,12 +146,14 @@ def test_change_comparison(
     old_comp = comp_page.data
 
     assert isinstance(comp_page, ComparisonPage)
-    new_idx = pick_different_combo_option(comp_page.specific_combo)
+    new_idxs = get_different_combo_options(comp_page.specific_combo)
 
     monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
                         lambda *args, **kwargs: QtWidgets.QMessageBox.Yes)
-    comp_page.specific_combo.setCurrentIndex(new_idx)
-    comp_page.specific_combo.activated.emit(new_idx)
+    for idx in new_idxs:
+        comp_page.specific_combo.setCurrentIndex(idx)
+        comp_page.specific_combo.activated.emit(idx)
 
-    new_comp = group_page.comparisons_table.cellWidget(0, 0).data
-    assert new_comp != old_comp
+        new_comp = group_page.comparisons_table.cellWidget(0, 0).data
+        qtbot.waitUntil(lambda: new_comp != old_comp, timeout=10000)
+        assert new_comp != old_comp

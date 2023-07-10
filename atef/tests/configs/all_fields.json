@@ -33,6 +33,7 @@
                         "string": null,
                         "severity_on_failure": 2,
                         "if_disconnected": 2,
+                        "value_dynamic": null,
                         "value": -10.0
                       }
                     }
@@ -64,6 +65,7 @@
                       "string": null,
                       "severity_on_failure": 2,
                       "if_disconnected": 2,
+                      "value_dynamic": null,
                       "value": 0.0,
                       "rtol": null,
                       "atol": null
@@ -106,6 +108,7 @@
                   "string": null,
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
+                  "value_dynamic": null,
                   "value": 1,
                   "rtol": null,
                   "atol": null
@@ -123,6 +126,7 @@
                   "string": null,
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
+                  "value_dynamic": null,
                   "value": 1.0
                 }
               }
@@ -138,6 +142,7 @@
                   "string": null,
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
+                  "value_dynamic": null,
                   "value": "",
                   "rtol": null,
                   "atol": null
@@ -155,6 +160,7 @@
                   "string": null,
                   "severity_on_failure": 1,
                   "if_disconnected": 2,
+                  "value_dynamic": null,
                   "value": 0.0
                 }
               }
@@ -170,6 +176,7 @@
                   "string": true,
                   "severity_on_failure": 1,
                   "if_disconnected": 2,
+                  "value_dynamic": null,
                   "value": "OUT",
                   "rtol": null,
                   "atol": null
@@ -188,9 +195,13 @@
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
                   "low": -200.0,
+                  "low_dynamic": null,
                   "high": 50.0,
+                  "high_dynamic": null,
                   "warn_low": -100.0,
+                  "warn_low_dynamic": null,
                   "warn_high": 10.0,
+                  "warn_high_dynamic": null,
                   "inclusive": true
                 }
               }
@@ -206,6 +217,7 @@
                   "string": null,
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
+                  "value_dynamic": null,
                   "value": 0.0
                 }
               }
@@ -221,6 +233,7 @@
                   "string": null,
                   "severity_on_failure": 1,
                   "if_disconnected": 2,
+                  "value_dynamic": null,
                   "value": 1.0
                 }
               }
@@ -278,7 +291,8 @@
                       "atol": null,
                       "severity": 2
                     }
-                  ]
+                  ],
+                  "values_dynamic": []
                 }
               }
             ]
@@ -305,6 +319,7 @@
                       "string": null,
                       "severity_on_failure": 2,
                       "if_disconnected": 2,
+                      "value_dynamic": null,
                       "value": 0.0
                     }
                   },
@@ -318,6 +333,7 @@
                       "string": null,
                       "severity_on_failure": 2,
                       "if_disconnected": 2,
+                      "value_dynamic": null,
                       "value": 100.0
                     }
                   },
@@ -353,6 +369,7 @@
                                   "string": null,
                                   "severity_on_failure": 2,
                                   "if_disconnected": 2,
+                                  "value_dynamic": null,
                                   "value": -1,
                                   "rtol": null,
                                   "atol": null
@@ -382,7 +399,8 @@
                   "OUT",
                   "RETICLE",
                   "YAG"
-                ]
+                ],
+                "values_dynamic": []
               }
             }
           ]
@@ -422,6 +440,7 @@
                   "string": null,
                   "severity_on_failure": 2,
                   "if_disconnected": 2,
+                  "value_dynamic": null,
                   "value": 3,
                   "rtol": null,
                   "atol": null

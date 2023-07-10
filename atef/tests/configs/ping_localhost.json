@@ -2,6 +2,8 @@
   "version": 0,
   "root": {
     "name": "Root",
+    "description": null,
+    "tags": null,
     "configs": [
       {
         "ToolConfiguration": {
@@ -14,12 +16,15 @@
                 "127.0.0.1",
                 "localhost"
               ],
-              "count": 1
+              "count": 1,
+              "encoding": "utf-8"
             }
           },
           "by_attr": {
             "max_time": [],
-            "times.localhost": []
+            "min_time": [],
+            "num_alive": [],
+            "num_unresponsive": []
           },
           "shared": [
             {
@@ -32,12 +37,15 @@
                 "string": null,
                 "severity_on_failure": 2,
                 "if_disconnected": 2,
+                "value_dynamic": null,
                 "value": 1000
               }
             }
           ]
         }
       }
-    ]
+    ],
+    "values": {},
+    "mode": "all"
   }
 }

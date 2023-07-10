@@ -1,5 +1,6 @@
 """
-Widgets used for manipulating Passive Checkout Data
+Widgets used for manipulating Passive Checkout Data.  Contains mostly `DataWidget`s
+that will exist as a child of a `PageWidget`.
 """
 
 from collections import defaultdict
@@ -11,7 +12,7 @@ from qtpy.QtGui import QColor, QDropEvent
 from qtpy.QtWidgets import (QCheckBox, QComboBox, QFrame, QLabel, QLineEdit,
                             QMessageBox, QPushButton, QSpinBox, QStyle,
                             QTableWidget, QTableWidgetItem, QToolButton,
-                            QVBoxLayout)
+                            QVBoxLayout, QWidget)
 
 from atef.check import Comparison, Equals, Value
 from atef.config import (Configuration, ConfigurationGroup,
@@ -20,7 +21,6 @@ from atef.enums import Severity
 from atef.qt_helpers import QDataclassList
 from atef.reduce import ReduceMethod
 from atef.tools import Ping
-from atef.type_hints import PrimitiveType
 from atef.widgets.config.data_base import DataWidget, SimpleRowWidget
 from atef.widgets.config.utils import (BulkListWidget, ComponentListWidget,
                                        DeviceListWidget, setup_line_edit_data,
@@ -656,14 +656,12 @@ class EqualsMixin:
     }
     cast_from_user_str[bool] = user_string_to_bool
 
-    value_edit: QLabel
+    value_widget: QWidget
     range_label: QLabel
     atol_label: QLabel
     atol_edit: QLineEdit
     rtol_label: QLabel
     rtol_edit: QLineEdit
-    data_type_label: QLabel
-    data_type_combo: QComboBox
 
     def setup_equals_widget(self) -> None:
         """
@@ -678,14 +676,6 @@ class EqualsMixin:
           data fields
         - Set up the range_label for a summary of the allowed range
         """
-        for option in self.label_to_type:
-            self.data_type_combo.addItem(option)
-        setup_line_edit_data(
-            line_edit=self.value_edit,
-            value_obj=self.bridge.value,
-            from_str=self.value_from_str,
-            to_str=str,
-        )
         setup_line_edit_data(
             line_edit=self.atol_edit,
             value_obj=self.bridge.atol,
@@ -699,10 +689,7 @@ class EqualsMixin:
             to_str=str,
         )
         starting_value = self.bridge.value.get()
-        self.data_type_combo.currentTextChanged.connect(self.new_gui_type)
-        self.data_type_combo.setCurrentText(
-            self.type_to_label[type(starting_value)]
-        )
+
         self.update_range_label(starting_value)
         self.bridge.value.changed_value.connect(self.update_range_label)
         self.bridge.atol.changed_value.connect(self.update_range_label)
@@ -730,57 +717,8 @@ class EqualsMixin:
             text = f'± {diff:.3g}'
         self.range_label.setText(text)
 
-    def value_from_str(
-        self,
-        value: Optional[str] = None,
-        gui_type_str: Optional[str] = None,
-    ) -> PrimitiveType:
-        """
-        Convert our line edit value into a string based on the combobox.
-        Parameters
-        ----------
-        value : str, optional
-            The text contents of our line edit.
-        gui_type_str : str, optional
-            The text contents of our combobox.
-        Returns
-        -------
-        converted : Any
-            The casted datatype.
-        """
-        if value is None:
-            value = self.value_edit.text()
-        if gui_type_str is None:
-            gui_type_str = self.data_type_combo.currentText()
-        type_cast = self.cast_from_user_str[self.label_to_type[gui_type_str]]
-        return type_cast(value)
-
-    def new_gui_type(self, gui_type_str: str) -> None:
-        """
-        Slot for when the user changes the GUI data type.
-        Re-interprets our value as the selected type. This will
-        update the current value in the bridge as appropriate.
-        If we have a numeric type, we'll enable the range and
-        tolerance widgets. Otherwise, we'll disable them.
-        Parameters
-        ----------
-        gui_type_str : str
-            The user's text input from the data type combobox.
-        """
-        gui_type = self.label_to_type[gui_type_str]
-        # Try the gui value first
-        try:
-            new_value = self.value_from_str(gui_type_str=gui_type_str)
-        except ValueError:
-            # Try the bridge value second, or give up
-            try:
-                new_value = gui_type(self.bridge.value.get())
-            except ValueError:
-                new_value = None
-        if new_value is not None:
-            self.bridge.value.put(new_value)
-        self.range_label.setVisible(gui_type in (int, float, bool))
-        tol_vis = gui_type in (int, float)
+    def set_tolerance_visible(self, tol_vis: bool) -> None:
+        self.range_label.setVisible(tol_vis)
         self.atol_label.setVisible(tol_vis)
         self.atol_edit.setVisible(tol_vis)
         self.rtol_label.setVisible(tol_vis)
@@ -820,18 +758,13 @@ class GtLtBaseWidget(DesignerDisplay, DataWidget):
     """
     filename = 'gtltbase_widget.ui'
 
-    value_edit: QLineEdit
-    comp_symbol_label: QLineEdit
+    value_widget: QWidget
+    comp_symbol_label: QLabel
     symbol: str
 
     def __init__(self, data: Comparison, **kwargs):
         super().__init__(data=data, **kwargs)
-        setup_line_edit_data(
-            line_edit=self.value_edit,
-            value_obj=self.bridge.value,
-            from_str=float,
-            to_str=str,
-        )
+        # value_widget configured after tree-links
         self.comp_symbol_label.setText(self.symbol)
 
 
@@ -878,10 +811,10 @@ class RangeWidget(DesignerDisplay, DataWidget):
     green = QColor.fromRgb(0, _intensity, 0)
 
     # Core
-    low_edit: QLineEdit
-    high_edit: QLineEdit
-    warn_low_edit: QLineEdit
-    warn_high_edit: QLineEdit
+    low_widget: QWidget
+    high_widget: QWidget
+    warn_low_widget: QWidget
+    warn_high_widget: QWidget
     inclusive_check: QCheckBox
 
     # Symbols
@@ -917,22 +850,7 @@ class RangeWidget(DesignerDisplay, DataWidget):
         - Set up the symbols based on the inclusive checkbox
         - Set up the dynamic behavior of the visualization
         """
-        # Line edits and visualization
-        for ident in ('low', 'high', 'warn_low', 'warn_high'):
-            line_edit = getattr(self, f'{ident}_edit')
-            value_obj = getattr(self.bridge, ident)
-            # Copy all changes to the visualization labels
-            label = getattr(self, f'{ident}_label')
-            line_edit.textChanged.connect(label.setText)
-            # Trigger the visualization update on any update
-            value_obj.changed_value.connect(self.update_visualization)
-            # Standard setup and initialization
-            setup_line_edit_data(
-                line_edit=line_edit,
-                value_obj=value_obj,
-                from_str=float,
-                to_str=str,
-            )
+        # Line edits and visualization hooked up after link-time
         # Checkbox
         self.bridge.inclusive.changed_value.connect(
             self.inclusive_check.setChecked

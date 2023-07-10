@@ -1,34 +1,50 @@
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import logging
+import time
+from dataclasses import fields
+from enum import IntEnum
+from functools import partial
 from itertools import zip_longest
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
 
 import qtawesome as qta
+from ophyd import EpicsSignal, EpicsSignalRO
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import (QPoint, QPointF, QRect, QRectF, QRegularExpression,
-                         QSize, Qt)
+                         QSize, Qt, QTimer)
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
                         QPaintEvent, QPen, QRegularExpressionValidator)
-from qtpy.QtWidgets import QCheckBox, QInputDialog, QLineEdit, QMenu, QWidget
+from qtpy.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QInputDialog,
+                            QLabel, QLayout, QLineEdit, QMenu, QPushButton,
+                            QSizePolicy, QSpinBox, QStyle, QToolButton,
+                            QWidget)
 
 from atef import util
-from atef.check import Comparison, Equals, Range
+from atef.cache import DataCache, get_signal_cache
+from atef.check import Comparison, EpicsValue, Equals, HappiValue, Range
 from atef.config import (Configuration, DeviceConfiguration,
                          PreparedComparison, PreparedConfiguration,
                          PreparedFile, PVConfiguration, ToolConfiguration)
 from atef.enums import Severity
-from atef.procedure import ProcedureFile, ProcedureStep, walk_steps
-from atef.qt_helpers import QDataclassList, QDataclassValue
+from atef.exceptions import DynamicValueError, MissingHappiDeviceError
+from atef.procedure import (ProcedureFile, ProcedureStep, SetValueStep,
+                            walk_steps)
+from atef.qt_helpers import (QDataclassBridge, QDataclassList, QDataclassValue,
+                             ThreadWorker)
 from atef.result import combine_results, incomplete_result
 from atef.tools import Ping
+from atef.type_hints import Number
 from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
+from atef.widgets.utils import (BusyCursorThread, PV_validator,
+                                match_line_edit_text_width)
 
 logger = logging.getLogger(__name__)
 
@@ -815,11 +831,12 @@ def cast_dataclass(data: Any, new_type: Type) -> Any:
     casted_data : instance of new_type
         The new dataclass instance.
     """
+    data_fields = dataclasses.fields(data)
     new_fields = dataclasses.fields(new_type)
     field_names = set(field.name for field in new_fields)
     new_kwargs = {
-        key: value for key, value in dataclasses.asdict(data).items()
-        if key in field_names
+        dfield.name: getattr(data, dfield.name) for dfield in data_fields
+        if dfield.name in field_names
     }
     return new_type(**new_kwargs)
 
@@ -1362,3 +1379,622 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
                 break
 
         self.table_updated.emit()
+
+
+def set_widget_font_size(widget: QWidget, size: int):
+    font = widget.font()
+    font.setPointSize(size)
+    widget.setFont(font)
+
+
+class EditMode(IntEnum):
+    BOOL = 0
+    ENUM = 1
+    FLOAT = 2
+    INT = 3
+    STR = 4
+    EPICS = 5
+    HAPPI = 6
+
+
+class MultiModeValueEdit(DesignerDisplay, QWidget):
+    """
+    Widget to edit a single value/dynamic value pair.  This widget contains a
+    set of various edit widgets that will be connected to the corresponding
+    QDataclassValue instances as appropriate. On first load we will match the
+    data type of the saved value (or of the default value). The user will be
+    able to pick a different input method via the mode select button and the
+    appropriate input widget will be shown.  This is intended to be used to
+    edit the "value" and "dynamic_value" attributes of "Comparison" classes and
+    of similar constructs. Some of the modes will edit the "dynamic_value" and
+    others will edit the plain normal "value".
+
+    Parameters
+    ----------
+    bridge : QDataclassBridge
+        The bridge to the "Comparison" data class.
+    value_name : str, optional
+        The attribute name of the static value to edit.
+        Defaults to "value".
+    dynamic_name : str, optional
+        The attribute name of the dynamic value to edit.
+        Defaults = "value_dynamic".
+    ids : QDataclassValue, optional
+        The value object that will give us the list of ids (pvnames, devices)
+        that are active for this comparison.  This is needed to establish enum
+        options.
+    devices : QDataclassValue, optional
+        The value object that will contain the list of device names if this is
+        part of a device config. This is needed to establish enum options. If
+        omitted, we'll treat ids as a list of PVs.
+    font_pt_size : int, optional
+        The size of the font to use for the widget.
+    """
+    filename = 'multi_mode_value_edit.ui'
+    show_tolerance: ClassVar[QSignal] = QSignal(bool)
+    refreshed: ClassVar[QSignal] = QSignal()
+
+    # Input widgets
+    select_mode_button: QToolButton
+    bool_input: QComboBox
+    enum_input: QComboBox
+    epics_widget: QWidget
+    epics_input: QLineEdit
+    epics_value_preview: QLabel
+    epics_refresh: QToolButton
+    happi_widget: QWidget
+    happi_select_component: QPushButton
+    happi_value_preview: QLabel
+    happi_refresh: QToolButton
+    float_input: QDoubleSpinBox
+    int_input: QSpinBox
+    str_input: QLineEdit
+
+    # metadata
+    bridge: QDataclassBridge
+    value_name: str
+    value: QDataclassValue
+    dynamic_name: str
+    dynamic_value: QDataclassValue
+    dynamic_bridge: Optional[QDataclassBridge]
+    ids: Optional[QDataclassValue]
+    devices: Optional[QDataclassValue]
+    happi_select_widget: Optional[HappiDeviceComponentWidget]
+    _last_device_name: str
+    _is_number: bool
+    _prep_dynamic_thread: Optional[ThreadWorker]
+
+    def __init__(
+        self,
+        bridge: QDataclassBridge,
+        value_name: str = 'value',
+        dynamic_name: str = 'value_dynamic',
+        id_fn: Optional[Callable] = None,
+        devices: Optional[list[str]] = None,
+        font_pt_size: int = 8,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.bridge = bridge
+        self.value_name = value_name
+        self.value = getattr(bridge, value_name)
+        self.dynamic_name = dynamic_name
+        self.dynamic_value = getattr(bridge, dynamic_name)
+        self.dynamic_bridge = None
+        self.id_fn = id_fn
+        self.ids = self.id_fn()
+        self.devices = devices
+        self.font_pt_size = font_pt_size
+        self.happi_select_widget = None
+        self._last_device_name = ""
+        self._is_number = False
+        self._show_tol = False
+        self._prep_dynamic_thread = None
+        self.setup_widgets()
+        self.set_mode_from_data()
+        self.setSizePolicy(
+            QSizePolicy(
+                QSizePolicy.Maximum,
+                QSizePolicy.Maximum,
+            )
+        )
+
+    def setup_widgets(self):
+        """
+        Connect widgets to edit data classes as appropriate.
+        """
+        # Data connections and style
+        self.bool_input.activated.connect(self.update_from_bool)
+        self.enum_input.activated.connect(self.update_from_enum)
+        self.epics_input.textEdited.connect(self.update_from_epics)
+        self.epics_refresh.clicked.connect(self.update_epics_preview)
+        self.setup_refresh_icon(self.epics_refresh)
+        self.happi_select_component.clicked.connect(self.select_happi_cpt)
+        self.happi_refresh.clicked.connect(self.update_happi_preview)
+        self.setup_refresh_icon(self.happi_refresh)
+        self.float_input.valueChanged.connect(self.update_from_float)
+        self.int_input.valueChanged.connect(self.update_normal)
+        self.str_input.textEdited.connect(self.update_normal)
+
+        # Data Validators
+        self.epics_input.setValidator(PV_validator)
+
+        for widget in self.children():
+            if hasattr(widget, "font"):
+                set_widget_font_size(widget, self.font_pt_size)
+
+        # Hide bool/str if "Number" annotation.
+        for field in fields(self.bridge.data):
+            if field.name == self.value_name:
+                if field.type in (
+                    Number,
+                    "Number",
+                    Optional[Number],
+                    "Optional[Number]",
+                ):
+                    self._is_number = True
+                break
+
+        # Select mode
+        menu = QMenu()
+        if not self._is_number:
+            use_bool = menu.addAction("&Bool")
+            use_bool.triggered.connect(partial(self.set_mode, EditMode.BOOL)),
+            use_enum = menu.addAction("&Enum")
+            use_enum.triggered.connect(partial(self.set_mode, EditMode.ENUM))
+        use_float = menu.addAction("&Float")
+        use_float.triggered.connect(partial(self.set_mode, EditMode.FLOAT))
+        use_int = menu.addAction("&Int")
+        use_int.triggered.connect(partial(self.set_mode, EditMode.INT))
+        if not self._is_number:
+            use_str = menu.addAction("&String")
+            use_str.triggered.connect(partial(self.set_mode, EditMode.STR))
+        use_epics = menu.addAction("EPI&CS")
+        use_epics.triggered.connect(partial(self.set_mode, EditMode.EPICS))
+        use_happi = menu.addAction("&Happi")
+        use_happi.triggered.connect(partial(self.set_mode, EditMode.HAPPI))
+        self.select_mode_button.setMenu(menu)
+        self.select_mode_button.setPopupMode(
+            self.select_mode_button.InstantPopup
+        )
+
+    def setup_refresh_icon(self, button: QToolButton):
+        """
+        Assign the refresh icon to a QToolButton.
+        """
+        icon = self.style().standardIcon(QStyle.SP_BrowserReload)
+        button.setIcon(icon)
+
+    def update_from_bool(self, index: int) -> None:
+        """
+        When the bool widget is updated by the user, save a boolean.
+        """
+        self.value.put(bool(index))
+
+    def update_from_enum(self, index: int) -> None:
+        """
+        When the enum widget is updated by the user, save a string.
+        """
+        text = self.enum_input.itemText(index)
+        self.value.put(text)
+
+    def update_from_float(self, value: float) -> None:
+        """
+        When the float widget is updated by the user, save a float.
+        """
+        self.value.put(float(value))
+
+    def update_normal(self, value: Any) -> None:
+        """
+        Catch-all for updates that are already correct.
+        These are cases where no preprocessing of value is needed.
+        """
+        match_line_edit_text_width(self.str_input, text=str(value),
+                                   minimum=50, buffer=10)
+        self.value.put(value)
+
+    def update_from_epics(self, text: str) -> None:
+        """
+        When the EPICS widget is updated by the user, save the PV name.
+        """
+        match_line_edit_text_width(self.epics_input, text=text, minimum=50, buffer=10)
+        self.epics_input.setToolTip(text)
+        self.dynamic_bridge.pvname.put(text.strip())
+
+    def update_epics_preview(self) -> None:
+        """
+        When the user asks for a new value, get a value from EPICS.
+        """
+        # Prepare each time to get updated value
+        def _prepare_value():
+            value = self.dynamic_value.get()
+            asyncio.run(value.prepare(DataCache()))
+            self.epics_value_preview.setText(str(value.get()))
+            if isinstance(value.get(), (float, int)):
+                self._show_tol = True
+            else:
+                self._show_tol = False
+            self.show_tolerance.emit(self._show_tol)
+            self.refreshed.emit()
+
+        def _handle_errors(ex: Exception):
+            if isinstance(ex, DynamicValueError):
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    'Failed to connect to PV',
+                    'Unable to gather PV information for preview. '
+                    'PV may not exist or be inaccessible',
+                )
+            else:
+                raise ex
+
+        if self._prep_dynamic_thread:
+            if self._prep_dynamic_thread.isRunning():
+                # TODO: Consider threadpools for this and other threading apps?
+                for i in range(10):
+                    QTimer.singleShot(1, self.update_epics_preview)
+
+        self._prep_dynamic_thread = ThreadWorker(_prepare_value)
+        self._prep_dynamic_thread.error_raised.connect(_handle_errors)
+        self._prep_dynamic_thread.start()
+
+    def select_happi_cpt(self) -> None:
+        """
+        When the user clicks on the happi device name, open the cpt chooser.
+        Unlike other uses of this GUI, this one is used to select both the
+        device and component all at once, since we can only have one
+        target for the dynamic value.
+        """
+        if self.happi_select_widget is None:
+            widget = HappiDeviceComponentWidget(
+                client=util.get_happi_client()
+            )
+            widget.item_search_widget.happi_items_selected.connect(
+                self.new_happi_devices
+            )
+            widget.device_widget.attributes_selected.connect(
+                self.new_happi_attrs
+            )
+            self.happi_select_widget = widget
+        self.happi_select_widget.show()
+        self.happi_select_widget.activateWindow()
+
+        try:
+            current_device = self.dynamic_value.get().device_name
+        except AttributeError:
+            return
+        if current_device:
+            self.happi_select_widget.item_search_widget.edit_filter.setText(
+                current_device
+            )
+
+    def new_happi_devices(self, device_names: List[str]) -> None:
+        """
+        Cache the name of the last device that was selected.
+        The selection widget gives us a list, but we can only accept
+        one item, so the first element is selected.
+        """
+        if device_names:
+            self._last_device_name = device_names[0]
+
+    def new_happi_attrs(self, attr_names: List[OphydAttributeData]) -> None:
+        """
+        Set the new happi device/attr on the dataclass and on the display.
+        This takes the selection we just chose in the UI and also the
+        cached device name.
+        The selection widget gives us a list, but we can only accept
+        one item, so the first element is selected.
+        """
+        if attr_names:
+            self.dynamic_bridge.device_name.put(self._last_device_name)
+            self.dynamic_bridge.signal_attr.put(attr_names[0].attr)
+            self.update_happi_text()
+
+    def update_happi_text(self) -> None:
+        """
+        Update the text on the happi selection button as appropriate.
+        """
+        happi_value = self.dynamic_value.get()
+        if happi_value is not None:
+            if not happi_value.device_name or not happi_value.signal_attr:
+                text = "click to select"
+            else:
+                text = f"{happi_value.device_name}.{happi_value.signal_attr}"
+            self.happi_select_component.setText(text)
+            self.happi_select_component.setToolTip(text)
+
+    def update_happi_preview(self) -> None:
+        """
+        When the user asks for a new value, query happi and make a device.
+        """
+        def _prepare_value():
+            value = self.dynamic_value.get()
+            asyncio.run(value.prepare(DataCache()))
+            self.happi_value_preview.setText(str(value.get()))
+            if isinstance(value.get(), (float, int)):
+                self._show_tol = True
+            else:
+                self._show_tol = False
+
+            self.show_tolerance.emit(self._show_tol)
+            self.refreshed.emit()
+
+        def _handle_errors(ex: Exception):
+            if isinstance(ex, DynamicValueError):
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    'Failed to connect to device',
+                    'Unable to gather information from happi device for preview. '
+                    'Device might be unset or failed to connect',
+                )
+            else:
+                raise ex
+
+        if self._prep_dynamic_thread:
+            if self._prep_dynamic_thread.isRunning():
+                # TODO: Consider threadpools for this and other threading apps?
+                for i in range(10):
+                    QTimer.singleShot(1, self.update_happi_preview)
+
+        self._prep_dynamic_thread = ThreadWorker(_prepare_value)
+        self._prep_dynamic_thread.error_raised.connect(_handle_errors)
+        self._prep_dynamic_thread.start()
+
+    def set_mode_from_data(self) -> None:
+        """
+        Set the expected mode from the current data.
+        """
+        mode = None
+        dynamic = self.dynamic_value.get()  # get from QDataclassBridge
+        if dynamic is not None:
+            if isinstance(dynamic, EpicsValue):
+                mode = EditMode.EPICS
+            elif isinstance(dynamic, HappiValue):
+                mode = EditMode.HAPPI
+            else:
+                raise TypeError(
+                    f"Unexpected dynamic value {dynamic}."
+                )
+
+            # prepare dynamic value
+            def prep_dynamic_value() -> Any:
+                try:
+                    asyncio.run(dynamic.prepare(DataCache()))
+                except DynamicValueError as ex:
+                    logger.warning('Unable to prepare dynamic value during '
+                                   f'input widget initialization: {ex}')
+                    self.set_mode(EditMode.STR)
+                    return
+                self.set_mode(mode)
+
+            self.prep_dynamic_thread = ThreadWorker(prep_dynamic_value)
+            self.prep_dynamic_thread.start()
+        else:
+            static = self.value.get()
+            if isinstance(static, bool):
+                mode = EditMode.BOOL
+            elif isinstance(static, float):
+                mode = EditMode.FLOAT
+            elif isinstance(static, int):
+                mode = EditMode.INT
+            elif isinstance(static, str):
+                self.setup_enums(set_mode=True)
+                return
+            elif static is None:
+                if self._is_number:
+                    mode = EditMode.INT
+                else:
+                    mode = EditMode.STR
+            else:
+                raise TypeError(
+                    f"Unexpected static value {static}"
+                )
+
+            self.set_mode(mode)
+
+    def setup_enums(self, set_mode: bool = False) -> None:
+        """
+        Get enum strings and populate enum combo
+        if enums are found, sets the mode to enum
+        """
+        self.enum_input.clear()
+
+        self.ids = self.id_fn()
+        if self.ids is None:
+            # no identifiers... nothing to do, but this shouldn't happen
+            return
+        if self.devices is None:
+            # Collect signals from ids as pv names
+            # self.ids: List[str]
+            signal_cache = get_signal_cache()
+            sigs: List[EpicsSignalRO] = []
+            for id in self.ids:
+                sigs.append(signal_cache[id])
+
+        else:
+            # Collect signals from ids as device attrs
+            # self.ids: List[Tuple[str, str]] (device, attr)
+            device_names = self.devices
+            devices = []
+            for device_name in device_names:
+                try:
+                    devices.append(util.get_happi_device_by_name(device_name))
+                except MissingHappiDeviceError as ex:
+                    logger.debug(f'Device missing in enum value setup: {ex}')
+                    continue
+            sigs: List[EpicsSignal] = []
+            for dev, attr in self.ids:
+                for device in devices:
+                    try:
+                        sig = getattr(device, attr)
+                    except AttributeError:
+                        continue
+                    else:
+                        sigs.append(sig)
+
+        enums_in_order = []
+
+        def get_signal_enums():
+            start = time.monotonic()
+            for sig in sigs:
+                try:
+                    sig.wait_for_connection(timeout=1)
+                except TimeoutError:
+                    pass
+                if time.monotonic() - start >= 1:
+                    break
+
+            enum_set = set()
+            for sig in sigs:
+                if sig.enum_strs is not None:
+                    for enum_str in sig.enum_strs:
+                        if enum_str not in enum_set:
+                            enum_set.add(enum_str)
+                            enums_in_order.append(enum_str)
+
+        def fill_enums():
+            for text in enums_in_order:
+                self.enum_input.addItem(text)
+            value = str(self.value.get())
+            if value in enums_in_order:
+                self.enum_input.setCurrentText(value)
+
+            if set_mode:
+                if enums_in_order:
+                    self.set_mode(EditMode.ENUM)
+                else:
+                    self.set_mode(EditMode.STR)
+
+        self.thread_worker = BusyCursorThread(func=get_signal_enums)
+        self.thread_worker.task_finished.connect(fill_enums)
+        self.thread_worker.start()
+
+    def set_mode(self, mode: EditMode) -> None:
+        """
+        Change the mode of the edit widget.
+        This adjusts the dynamic data classes as needed and
+        shows only the correct edit widget.
+        """
+        # Hide all the widgets
+        self.epics_widget.hide()
+        self.happi_widget.hide()
+        self.bool_input.hide()
+        self.enum_input.hide()
+        self.float_input.hide()
+        self.int_input.hide()
+        self.str_input.hide()
+        if mode == EditMode.EPICS:
+            if not isinstance(self.dynamic_value.get(), EpicsValue):
+                self.dynamic_value.put(EpicsValue(pvname=""))
+            self.dynamic_bridge = QDataclassBridge(self.dynamic_value.get())
+            self.epics_input.setText(self.dynamic_bridge.pvname.get())
+            self.epics_widget.show()
+        elif mode == EditMode.HAPPI:
+            if not isinstance(self.dynamic_value.get(), HappiValue):
+                self.dynamic_value.put(
+                    HappiValue(device_name="", signal_attr="")
+                )
+            self.dynamic_bridge = QDataclassBridge(self.dynamic_value.get())
+            self.update_happi_text()
+            self.happi_widget.show()
+        else:
+            self.dynamic_value.put(None)
+            self.dynamic_bridge = None
+        if mode == EditMode.BOOL:
+            self.bool_input.setCurrentIndex(int(bool(self.value.get())))
+            self._show_tol = False
+            self.bool_input.show()
+        elif mode == EditMode.ENUM:
+            self.setup_enums()
+            self._show_tol = False
+            self.enum_input.show()
+        elif mode == EditMode.FLOAT:
+            try:
+                value = float(self.value.get())
+            except (ValueError, TypeError):
+                value = 0.0
+            self._show_tol = True
+            self.float_input.setValue(value)
+            self.float_input.show()
+        elif mode == EditMode.INT:
+            try:
+                value = int(self.value.get())
+            except (ValueError, TypeError):
+                value = 0
+            self._show_tol = True
+            self.int_input.setValue(value)
+            self.int_input.show()
+        elif mode == EditMode.STR:
+            self._show_tol = False
+            self.str_input.setText(str(self.value.get()))
+            self.str_input.show()
+
+        self.select_mode_button.setToolTip(
+            f"Current mode: {mode.name}"
+        )
+        self.show_tolerance.emit(self._show_tol)
+
+
+def disable_widget(widget: QWidget) -> QWidget:
+    """ Disable widget, recurse through layouts """
+    # TODO: revisit, is there a better way to do this?
+    for idx in range(widget.layout().count()):
+        layout_item = widget.layout().itemAt(idx)
+        if isinstance(layout_item, QLayout):
+            disable_widget(layout_item)
+        else:
+            wid = layout_item.widget()
+            if wid:
+                wid.setEnabled(False)
+    return widget
+
+
+def gather_relevant_identifiers(
+    comp: Comparison,
+    group: Union[DeviceConfiguration, PVConfiguration, ToolConfiguration, SetValueStep]
+) -> list[str]:
+    """
+    Gathers identifiers for ``comp`` from its parent ``group``.  ``comp`` must
+    be present in ``group``, else an empty list will be returned
+
+    Identifiers are typically device+attribute pairs, or raw EPICS PVs
+
+    This function will need to be updated when new configurations or steps are added
+
+    Parameters
+    ----------
+    comp : Comparison
+        the comparison in question
+    group : Union[DeviceConfiguration, PVConfiguration]
+        a configuration holding ``comp``
+
+    Returns
+    -------
+    list[str]
+        the identifiers related to ``comp``, or an empty list if none are found
+    """
+    identifiers = []
+    if isinstance(group, DeviceConfiguration):
+        for device in group.devices:
+            for attr, comparisons in group.by_attr.items():
+                for comparison in comparisons + group.shared:
+                    if comparison == comp:
+                        identifiers.append((device, attr))
+    elif isinstance(group, PVConfiguration):
+        for pvname, comparisons in group.by_pv.items():
+            for comparison in comparisons + group.shared:
+                if comparison == comp:
+                    identifiers.append(pvname)
+    elif isinstance(group, ToolConfiguration):
+        for result_key, comparisons in group.by_attr.items():
+            for comparison in comparisons + group.shared:
+                if comparison == comp:
+                    identifiers.append(result_key)
+    elif isinstance(group, SetValueStep):
+        for check in group.success_criteria:
+            if check.comparison == comp:
+                signal = check.to_signal()
+                if signal:
+                    identifiers.append(signal.pvname)
+
+    return identifiers

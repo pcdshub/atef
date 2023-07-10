@@ -1,18 +1,27 @@
+"""
+Dataclasses for describing comparisons.  Comparisons generally subclass ``Comparison``,
+which hold ``Value`` and ``DynamicValue`` objects.  Comparisons involving
+``DynamicValue`` must be prepared before comparisons can be run.
+"""
+
 from __future__ import annotations
 
 import concurrent.futures
 import logging
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from itertools import zip_longest
 from typing import Any, Generator, Iterable, List, Optional, Sequence
 
 import numpy as np
 import ophyd
 
-from atef.result import Result, successful_result
-
-from . import reduce, serialization
+from . import reduce, serialization, util
+from .cache import DataCache
 from .enums import Severity
-from .exceptions import ComparisonError, ComparisonException, ComparisonWarning
+from .exceptions import (ComparisonError, ComparisonException,
+                         ComparisonWarning, DynamicValueError,
+                         UnpreparedComparisonException)
+from .result import Result, successful_result
 from .type_hints import Number, PrimitiveType
 
 logger = logging.getLogger(__name__)
@@ -37,7 +46,7 @@ def _raise_for_severity(severity: Severity, reason: str):
 
 @dataclass
 class Value:
-    """A primitive value with optional metadata."""
+    """A primitive (static) value with optional metadata."""
     #: The value for comparison.
     value: PrimitiveType
     #: A description of what the value represents.
@@ -72,6 +81,10 @@ class Value:
             return f"{value_desc}: {self.description}"
         return value_desc
 
+    def get(self) -> PrimitiveType:
+        """Get the value from this container."""
+        return self.value
+
     def compare(self, value: PrimitiveType) -> bool:
         """Compare the provided value with this one, using tolerance settings."""
         if self.rtol is not None or self.atol is not None:
@@ -81,6 +94,141 @@ class Value:
                 atol=(self.atol or 0.0)
             )
         return value == self.value
+
+
+@dataclass
+@serialization.as_tagged_union
+class DynamicValue:
+    """
+    A primitive value from an external source that may change over time.
+    This necessarily picks up a runtime performance cost and getting
+    the value is not guaranteed to be successful. If unsuccessful,
+    this will raise a DynamicValueError from the original exception.
+
+    Includes settings for reduction of multiple samples.
+
+    Value will be cached on preparation, and this value used for comparisons
+    """
+    #: Value is now optional, and will be filled in when prepared
+    value: Optional[PrimitiveType] = None
+
+    #: Period over which the value will be read
+    reduce_period: Optional[Number] = None
+
+    #: Reduce collected samples by this reduce method
+    reduce_method: reduce.ReduceMethod = reduce.ReduceMethod.average
+
+    #: If applicable, request and compare string values rather than the default
+    string: Optional[bool] = None
+
+    def __str__(self) -> str:
+        kwds = (f"{key}={value}" for key, value in asdict(self).items()
+                if (value is not None))
+        return f"{type(self).__name__}({', '.join(kwds)}) [{self.value}]"
+
+    def get(self) -> PrimitiveType:
+        """
+        Return the cached value from `prepare`, or raise a `DynamicValueError` if there is no such value.
+        """
+        if self.value is not None:
+            return self.value
+        else:
+            raise DynamicValueError('Dynamic value has not been prepared.')
+
+    async def prepare(self, cache: DataCache) -> None:
+        """
+        Implement in child class to get the current value from source.
+        Should set the self.value
+        """
+        raise NotImplementedError()
+
+
+@dataclass
+class EpicsValue(DynamicValue):
+    """
+    A primitive value sourced from an EPICS PV.
+    This will create and cache an EpicsSignalRO object, and defer
+    to that signal's get handling.
+    """
+    # as of 3.10, use kw_only=True to allow mandatory arguments after the inherited
+    # optional ones.  Until then, these must have a default
+    #: The EPICS PV to use.
+    pvname: str = ''
+
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare the EpicsValue.  Accesses the EPICS PV using the data
+        cache provided.
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Raises
+        ------
+        DynamicValueError
+            if the EpicsValue does not have a pv specified
+        """
+        if not self.pvname:
+            raise DynamicValueError('No PV specified')
+
+        if cache is None:
+            cache = DataCache()
+
+        data = await cache.get_pv_data(
+            self.pvname.strip(),
+            reduce_period=self.reduce_period,
+            reduce_method=self.reduce_method,
+            string=self.string or False,
+        )
+        self.value = data
+
+
+@dataclass
+class HappiValue(DynamicValue):
+    """
+    A primitive value sourced from a specific happi device signal.
+    This will query happi to cache a Signal object, and defer to
+    that signal's get handling.
+    """
+    #: The name of the device to use.
+    device_name: str = ''
+    #: The attr name of the signal to get from.
+    signal_attr: str = ''
+
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare the HappiValue. Accesses the specified device and component
+        from the happi database.
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Raises
+        ------
+        DynamicValueError
+            if the EpicsValue does not have a pv specified
+        """
+        if not self.device_name or not self.signal_attr:
+            raise DynamicValueError('Happi value is unspecified')
+
+        if cache is None:
+            cache = DataCache()
+
+        device = util.get_happi_device_by_name(self.device_name)
+        signal = getattr(device, self.signal_attr)
+        data = await cache.get_signal_data(
+            signal,
+            reduce_period=self.reduce_period,
+            reduce_method=self.reduce_method,
+            string=self.string or False,
+        )
+        self.value = data
 
 
 @dataclass
@@ -160,6 +308,9 @@ class Comparison:
     #: result severity.
     if_disconnected: Severity = Severity.error
 
+    def __post_init__(self):
+        self.is_prepared: bool = False
+
     def __call__(self, value: Any) -> Optional[Result]:
         """Run the comparison against ``value``."""
         return self.compare(value)
@@ -202,6 +353,11 @@ class Comparison:
             An identifier that goes along with the provided value.  Used for
             severity result descriptions.
         """
+        if not self.is_prepared:
+            raise UnpreparedComparisonException(
+                f"Comparison {self} was not prepared."
+            )
+
         if value is None:
             return Result(
                 severity=self.if_disconnected,
@@ -308,9 +464,39 @@ class Comparison:
             executor=executor,
         )
 
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Implement in subclass to grab and cache dynamic values.
+        This is expected to set self.is_prepared to True if
+        successful.
+        """
+        # TODO: think about renaming this method, collides with PreparedComparison
+        # Why would we have to prepare the comparison AND make a prepared comparison?
+        raise NotImplementedError()
+
 
 @dataclass
-class Equals(Comparison):
+class BasicDynamic(Comparison):
+    value_dynamic: Optional[DynamicValue] = None
+
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  If a value_dynamic is specified,
+        prepare its data
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
+        if self.value_dynamic is not None:
+            await self.value_dynamic.prepare(cache)
+            self.value = self.value_dynamic.get()
+        self.is_prepared = True
+
+
+@dataclass
+class Equals(BasicDynamic):
     value: PrimitiveType = 0.0
     rtol: Optional[Number] = None
     atol: Optional[Number] = None
@@ -327,14 +513,18 @@ class Equals(Comparison):
     def describe(self) -> str:
         """Describe the equality comparison in words."""
         comparison = "equal to" if not self.invert else "not equal to"
-        return f"{comparison} {self._value}"
+        if self.value_dynamic is None:
+            dynamic = " "
+        else:
+            dynamic = f" {self.value_dynamic}"
+        return f"{comparison}{dynamic}{self._value}"
 
     def _compare(self, value: PrimitiveType) -> bool:
         return self._value.compare(value)
 
 
 @dataclass
-class NotEquals(Comparison):
+class NotEquals(BasicDynamic):
     # Less confusing shortcut for `Equals(..., invert=True)`
     value: PrimitiveType = 0
     rtol: Optional[Number] = None
@@ -352,7 +542,11 @@ class NotEquals(Comparison):
     def describe(self) -> str:
         """Describe the equality comparison in words."""
         comparison = "equal to" if self.invert else "not equal to"
-        return f"{comparison} {self._value}"
+        if self.value_dynamic is None:
+            dynamic = " "
+        else:
+            dynamic = f" {self.value_dynamic} "
+        return f"{comparison}{dynamic}{self._value}"
 
     def _compare(self, value: PrimitiveType) -> bool:
         return not self._value.compare(value)
@@ -364,13 +558,21 @@ class ValueSet(Comparison):
     # Review: really a "value sequence"/list as the first ones have priority,
     # but that sounds like a vector version of "Value" above; better ideas?
     values: Sequence[Value] = field(default_factory=list)
+    values_dynamic: Sequence[Optional[DynamicValue]] = field(default_factory=list)
 
     def describe(self) -> str:
         """Describe the equality comparison in words."""
+        accumulated_values = []
+        for value, dynamic in zip_longest(self.values, self.values_dynamic):
+            if dynamic is None:
+                accumulated_values.append(value)
+            else:
+                accumulated_values.append(dynamic)
         values = "\n".join(
             str(value)
-            for value in self.values
+            for value in accumulated_values
         )
+
         return f"Any of:\n{values}"
 
     def _compare(self, value: PrimitiveType) -> bool:
@@ -382,24 +584,65 @@ class ValueSet(Comparison):
                 return True
         return False
 
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  If a value_dynamic is specified,
+        prepare its data
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
+        # TODO revisit this logic, seems to overwrite normal values.
+        # How are these populated?  is there a value for every dynamic?
+        for value, dynamic in zip(self.values, self.values_dynamic):
+            if dynamic is not None:
+                await dynamic.prepare(cache)
+                value.value = dynamic.get()
+        self.is_prepared = True
+
 
 @dataclass
 class AnyValue(Comparison):
     """Comparison passes if the value is in the ``values`` list."""
     values: List[PrimitiveType] = field(default_factory=list)
+    values_dynamic: List[Optional[DynamicValue]] = field(default_factory=list)
 
     def describe(self) -> str:
         """Describe the comparison in words."""
-        values = ", ".join(str(value) for value in self.values)
+        accumulated_values = []
+        for value, dynamic in zip_longest(self.values, self.values_dynamic):
+            if dynamic is None:
+                accumulated_values.append(value)
+            else:
+                accumulated_values.append(dynamic)
+        values = ", ".join(str(value) for value in accumulated_values)
         return f"one of {values}"
 
     def _compare(self, value: PrimitiveType) -> bool:
         return value in self.values
 
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  Prepares each DynamicValue in the
+        value_dynamic list, if specified.
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
+        for index, dynamic in enumerate(self.values_dynamic):
+            if dynamic is not None:
+                await dynamic.prepare(cache)
+                self.values[index] = dynamic.get()
+        self.is_prepared = True
+
 
 @dataclass
 class AnyComparison(Comparison):
-    """Comparison passes if the value matches *any* comparison."""
+    """Comparison passes if *any* contained comparison passes."""
     comparisons: List[Comparison] = field(default_factory=list)
 
     def describe(self) -> str:
@@ -416,50 +659,66 @@ class AnyComparison(Comparison):
             for comparison in self.comparisons
         )
 
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  Prepares all comparisons contained
+        in this comparison.
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
+        # TODO make sure all comparisons have a prepare?  Or allow for case where
+        # non-dynamic comparisons that don't have prepare
+        for comp in self.comparisons:
+            await comp.prepare(cache)
+        self.is_prepared = True
+
 
 @dataclass
-class Greater(Comparison):
+class Greater(BasicDynamic):
     """Comparison: value > self.value."""
     value: Number = 0
 
     def describe(self) -> str:
-        return f"> {self.value}: {self.description}"
+        return f"> {self.value_dynamic or self.value}: {self.description}"
 
     def _compare(self, value: Number) -> bool:
         return value > self.value
 
 
 @dataclass
-class GreaterOrEqual(Comparison):
+class GreaterOrEqual(BasicDynamic):
     """Comparison: value >= self.value."""
     value: Number = 0
 
     def describe(self) -> str:
-        return f">= {self.value}: {self.description}"
+        return f">= {self.value_dynamic or self.value}: {self.description}"
 
     def _compare(self, value: Number) -> bool:
         return value >= self.value
 
 
 @dataclass
-class Less(Comparison):
+class Less(BasicDynamic):
     """Comparison: value < self.value."""
     value: Number = 0
 
     def describe(self) -> str:
-        return f"< {self.value}: {self.description}"
+        return f"< {self.value_dynamic or self.value}: {self.description}"
 
     def _compare(self, value: Number) -> bool:
         return value < self.value
 
 
 @dataclass
-class LessOrEqual(Comparison):
+class LessOrEqual(BasicDynamic):
     """Comparison: value <= self.value."""
     value: Number = 0
 
     def describe(self) -> str:
-        return f"<= {self.value}: {self.description}"
+        return f"<= {self.value_dynamic or self.value}: {self.description}"
 
     def _compare(self, value: Number) -> bool:
         return value <= self.value
@@ -495,12 +754,16 @@ class Range(Comparison):
     """
     #: The low end of the range, which must be <= high.
     low: Number = 0
+    low_dynamic: Optional[DynamicValue] = None
     #: The high end of the range, which must be >= low.
     high: Number = 0
+    high_dynamic: Optional[DynamicValue] = None
     #: The low end of the warning range, which must be <= warn_high.
     warn_low: Optional[Number] = None
+    warn_low_dynamic: Optional[DynamicValue] = None
     #: The high end of the warning range, which must be >= warn_low.
     warn_high: Optional[Number] = None
+    warn_high_dynamic: Optional[DynamicValue] = None
     #: Should the low and high values be included in the range?
     inclusive: bool = True
 
@@ -534,7 +797,18 @@ class Range(Comparison):
             )
 
     def describe(self) -> str:
-        return "\n".join(str(range_) for range_ in self.ranges)
+        text = "\n".join(str(range_) for range_ in self.ranges)
+        if self.low_dynamic is not None:
+            text.append(f"\n Dynamic low value: {self.low_dynamic}")
+        if self.high_dynamic is not None:
+            text.append(f"\n Dynamic high value: {self.high_dynamic}")
+        if self.warn_low_dynamic is not None:
+            text.append(f"\n Dynamic warn_low value: {self.warn_low_dynamic}")
+        if self.warn_high_dynamic is not None:
+            text.append(
+                f"\n Dynamic warn_high value: {self.warn_high_dynamic}"
+            )
+        return text
 
     def _compare(self, value: Number) -> bool:
         for range_ in self.ranges:
@@ -542,3 +816,28 @@ class Range(Comparison):
                 _raise_for_severity(range_.severity, str(range_))
 
         return True
+
+    async def prepare(self, cache: Optional[DataCache] = None) -> None:
+        """
+        Prepare this comparison's value data.  If a value_dynamic is specified,
+        prepare its data.  Prepares the high/low limits along with dynamic high/low
+        warning values if they exist
+
+        Parameters
+        ----------
+        cache : DataCache, optional
+            The data cache instance, if available.
+        """
+        if self.low_dynamic is not None:
+            await self.low_dynamic.prepare(cache)
+            self.low = self.low_dynamic.get()
+        if self.high_dynamic is not None:
+            await self.high_dynamic.prepare(cache)
+            self.high = self.high_dynamic.get()
+        if self.warn_low_dynamic is not None:
+            await self.warn_low_dynamic.prepare(cache)
+            self.warn_low = self.warn_low_dynamic.get()
+        if self.warn_high_dynamic is not None:
+            await self.warn_high_dynamic.prepare(cache)
+            self.warn_high = self.warn_high_dynamic.get()
+        self.is_prepared = True
