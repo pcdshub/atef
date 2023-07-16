@@ -24,37 +24,27 @@ from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
                     Union, cast)
 
 import apischema
-import databroker
 import ophyd
 import yaml
-from bluesky import RunEngine
+from bluesky_queueserver.manager.profile_ops import (
+    existing_plans_and_devices_from_nspace, validate_plan)
 
 from atef import util
 from atef.cache import _SignalCache, get_signal_cache
 from atef.check import Comparison
 from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
-from atef.enums import GroupResultMode, Severity
+from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparedComparisonException
-from atef.result import Result, _summarize_result_severity, incomplete_result
+from atef.plan_utils import get_default_namespace, run_in_local_RE
+from atef.result import (Result, _summarize_result_severity, combine_results,
+                         incomplete_result)
 from atef.type_hints import AnyPath, Number, PrimitiveType
 from atef.yaml_support import init_yaml_support
 
 from . import serialization
 
 logger = logging.getLogger(__name__)
-
-
-class BlueskyState:
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(BlueskyState, cls).__new__(cls)
-        return cls.instance
-
-    def __init__(self):
-        self.db = databroker.Broker.named('temp')
-        self.RE = RunEngine({})
-        self.RE.subscribe(self.db.insert)
 
 
 def walk_steps(step: ProcedureStep) -> Generator[ProcedureStep, None, None]:
@@ -216,14 +206,16 @@ class CodeStep(ProcedureStep):
 @dataclass
 class PlanOptions:
     """Options for a bluesky plan scan."""
-    #: The plan name.
+    #: Name to identify this plan
+    name: str
+    #: The plan name.  Bluesky plan or otherwise
     plan: str
     #: Plan arguments dictionary - argument name to value.
-    args: Sequence[Any]
+    args: Optional[Sequence[Any]] = field(default_factory=list)
     #: Plan keyword  arguments dictionary - argument name to value.
-    kwargs: Dict[Any, Any]
+    kwargs: Optional[Dict[Any, Any]] = field(default_factory=dict)
     #: Arguments which should not be configurable.
-    fixed_arguments: Optional[Sequence[str]]
+    fixed_arguments: Optional[Sequence[str]] = None
 
 
 @dataclass
@@ -231,12 +223,7 @@ class PlanStep(ProcedureStep):
     """A procedure step comprised of one or more bluesky plans."""
     plans: Sequence[PlanOptions] = field(default_factory=list)
 
-    def _run(self) -> Result:
-        """ Gather plan options and run the bluesky plan """
-        # get global run engine
-        # Construct plan (get devices, organize args/kwargs, run)
-
-        return super()._run()
+    destination: PlanDestination = PlanDestination.local_
 
 
 @dataclass
@@ -882,11 +869,114 @@ class PreparedValueToSignal:
         return pvts
 
 
+def make_plan_item(plan_opts: PlanOptions) -> Sequence[Dict]:
+    """ Makes a plan item (dictionary of parameters) for a given PlanStep """
+    it = {
+        "name": plan_opts.plan,
+        "args": plan_opts.args,
+        "kwargs": plan_opts.kwargs,
+        "user_group": "root"}
+    return it
+
+
+@dataclass
+class PreparedPlan:
+    name: str
+    origin: PlanOptions
+    item: Dict[str, any] = field(default_factory=dict)
+    uuid: Optional[str] = None
+    result: Result = field(default_factory=incomplete_result)
+
+    async def run(self, destination: PlanDestination) -> Result:
+        # submit the plan to the destination
+        if destination != PlanDestination.local_:
+            self.result = Result(
+                severity=Severity.error,
+                reason='Only local RunEngine supported at this time'
+            )
+
+        self.uuid = run_in_local_RE(self.item)
+        self.result = Result()
+        return self.result
+
+    @classmethod
+    def from_origin(
+        cls,
+        origin: PlanOptions
+    ) -> PreparedPlan:
+        return cls(
+            name=origin.name,
+            item=make_plan_item(origin),
+            origin=origin
+        )
+
+
+@dataclass
+class PreparedPlanStep(PreparedProcedureStep):
+    prep_plans: List[PreparedPlan] = field(default_factory=list)
+
+    async def _run(self) -> Result:
+        """ Gather plan options and run the bluesky plan """
+        # Construct plan (get devices, organize args/kwargs, run)
+        # verify
+        # - gather namespace (plans, devices)
+        # - validate_plan
+        # send plan to destination (local, queue server, ...)
+        # local -> get global run engine, setup
+        # qserver -> send to queueserver
+
+        # get namespace (based on destination?
+        # How will we know what's in the queueserver's destination?)
+        print('start PPS._run')
+        nspace = {}
+        nspace = get_default_namespace()
+        epd = existing_plans_and_devices_from_nspace(nspace=nspace)
+        plans, devices, plans_in_ns, devices_in_ns = epd
+        plan_status = [validate_plan(plan.item, allowed_plans=plans,
+                                     allowed_devices=devices)
+                       for plan in self.prep_plans]
+
+        validation_status = [status[0] for status in plan_status]
+        print(validation_status)
+        if not all(validation_status):
+            # raise an error, place info in result
+            fail_plan_names = [pl['name'] for pl, st in
+                               zip(self.prep_plans, validation_status)
+                               if not st]
+            return Result(
+                severity=Severity.error,
+                reason=f'One or more plans ({fail_plan_names}) failed validation'
+            )
+
+        # send each plan to correct destination
+        plan_results = []
+        for pplan in self.prep_plans:
+            res = await pplan.run(self.origin.destination)
+            plan_results.append(res)
+
+        return combine_results(plan_results)
+
+    @classmethod
+    def from_origin(
+        cls,
+        origin: PlanStep,
+        parent: Optional[PreparedProcedureGroup] = None
+    ) -> PreparedPlanStep:
+        prep_plans = [PreparedPlan.from_origin(plan) for plan in origin.plans]
+        return cls(
+            origin=origin,
+            parent=parent,
+            prep_plans=prep_plans,
+            name=origin.name,
+        )
+
+
 AnyProcedure = Union[
     ProcedureGroup,
     DescriptionStep,
     PassiveStep,
     SetValueStep,
+    PlanStep
 ]
 
 AnyPreparedProcedure = Union[
@@ -894,4 +984,5 @@ AnyPreparedProcedure = Union[
     PreparedDescriptionStep,
     PreparedPassiveStep,
     PreparedSetValueStep,
+    PreparedPlanStep
 ]
