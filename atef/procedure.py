@@ -927,7 +927,6 @@ class PreparedPlanStep(PreparedProcedureStep):
 
         # get namespace (based on destination?
         # How will we know what's in the queueserver's destination?)
-        print('start PPS._run')
         nspace = {}
         nspace = get_default_namespace()
         epd = existing_plans_and_devices_from_nspace(nspace=nspace)
@@ -937,7 +936,6 @@ class PreparedPlanStep(PreparedProcedureStep):
                        for plan in self.prep_plans]
 
         validation_status = [status[0] for status in plan_status]
-        print(validation_status)
         if not all(validation_status):
             # raise an error, place info in result
             fail_plan_names = [pl['name'] for pl, st in
