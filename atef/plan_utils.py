@@ -45,6 +45,14 @@ def get_default_namespace() -> Dict[str, Any]:
 
 
 class BlueskyState:
+    # think about making this a singleton thread.
+    # Tryto include:
+    # - self.env_state, self.running_plan_exec_state
+    # - self.re_state (property)
+    # - self._execute_plan_or_task() -> self._execte_plan() -> self._generate_new_plan() [runs in RE]
+    # - self._generate_continued_plan()
+    # - self.run(), self.start()  --> Used by multiprocessing.Process, may have different API
+    # - shutdown code?
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             cls.instance = super(BlueskyState, cls).__new__(cls)
@@ -121,6 +129,9 @@ def run_in_local_RE(item) -> UUID:
     - return uuid for databroker access
     """
     # TODO: Dispatch to worker thread with stop/pause methods available
+    # put in QThread or other thread?...
+
+    # Can we just use REWorker from bsqs?  is a multiprocessing.Process, to re_worker.start()
     BSState = BlueskyState()
     BSState.get_allowed_plans_and_devices(destination=PlanDestination.local_)
-    BSState.run_plan(item)
+    return BSState.run_plan(item)
