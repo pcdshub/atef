@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import enum
 import logging
-from typing import Any, ClassVar, Dict, List, Optional
+import re
+from typing import (Any, ClassVar, Dict, List, Optional, Union, get_args,
+                    get_origin)
 
+from bluesky_queueserver.manager.profile_ops import construct_parameters
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Signal as QSignal
 
@@ -22,37 +26,34 @@ class PlanEntryWidget(QtWidgets.QWidget):
         self.vlayout = QtWidgets.QVBoxLayout()
         self.setLayout(self.vlayout)
 
-        self.arg_widgets = []
-        for param_info in plan['parameters']:
-            arg_widget = build_arg_widget(param_info)
-            self.arg_widgets.append(arg_widget)
+        self.arg_widgets = {}
+        parameters = construct_parameters(plan['parameters'])
+        # gather both the annotation from the parameter and
+        # original text annotation
+        for param, info in zip(parameters, self.plan_info['parameters']):
+            anno = info.get('annotation')
+            if anno:
+                anno = anno['type']
+            arg_widget = ArgumentEntryWidget.from_hint_info(
+                param.annotation, anno, name=info['name']
+            )
+            self.arg_widgets[param.name] = arg_widget
             self.vlayout.addWidget(arg_widget)
+
+        # TODO: add optional metadata in expandable section?
 
     def plan_item(self) -> Dict[str, Any]:
         """ Returns a plan item in the form {...}"""
         plan_item = {'name': self.plan_info['name'], 'args': [], 'kwargs': {},
                      'user_group': 'root'}
-        for param_info, arg_widget in zip(self.plan_info['parameters'], self.arg_widgets):
-            value = arg_widget.value()
+        for param_info, arg_name in zip(self.plan_info['parameters'], self.arg_widgets):
+            value = self.arg_widgets[arg_name].value()
             if param_info['kind']['name'] == 'KEYWORD_ONLY':
-                arg_name = param_info['name']
                 plan_item['kwargs'][arg_name] = value
             elif param_info['kind']['name'] == 'POSITIONAL_OR_KEYWORD':
                 plan_item['args'].append(value)
 
         return plan_item
-
-
-def build_arg_widget(info: Dict[str, Any]) -> QtWidgets.QWidget:
-    """ Intended to be a factory function """
-    if not info.get('annotation'):
-        # no annotation, just use a simple text edit
-        return BasicArgEdit(name=info['name'], info=info)
-    elif info['annotation']['type'] in ('str'):
-        return BasicArgEdit(name=info['name'], info=info)
-    elif '__DEVICE__' in info['annotation']['type']:
-        return DeviceChoiceWidget(name=info['name'], info=info)
-    return QtWidgets.QLabel('Could not identify argument type')
 
 
 class ArgumentEntryWidget(QtWidgets.QWidget):
@@ -68,10 +69,9 @@ class ArgumentEntryWidget(QtWidgets.QWidget):
     arg_label: QtWidgets.QLabel
     arg_changed: ClassVar[QtCore.Signal] = QSignal()
 
-    def __init__(self, *args, info: Dict[str, Any], name: Optional[str] = None, **kwargs) -> None:
+    def __init__(self, *args, name: Optional[str] = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.name = name
-        self.info = info
 
         self.hlayout = QtWidgets.QHBoxLayout()
         self.setLayout(self.hlayout)
@@ -83,9 +83,58 @@ class ArgumentEntryWidget(QtWidgets.QWidget):
 
         # TODO: set description as tooltip?
 
-    def value(self) -> str:
+    def value(self) -> Any:
         """ Return the entered value as string. """
         raise NotImplementedError
+
+    @classmethod
+    def from_hint_info(
+        cls,
+        type_hint: Any,
+        annotation: str,
+        name: Optional[str] = None
+    ) -> ArgumentEntryWidget:
+        """ Create the appropriate arg widget given the type hint and info"""
+        # simple cases
+        if type_hint is Any:
+            # no annotation, just use a simple text edit
+            return BasicArgEdit(arg_type=str, name=name)
+        elif type_hint in (int, str, float):
+            return BasicArgEdit(arg_type=type_hint, name=name)
+        elif annotation is None:
+            return BasicArgEdit(arg_type=str, name=name)
+
+        # more complicated cases
+        origin = get_origin(type_hint)
+        args = get_args(type_hint)
+
+        if origin is list:
+            match = re.search(r'^typing.List\[(.*)\]$', annotation)
+            return ListArgWidget.from_hint_info(
+                type_hint=args, annotation=match[1], name=name
+            )
+        elif (origin is Union) and (type(None) not in args):
+            match = re.search(r'^typing.Union\[(.*)\]$', annotation)
+            return UnionArgWidget.from_hint_info(
+                type_hint=args, annotation=match[1], name=name
+            )
+
+        elif (origin is Union) and (type(None) in args):
+            # handle optional case
+            print('stripped optional')
+            match = re.search(r'^typing.Optional\[(.*)\]$', annotation)
+            return ArgumentEntryWidget.from_hint_info(
+                type_hint=args[0], annotation=match[1], name=name
+            )
+
+        # elif '__DEVICE__' in info['annotation']['type']:
+        #     return DeviceChoiceWidget(name="param.name", arg_type=type_hint)
+        # else:
+        #     return BasicArgEdit(arg_type=type, name="param.name")
+
+        # Currently don't support unions, dicts
+        return QtWidgets.QLabel(f'Could not identify argument type {type_hint}')
+
 
 # Default is str, just leave as str, let qserver construct plan
 # Read enum from annotation first
@@ -96,21 +145,28 @@ class ArgumentEntryWidget(QtWidgets.QWidget):
 
 class BasicArgEdit(ArgumentEntryWidget):
 
-    line_edit: QtWidgets.QLineEdit
+    edit_widget: QtWidgets.QWidget
 
-    def __init__(
-        self,
-        *args,
-        info: Dict[str, Any],
-        name: Optional[str] = None,
-        **kwargs
-    ) -> None:
-        super().__init__(*args, name=name, info=info, **kwargs)
-        self.line_edit = QtWidgets.QLineEdit()
-        self.hlayout.addWidget(self.line_edit)
+    def __init__(self, *args, arg_type: Any, name: Optional[str] = None, **kwargs) -> None:
+        super().__init__(*args, name=name, **kwargs)
+        if arg_type is int:
+            self.edit_widget = QtWidgets.QSpinBox()
+            self.edit_widget.setRange(-2147483647, 2147483647)
+        elif arg_type is float:
+            self.edit_widget = QtWidgets.QDoubleSpinBox()
+            self.edit_widget.setRange(-2147483647, 2147483647)
+        elif arg_type is str:
+            self.edit_widget = QtWidgets.QLineEdit()
+        else:
+            raise RuntimeError(f'invalid type provided {arg_type}')
+
+        self.hlayout.addWidget(self.edit_widget)
 
     def value(self) -> str:
-        return self.line_edit.text()
+        if isinstance(self.edit_widget, QtWidgets.QAbstractSpinBox):
+            return self.edit_widget.value()
+        elif isinstance(self.edit_widget, QtWidgets.QLineEdit):
+            return self.edit_widget.text()
 
 
 class DeviceChoiceWidget(ArgumentEntryWidget):
@@ -119,24 +175,23 @@ class DeviceChoiceWidget(ArgumentEntryWidget):
     combo_box: Optional[QtWidgets.QComboBox] = None
     signal_button: Optional[QtWidgets.QPushButton] = None
 
-    def __init__(self, *args, info: Dict[str, Any], name: Optional[str] = None, **kwargs) -> None:
-        super().__init__(*args, name=name, info=info, **kwargs)
+    def __init__(self, *args, arg_type: Optional[Any] = None, name: Optional[str] = None, **kwargs) -> None:
+        super().__init__(*args, name=name, **kwargs)
         self._device = None
         self._signal_attr = None
 
-        if 'devices' in info:
+        if isinstance(arg_type, enum.EnumMeta):
             # set up a combo box with given values
             self.combo_box = QtWidgets.QComboBox()
-            for _, value in info['devices'].items():
-                for device_name in value:
-                    self.combo_box.addItem(device_name)
+            for name in [en.value for en in arg_type]:
+                self.combo_box.addItem(name)
 
             # TODO: Connect signal to arg_changed ?
             self.hlayout.addWidget(self.combo_box)
 
         else:
             # No pre-determined values, pick from general devices
-            self.signal_button = QtWidgets.QPushButton()
+            self.signal_button = QtWidgets.QPushButton('select a device')
             self.signal_button.clicked.connect(self.pick_signal)
             self.hlayout.addWidget(self.signal_button)
 
@@ -192,3 +247,226 @@ class DeviceChoiceWidget(ArgumentEntryWidget):
             return self.signal_button.text()
         else:
             raise RuntimeError('no entry widgets available')
+
+
+class CloseEmitWidget(QtWidgets.QWidget):
+
+    widget_closed: ClassVar[QtCore.Signal] = QSignal()
+
+    def closeEvent(self, *args, **kwargs):
+        self.widget_closed.emit()
+        super().closeEvent(*args, **kwargs)
+
+
+class ListArgWidget(ArgumentEntryWidget):
+    """ A table view widget that holds other ArgumentEntryWidget's """
+
+    def __init__(
+        self,
+        *args,
+        widget_cls: ArgumentEntryWidget,
+        arg_type: Optional[Any] = None,
+        name: Optional[str] = None,
+        compact: bool = False,
+        **kwargs
+    ) -> None:
+        super().__init__(*args, name=name, **kwargs)
+        self.widget_cls = widget_cls
+        self.arg_type = arg_type
+        self.compact = compact
+        self.table_widget = CloseEmitWidget()
+        self.show_button = None
+        self.setup_ui()
+
+    @classmethod
+    def from_hint_info(
+        cls,
+        type_hint: Any,
+        annotation: str,
+        name: str | None = None,
+        compact: bool = False
+    ) -> ListArgWidget:
+        origin = get_origin(type_hint)
+        # args = get_args(type_hint)
+
+        if not origin:
+            # we have reached the bottom, should just have a single type
+            if '__DEVICE__' in annotation:
+                widget_cls = DeviceChoiceWidget
+                return cls(widget_cls=widget_cls, arg_type=type_hint, name=name)
+            else:
+                widget_cls = BasicArgEdit
+                return cls(widget_cls=widget_cls, arg_type=type_hint, name=name)
+
+        if origin is list:
+            return QtWidgets.QLabel(f'List[List] not supported yet {type_hint}')
+        if origin is Union:
+            return QtWidgets.QLabel(f'List[Unions] not supported yet {type_hint}')
+
+    def setup_ui(self) -> None:
+        self.table_widget.setLayout(QtWidgets.QHBoxLayout())
+
+        self.arg_table = QtWidgets.QTableWidget(parent=self)
+        self.arg_table.setRowCount(1)
+        self.arg_table.setColumnCount(1)
+        self.arg_table.setCellWidget(0, 0, self.widget_cls(arg_type=self.arg_type))
+        self.arg_table.setSizeAdjustPolicy(
+            QtWidgets.QAbstractScrollArea.AdjustToContents
+        )
+        self.arg_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.arg_table.horizontalHeader().setStretchLastSection(True)
+        self.arg_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.arg_table.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.arg_table.setHorizontalHeaderLabels(['args'])
+        # run with every item add?
+
+        self.button_vlayout = QtWidgets.QVBoxLayout()
+        self.add_button = QtWidgets.QPushButton('+')
+        self.add_button.clicked.connect(self.add_row)
+        self.del_button = QtWidgets.QPushButton('-')
+        self.del_button.clicked.connect(self.del_row)
+        self.button_vlayout.addWidget(self.add_button)
+        self.button_vlayout.addWidget(self.del_button)
+
+        self.table_widget.layout().addWidget(self.arg_table)
+        self.table_widget.layout().addLayout(self.button_vlayout)
+
+        if self.compact:
+            self.show_button = QtWidgets.QPushButton('Open list Editor')
+            self.show_button.clicked.connect(self.show_list_edit)
+            self.hlayout.addWidget(self.show_button)
+
+            def update_button_text():
+                self.show_button.setText(str(self.value()))
+
+            self.table_widget.widget_closed.connect(update_button_text)
+        else:
+            self.hlayout.addWidget(self.table_widget)
+
+    def add_row(self) -> None:
+        self.arg_table.insertRow(self.arg_table.rowCount())
+        self.arg_table.setCellWidget(self.arg_table.rowCount() - 1, 0,
+                                     self.widget_cls(arg_type=self.arg_type))
+        self.arg_table.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeToContents
+        )
+
+    def del_row(self) -> None:
+        self.arg_table.removeRow(self.arg_table.currentRow())
+
+    def show_list_edit(self) -> None:
+        self.table_widget.show()
+        self.table_widget.activateWindow()
+        self.table_widget.setWindowState(QtCore.Qt.WindowActive)
+
+    def value(self) -> List[Any]:
+        args = []
+        for i in range(self.arg_table.rowCount()):
+            args.append(self.arg_table.cellWidget(i, 0).value())
+        return args
+
+
+class DictArgWidget(ArgumentEntryWidget):
+
+    def __init__(
+        self,
+        *args,
+        arg_type: Optional[Any] = None,
+        name: Optional[str] = None,
+        compact: bool = False,
+        **kwargs
+    ) -> None:
+        super().__init__(*args, name=name, **kwargs)
+        self.arg_type = arg_type
+        self.compact = compact
+        self.table_widget = CloseEmitWidget()
+        self.show_button = None
+        self.setup_ui()
+
+    @classmethod
+    def from_hint_info(
+        cls,
+        type_hint: Any,
+        annotation: str,
+        name: str | None = None,
+        compact: bool = False
+    ) -> ListArgWidget:
+        key_hint = type_hint[0]
+        val_hint = type_hint[1]
+
+        if (key_hint is not str) or (val_hint is not Any):
+            raise RuntimeError(f'only string keys/values permitted ({type_hint})')
+
+        return cls(name=name, compact=compact)
+
+    def setup_ui(self) -> None:
+        self.table_widget.setLayout(QtWidgets.QHBoxLayout())
+
+        self.arg_table = QtWidgets.QTableWidget(parent=self)
+        self.arg_table.setRowCount(1)
+        self.arg_table.setColumnCount(2)
+        self.arg_table.setSizeAdjustPolicy(
+            QtWidgets.QAbstractScrollArea.AdjustToContents
+        )
+        self.arg_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.arg_table.horizontalHeader().setStretchLastSection(True)
+        self.arg_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.arg_table.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        self.arg_table.setHorizontalHeaderLabels(['key', 'value'])
+        # run with every item add?
+
+        self.button_vlayout = QtWidgets.QVBoxLayout()
+        self.add_button = QtWidgets.QPushButton('+')
+        self.add_button.clicked.connect(self.add_row)
+        self.del_button = QtWidgets.QPushButton('-')
+        self.del_button.clicked.connect(self.del_row)
+        self.button_vlayout.addWidget(self.add_button)
+        self.button_vlayout.addWidget(self.del_button)
+
+        self.table_widget.layout().addWidget(self.arg_table)
+        self.table_widget.layout().addLayout(self.button_vlayout)
+
+        if self.compact:
+            self.show_button = QtWidgets.QPushButton('Open Dict Editor')
+            self.show_button.clicked.connect(self.show_list_edit)
+            self.hlayout.addWidget(self.show_button)
+
+            def update_button_text():
+                self.show_button.setText(str(self.value()))
+
+            self.table_widget.widget_closed.connect(update_button_text)
+        else:
+            self.hlayout.addWidget(self.table_widget)
+
+    def add_row(self) -> None:
+        self.arg_table.insertRow(self.arg_table.rowCount())
+        self.arg_table.verticalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeToContents
+        )
+
+    def del_row(self) -> None:
+        self.arg_table.removeRow(self.arg_table.currentRow())
+
+    def show_list_edit(self) -> None:
+        self.table_widget.show()
+        self.table_widget.activateWindow()
+        self.table_widget.setWindowState(QtCore.Qt.WindowActive)
+
+    def value(self) -> List[Any]:
+        args = {}
+        for i in range(self.arg_table.rowCount()):
+            key = self.arg_table.item(i, 0).text()
+            value = self.arg_table.item(i, 1).text()
+            args[key] = value
+        return args
+
+
+class UnionArgWidget(ArgumentEntryWidget):
+    @classmethod
+    def from_hint_info(
+        cls,
+        type_hint: Any,
+        annotation: str,
+        name: str | None = None
+    ) -> ArgumentEntryWidget:
+        return QtWidgets.QLabel('Union here')
