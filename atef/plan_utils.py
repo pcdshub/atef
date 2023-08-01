@@ -21,7 +21,7 @@ DEFAULT_PERMISSIONS_PATH = (Path(__file__).parent / "tests" / "profiles" /
 
 PERMISSIONS_PATH = os.environ.get('ATEF_PERMISSIONS_PATH') or DEFAULT_PERMISSIONS_PATH
 
-_PLAN_MODULES = ['bluesky.plans', 'nabs.plans']
+_PLAN_MODULES = ['atef.annotated_plans', 'nabs.plans']
 
 
 def get_default_namespace() -> Dict[str, Any]:
@@ -30,7 +30,7 @@ def get_default_namespace() -> Dict[str, Any]:
     # Load plans: bluesky.plans, nabs
     for module_name in _PLAN_MODULES:
         try:
-            load_startup_module('bluesky.plans', nspace=nspace)
+            load_startup_module(module_name, nspace=nspace)
         except ScriptLoadingError as ex:
             logger.warning(f"unable to load namespace from module '{module_name}'"
                            f": {ex}")
