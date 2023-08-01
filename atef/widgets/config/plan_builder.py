@@ -37,8 +37,9 @@ class PlanEntryWidget(QtWidgets.QWidget):
             arg_widget = ArgumentEntryWidget.from_hint_info(
                 param.annotation, anno, name=info['name']
             )
-            self.arg_widgets[param.name] = arg_widget
             self.vlayout.addWidget(arg_widget)
+            if isinstance(arg_widget, ArgumentEntryWidget):
+                self.arg_widgets[param.name] = arg_widget
 
         # TODO: add optional metadata in expandable section?
 
@@ -46,6 +47,8 @@ class PlanEntryWidget(QtWidgets.QWidget):
         """ Returns a plan item in the form {...}"""
         plan_item = {'name': self.plan_info['name'], 'args': [], 'kwargs': {},
                      'user_group': 'root'}
+
+        # TODO: consider required arguments that don't get values?  leave to validation?
         for param_info, arg_name in zip(self.plan_info['parameters'], self.arg_widgets):
             value = self.arg_widgets[arg_name].value()
             if param_info['kind']['name'] == 'KEYWORD_ONLY':
@@ -127,12 +130,12 @@ class ArgumentEntryWidget(QtWidgets.QWidget):
                 type_hint=args[0], annotation=match[1], name=name
             )
 
-        # elif '__DEVICE__' in info['annotation']['type']:
-        #     return DeviceChoiceWidget(name="param.name", arg_type=type_hint)
-        # else:
-        #     return BasicArgEdit(arg_type=type, name="param.name")
+        elif origin is dict:
+            return DictArgWidget.from_hint_info(
+                type_hint=args, annotation=annotation, name=name
+            )
 
-        # Currently don't support unions, dicts
+        # Currently don't support unions
         return QtWidgets.QLabel(f'Could not identify argument type {type_hint}')
 
 
@@ -455,6 +458,8 @@ class DictArgWidget(ArgumentEntryWidget):
     def value(self) -> List[Any]:
         args = {}
         for i in range(self.arg_table.rowCount()):
+            if not (self.arg_table.item(i, 0) and self.arg_table.item(i, 1)):
+                continue
             key = self.arg_table.item(i, 0).text()
             value = self.arg_table.item(i, 1).text()
             args[key] = value
