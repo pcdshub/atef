@@ -21,7 +21,7 @@ import logging
 import pathlib
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
-                    Union, cast)
+                    Tuple, Union, cast)
 
 import apischema
 import ophyd
@@ -30,15 +30,15 @@ from bluesky_queueserver.manager.profile_ops import (
     existing_plans_and_devices_from_nspace, validate_plan)
 
 from atef import util
-from atef.cache import _SignalCache, get_signal_cache
+from atef.cache import DataCache, _SignalCache, get_signal_cache
 from atef.check import Comparison
 from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
 from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparedComparisonException
 from atef.plan_utils import get_default_namespace, run_in_local_RE
-from atef.result import (Result, _summarize_result_severity, combine_results,
-                         incomplete_result)
+from atef.reduce import ReduceMethod
+from atef.result import Result, _summarize_result_severity, incomplete_result
 from atef.type_hints import AnyPath, Number, PrimitiveType
 from atef.yaml_support import init_yaml_support
 
@@ -195,6 +195,22 @@ class ComparisonToTarget(Target):
 
 
 @dataclass
+class PlanData:
+    #: name of PlanStep to grab data from
+    plan_name: Optional[str] = None
+    #: data point(s) in plan (0-indexed) or slice notation
+    data_points: Union[List[int], Tuple[int, int, int]] = field(default_factory=list)
+    #: data reduction / operation
+    reduction_mode: ReduceMethod = ReduceMethod.average
+
+
+@dataclass
+class ComparisonToPlanData(PlanData):
+    #: the comparison to apply to the target
+    comparison: Optional[Comparison] = None
+
+
+@dataclass
 class CodeStep(ProcedureStep):
     """Run source code in a procedure."""
     #: The source code to execute.
@@ -222,8 +238,16 @@ class PlanOptions:
 class PlanStep(ProcedureStep):
     """A procedure step comprised of one or more bluesky plans."""
     plans: Sequence[PlanOptions] = field(default_factory=list)
+    checks: Sequence[Union[ComparisonToTarget, ComparisonToPlanData]] = field(
+        default_factory=list
+    )
 
+    #: platform for plan to be run on
     destination: PlanDestination = PlanDestination.local_
+    #: Stop performing plans if one fails
+    halt_on_fail: bool = True
+    #: Only mark step_result successfull if all steps have succeeded
+    require_plan_success: bool = True
 
 
 @dataclass
@@ -697,7 +721,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
         Result
             the step_result for this step
         """
-        self = cast(SetValueStep, self)
+        self.origin = cast(SetValueStep, self.origin)
         for prep_action in self.prepared_actions:
             action_result = await prep_action.run()
             if (self.origin.halt_on_fail and action_result.severity > Severity.success):
@@ -774,22 +798,11 @@ class PreparedSetValueStep(PreparedProcedureStep):
                 prep_step.prepare_action_failures.append(value_to_target)
 
         for comp_to_target in step.success_criteria:
-            signal = comp_to_target.to_signal()
-            comp = comp_to_target.comparison
-            try:
-                prep_comp = PreparedSignalComparison.from_signal(
-                    signal=signal, comparison=comp
-                )
-                prep_step.prepared_criteria.append(prep_comp)
-            except Exception as ex:
-                prep_comp_exc = PreparedComparisonException(
-                    exception=ex,
-                    identifier=getattr(signal, 'pvname', ''),
-                    message='Failed to initialize comparison',
-                    comparison=comp,
-                    name=comp.name
-                )
-                prep_step.prepare_criteria_failures.append(prep_comp_exc)
+            res = create_prepared_comparison(comp_to_target)
+            if isinstance(res, Exception):
+                prep_step.prepare_criteria_failures.append(res)
+            else:
+                prep_step.prepared_criteria.append(res)
 
         return prep_step
 
@@ -869,7 +882,7 @@ class PreparedValueToSignal:
         return pvts
 
 
-def make_plan_item(plan_opts: PlanOptions) -> Sequence[Dict]:
+def make_plan_item(plan_opts: PlanOptions) -> Dict[str, Any]:
     """ Makes a plan item (dictionary of parameters) for a given PlanStep """
     it = {
         "name": plan_opts.plan,
@@ -913,7 +926,19 @@ class PreparedPlan:
 
 @dataclass
 class PreparedPlanStep(PreparedProcedureStep):
-    prep_plans: List[PreparedPlan] = field(default_factory=list)
+    origin: PlanStep = field(default_factory=PlanStep)
+
+    prepared_plans: List[PreparedPlan] = field(default_factory=list)
+
+    prepared_plan_failures: List[PlanOptions] = field(default_factory=list)
+
+    #: list of success criteria (TODO: add plandata comparison)
+    prepared_checks: List[Union[PreparedSignalComparison,
+                                Any]] = field(default_factory=list)
+
+    prepared_checks_failures: List[PreparedComparisonException] = field(
+        default_factory=list
+    )
 
     async def _run(self) -> Result:
         """ Gather plan options and run the bluesky plan """
@@ -925,8 +950,16 @@ class PreparedPlanStep(PreparedProcedureStep):
         # local -> get global run engine, setup
         # qserver -> send to queueserver
 
+        if self.origin.require_plan_success and self.prepared_plan_failures:
+            return Result(
+                severity=Severity.error,
+                reason=('One or more actions failed to prepare: '
+                        f'{[plan.name for plan in self.prepared_plan_failures]}')
+            )
+
         # get namespace (based on destination?
         # How will we know what's in the queueserver's destination?)
+        # Run the plans
         nspace = {}
         nspace = get_default_namespace()
         epd = existing_plans_and_devices_from_nspace(nspace=nspace)
@@ -939,7 +972,7 @@ class PreparedPlanStep(PreparedProcedureStep):
         if not all(validation_status):
             # raise an error, place info in result
             fail_plan_names = [pl['name'] for pl, st in
-                               zip(self.prep_plans, validation_status)
+                               zip(self.prepared_plans, validation_status)
                                if not st]
             return Result(
                 severity=Severity.error,
@@ -948,11 +981,27 @@ class PreparedPlanStep(PreparedProcedureStep):
 
         # send each plan to correct destination
         plan_results = []
-        for pplan in self.prep_plans:
+        for pplan in self.prepared_plans:
             res = await pplan.run(self.origin.destination)
             plan_results.append(res)
 
-        return combine_results(plan_results)
+        # run the checks
+        for prep_check in self.prepared_checks:
+            await prep_check.compare()
+
+        check_results = [check.result for check in self.prepared_checks]
+
+        if self.prepared_checks_failures:
+            return Result(
+                severity=Severity.error,
+                reason=('One or more success criteria failed to initialize: '
+                        f'{[check.name for check in self.prepared_checks_failures]}')
+            )
+
+        severity = _summarize_result_severity(GroupResultMode.all_,
+                                              check_results + plan_results)
+
+        return Result(severity=severity)
 
     @classmethod
     def from_origin(
@@ -960,12 +1009,108 @@ class PreparedPlanStep(PreparedProcedureStep):
         origin: PlanStep,
         parent: Optional[PreparedProcedureGroup] = None
     ) -> PreparedPlanStep:
-        prep_plans = [PreparedPlan.from_origin(plan) for plan in origin.plans]
-        return cls(
+
+        prep_step = cls(
             origin=origin,
             parent=parent,
-            prep_plans=prep_plans,
             name=origin.name,
+        )
+
+        for plan_step in origin.plans:
+            try:
+                prep_plan = PreparedPlan.from_origin(plan_step)
+                prep_step.prepared_plans.append(prep_plan)
+            except Exception:
+                prep_step.prepared_plan_failures.append(plan_step)
+
+        for check in origin.checks:
+            res = create_prepared_comparison(check)
+            if isinstance(res, Exception):
+                prep_step.prepared_checks_failures.append(res)
+            else:
+                prep_step.prepared_checks.append(res)
+
+        return prep_step
+
+
+def create_prepared_comparison(
+    check: Union[ComparisonToTarget, ComparisonToPlanData]
+) -> Union[PreparedComparison, PreparedComparisonException]:
+
+    output = ValueError('Cannot prepare the provided comparison, type not '
+                        f'supported: ({check})')
+
+    if isinstance(check, ComparisonToTarget):
+        signal = check.to_signal()
+        comp = check.comparison
+        try:
+            output = PreparedSignalComparison.from_signal(
+                signal=signal, comparison=comp
+            )
+        except Exception as ex:
+            output = PreparedComparisonException(
+                exception=ex,
+                identifier=getattr(signal, 'pvname', ''),
+                message='Failed to initialize comparison',
+                comparison=comp,
+                name=comp.name
+            )
+
+    elif isinstance(check, ComparisonToPlanData):
+        comp = check.comparison
+        try:
+            output = PreparedPlanComparison.from_comp_to_plan(check)
+        except Exception as ex:
+            output = PreparedComparisonException(
+                exception=ex,
+                identifier=getattr(check, 'plan_name', ''),
+                message='Failed to initialize comparison',
+                comparison=comp,
+                name=comp.name
+            )
+
+    return output
+
+
+@dataclass
+class PreparedPlanComparison(PreparedComparison):
+    """
+    Unified representation for comparisons to Bluesky Plan data
+    """
+    plan_data: Optional[PlanData] = None
+
+    parent: Optional[PreparedPlanStep] = field(default=None, repr=None)
+
+    data: Optional[Any] = None
+
+    async def get_data_async(self) -> Any:
+        # get BSState, look for entry?
+        raise NotImplementedError
+
+    async def _compare(self, data: Any) -> Result:
+        raise NotImplementedError
+
+    @classmethod
+    def from_comp_to_plan(
+        cls,
+        origin: ComparisonToPlanData,
+        cache: Optional[DataCache] = None,
+        parent: Optional[PreparedPlanStep] = None
+    ) -> PreparedPlanComparison:
+
+        identifier = origin.comparison.name + f'[{origin.data_points}]'
+        name = origin.name
+
+        if cache is None:
+            cache = DataCache()
+
+        return cls(
+            plan_data=origin,
+            cache=cache,
+            identifier=identifier,
+            comparison=origin.comparison,
+            name=name,
+            parent=parent
         )
 
 
