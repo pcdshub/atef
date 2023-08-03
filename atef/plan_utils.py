@@ -21,7 +21,7 @@ DEFAULT_PERMISSIONS_PATH = (Path(__file__).parent / "tests" / "profiles" /
 
 PERMISSIONS_PATH = os.environ.get('ATEF_PERMISSIONS_PATH') or DEFAULT_PERMISSIONS_PATH
 
-_PLAN_MODULES = ['atef.annotated_plans', 'nabs.plans']
+_PLAN_MODULES = ['atef.annotated_plans']  # , 'nabs.plans']
 
 
 def get_default_namespace() -> Dict[str, Any]:
@@ -35,6 +35,7 @@ def get_default_namespace() -> Dict[str, Any]:
             logger.warning(f"unable to load namespace from module '{module_name}'"
                            f": {ex}")
 
+    # TODO: think about caching this, don't want to re-get all the happi devices each run
     # load devices: happi
     client = get_happi_client()
     results = client.search()
@@ -53,16 +54,9 @@ class BlueskyState:
     # - self._generate_continued_plan()
     # - self.run(), self.start()  --> Used by multiprocessing.Process, may have different API
     # - shutdown code?
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(BlueskyState, cls).__new__(cls)
-        return cls.instance
 
     def __init__(self):
-        self.db = databroker.Broker.named('temp')
-        self.RE = RunEngine({})
-        self.RE.subscribe(self.db.insert)
-
+        self.run_map = {}
         # Set up plans / devices to stay here for future access?
         self.plans_md = {}
         self.devices_md = {}
@@ -104,23 +98,66 @@ class BlueskyState:
 
         return self.allowed_plans, self.allowed_devices
 
-    def run_plan(self, item) -> UUID:
+    def register_identifier(self, identifier: str) -> None:
+        if identifier in self.run_map:
+            raise ValueError('identifier already registered')
+        self.run_map[identifier] = None
+
+
+class GlobalRunEngine:
+    RE: RunEngine
+    db: databroker.Broker
+
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(GlobalRunEngine, cls).__new__(cls)
+            cls.db = databroker.Broker.named('temp')
+            cls.RE = RunEngine({})
+            cls.RE.subscribe(cls.db.insert)
+
+        return cls.instance
+
+    def run_plan(self, state: BlueskyState, item: Dict[str, Any], identifier: str) -> Tuple[UUID, ...]:
         parsed_plan = prepare_plan(
             item,
-            plans_in_nspace=self.plans_in_ns,
-            devices_in_nspace=self.devices_in_ns,
-            allowed_plans=self.allowed_plans,
-            allowed_devices=self.allowed_devices
+            plans_in_nspace=state.plans_in_ns,
+            devices_in_nspace=state.devices_in_ns,
+            allowed_plans=state.allowed_plans,
+            allowed_devices=state.allowed_devices
         )
 
         # actually run plan
-        run_uuid = self.RE(parsed_plan["callable"](
-                           *parsed_plan["args"], **parsed_plan["kwargs"]))
+        run_uuids = self.RE(parsed_plan["callable"](
+            *parsed_plan["args"], **parsed_plan["kwargs"]
+        ))
+        print(run_uuids)
+        state.run_map[identifier] = run_uuids
+        print(state.run_map)
+        return run_uuids
 
-        return run_uuid
+
+def register_run_identifier(state: BlueskyState, name: str) -> str:
+    """
+    generate and return a unique identifer and register it to the BlueskyState.
+
+    Attempts to register the given name,
+    """
+    new_name = name
+    attempt_ct = 1
+    while (new_name in state.run_map) and (attempt_ct < 100):
+        new_name = new_name + f'_{attempt_ct}'
+        attempt_ct += 1
+
+    if attempt_ct >= 100:
+        raise RuntimeError(f'{attempt_ct} runs with the identifier ({name}) '
+                           'found.  Please pick a more unique name.')
+
+    state.register_identifier(new_name)
+
+    return new_name
 
 
-def run_in_local_RE(item) -> UUID:
+def run_in_local_RE(item: Dict[str, Any], identifier: str, state: BlueskyState):
     """
     Run a plan item in a local RunEngine.  Should:
     - once again verify the plan...
@@ -132,6 +169,6 @@ def run_in_local_RE(item) -> UUID:
     # put in QThread or other thread?...
 
     # Can we just use REWorker from bsqs?  is a multiprocessing.Process, to re_worker.start()
-    BSState = BlueskyState()
-    BSState.get_allowed_plans_and_devices(destination=PlanDestination.local_)
-    return BSState.run_plan(item)
+    state.get_allowed_plans_and_devices(destination=PlanDestination.local_)
+    gre = GlobalRunEngine()
+    gre.run_plan(state, item, identifier)

@@ -36,7 +36,8 @@ from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
 from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparedComparisonException
-from atef.plan_utils import get_default_namespace, run_in_local_RE
+from atef.plan_utils import (BlueskyState, get_default_namespace,
+                             register_run_identifier, run_in_local_RE)
 from atef.reduce import ReduceMethod
 from atef.result import Result, _summarize_result_severity, incomplete_result
 from atef.type_hints import AnyPath, Number, PrimitiveType
@@ -45,6 +46,11 @@ from atef.yaml_support import init_yaml_support
 from . import serialization
 
 logger = logging.getLogger(__name__)
+
+
+# BlueskyState tracker.  Keys are the id of the top-level ProcedureFile
+# Includes one default BlueskyState, with key id(None)
+BS_STATE_MAP: Dict[int, BlueskyState] = {}
 
 
 def walk_steps(step: ProcedureStep) -> Generator[ProcedureStep, None, None]:
@@ -306,6 +312,10 @@ class ProcedureFile:
     #: Top-level configuration group.
     root: ProcedureGroup = field(default_factory=ProcedureGroup)
 
+    def __post_init__(self):
+        # register a BSState for this ProcedureFile
+        BS_STATE_MAP[id(self)] = BlueskyState()
+
     def walk_steps(self) -> Generator[AnyProcedure, None, None]:
         yield self.root
         yield from self.root.walk_steps()
@@ -372,14 +382,19 @@ class PreparedProcedureFile:
         file : ProcedureFile
             the procedure file instance
         """
-        prepared_root = PreparedProcedureGroup.from_origin(group=file.root)
 
         prep_proc_file = PreparedProcedureFile(
             file=file,
-            root=prepared_root
+            root=PreparedProcedureGroup()
         )
 
-        prepared_root.parent = prep_proc_file
+        # PreparedProcedureGroup needs to know about its parent from birth
+        # get_bs_state doesn't like orphans
+        prepared_root = PreparedProcedureGroup.from_origin(
+            group=file.root, parent=prep_proc_file
+        )
+        prep_proc_file.root = prepared_root
+
         return prep_proc_file
 
     async def run(self) -> Result:
@@ -515,6 +530,11 @@ class PreparedProcedureStep:
                 return PreparedSetValueStep.from_origin(
                     step=step, parent=parent
                 )
+            if isinstance(step, PlanStep):
+                return PreparedPlanStep.from_origin(
+                    origin=step, parent=parent
+                )
+
             raise NotImplementedError(f"Step type unsupported: {type(step)}")
         except Exception as ex:
             return FailedStep(
@@ -791,7 +811,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
         for value_to_target in step.actions:
             try:
                 prep_value_to_signal = PreparedValueToSignal.from_origin(
-                    origin=value_to_target
+                    origin=value_to_target, parent=prep_step
                 )
                 prep_step.prepared_actions.append(prep_value_to_signal)
             except Exception:
@@ -817,6 +837,8 @@ class PreparedValueToSignal:
     value: PrimitiveType
     #: a link to the original ValueToTarget
     origin: ValueToTarget
+    #: parent step that owns this instance
+    parent: Optional[PreparedSetValueStep] = None
     #: The result of the set action
     result: Result = field(default_factory=incomplete_result)
 
@@ -850,7 +872,8 @@ class PreparedValueToSignal:
     @classmethod
     def from_origin(
         cls,
-        origin: ValueToTarget
+        origin: ValueToTarget,
+        parent: Optional[PreparedSetValueStep] = None
     ) -> PreparedValueToSignal:
         """
         Prepare the ValueToSignal for running.
@@ -878,6 +901,7 @@ class PreparedValueToSignal:
             signal=signal,
             value=origin.value,
             origin=origin,
+            parent=parent
         )
         return pvts
 
@@ -896,8 +920,10 @@ def make_plan_item(plan_opts: PlanOptions) -> Dict[str, Any]:
 class PreparedPlan:
     name: str
     origin: PlanOptions
+    parent: Optional[PreparedPlanStep] = None
     item: Dict[str, any] = field(default_factory=dict)
-    uuid: Optional[str] = None
+    identifier: Optional[str] = None
+    bs_state: Optional[BlueskyState] = None
     result: Result = field(default_factory=incomplete_result)
 
     async def run(self, destination: PlanDestination) -> Result:
@@ -908,19 +934,25 @@ class PreparedPlan:
                 reason='Only local RunEngine supported at this time'
             )
 
-        self.uuid = run_in_local_RE(self.item)
+        run_in_local_RE(self.item, self.identifier, self.bs_state)
         self.result = Result()
         return self.result
 
     @classmethod
     def from_origin(
         cls,
-        origin: PlanOptions
+        origin: PlanOptions,
+        parent: Optional[PreparedPlanStep] = None
     ) -> PreparedPlan:
+        bs_state = get_bs_state(parent)
+        identifier = register_run_identifier(bs_state, origin.name)
         return cls(
             name=origin.name,
             item=make_plan_item(origin),
-            origin=origin
+            identifier=identifier,
+            bs_state=bs_state,
+            origin=origin,
+            parent=parent
         )
 
 
@@ -966,7 +998,7 @@ class PreparedPlanStep(PreparedProcedureStep):
         plans, devices, plans_in_ns, devices_in_ns = epd
         plan_status = [validate_plan(plan.item, allowed_plans=plans,
                                      allowed_devices=devices)
-                       for plan in self.prep_plans]
+                       for plan in self.prepared_plans]
 
         validation_status = [status[0] for status in plan_status]
         if not all(validation_status):
@@ -974,6 +1006,7 @@ class PreparedPlanStep(PreparedProcedureStep):
             fail_plan_names = [pl['name'] for pl, st in
                                zip(self.prepared_plans, validation_status)
                                if not st]
+            logger.debug(f'One or more plans ({fail_plan_names}) failed validation')
             return Result(
                 severity=Severity.error,
                 reason=f'One or more plans ({fail_plan_names}) failed validation'
@@ -982,7 +1015,9 @@ class PreparedPlanStep(PreparedProcedureStep):
         # send each plan to correct destination
         plan_results = []
         for pplan in self.prepared_plans:
+            logger.debug(f'running plan: {pplan.name}...')
             res = await pplan.run(self.origin.destination)
+            logger.debug(f'run completed: {res}')
             plan_results.append(res)
 
         # run the checks
@@ -1018,7 +1053,7 @@ class PreparedPlanStep(PreparedProcedureStep):
 
         for plan_step in origin.plans:
             try:
-                prep_plan = PreparedPlan.from_origin(plan_step)
+                prep_plan = PreparedPlan.from_origin(plan_step, parent=prep_step)
                 prep_step.prepared_plans.append(prep_plan)
             except Exception:
                 prep_step.prepared_plan_failures.append(plan_step)
@@ -1070,6 +1105,34 @@ def create_prepared_comparison(
             )
 
     return output
+
+
+def get_bs_state(dclass: Any):
+    # dclass should be a Prepared dataclass
+    if dclass is None:
+        top_dclass = None
+    else:
+        top_dclass = dclass
+        ctr = 0
+        while (getattr(top_dclass, 'parent', None) is not None) and (ctr < 200):
+            top_dclass = top_dclass.parent
+            ctr += 1
+
+        if ctr >= 200:
+            logger.warning(f'{ctr} "parents" traversed, either the depth of '
+                           'this file is excessive or an infinite loop occurred')
+        if not isinstance(top_dclass, PreparedProcedureFile):
+            logger.debug('top-level dataclass was not a PreparedProcedureFile, '
+                         f' {type(top_dclass)}, using default BlueskyState')
+            top_dclass = None
+        else:
+            top_dclass = top_dclass.file  # grab un-prepared ProcedureFile
+
+    top_dclass_id = id(top_dclass)
+    if top_dclass_id not in BS_STATE_MAP:
+        BS_STATE_MAP[top_dclass_id] = BlueskyState()
+
+    return BS_STATE_MAP[top_dclass_id]
 
 
 @dataclass
