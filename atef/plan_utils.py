@@ -172,3 +172,9 @@ def run_in_local_RE(item: Dict[str, Any], identifier: str, state: BlueskyState):
     state.get_allowed_plans_and_devices(destination=PlanDestination.local_)
     gre = GlobalRunEngine()
     gre.run_plan(state, item, identifier)
+
+
+def get_RE_data(index: Any, uuids: Tuple[UUID, ...]):
+    # gre = GlobalRunEngine()
+    # Use index to grab right uuid, data row
+    return []

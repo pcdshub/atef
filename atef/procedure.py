@@ -36,11 +36,11 @@ from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
 from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparedComparisonException
-from atef.plan_utils import (BlueskyState, get_default_namespace,
+from atef.plan_utils import (BlueskyState, get_default_namespace, get_RE_data,
                              register_run_identifier, run_in_local_RE)
 from atef.reduce import ReduceMethod
 from atef.result import Result, _summarize_result_severity, incomplete_result
-from atef.type_hints import AnyPath, Number, PrimitiveType
+from atef.type_hints import AnyDataclass, AnyPath, Number, PrimitiveType
 from atef.yaml_support import init_yaml_support
 
 from . import serialization
@@ -202,8 +202,9 @@ class ComparisonToTarget(Target):
 
 @dataclass
 class PlanData:
-    #: name of PlanStep to grab data from
-    plan_name: Optional[str] = None
+    #: identifier of PlanStep to grab data from.
+    #: Set via GUI, must match PreparedPlan.plan_id
+    plan_id: Optional[str] = None
     #: data point(s) in plan (0-indexed) or slice notation
     data_points: Union[List[int], Tuple[int, int, int]] = field(default_factory=list)
     #: data reduction / operation
@@ -238,6 +239,8 @@ class PlanOptions:
     kwargs: Optional[Dict[Any, Any]] = field(default_factory=dict)
     #: Arguments which should not be configurable.
     fixed_arguments: Optional[Sequence[str]] = None
+    #: Plan Identifier used to cross-reference plan
+    plan_id: Optional[str] = None
 
 
 @dataclass
@@ -922,7 +925,7 @@ class PreparedPlan:
     origin: PlanOptions
     parent: Optional[PreparedPlanStep] = None
     item: Dict[str, any] = field(default_factory=dict)
-    identifier: Optional[str] = None
+    plan_id: Optional[str] = None
     bs_state: Optional[BlueskyState] = None
     result: Result = field(default_factory=incomplete_result)
 
@@ -934,7 +937,7 @@ class PreparedPlan:
                 reason='Only local RunEngine supported at this time'
             )
 
-        run_in_local_RE(self.item, self.identifier, self.bs_state)
+        run_in_local_RE(self.item, self.plan_id, self.bs_state)
         self.result = Result()
         return self.result
 
@@ -944,12 +947,15 @@ class PreparedPlan:
         origin: PlanOptions,
         parent: Optional[PreparedPlanStep] = None
     ) -> PreparedPlan:
+        # register run identifier, store in prepared_plan name
         bs_state = get_bs_state(parent)
         identifier = register_run_identifier(bs_state, origin.name)
+        # pass identifier back to PlanOptions
+        origin.plan_id = identifier
         return cls(
             name=origin.name,
             item=make_plan_item(origin),
-            identifier=identifier,
+            plan_id=identifier,
             bs_state=bs_state,
             origin=origin,
             parent=parent
@@ -1058,8 +1064,15 @@ class PreparedPlanStep(PreparedProcedureStep):
             except Exception:
                 prep_step.prepared_plan_failures.append(plan_step)
 
+        # create map from generated plan_id <-> ComparisonToPlanData
+        # - map should include everything that exists **so far**
+        # ? Store identifier back on PlanOptions on prepare-time?
+        # - would serialize and save.  Would have to be a read-only gui element
+        #    that refreshes on rquest
+
         for check in origin.checks:
-            res = create_prepared_comparison(check)
+            # find plan_id that mateches comparison
+            res = create_prepared_comparison(check, parent=prep_step)
             if isinstance(res, Exception):
                 prep_step.prepared_checks_failures.append(res)
             else:
@@ -1069,7 +1082,8 @@ class PreparedPlanStep(PreparedProcedureStep):
 
 
 def create_prepared_comparison(
-    check: Union[ComparisonToTarget, ComparisonToPlanData]
+    check: Union[ComparisonToTarget, ComparisonToPlanData],
+    parent: Optional[AnyDataclass] = None
 ) -> Union[PreparedComparison, PreparedComparisonException]:
 
     output = ValueError('Cannot prepare the provided comparison, type not '
@@ -1080,7 +1094,7 @@ def create_prepared_comparison(
         comp = check.comparison
         try:
             output = PreparedSignalComparison.from_signal(
-                signal=signal, comparison=comp
+                signal=signal, comparison=comp, parent=parent
             )
         except Exception as ex:
             output = PreparedComparisonException(
@@ -1094,11 +1108,13 @@ def create_prepared_comparison(
     elif isinstance(check, ComparisonToPlanData):
         comp = check.comparison
         try:
-            output = PreparedPlanComparison.from_comp_to_plan(check)
+            output = PreparedPlanComparison.from_comp_to_plan(
+                check, parent=parent
+            )
         except Exception as ex:
             output = PreparedComparisonException(
                 exception=ex,
-                identifier=getattr(check, 'plan_name', ''),
+                identifier=getattr(check, 'plan_id', ''),
                 message='Failed to initialize comparison',
                 comparison=comp,
                 name=comp.name
@@ -1140,6 +1156,8 @@ class PreparedPlanComparison(PreparedComparison):
     """
     Unified representation for comparisons to Bluesky Plan data
     """
+    # plan identifier as generated during plan preparation
+    plan_id: str = ""
     plan_data: Optional[PlanData] = None
 
     parent: Optional[PreparedPlanStep] = field(default=None, repr=None)
@@ -1148,7 +1166,12 @@ class PreparedPlanComparison(PreparedComparison):
 
     async def get_data_async(self) -> Any:
         # get BSState, look for entry?
-        raise NotImplementedError
+        bs_state = get_bs_state(self)
+        # PlanData.plan_id is root of correct identifier, but not its final form
+        # Must get the identifiers generated at preparation-time
+        run_uuids = bs_state.run_map[self.plan_id]
+        # GlobalRunEngine().db[]
+        return get_RE_data(self.plan_data.data_points, run_uuids)
 
     async def _compare(self, data: Any) -> Result:
         raise NotImplementedError
@@ -1169,6 +1192,7 @@ class PreparedPlanComparison(PreparedComparison):
 
         return cls(
             plan_data=origin,
+            plan_id=origin.plan_id,
             cache=cache,
             identifier=identifier,
             comparison=origin.comparison,
