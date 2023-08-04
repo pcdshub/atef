@@ -26,8 +26,8 @@ requirements:
   - apischema
   - archapp >=1.1.0
   - bluesky
+  - bluesky-queueserver >=0.0.19
   - bluesky-widgets
-  - bluesky-queueserver
   - databroker
   - happi
   - ipython
