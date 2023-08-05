@@ -25,6 +25,7 @@ from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
 
 import apischema
 import ophyd
+import pandas as pd
 import yaml
 from bluesky_queueserver.manager.profile_ops import (
     existing_plans_and_devices_from_nspace, validate_plan)
@@ -36,8 +37,9 @@ from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
 from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparedComparisonException
-from atef.plan_utils import (BlueskyState, get_default_namespace, get_RE_data,
-                             register_run_identifier, run_in_local_RE)
+from atef.plan_utils import (BlueskyState, GlobalRunEngine,
+                             get_default_namespace, register_run_identifier,
+                             run_in_local_RE)
 from atef.reduce import ReduceMethod
 from atef.result import Result, _summarize_result_severity, incomplete_result
 from atef.type_hints import AnyDataclass, AnyPath, Number, PrimitiveType
@@ -202,11 +204,18 @@ class ComparisonToTarget(Target):
 
 @dataclass
 class PlanData:
+    #: user-provided name for this plan data.  Not used to identify the run
+    name: str = ""
     #: identifier of PlanStep to grab data from.
     #: Set via GUI, must match PreparedPlan.plan_id
     plan_id: Optional[str] = None
+    #: plan number (for plans containing nested plans, which return multiple uuids)
+    plan_no: int = 0
     #: data point(s) in plan (0-indexed) or slice notation
-    data_points: Union[List[int], Tuple[int, int, int]] = field(default_factory=list)
+    #: [row_start, row_end)
+    data_points: Union[List[int], Tuple[int, int]] = field(default_factory=list)
+    #: Field / column names to grab data from
+    field_names: List[str] = field(default_factory=list)
     #: data reduction / operation
     reduction_mode: ReduceMethod = ReduceMethod.average
 
@@ -1156,25 +1165,32 @@ class PreparedPlanComparison(PreparedComparison):
     """
     Unified representation for comparisons to Bluesky Plan data
     """
-    # plan identifier as generated during plan preparation
-    plan_id: str = ""
-    plan_data: Optional[PlanData] = None
-
+    #: Original plan data, holds relevant data coordinates
+    plan_data: Optional[ComparisonToPlanData] = None
+    #: The hierarchical parent of this comparison
     parent: Optional[PreparedPlanStep] = field(default=None, repr=None)
-
+    #: The value from the plan, to which the comparison will take place
     data: Optional[Any] = None
 
     async def get_data_async(self) -> Any:
+        bs_state = get_bs_state(self.parent)
         # get BSState, look for entry?
-        bs_state = get_bs_state(self)
-        # PlanData.plan_id is root of correct identifier, but not its final form
-        # Must get the identifiers generated at preparation-time
-        run_uuids = bs_state.run_map[self.plan_id]
-        # GlobalRunEngine().db[]
-        return get_RE_data(self.plan_data.data_points, run_uuids)
+        data = get_RE_data(bs_state, self.plan_data)
+        return data
 
     async def _compare(self, data: Any) -> Result:
-        raise NotImplementedError
+        if data is None:
+            # 'None' is likely incompatible with our comparisons and should
+            # be raised for separately
+            return Result(
+                severity=self.comparison.if_disconnected,
+                reason=(
+                    f"No data available for signal {self.identifier!r} in "
+                    f"comparison {self.comparison}"
+                ),
+            )
+
+        return self.plan_data.comparison.compare(data, identifier=self.identifier)
 
     @classmethod
     def from_comp_to_plan(
@@ -1192,13 +1208,35 @@ class PreparedPlanComparison(PreparedComparison):
 
         return cls(
             plan_data=origin,
-            plan_id=origin.plan_id,
             cache=cache,
             identifier=identifier,
             comparison=origin.comparison,
             name=name,
             parent=parent
         )
+
+
+def get_RE_data(bs_state: BlueskyState, plan_data: ComparisonToPlanData) -> Any:
+    gre = GlobalRunEngine()
+    run_uuids = bs_state.run_map[plan_data.plan_id]
+    if run_uuids is None:
+        raise RuntimeError("Data unavailable, run cannot be found.  Has the "
+                           f"referenced plan (id: {plan_data.plan_id}) "
+                           "been run?")
+
+    # Use index to grab right uuid, data row
+    uuid = run_uuids[plan_data.plan_no]
+    plan_table: pd.DataFrame = gre.db[uuid].table()
+    field_series: pd.Series = plan_table[plan_data.field_names]
+
+    if isinstance(plan_data.data_points, tuple):
+        data_slice = slice(*plan_data.data_points)
+        data_table = field_series[data_slice].to_numpy()
+    elif isinstance(plan_data.data_points, list):
+        data_table = field_series.iloc[plan_data.data_points].to_numpy()
+
+    reduced_data = plan_data.reduction_mode.reduce_values(data_table)
+    return reduced_data
 
 
 AnyProcedure = Union[
