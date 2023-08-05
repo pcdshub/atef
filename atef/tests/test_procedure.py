@@ -1,7 +1,9 @@
 import pytest
 
+from atef.check import Equals
 from atef.enums import Severity
-from atef.procedure import (DescriptionStep, PreparedProcedureFile,
+from atef.procedure import (ComparisonToPlanData, DescriptionStep, PlanOptions,
+                            PlanStep, PreparedPlanStep, PreparedProcedureFile,
                             PreparedProcedureStep, ProcedureFile)
 from atef.result import Result
 
@@ -71,3 +73,32 @@ async def test_prepared_procedure(active_config_path):
     # simple smoke test
     ppf = PreparedProcedureFile.from_origin(file=procedure_file)
     await ppf.run()
+
+
+@pytest.mark.asyncio
+async def test_plan_step():
+    """ Pass if a PlanStep can be prepared and run in isolation """
+    # Note: this is not the standard way of using these plan steps.
+    #       Normally PlanSteps will have a top-level ProcedureFile that owns
+    #       its own BlueskyState.  Here we use the default None-BlueskyState
+    plan_opt_1 = PlanOptions(
+        name='plan_opt_1',
+        plan='scan',
+        args=[['motor1'], 'motor2', 0, 10, 10]
+    )
+
+    plan_comp = ComparisonToPlanData(
+        plan_id='plan_opt_1', data_points=(0, 1, 4),
+        field_names=['motor2'],
+        comparison=Equals(name='equals', value=1, invert=True)
+    )
+
+    plan_step = PlanStep('one plan', plans=[plan_opt_1], checks=[plan_comp])
+
+    prepared_plan_step = PreparedPlanStep.from_origin(plan_step, parent=None)
+
+    await prepared_plan_step.run()
+
+    assert prepared_plan_step.step_result == pass_result
+    assert prepared_plan_step.prepared_checks[0].result == pass_result
+    assert prepared_plan_step.prepared_plans[0].result == pass_result

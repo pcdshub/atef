@@ -263,6 +263,10 @@ def mock_happi(monkeypatch: Any, happi_client: happi.Client):
             if not hasattr(cpt, 'pvname'):
                 setattr(cpt, 'pvname', f'{dev.prefix}:{cpt_name}')
     monkeypatch.setattr(atef.util, 'get_happi_client', lambda: happi_client)
+    # Only one of these should be needed, but after adding the PlanStep
+    # tests both were needed (test_plan_step failed without atef.util,
+    # test_gather_pvs failed with atef.util and without from_config)
+    monkeypatch.setattr(happi.Client, 'from_config', lambda: happi_client)
 
 
 @pytest.fixture(scope='function')
