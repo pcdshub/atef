@@ -99,6 +99,9 @@ async def test_plan_step():
 
     await prepared_plan_step.run()
 
+    print(prepared_plan_step.step_result)
     assert prepared_plan_step.step_result == pass_result
+    print(prepared_plan_step.prepared_checks[0].result)
     assert prepared_plan_step.prepared_checks[0].result == pass_result
+    print(prepared_plan_step.prepared_plans[0].result)
     assert prepared_plan_step.prepared_plans[0].result == pass_result
