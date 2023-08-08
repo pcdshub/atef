@@ -1,10 +1,12 @@
 import logging
+import operator
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from uuid import UUID
 
 import databroker
+import ophyd
 from bluesky import RunEngine
 from bluesky_queueserver.manager.profile_ops import (
     ScriptLoadingError, existing_plans_and_devices_from_nspace,
@@ -117,21 +119,78 @@ class GlobalRunEngine:
 
         return cls.instance
 
-    def run_plan(self, state: BlueskyState, item: Dict[str, Any], identifier: str) -> Tuple[UUID, ...]:
+    def run_plan(
+        self,
+        state: BlueskyState,
+        item: Dict[str, Any],
+        identifier: str
+    ) -> Tuple[UUID, ...]:
+        """
+        Run a plan item, and store the resulting UUIDs in ``state`` under ``identifier``
+        """
+        base, cpt = separate_attrs_from_strings(item)
         parsed_plan = prepare_plan(
-            item,
+            base,
             plans_in_nspace=state.plans_in_ns,
             devices_in_nspace=state.devices_in_ns,
             allowed_plans=state.allowed_plans,
             allowed_devices=state.allowed_devices
         )
+        # reconstruct args and kwargs (operator.attrgetter(attr)(device))
+        parsed_args = get_attr_from_strings(parsed_plan['args'], cpt['args'])
+        parsed_kwargs = get_attr_from_strings(parsed_plan['kwargs'], cpt['kwargs'])
 
         # actually run plan
+        logger.debug(f'running plan: {parsed_plan["callable"]}'
+                     f'(*{parsed_args}, **{parsed_kwargs})')
         run_uuids = self.RE(parsed_plan["callable"](
-            *parsed_plan["args"], **parsed_plan["kwargs"]
-        ))
+                            *parsed_args, **parsed_kwargs))
         state.run_map[identifier] = run_uuids
         return run_uuids
+
+
+def separate_attrs_from_strings(item: Any) -> Tuple[Any, Any]:
+    """ Recursively strip attributes from strings, return other items unchanged """
+    if isinstance(item, dict):
+        base, attr = {}, {}
+        for key, value in item.items():
+            device_val, cpt_val = separate_attrs_from_strings(value)
+            base[key] = device_val
+            attr[key] = cpt_val
+        return base, attr
+    elif isinstance(item, list):
+        base, attr = [], []
+        for value in item:
+            base_val, attr_val = separate_attrs_from_strings(value)
+            base.append(base_val)
+            attr.append(attr_val)
+        return base, attr
+    elif isinstance(item, str):
+        try:
+            device, cpt = item.split('.', maxsplit=1)
+        except ValueError:
+            return item, item
+        return device, cpt
+    else:
+        return item, item
+
+
+def get_attr_from_strings(base: Any, cpt: Any) -> Any:
+    """
+    Get ophyd copmonents from the devices in ``base``, if there is an attribute
+    in ``cpt``.  Traverses ``base`` and ``cpt`` in parallel
+    """
+    if base == cpt:
+        return base
+
+    if isinstance(base, dict):
+        return {k: get_attr_from_strings(base[k], cpt[k]) for k in base.keys()}
+    elif isinstance(base, list):
+        return [get_attr_from_strings(b, c) for b, c in zip(base, cpt)]
+    elif isinstance(base, ophyd.Device):
+        return operator.attrgetter(cpt)(base)
+    else:
+        return base
 
 
 def register_run_identifier(state: BlueskyState, name: str) -> str:
