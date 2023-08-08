@@ -4,7 +4,7 @@ In the future this should probably be pulled out into a separate repository
 as it will probably see considerable use
 """
 from typing import (Any, Callable, Dict, Generator, Iterable, List, Optional,
-                    Union)
+                    Tuple, Union)
 
 import bluesky.plans as bp
 from bluesky_queueserver import parameter_annotation_decorator
@@ -42,64 +42,80 @@ def count(
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "point_lists": {"annotation": "typing.List[typing.List[float]]"},
     }
 })
 @add_docstring_from(bp.list_scan)
 def list_scan(
     detectors: List[Any],
-    *args,
+    motors: List[Any],
+    point_lists: List[List[float]],
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.list_scan(detectors, *args, per_step=per_step, md=md)
+    motor_args = [val for pair in zip(motors, point_lists) for val in pair]
+    yield from bp.list_scan(detectors, *motor_args, per_step=per_step, md=md)
 
 
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "point_lists": {"annotation": "typing.List[typing.List[float]]"},
     }
 })
 @add_docstring_from(bp.rel_list_scan)
 def rel_list_scan(
     detectors: List[Any],
-    *args,
+    motors: List[Any],
+    point_lists: List[List[float]],
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.rel_list_scan(detectors, *args, per_step=per_step, md=md)
+    motor_args = [val for pair in zip(motors, point_lists) for val in pair]
+    yield from bp.rel_list_scan(detectors, *motor_args, per_step=per_step, md=md)
 
 
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "point_lists": {"annotation": "typing.List[typing.List[float]]"},
     }
 })
 @add_docstring_from(bp.list_grid_scan)
 def list_grid_scan(
     detectors: List[Any],
-    *args,
+    motors: List[Any],
+    point_lists: List[List[float]],
     snake_axes: bool = False,
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.list_grid_scan(detectors, *args, snake_axes, per_step=per_step,
-                                 md=md)
+    motor_args = [val for pair in zip(motors, point_lists) for val in pair]
+    yield from bp.list_grid_scan(detectors, *motor_args, snake_axes,
+                                 per_step=per_step, md=md)
 
 
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "point_lists": {"annotation": "typing.List[typing.List[float]]"},
     }
 })
 @add_docstring_from(bp.rel_list_grid_scan)
 def rel_list_grid_scan(
     detectors: List[Any],
-    *args,
+    motors: List[Any],
+    point_lists: List[List[float]],
     snake_axes: bool = False,
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.rel_list_grid_scan(detectors, *args, snake_axes,
+    motor_args = [val for pair in zip(motors, point_lists) for val in pair]
+    yield from bp.rel_list_grid_scan(detectors, *motor_args, snake_axes,
                                      per_step=per_step, md=md)
 
 
@@ -240,100 +256,125 @@ def scan_nd(
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "limits": {"annotation": "typing.List[typing.Tuple[float, float]]"},
     }
 })
 @add_docstring_from(bp.scan)
 def scan(
     detectors: List[Any],
-    *args,
+    motors: List[Any],
+    limits: List[Tuple[float, float]],
     num: Optional[int] = None,
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.scan(detectors, *args, num=num, per_step=per_step, md=md)
+    motor_args = [item for tup in zip(motors, *zip(*limits)) for item in tup]
+    yield from bp.scan(detectors, *motor_args, num=num, per_step=per_step, md=md)
 
 
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "limits": {"annotation": "typing.List[typing.Tuple[float, float]]"},
     }
 })
 @add_docstring_from(bp.inner_product_scan)
 def inner_product_scan(
     detectors: List[Any],
     num: int,
-    *args,
+    motors: List[Any],
+    limits: List[Tuple[float, float]],
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.inner_product_scan(detectors, num, *args, per_step=per_step, md=md)
+    motor_args = [item for tup in zip(motors, *zip(*limits)) for item in tup]
+    yield from bp.inner_product_scan(detectors, num, *motor_args,
+                                     per_step=per_step, md=md)
 
 
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "limits": {"annotation": "typing.List[typing.Tuple[float, float, int]]"},
     }
 })
 @add_docstring_from(bp.grid_scan)
 def grid_scan(
     detectors: List[Any],
-    *args,
+    motors: List[Any],
+    limits: List[Tuple[float, float, int]],
     snake_axes: Optional[Union[bool, Iterable[Any]]] = None,
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.grid_scan(detectors, *args, snake_axes=snake_axes,
+    motor_args = [item for tup in zip(motors, *zip(*limits)) for item in tup]
+    yield from bp.grid_scan(detectors, *motor_args, snake_axes=snake_axes,
                             per_step=per_step, md=md)
 
 
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "limits": {"annotation": "typing.List[typing.Tuple[float, float, int]]"},
     }
 })
 @add_docstring_from(bp.rel_grid_scan)
 def rel_grid_scan(
     detectors: List[Any],
-    *args,
+    motors: List[Any],
+    limits: List[Tuple[float, float, int]],
     snake_axes: Optional[Union[bool, Iterable[Any]]] = None,
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.rel_grid_scan(detectors, *args, snake_axes=snake_axes,
+    motor_args = [item for tup in zip(motors, *zip(*limits)) for item in tup]
+    yield from bp.rel_grid_scan(detectors, *motor_args, snake_axes=snake_axes,
                                 per_step=per_step, md=md)
 
 
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "limits": {"annotation": "typing.List[typing.Tuple[float, float]]"},
     }
 })
 @add_docstring_from(bp.relative_inner_product_scan)
 def relative_inner_product_scan(
     detectors: List[Any],
     num: int,
-    *args,
+    motors: List[Any],
+    limits: List[Tuple[float, float]],
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.relative_inner_product_scan(detectors, num, *args,
+    motor_args = [item for tup in zip(motors, *zip(*limits)) for item in tup]
+    yield from bp.relative_inner_product_scan(detectors, num, *motor_args,
                                               per_step=per_step, md=md)
 
 
 @parameter_annotation_decorator({
     "parameters": {
         "detectors": {"annotation": "typing.List[__DEVICE__]"},
+        "motors": {"annotation": "typing.List[__DEVICE__]"},
+        "limits": {"annotation": "typing.List[typing.Tuple[float, float]]"},
     }
 })
 @add_docstring_from(bp.rel_scan)
 def rel_scan(
     detectors: List[Any],
-    *args,
+    motors: List[Any],
+    limits: List[Tuple[float, float]],
     num: Optional[int] = None,
     per_step: Optional[Callable] = None,
     md: Optional[Dict[str, Any]] = None
 ):
-    yield from bp.rel_scan(detectors, *args, num=num, per_step=per_step, md=md)
+    motor_args = [item for tup in zip(motors, *zip(*limits)) for item in tup]
+    yield from bp.rel_scan(detectors, *motor_args, num=num, per_step=per_step, md=md)
 
 
 @parameter_annotation_decorator({
