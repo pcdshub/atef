@@ -3,31 +3,46 @@ from __future__ import annotations
 import enum
 import logging
 import re
-from typing import (Any, ClassVar, Dict, List, Optional, Union, get_args,
-                    get_origin)
+from functools import partial
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Union,
+                    get_args, get_origin)
 
 from bluesky_queueserver.manager.profile_ops import construct_parameters
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Signal as QSignal
 
 from atef import util
+from atef.widgets.config.data_active import ExpandableFrame
+from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData
+from atef.widgets.utils import insert_widget
 
 logger = logging.getLogger(__file__)
 
 
-class PlanEntryWidget(QtWidgets.QWidget):
+class PlanEntryWidget(DesignerDisplay, QtWidgets.QWidget):
     """ holds many ArgumentEntryWidget's and supplies a plan item """
+
+    filename = 'plan_entry_widget.ui'
+
+    args_layout: QtWidgets.QVBoxLayout
+    optional_args_frame: QtWidgets.QFrame
 
     def __init__(self, *args, plan: Dict[str, Any], **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.plan_info = plan
-        self.vlayout = QtWidgets.QVBoxLayout()
-        self.setLayout(self.vlayout)
-
         self.arg_widgets = {}
         parameters = construct_parameters(plan['parameters'])
+
+        # setup optional args frame
+        optional_frame = ExpandableFrame(text='Optional Arguments')
+        optional_widget = QtWidgets.QWidget()
+        self.optional_layout = QtWidgets.QVBoxLayout()
+        optional_widget.setLayout(self.optional_layout)
+        optional_frame.add_widget(optional_widget)
+        insert_widget(optional_frame, self.optional_args_frame)
+
         # gather both the annotation from the parameter and
         # original text annotation
         for param, info in zip(parameters, self.plan_info['parameters']):
@@ -37,7 +52,11 @@ class PlanEntryWidget(QtWidgets.QWidget):
             arg_widget = ArgumentEntryWidget.from_hint_info(
                 param.annotation, anno, name=info['name']
             )
-            self.vlayout.addWidget(arg_widget)
+            if arg_widget.is_optional:
+                self.optional_layout.addWidget(arg_widget)
+            else:
+                self.args_layout.addWidget(arg_widget)
+
             if isinstance(arg_widget, ArgumentEntryWidget):
                 self.arg_widgets[param.name] = arg_widget
 
@@ -75,6 +94,7 @@ class ArgumentEntryWidget(QtWidgets.QWidget):
     def __init__(self, *args, name: Optional[str] = None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.name = name
+        self.is_optional = False
 
         self.hlayout = QtWidgets.QHBoxLayout()
         self.setLayout(self.hlayout)
@@ -114,21 +134,23 @@ class ArgumentEntryWidget(QtWidgets.QWidget):
         if origin is list:
             match = re.search(r'^typing.List\[(.*)\]$', annotation)
             return ListArgWidget.from_hint_info(
-                type_hint=args, annotation=match[1], name=name
+                type_hint=args[0], annotation=match[1], name=name
             )
         elif (origin is Union) and (type(None) not in args):
             match = re.search(r'^typing.Union\[(.*)\]$', annotation)
-            return UnionArgWidget.from_hint_info(
-                type_hint=args, annotation=match[1], name=name
+            return LabelArgWidget(
+                name=name,
+                label_text=f'Argument type not supported: ({type_hint})'
             )
 
         elif (origin is Union) and (type(None) in args):
             # handle optional case
-            print('stripped optional')
             match = re.search(r'^typing.Optional\[(.*)\]$', annotation)
-            return ArgumentEntryWidget.from_hint_info(
+            widget = ArgumentEntryWidget.from_hint_info(
                 type_hint=args[0], annotation=match[1], name=name
             )
+            widget.is_optional = True
+            return widget
 
         elif origin is dict:
             return DictArgWidget.from_hint_info(
@@ -136,14 +158,13 @@ class ArgumentEntryWidget(QtWidgets.QWidget):
             )
 
         # Currently don't support unions
-        return QtWidgets.QLabel(f'Could not identify argument type {type_hint}')
-
+        return LabelArgWidget(
+            name=name,
+            label_text=f'Could not identify argument type {type_hint}'
+        )
 
 # Default is str, just leave as str, let qserver construct plan
 # Read enum from annotation first
-# List -> table widget?.....
-# primitives -> specific edits
-# __DEVICE__ -> happi selector
 
 
 class BasicArgEdit(ArgumentEntryWidget):
@@ -178,6 +199,8 @@ class DeviceChoiceWidget(ArgumentEntryWidget):
     combo_box: Optional[QtWidgets.QComboBox] = None
     signal_button: Optional[QtWidgets.QPushButton] = None
 
+    DEFAULT_TEXT = 'select a device'
+
     def __init__(self, *args, arg_type: Optional[Any] = None, name: Optional[str] = None, **kwargs) -> None:
         super().__init__(*args, name=name, **kwargs)
         self._device = None
@@ -194,7 +217,7 @@ class DeviceChoiceWidget(ArgumentEntryWidget):
 
         else:
             # No pre-determined values, pick from general devices
-            self.signal_button = QtWidgets.QPushButton('select a device')
+            self.signal_button = QtWidgets.QPushButton(self.DEFAULT_TEXT)
             self.signal_button.clicked.connect(self.pick_signal)
             self.hlayout.addWidget(self.signal_button)
 
@@ -205,7 +228,7 @@ class DeviceChoiceWidget(ArgumentEntryWidget):
         """
         if self._search_widget is None:
             widget = HappiDeviceComponentWidget(
-                client=util.get_happi_client()
+                client=util.get_happi_client(), parent=self
             )
 
             # clear previous cache state
@@ -239,17 +262,25 @@ class DeviceChoiceWidget(ArgumentEntryWidget):
         HappiDeviceComponentWidget.device_widget.attributes_selected.
         """
         attr = attr_selected[0]
+        if self._device is None:
+            # simulate click on device to store device name
+            self._search_widget.item_search_widget.button_choose.clicked.emit()
         logger.debug(f'found attr: {attr}')
         self._signal_attr = attr.attr
         self.signal_button.setText(f'{self._device}.{self._signal_attr}')
 
     def value(self) -> str:
         if self.combo_box:
-            return self.combo_box.currentText()
+            device_name = self.combo_box.currentText()
         elif self.signal_button:
-            return self.signal_button.text()
+            device_name = self.signal_button.text()
         else:
             raise RuntimeError('no entry widgets available')
+
+        if device_name == self.DEFAULT_TEXT:
+            return None
+
+        return device_name
 
 
 class CloseEmitWidget(QtWidgets.QWidget):
@@ -267,15 +298,13 @@ class ListArgWidget(ArgumentEntryWidget):
     def __init__(
         self,
         *args,
-        widget_cls: ArgumentEntryWidget,
-        arg_type: Optional[Any] = None,
+        widget_factory: Callable[[], ArgumentEntryWidget],
         name: Optional[str] = None,
         compact: bool = False,
         **kwargs
     ) -> None:
         super().__init__(*args, name=name, **kwargs)
-        self.widget_cls = widget_cls
-        self.arg_type = arg_type
+        self.widget_factory = widget_factory
         self.compact = compact
         self.table_widget = CloseEmitWidget()
         self.show_button = None
@@ -287,24 +316,53 @@ class ListArgWidget(ArgumentEntryWidget):
         type_hint: Any,
         annotation: str,
         name: str | None = None,
-        compact: bool = False
     ) -> ListArgWidget:
         origin = get_origin(type_hint)
-        # args = get_args(type_hint)
 
         if not origin:
             # we have reached the bottom, should just have a single type
             if '__DEVICE__' in annotation:
-                widget_cls = DeviceChoiceWidget
-                return cls(widget_cls=widget_cls, arg_type=type_hint, name=name)
+                widget_factory = DeviceChoiceWidget
+                return cls(widget_factory=widget_factory, name=name)
             else:
-                widget_cls = BasicArgEdit
-                return cls(widget_cls=widget_cls, arg_type=type_hint, name=name)
+                widget_factory = partial(BasicArgEdit, arg_type=type_hint)
+                return cls(widget_factory=widget_factory, name=name)
 
         if origin is list:
-            return QtWidgets.QLabel(f'List[List] not supported yet {type_hint}')
+            args = get_args(type_hint)
+            sub_anno = re.search(r'^typing.List\[(.*)\]$', annotation)[1]
+
+            def get_sub_widget_callable(type_hint: Any, anno: str):
+                """
+                Recurse through nested lists and return the appropriately
+                wrapped widget_factory
+                """
+                origin = get_origin(type_hint)
+                args = get_args(type_hint)
+                sub_anno = re.search(r'^typing.List\[(.*)\]$', anno)
+                if not origin:
+                    # final list, no need to compact
+                    return partial(BasicArgEdit, arg_type=type_hint)
+                else:
+                    sub_widget = get_sub_widget_callable(args[0], sub_anno[1])
+                    if isinstance(sub_widget, ListArgWidget):
+                        compact = True
+                    else:
+                        compact = False
+                    return partial(ListArgWidget,
+                                   widget_factory=sub_widget, compact=compact,
+                                   arg_type=args[0])
+
+            sub_widget_factory = get_sub_widget_callable(args[0], sub_anno)
+            widget_factory = partial(ListArgWidget,
+                                     widget_factory=sub_widget_factory,
+                                     compact=True)
+            return cls(widget_factory=widget_factory, name=name)
+
         if origin is Union:
-            return QtWidgets.QLabel(f'List[Unions] not supported yet {type_hint}')
+            return LabelArgWidget(
+                name=name, label_text=f'List[Union] not supported yet {type_hint}'
+            )
 
     def setup_ui(self) -> None:
         self.table_widget.setLayout(QtWidgets.QHBoxLayout())
@@ -312,7 +370,7 @@ class ListArgWidget(ArgumentEntryWidget):
         self.arg_table = QtWidgets.QTableWidget(parent=self)
         self.arg_table.setRowCount(1)
         self.arg_table.setColumnCount(1)
-        self.arg_table.setCellWidget(0, 0, self.widget_cls(arg_type=self.arg_type))
+        self.arg_table.setCellWidget(0, 0, self.widget_factory())
         self.arg_table.setSizeAdjustPolicy(
             QtWidgets.QAbstractScrollArea.AdjustToContents
         )
@@ -349,7 +407,7 @@ class ListArgWidget(ArgumentEntryWidget):
     def add_row(self) -> None:
         self.arg_table.insertRow(self.arg_table.rowCount())
         self.arg_table.setCellWidget(self.arg_table.rowCount() - 1, 0,
-                                     self.widget_cls(arg_type=self.arg_type))
+                                     self.widget_factory())
         self.arg_table.verticalHeader().setSectionResizeMode(
             QtWidgets.QHeaderView.ResizeToContents
         )
@@ -365,7 +423,9 @@ class ListArgWidget(ArgumentEntryWidget):
     def value(self) -> List[Any]:
         args = []
         for i in range(self.arg_table.rowCount()):
-            args.append(self.arg_table.cellWidget(i, 0).value())
+            cell_value = self.arg_table.cellWidget(i, 0).value()
+            if cell_value is not None:
+                args.append(cell_value)
         return args
 
 
@@ -475,3 +535,19 @@ class UnionArgWidget(ArgumentEntryWidget):
         name: str | None = None
     ) -> ArgumentEntryWidget:
         return QtWidgets.QLabel('Union here')
+
+
+class LabelArgWidget(ArgumentEntryWidget):
+    def __init__(
+        self,
+        *args,
+        label_text: str,
+        name: Optional[str] = None,
+        **kwargs
+    ) -> None:
+        super().__init__(*args, name=name, **kwargs)
+        self.label = QtWidgets.QLabel(label_text)
+        self.hlayout.addWidget(self.label)
+
+    def value(self):
+        return None
