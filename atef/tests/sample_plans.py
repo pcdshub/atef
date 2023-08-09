@@ -35,7 +35,7 @@ def docstring_plan(dets: List[Any], num: int, default_arg=1):
 @parameter_annotation_decorator({
     "parameters": {
         "dets": {
-            "annotation": "typing.List[__DEVICE__]",
+            "annotation": "typing.List[typing.List[__DEVICE__]]",
             "description": "detector_desc, param_ann_plan"
         },
         "num": {
@@ -43,5 +43,5 @@ def docstring_plan(dets: List[Any], num: int, default_arg=1):
         }
     }
 })
-def param_ann_plan(dets: List[Any], num: int, default_arg=1):
+def param_ann_plan(dets: List[List[Any]], num: int, default_arg=1):
     yield from count(dets, num=num)

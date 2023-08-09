@@ -99,9 +99,10 @@ async def test_plan_step():
 
     await prepared_plan_step.run()
 
+    # plan step has an additional reason, so we compare directly to the severity
     print(prepared_plan_step.step_result)
-    assert prepared_plan_step.step_result == pass_result
+    assert prepared_plan_step.step_result.severity == pass_result.severity
     print(prepared_plan_step.prepared_checks[0].result)
-    assert prepared_plan_step.prepared_checks[0].result == pass_result
+    assert prepared_plan_step.prepared_checks[0].result.severity == pass_result.severity
     print(prepared_plan_step.prepared_plans[0].result)
-    assert prepared_plan_step.prepared_plans[0].result == pass_result
+    assert prepared_plan_step.prepared_plans[0].result.severity == pass_result.severity

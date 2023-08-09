@@ -84,6 +84,9 @@ class BlueskyState:
         TODO: if the destination is a queueserver, we should query it for its
         permitted namespace
         """
+        if not destination == PlanDestination.local_:
+            raise NotImplementedError("only local plan execution supported")
+
         if self.allowed_devices and self.allowed_plans:
             return self.allowed_plans, self.allowed_devices
 
