@@ -84,7 +84,7 @@ async def test_plan_step():
     plan_opt_1 = PlanOptions(
         name='plan_opt_1',
         plan='scan',
-        args=[['motor1'], 'motor2', 0, 10, 10]
+        args=[['motor1'], ['motor2'], [(0, 10)], 10]
     )
 
     plan_comp = ComparisonToPlanData(
