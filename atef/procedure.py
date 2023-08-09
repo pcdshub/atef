@@ -207,7 +207,7 @@ class PlanData:
     #: user-provided name for this plan data.  Not used to identify the run
     name: str = ""
     #: identifier of PlanStep to grab data from.
-    #: Set via GUI, must match PreparedPlan.plan_id
+    #: set via GUI, must match a PreparedPlan.plan_id
     plan_id: Optional[str] = None
     #: plan number (for plans containing nested plans, which return multiple uuids)
     plan_no: int = 0
@@ -248,8 +248,15 @@ class PlanOptions:
     kwargs: Optional[Dict[Any, Any]] = field(default_factory=dict)
     #: Arguments which should not be configurable.
     fixed_arguments: Optional[Sequence[str]] = None
-    #: Plan Identifier used to cross-reference plan
-    plan_id: Optional[str] = None
+
+    def make_plan_item(self: PlanOptions) -> Dict[str, Any]:
+        """ Makes a plan item (dictionary of parameters) for a given PlanStep """
+        it = {
+            "name": self.plan,
+            "args": self.args,
+            "kwargs": self.kwargs,
+            "user_group": "root"}
+        return it
 
 
 @dataclass
@@ -918,29 +925,26 @@ class PreparedValueToSignal:
         return pvts
 
 
-def make_plan_item(plan_opts: PlanOptions) -> Dict[str, Any]:
-    """ Makes a plan item (dictionary of parameters) for a given PlanStep """
-    it = {
-        "name": plan_opts.plan,
-        "args": plan_opts.args,
-        "kwargs": plan_opts.kwargs,
-        "user_group": "root"}
-    return it
-
-
 @dataclass
 class PreparedPlan:
+    #: identifying name
     name: str
+    #: a link to the original PlanOptions
     origin: PlanOptions
+    #: the hierarchical parent of this PreparedPlan
     parent: Optional[PreparedPlanStep] = None
+    #: the plan item, suitable for submission to a bluesky queueserver
     item: Dict[str, any] = field(default_factory=dict)
+    #: the plan identifer, may be different from origin.plan_id
     plan_id: Optional[str] = None
+    #: stashed BlueskyState.  Passed to RunEngine runner
     bs_state: Optional[BlueskyState] = None
+    #: result of this step. (did the plan run?)
     result: Result = field(default_factory=incomplete_result)
 
-    async def run(self, destination: PlanDestination) -> Result:
+    async def run(self) -> Result:
         # submit the plan to the destination
-        if destination != PlanDestination.local_:
+        if self.parent.origin.destination != PlanDestination.local_:
             self.result = Result(
                 severity=Severity.error,
                 reason='Only local RunEngine supported at this time'
@@ -959,11 +963,9 @@ class PreparedPlan:
         # register run identifier, store in prepared_plan name
         bs_state = get_bs_state(parent)
         identifier = register_run_identifier(bs_state, origin.name)
-        # pass identifier back to PlanOptions
-        origin.plan_id = identifier
         return cls(
             name=origin.name,
-            item=make_plan_item(origin),
+            item=origin.make_plan_item(),
             plan_id=identifier,
             bs_state=bs_state,
             origin=origin,
@@ -973,16 +975,16 @@ class PreparedPlan:
 
 @dataclass
 class PreparedPlanStep(PreparedProcedureStep):
+    #: a link to the original PlanStep
     origin: PlanStep = field(default_factory=PlanStep)
-
+    #: list of PreparedPlan
     prepared_plans: List[PreparedPlan] = field(default_factory=list)
-
+    #: list of PlanOption's that led to failed PreparedPlan's
     prepared_plan_failures: List[PlanOptions] = field(default_factory=list)
-
-    #: list of success criteria (TODO: add plandata comparison)
+    #: list of success criteria
     prepared_checks: List[Union[PreparedSignalComparison,
-                                Any]] = field(default_factory=list)
-
+                                PreparedPlanComparison]] = field(default_factory=list)
+    #: list of failed checks
     prepared_checks_failures: List[PreparedComparisonException] = field(
         default_factory=list
     )
@@ -1031,7 +1033,7 @@ class PreparedPlanStep(PreparedProcedureStep):
         plan_results = []
         for pplan in self.prepared_plans:
             logger.debug(f'running plan: {pplan.name}...')
-            res = await pplan.run(self.origin.destination)
+            res = await pplan.run()
             logger.debug(f'run completed: {res}')
             plan_results.append(res)
 
@@ -1080,7 +1082,6 @@ class PreparedPlanStep(PreparedProcedureStep):
         #    that refreshes on rquest
 
         for check in origin.checks:
-            # find plan_id that mateches comparison
             res = create_prepared_comparison(check, parent=prep_step)
             if isinstance(res, Exception):
                 prep_step.prepared_checks_failures.append(res)
