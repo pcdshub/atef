@@ -1012,7 +1012,7 @@ class PreparedPlanStep(PreparedProcedureStep):
         nspace = {}
         nspace = get_default_namespace()
         epd = existing_plans_and_devices_from_nspace(nspace=nspace)
-        plans, devices, plans_in_ns, devices_in_ns = epd
+        plans, devices, _, __ = epd
         plan_status = [validate_plan(plan.item, allowed_plans=plans,
                                      allowed_devices=devices)
                        for plan in self.prepared_plans]
@@ -1020,7 +1020,7 @@ class PreparedPlanStep(PreparedProcedureStep):
         validation_status = [status[0] for status in plan_status]
         if not all(validation_status):
             # raise an error, place info in result
-            fail_plan_names = [pl['name'] for pl, st in
+            fail_plan_names = [pl.name for pl, st in
                                zip(self.prepared_plans, validation_status)
                                if not st]
             logger.debug(f'One or more plans ({fail_plan_names}) failed validation')
@@ -1052,8 +1052,9 @@ class PreparedPlanStep(PreparedProcedureStep):
 
         severity = _summarize_result_severity(GroupResultMode.all_,
                                               check_results + plan_results)
-
-        return Result(severity=severity)
+        reason = (f'{len(plan_results)} plans run, '
+                  f'{len(check_results)} checks passed')
+        return Result(severity=severity, reason=reason)
 
     @classmethod
     def from_origin(
@@ -1074,12 +1075,6 @@ class PreparedPlanStep(PreparedProcedureStep):
                 prep_step.prepared_plans.append(prep_plan)
             except Exception:
                 prep_step.prepared_plan_failures.append(plan_step)
-
-        # create map from generated plan_id <-> ComparisonToPlanData
-        # - map should include everything that exists **so far**
-        # ? Store identifier back on PlanOptions on prepare-time?
-        # - would serialize and save.  Would have to be a read-only gui element
-        #    that refreshes on rquest
 
         for check in origin.checks:
             res = create_prepared_comparison(check, parent=prep_step)
