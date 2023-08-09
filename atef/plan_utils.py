@@ -1,6 +1,7 @@
 import logging
 import operator
 import os
+from itertools import zip_longest
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from uuid import UUID
@@ -196,7 +197,7 @@ def get_attr_from_strings(base: Any, cpt: Any) -> Any:
     if isinstance(base, dict):
         return {k: get_attr_from_strings(base[k], cpt[k]) for k in base.keys()}
     elif isinstance(base, list):
-        return [get_attr_from_strings(b, c) for b, c in zip(base, cpt)]
+        return [get_attr_from_strings(b, c) for b, c in zip_longest(base, cpt)]
     elif isinstance(base, ophyd.Device) and (base.name != cpt):
         return operator.attrgetter(cpt)(base)
     else:
