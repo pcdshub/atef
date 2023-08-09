@@ -23,11 +23,15 @@ DEFAULT_PERMISSIONS_PATH = (Path(__file__).parent / "tests" / "profiles" /
 
 PERMISSIONS_PATH = os.environ.get('ATEF_PERMISSIONS_PATH') or DEFAULT_PERMISSIONS_PATH
 
-_PLAN_MODULES = ['atef.annotated_plans']  # , 'nabs.plans']
+# add 'nabs.plans' when they have been annotated
+_PLAN_MODULES = ['atef.annotated_plans']
 
 
 def get_default_namespace() -> Dict[str, Any]:
-    """ Look in the basic places to get the default namespace"""
+    """
+    Look in the basic places to get the default namespace.  Will incur a significant
+    time penalty as it gathers happi devices for the first time.
+    """
     nspace = {}
     # Load plans: bluesky.plans, nabs
     for module_name in _PLAN_MODULES:
@@ -37,25 +41,19 @@ def get_default_namespace() -> Dict[str, Any]:
             logger.warning(f"unable to load namespace from module '{module_name}'"
                            f": {ex}")
 
-    # TODO: think about caching this, don't want to re-get all the happi devices each run
     # load devices: happi
     client = get_happi_client()
     results = client.search()
     for res in results:
-        nspace[res.metadata['name']] = res.get()
+        try:
+            nspace[res.metadata['name']] = res.get()
+        except Exception as ex:
+            logger.warning(f'Unable to load device ({res.metadata["name"]}): {ex}')
 
     return nspace
 
 
 class BlueskyState:
-    # think about making this a singleton thread.
-    # Tryto include:
-    # - self.env_state, self.running_plan_exec_state
-    # - self.re_state (property)
-    # - self._execute_plan_or_task() -> self._execte_plan() -> self._generate_new_plan() [runs in RE]
-    # - self._generate_continued_plan()
-    # - self.run(), self.start()  --> Used by multiprocessing.Process, may have different API
-    # - shutdown code?
 
     def __init__(self):
         self.run_map = {}
@@ -78,10 +76,9 @@ class BlueskyState:
 
         Plans taken from a standard list
 
-        TODO: set up yaml file for each hutch? specify an env var for these?
-        - epad(path_to_yaml)
-
-        TODO: machinery around yaml
+        TODO: add option to specify plans via yaml file
+        (load_existing_plans_and_devices)
+        - set up a file for each hutch? locate via env var?
 
         TODO: if the destination is a queueserver, we should query it for its
         permitted namespace
@@ -107,6 +104,14 @@ class BlueskyState:
 
 
 class GlobalRunEngine:
+    # TODO: think about making this a singleton thread.
+    # Try to include (inspiration from bsqs.worker.RunEngineWorker):
+    # - .running_plan_exec_state
+    # - .re_state (property)
+    # - self._generate_continued_plan()
+    # - self.run(), self.start()
+    #   --> Used by multiprocessing.Process, QThread has different API
+    # - shutdown code?
     RE: RunEngine
     db: databroker.Broker
 
@@ -126,9 +131,13 @@ class GlobalRunEngine:
         identifier: str
     ) -> Tuple[UUID, ...]:
         """
-        Run a plan item, and store the resulting UUIDs in ``state`` under ``identifier``
+        Run a plan item, and store the resulting UUIDs in
+        ``state`` under ``identifier``
         """
+        # separate device from component attributes
         base, cpt = separate_attrs_from_strings(item)
+
+        # fill device, plan names with objects from namespace
         parsed_plan = prepare_plan(
             base,
             plans_in_nspace=state.plans_in_ns,
@@ -136,11 +145,12 @@ class GlobalRunEngine:
             allowed_plans=state.allowed_plans,
             allowed_devices=state.allowed_devices
         )
+
         # reconstruct args and kwargs (operator.attrgetter(attr)(device))
         parsed_args = get_attr_from_strings(parsed_plan['args'], cpt['args'])
         parsed_kwargs = get_attr_from_strings(parsed_plan['kwargs'], cpt['kwargs'])
 
-        # actually run plan
+        # actually run plan and store uuids
         logger.debug(f'running plan: {parsed_plan["callable"]}'
                      f'(*{parsed_args}, **{parsed_kwargs})')
         run_uuids = self.RE(parsed_plan["callable"](
@@ -187,7 +197,7 @@ def get_attr_from_strings(base: Any, cpt: Any) -> Any:
         return {k: get_attr_from_strings(base[k], cpt[k]) for k in base.keys()}
     elif isinstance(base, list):
         return [get_attr_from_strings(b, c) for b, c in zip(base, cpt)]
-    elif isinstance(base, ophyd.Device):
+    elif isinstance(base, ophyd.Device) and (base.name != cpt):
         return operator.attrgetter(cpt)(base)
     else:
         return base
@@ -195,9 +205,10 @@ def get_attr_from_strings(base: Any, cpt: Any) -> Any:
 
 def register_run_identifier(state: BlueskyState, name: str) -> str:
     """
-    generate and return a unique identifer and register it to the BlueskyState.
+    Generate and return a unique identifer and register it to the BlueskyState.
 
-    Attempts to register the given name,
+    Attempts to register the given name as is.  If that name exists, increment
+    the attempt count, append a count suffix and try again.
     """
     new_name = name
     attempt_ct = 1
@@ -216,11 +227,7 @@ def register_run_identifier(state: BlueskyState, name: str) -> str:
 
 def run_in_local_RE(item: Dict[str, Any], identifier: str, state: BlueskyState):
     """
-    Run a plan item in a local RunEngine.  Should:
-    - once again verify the plan...
-    - get current RE instance
-    - Run plan
-    - return uuid for databroker access
+    Run a plan item in a local RunEngine.
     """
     # TODO: Dispatch to worker thread with stop/pause methods available
     # put in QThread or other thread?...
