@@ -1,8 +1,7 @@
 import pytest
 
 from atef.enums import PlanDestination
-from atef.plan_utils import (BlueskyState, GlobalRunEngine, run_in_local_RE,
-                             separate_attrs_from_strings)
+from atef.plan_utils import BlueskyState, GlobalRunEngine, run_in_local_RE
 from atef.procedure import register_run_identifier
 
 
@@ -16,26 +15,14 @@ def test_run_identifier():
     assert 'run_name' in bs_state.run_map
     assert 'run_name_1' in bs_state.run_map
 
+    register_run_identifier(bs_state, 'run_name')
+    assert len(bs_state.run_map) == 3
+    assert 'run_name_2' in bs_state.run_map
+
 
 def test_bluesky_state():
     state = BlueskyState()
-    state.get_allowed_plans_and_devices(PlanDestination.local_)
-
-
-def test_cpt_separation():
-    item = {'name': 'scan',
-            'args': [['enum1.readback'], 'motor2.a.b.s', [(0, 10)], 10.2],
-            'kwargs': {'num': 42, 'kwarg2': 'string.cpt'},
-            'user_group': 'root'}
-
-    base, cpt = separate_attrs_from_strings(item)
-
-    assert base['args'][0][0] == 'enum1'
-    assert cpt['args'][0][0] == 'readback'
-    assert base['args'][1] == 'motor2'
-    assert cpt['args'][1] == 'a.b.s'
-    assert base['kwargs']['kwarg2'] == 'string'
-    assert cpt['kwargs']['kwarg2'] == 'cpt'
+    state.get_allowed_plans_and_devices(PlanDestination.local)
 
 
 @pytest.mark.parametrize(
@@ -50,7 +37,7 @@ def test_cpt_separation():
         ),
         pytest.param(
             {'name': 'count',
-             'args': [['motor1.readback']],
+             'args': [['motor1.acceleration']],
              'kwargs': {'num': 13},
              'user_group': 'root'},
             13,
@@ -58,7 +45,7 @@ def test_cpt_separation():
         ),
         pytest.param(
             {'name': 'count',
-             'args': [['motor1.readback'], 42],
+             'args': [['motor1.acceleration'], 42],
              'kwargs': {},
              'user_group': 'root'},
             42,
@@ -78,4 +65,5 @@ def test_run_local_plan(plan_item, num_points):
     run_in_local_RE(item=plan_item, identifier=plan_item['name'], state=bs_state)
     gre = GlobalRunEngine()
     uuids = bs_state.run_map[plan_item['name']]
+    print(gre.db[uuids[0]].table())
     assert len(gre.db[uuids[0]].table()) == num_points

@@ -1,13 +1,10 @@
 import logging
-import operator
 import os
-from itertools import zip_longest
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from uuid import UUID
 
 import databroker
-import ophyd
 from bluesky import RunEngine
 from bluesky_queueserver.manager.profile_ops import (
     ScriptLoadingError, existing_plans_and_devices_from_nspace,
@@ -84,7 +81,7 @@ class BlueskyState:
         TODO: if the destination is a queueserver, we should query it for its
         permitted namespace
         """
-        if not destination == PlanDestination.local_:
+        if not destination == PlanDestination.local:
             raise NotImplementedError("only local plan execution supported")
 
         if self.allowed_devices and self.allowed_plans:
@@ -138,73 +135,22 @@ class GlobalRunEngine:
         Run a plan item, and store the resulting UUIDs in
         ``state`` under ``identifier``
         """
-        # separate device from component attributes
-        base, cpt = separate_attrs_from_strings(item)
-
         # fill device, plan names with objects from namespace
         parsed_plan = prepare_plan(
-            base,
+            item,
             plans_in_nspace=state.plans_in_ns,
             devices_in_nspace=state.devices_in_ns,
             allowed_plans=state.allowed_plans,
             allowed_devices=state.allowed_devices
         )
 
-        # reconstruct args and kwargs (operator.attrgetter(attr)(device))
-        parsed_args = get_attr_from_strings(parsed_plan['args'], cpt['args'])
-        parsed_kwargs = get_attr_from_strings(parsed_plan['kwargs'], cpt['kwargs'])
-
         # actually run plan and store uuids
         logger.debug(f'running plan: {parsed_plan["callable"]}'
-                     f'(*{parsed_args}, **{parsed_kwargs})')
+                     f'(*{parsed_plan["args"]}, **{parsed_plan["kwargs"]})')
         run_uuids = self.RE(parsed_plan["callable"](
-                            *parsed_args, **parsed_kwargs))
+                            *parsed_plan['args'], **parsed_plan['kwargs']))
         state.run_map[identifier] = run_uuids
         return run_uuids
-
-
-def separate_attrs_from_strings(item: Any) -> Tuple[Any, Any]:
-    """ Recursively strip attributes from strings, return other items unchanged """
-    if isinstance(item, dict):
-        base, attr = {}, {}
-        for key, value in item.items():
-            device_val, cpt_val = separate_attrs_from_strings(value)
-            base[key] = device_val
-            attr[key] = cpt_val
-        return base, attr
-    elif isinstance(item, list):
-        base, attr = [], []
-        for value in item:
-            base_val, attr_val = separate_attrs_from_strings(value)
-            base.append(base_val)
-            attr.append(attr_val)
-        return base, attr
-    elif isinstance(item, str):
-        try:
-            device, cpt = item.split('.', maxsplit=1)
-        except ValueError:
-            return item, item
-        return device, cpt
-    else:
-        return item, item
-
-
-def get_attr_from_strings(base: Any, cpt: Any) -> Any:
-    """
-    Get ophyd copmonents from the devices in ``base``, if there is an attribute
-    in ``cpt``.  Traverses ``base`` and ``cpt`` in parallel
-    """
-    if base == cpt:
-        return base
-
-    if isinstance(base, dict):
-        return {k: get_attr_from_strings(base[k], cpt[k]) for k in base.keys()}
-    elif isinstance(base, list):
-        return [get_attr_from_strings(b, c) for b, c in zip_longest(base, cpt)]
-    elif isinstance(base, ophyd.Device) and (base.name != cpt):
-        return operator.attrgetter(cpt)(base)
-    else:
-        return base
 
 
 def register_run_identifier(state: BlueskyState, name: str) -> str:
@@ -217,7 +163,7 @@ def register_run_identifier(state: BlueskyState, name: str) -> str:
     new_name = name
     attempt_ct = 1
     while (new_name in state.run_map) and (attempt_ct < 100):
-        new_name = new_name + f'_{attempt_ct}'
+        new_name = name + f'_{attempt_ct}'
         attempt_ct += 1
 
     if attempt_ct >= 100:
@@ -237,6 +183,6 @@ def run_in_local_RE(item: Dict[str, Any], identifier: str, state: BlueskyState):
     # put in QThread or other thread?...
 
     # Can we just use REWorker from bsqs?  is a multiprocessing.Process, to re_worker.start()
-    state.get_allowed_plans_and_devices(destination=PlanDestination.local_)
+    state.get_allowed_plans_and_devices(destination=PlanDestination.local)
     gre = GlobalRunEngine()
     gre.run_plan(state, item, identifier)

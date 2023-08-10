@@ -247,13 +247,13 @@ class PlanOptions:
     #: The plan name.  Bluesky plan or otherwise
     plan: str
     #: Plan arguments dictionary - argument name to value.
-    args: Optional[Sequence[Any]] = field(default_factory=list)
+    args: Sequence[Any] = field(default_factory=list)
     #: Plan keyword  arguments dictionary - argument name to value.
-    kwargs: Optional[Dict[Any, Any]] = field(default_factory=dict)
+    kwargs: Dict[Any, Any] = field(default_factory=dict)
     #: Arguments which should not be configurable.
     fixed_arguments: Optional[Sequence[str]] = None
 
-    def make_plan_item(self: PlanOptions) -> Dict[str, Any]:
+    def to_plan_item(self: PlanOptions) -> Dict[str, Any]:
         """ Makes a plan item (dictionary of parameters) for a given PlanStep """
         it = {
             "name": self.plan,
@@ -272,7 +272,7 @@ class PlanStep(ProcedureStep):
     )
 
     #: platform for plan to be run on
-    destination: PlanDestination = PlanDestination.local_
+    destination: PlanDestination = PlanDestination.local
     #: Stop performing plans if one fails
     halt_on_fail: bool = True
     #: Only mark step_result successfull if all steps have succeeded
@@ -948,7 +948,7 @@ class PreparedPlan:
 
     async def run(self) -> Result:
         # submit the plan to the destination
-        if self.parent.origin.destination != PlanDestination.local_:
+        if self.parent.origin.destination != PlanDestination.local:
             self.result = Result(
                 severity=Severity.error,
                 reason='Only local RunEngine supported at this time'
@@ -969,7 +969,7 @@ class PreparedPlan:
         identifier = register_run_identifier(bs_state, origin.name or origin.plan)
         return cls(
             name=origin.name,
-            item=origin.make_plan_item(),
+            item=origin.to_plan_item(),
             plan_id=identifier,
             bs_state=bs_state,
             origin=origin,
@@ -1013,7 +1013,6 @@ class PreparedPlanStep(PreparedProcedureStep):
         # get namespace (based on destination?
         # How will we know what's in the queueserver's destination?)
         # Run the plans
-        nspace = {}
         nspace = get_default_namespace()
         epd = existing_plans_and_devices_from_nspace(nspace=nspace)
         plans, devices, _, __ = epd
@@ -1132,7 +1131,23 @@ def create_prepared_comparison(
     return output
 
 
-def get_bs_state(dclass: Any):
+def get_bs_state(dclass: PreparedProcedureStep) -> BlueskyState:
+    """
+    Get the BlueskyState instance corresponding to ``dclass``.
+    Each ProcedureFile gets assigned a single BlueskyState.
+    Walk parents up to the top-level PreparedProcedureFile, find its origin
+    (ProcedureFile), then return its correspoinding BlueskyState
+
+    Parameters
+    ----------
+    dclass : PreparedProcedureStep
+        the current prepared-variant procedure step
+
+    Returns
+    -------
+    BlueskyState
+        the BlueskyState holding run information and allowed devices/plans
+    """
     # dclass should be a Prepared dataclass
     if dclass is None:
         top_dclass = None
@@ -1218,7 +1233,30 @@ class PreparedPlanComparison(PreparedComparison):
         )
 
 
-def get_RE_data(bs_state: BlueskyState, plan_data: ComparisonToPlanData) -> Any:
+def get_RE_data(bs_state: BlueskyState, plan_data: PlanData) -> Any:
+    """
+    Get databroker data from the GlobalRunEngine from the plan specified by
+    ``plan_data``.
+
+    Parameters
+    ----------
+    bs_state : BlueskyState
+        the BlueskyState whose run_map holds the uuid for ``plan_data``
+    plan_data : PlanData
+        the plan data specification (data points, plan number, field names)
+
+    Returns
+    -------
+    Any
+        Array of data specified by ``plan_data``
+
+    Raises
+    ------
+    RuntimeError
+        if the data cannot be found in ``bs_state``
+    ValueError
+        if ``plan_data`` does not provide parsable datapoints
+    """
     gre = GlobalRunEngine()
     run_uuids = bs_state.run_map[plan_data.plan_id]
     if run_uuids is None:
@@ -1236,6 +1274,8 @@ def get_RE_data(bs_state: BlueskyState, plan_data: ComparisonToPlanData) -> Any:
         data_table = field_series[data_slice].to_numpy()
     elif isinstance(plan_data.data_points, list):
         data_table = field_series.iloc[plan_data.data_points].to_numpy()
+    else:
+        raise ValueError(f'Unable to parse data point format: {plan_data.data_points}')
 
     reduced_data = plan_data.reduction_mode.reduce_values(data_table)
     return reduced_data

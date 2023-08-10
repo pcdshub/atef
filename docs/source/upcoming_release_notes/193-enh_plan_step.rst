@@ -7,7 +7,7 @@ API Changes
 
 Features
 --------
-- Adds backend for running Bluesky plans in active chekckouts
+- Adds backend for running Bluesky plans in active checkouts
 - Prototypes auto-generated plan argument entry widgets
 - Annotates built-in Bluesky plans with bluesky-queueserver compatible type hints
 

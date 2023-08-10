@@ -24,6 +24,6 @@ class GroupResultMode(str, enum.Enum):
 class PlanDestination(str, enum.Enum):
     """Destination for plans to be executed"""
     # local RunEngine
-    local_ = "local"
+    local = "local"
     # queueserver, requires extra information
-    qserver_ = "queueserver"
+    qserver = "queueserver"
