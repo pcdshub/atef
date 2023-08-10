@@ -28,7 +28,8 @@ requirements:
   - bluesky
   - bluesky-queueserver >=0.0.19
   - bluesky-widgets
-  - databroker
+  # databroker >2 incompatible with pydantic v2
+  - databroker <2.0.0
   - happi
   - ipython
   - numpy
