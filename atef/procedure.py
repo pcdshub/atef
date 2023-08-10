@@ -54,6 +54,9 @@ logger = logging.getLogger(__name__)
 # Includes one default BlueskyState, with key id(None)
 BS_STATE_MAP: Dict[int, BlueskyState] = {}
 
+# Max depth for plan steps
+MAX_PLAN_DEPTH = 200
+
 
 def walk_steps(step: ProcedureStep) -> Generator[ProcedureStep, None, None]:
     """
@@ -207,7 +210,8 @@ class PlanData:
     #: user-provided name for this plan data.  Not used to identify the run
     name: str = ""
     #: identifier of PlanStep to grab data from.
-    #: set via GUI, must match a PreparedPlan.plan_id
+    #: set via GUI, must match a PreparedPlan.plan_id.  Options should be fixed
+    #: and regenerated with every view
     plan_id: Optional[str] = None
     #: plan number (for plans containing nested plans, which return multiple uuids)
     plan_no: int = 0
@@ -962,7 +966,7 @@ class PreparedPlan:
     ) -> PreparedPlan:
         # register run identifier, store in prepared_plan name
         bs_state = get_bs_state(parent)
-        identifier = register_run_identifier(bs_state, origin.name)
+        identifier = register_run_identifier(bs_state, origin.name or origin.plan)
         return cls(
             name=origin.name,
             item=origin.make_plan_item(),
@@ -1135,11 +1139,13 @@ def get_bs_state(dclass: Any):
     else:
         top_dclass = dclass
         ctr = 0
-        while (getattr(top_dclass, 'parent', None) is not None) and (ctr < 200):
+        # This isn't my finest work, but it does work
+        while ((getattr(top_dclass, 'parent', None) is not None) and
+                (ctr < MAX_PLAN_DEPTH)):
             top_dclass = top_dclass.parent
             ctr += 1
 
-        if ctr >= 200:
+        if ctr >= MAX_PLAN_DEPTH:
             logger.warning(f'{ctr} "parents" traversed, either the depth of '
                            'this file is excessive or an infinite loop occurred')
         if not isinstance(top_dclass, PreparedProcedureFile):
