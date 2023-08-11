@@ -21,23 +21,28 @@ import logging
 import pathlib
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
-                    Union, cast)
+                    Tuple, Union, cast)
 
 import apischema
-import databroker
 import ophyd
+import pandas as pd
 import yaml
-from bluesky import RunEngine
+from bluesky_queueserver.manager.profile_ops import (
+    existing_plans_and_devices_from_nspace, validate_plan)
 
 from atef import util
-from atef.cache import _SignalCache, get_signal_cache
+from atef.cache import DataCache, _SignalCache, get_signal_cache
 from atef.check import Comparison
 from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
-from atef.enums import GroupResultMode, Severity
+from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparedComparisonException
+from atef.plan_utils import (BlueskyState, GlobalRunEngine,
+                             get_default_namespace, register_run_identifier,
+                             run_in_local_RE)
+from atef.reduce import ReduceMethod
 from atef.result import Result, _summarize_result_severity, incomplete_result
-from atef.type_hints import AnyPath, Number, PrimitiveType
+from atef.type_hints import AnyDataclass, AnyPath, Number, PrimitiveType
 from atef.yaml_support import init_yaml_support
 
 from . import serialization
@@ -45,16 +50,12 @@ from . import serialization
 logger = logging.getLogger(__name__)
 
 
-class BlueskyState:
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(BlueskyState, cls).__new__(cls)
-        return cls.instance
+# BlueskyState tracker.  Keys are the id of the top-level ProcedureFile
+# Includes one default BlueskyState, with key id(None)
+BS_STATE_MAP: Dict[int, BlueskyState] = {}
 
-    def __init__(self):
-        self.db = databroker.Broker.named('temp')
-        self.RE = RunEngine({})
-        self.RE.subscribe(self.db.insert)
+# Max depth for plan steps
+MAX_PLAN_DEPTH = 200
 
 
 def walk_steps(step: ProcedureStep) -> Generator[ProcedureStep, None, None]:
@@ -205,6 +206,31 @@ class ComparisonToTarget(Target):
 
 
 @dataclass
+class PlanData:
+    #: user-provided name for this plan data.  Not used to identify the run
+    name: str = ""
+    #: identifier of PlanStep to grab data from.
+    #: set via GUI, must match a PreparedPlan.plan_id.  Options should be fixed
+    #: and regenerated with every view
+    plan_id: Optional[str] = None
+    #: plan number (for plans containing nested plans, which return multiple uuids)
+    plan_no: int = 0
+    #: data point(s) in plan (0-indexed) or slice notation
+    #: [row_start, row_end)
+    data_points: Union[List[int], Tuple[int, int]] = field(default_factory=list)
+    #: Field / column names to grab data from
+    field_names: List[str] = field(default_factory=list)
+    #: data reduction / operation
+    reduction_mode: ReduceMethod = ReduceMethod.average
+
+
+@dataclass
+class ComparisonToPlanData(PlanData):
+    #: the comparison to apply to the target
+    comparison: Optional[Comparison] = None
+
+
+@dataclass
 class CodeStep(ProcedureStep):
     """Run source code in a procedure."""
     #: The source code to execute.
@@ -216,27 +242,41 @@ class CodeStep(ProcedureStep):
 @dataclass
 class PlanOptions:
     """Options for a bluesky plan scan."""
-    #: The plan name.
+    #: Name to identify this plan
+    name: str
+    #: The plan name.  Bluesky plan or otherwise
     plan: str
     #: Plan arguments dictionary - argument name to value.
-    args: Sequence[Any]
+    args: Sequence[Any] = field(default_factory=list)
     #: Plan keyword  arguments dictionary - argument name to value.
-    kwargs: Dict[Any, Any]
+    kwargs: Dict[Any, Any] = field(default_factory=dict)
     #: Arguments which should not be configurable.
-    fixed_arguments: Optional[Sequence[str]]
+    fixed_arguments: Optional[Sequence[str]] = None
+
+    def to_plan_item(self: PlanOptions) -> Dict[str, Any]:
+        """ Makes a plan item (dictionary of parameters) for a given PlanStep """
+        it = {
+            "name": self.plan,
+            "args": self.args,
+            "kwargs": self.kwargs,
+            "user_group": "root"}
+        return it
 
 
 @dataclass
 class PlanStep(ProcedureStep):
     """A procedure step comprised of one or more bluesky plans."""
     plans: Sequence[PlanOptions] = field(default_factory=list)
+    checks: Sequence[Union[ComparisonToTarget, ComparisonToPlanData]] = field(
+        default_factory=list
+    )
 
-    def _run(self) -> Result:
-        """ Gather plan options and run the bluesky plan """
-        # get global run engine
-        # Construct plan (get devices, organize args/kwargs, run)
-
-        return super()._run()
+    #: platform for plan to be run on
+    destination: PlanDestination = PlanDestination.local
+    #: Stop performing plans if one fails
+    halt_on_fail: bool = True
+    #: Only mark step_result successfull if all steps have succeeded
+    require_plan_success: bool = True
 
 
 @dataclass
@@ -294,6 +334,10 @@ class ProcedureFile:
     version: Literal[0] = field(default=0, metadata=apischema.metadata.required)
     #: Top-level configuration group.
     root: ProcedureGroup = field(default_factory=ProcedureGroup)
+
+    def __post_init__(self):
+        # register a BSState for this ProcedureFile
+        BS_STATE_MAP[id(self)] = BlueskyState()
 
     def walk_steps(self) -> Generator[AnyProcedure, None, None]:
         yield self.root
@@ -361,14 +405,19 @@ class PreparedProcedureFile:
         file : ProcedureFile
             the procedure file instance
         """
-        prepared_root = PreparedProcedureGroup.from_origin(group=file.root)
 
         prep_proc_file = PreparedProcedureFile(
             file=file,
-            root=prepared_root
+            root=PreparedProcedureGroup()
         )
 
-        prepared_root.parent = prep_proc_file
+        # PreparedProcedureGroup needs to know about its parent from birth
+        # get_bs_state doesn't like orphans
+        prepared_root = PreparedProcedureGroup.from_origin(
+            group=file.root, parent=prep_proc_file
+        )
+        prep_proc_file.root = prepared_root
+
         return prep_proc_file
 
     async def run(self) -> Result:
@@ -504,6 +553,11 @@ class PreparedProcedureStep:
                 return PreparedSetValueStep.from_origin(
                     step=step, parent=parent
                 )
+            if isinstance(step, PlanStep):
+                return PreparedPlanStep.from_origin(
+                    origin=step, parent=parent
+                )
+
             raise NotImplementedError(f"Step type unsupported: {type(step)}")
         except Exception as ex:
             return FailedStep(
@@ -710,7 +764,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
         Result
             the step_result for this step
         """
-        self = cast(SetValueStep, self)
+        self.origin = cast(SetValueStep, self.origin)
         for prep_action in self.prepared_actions:
             action_result = await prep_action.run()
             if (self.origin.halt_on_fail and action_result.severity > Severity.success):
@@ -780,29 +834,18 @@ class PreparedSetValueStep(PreparedProcedureStep):
         for value_to_target in step.actions:
             try:
                 prep_value_to_signal = PreparedValueToSignal.from_origin(
-                    origin=value_to_target
+                    origin=value_to_target, parent=prep_step
                 )
                 prep_step.prepared_actions.append(prep_value_to_signal)
             except Exception:
                 prep_step.prepare_action_failures.append(value_to_target)
 
         for comp_to_target in step.success_criteria:
-            signal = comp_to_target.to_signal()
-            comp = comp_to_target.comparison
-            try:
-                prep_comp = PreparedSignalComparison.from_signal(
-                    signal=signal, comparison=comp
-                )
-                prep_step.prepared_criteria.append(prep_comp)
-            except Exception as ex:
-                prep_comp_exc = PreparedComparisonException(
-                    exception=ex,
-                    identifier=getattr(signal, 'pvname', ''),
-                    message='Failed to initialize comparison',
-                    comparison=comp,
-                    name=comp.name
-                )
-                prep_step.prepare_criteria_failures.append(prep_comp_exc)
+            res = create_prepared_comparison(comp_to_target)
+            if isinstance(res, Exception):
+                prep_step.prepare_criteria_failures.append(res)
+            else:
+                prep_step.prepared_criteria.append(res)
 
         return prep_step
 
@@ -817,6 +860,8 @@ class PreparedValueToSignal:
     value: PrimitiveType
     #: a link to the original ValueToTarget
     origin: ValueToTarget
+    #: parent step that owns this instance
+    parent: Optional[PreparedSetValueStep] = None
     #: The result of the set action
     result: Result = field(default_factory=incomplete_result)
 
@@ -850,7 +895,8 @@ class PreparedValueToSignal:
     @classmethod
     def from_origin(
         cls,
-        origin: ValueToTarget
+        origin: ValueToTarget,
+        parent: Optional[PreparedSetValueStep] = None
     ) -> PreparedValueToSignal:
         """
         Prepare the ValueToSignal for running.
@@ -878,8 +924,361 @@ class PreparedValueToSignal:
             signal=signal,
             value=origin.value,
             origin=origin,
+            parent=parent
         )
         return pvts
+
+
+@dataclass
+class PreparedPlan:
+    #: identifying name
+    name: str
+    #: a link to the original PlanOptions
+    origin: PlanOptions
+    #: the hierarchical parent of this PreparedPlan
+    parent: Optional[PreparedPlanStep] = None
+    #: the plan item, suitable for submission to a bluesky queueserver
+    item: Dict[str, any] = field(default_factory=dict)
+    #: the plan identifer, may be different from origin.plan_id
+    plan_id: Optional[str] = None
+    #: stashed BlueskyState.  Passed to RunEngine runner
+    bs_state: Optional[BlueskyState] = None
+    #: result of this step. (did the plan run?)
+    result: Result = field(default_factory=incomplete_result)
+
+    async def run(self) -> Result:
+        # submit the plan to the destination
+        if self.parent.origin.destination != PlanDestination.local:
+            self.result = Result(
+                severity=Severity.error,
+                reason='Only local RunEngine supported at this time'
+            )
+
+        run_in_local_RE(self.item, self.plan_id, self.bs_state)
+        self.result = Result()
+        return self.result
+
+    @classmethod
+    def from_origin(
+        cls,
+        origin: PlanOptions,
+        parent: Optional[PreparedPlanStep] = None
+    ) -> PreparedPlan:
+        # register run identifier, store in prepared_plan name
+        bs_state = get_bs_state(parent)
+        identifier = register_run_identifier(bs_state, origin.name or origin.plan)
+        return cls(
+            name=origin.name,
+            item=origin.to_plan_item(),
+            plan_id=identifier,
+            bs_state=bs_state,
+            origin=origin,
+            parent=parent
+        )
+
+
+@dataclass
+class PreparedPlanStep(PreparedProcedureStep):
+    #: a link to the original PlanStep
+    origin: PlanStep = field(default_factory=PlanStep)
+    #: list of PreparedPlan
+    prepared_plans: List[PreparedPlan] = field(default_factory=list)
+    #: list of PlanOption's that led to failed PreparedPlan's
+    prepared_plan_failures: List[PlanOptions] = field(default_factory=list)
+    #: list of success criteria
+    prepared_checks: List[Union[PreparedSignalComparison,
+                                PreparedPlanComparison]] = field(default_factory=list)
+    #: list of failed checks
+    prepared_checks_failures: List[PreparedComparisonException] = field(
+        default_factory=list
+    )
+
+    async def _run(self) -> Result:
+        """ Gather plan options and run the bluesky plan """
+        # Construct plan (get devices, organize args/kwargs, run)
+        # verify
+        # - gather namespace (plans, devices)
+        # - validate_plan
+        # send plan to destination (local, queue server, ...)
+        # local -> get global run engine, setup
+        # qserver -> send to queueserver
+
+        if self.origin.require_plan_success and self.prepared_plan_failures:
+            return Result(
+                severity=Severity.error,
+                reason=('One or more actions failed to prepare: '
+                        f'{[plan.name for plan in self.prepared_plan_failures]}')
+            )
+
+        # get namespace (based on destination?
+        # How will we know what's in the queueserver's destination?)
+        # Run the plans
+        nspace = get_default_namespace()
+        epd = existing_plans_and_devices_from_nspace(nspace=nspace)
+        plans, devices, _, __ = epd
+        plan_status = [validate_plan(plan.item, allowed_plans=plans,
+                                     allowed_devices=devices)
+                       for plan in self.prepared_plans]
+
+        validation_status = [status[0] for status in plan_status]
+        if not all(validation_status):
+            # raise an error, place info in result
+            fail_plan_names = [pl.name for pl, st in
+                               zip(self.prepared_plans, validation_status)
+                               if not st]
+            logger.debug(f'One or more plans ({fail_plan_names}) failed validation')
+            return Result(
+                severity=Severity.error,
+                reason=f'One or more plans ({fail_plan_names}) failed validation'
+            )
+
+        # send each plan to correct destination
+        plan_results = []
+        for pplan in self.prepared_plans:
+            logger.debug(f'running plan: {pplan.name}...')
+            res = await pplan.run()
+            logger.debug(f'run completed: {res}')
+            plan_results.append(res)
+
+        # run the checks
+        for prep_check in self.prepared_checks:
+            await prep_check.compare()
+
+        check_results = [check.result for check in self.prepared_checks]
+
+        if self.prepared_checks_failures:
+            return Result(
+                severity=Severity.error,
+                reason=('One or more success criteria failed to initialize: '
+                        f'{[check.name for check in self.prepared_checks_failures]}')
+            )
+
+        severity = _summarize_result_severity(GroupResultMode.all_,
+                                              check_results + plan_results)
+        reason = (f'{len(plan_results)} plans run, '
+                  f'{len(check_results)} checks passed')
+        return Result(severity=severity, reason=reason)
+
+    @classmethod
+    def from_origin(
+        cls,
+        origin: PlanStep,
+        parent: Optional[PreparedProcedureGroup] = None
+    ) -> PreparedPlanStep:
+
+        prep_step = cls(
+            origin=origin,
+            parent=parent,
+            name=origin.name,
+        )
+
+        for plan_step in origin.plans:
+            try:
+                prep_plan = PreparedPlan.from_origin(plan_step, parent=prep_step)
+                prep_step.prepared_plans.append(prep_plan)
+            except Exception:
+                prep_step.prepared_plan_failures.append(plan_step)
+
+        for check in origin.checks:
+            res = create_prepared_comparison(check, parent=prep_step)
+            if isinstance(res, Exception):
+                prep_step.prepared_checks_failures.append(res)
+            else:
+                prep_step.prepared_checks.append(res)
+
+        return prep_step
+
+
+def create_prepared_comparison(
+    check: Union[ComparisonToTarget, ComparisonToPlanData],
+    parent: Optional[AnyDataclass] = None
+) -> Union[PreparedComparison, PreparedComparisonException]:
+
+    output = ValueError('Cannot prepare the provided comparison, type not '
+                        f'supported: ({check})')
+
+    if isinstance(check, ComparisonToTarget):
+        signal = check.to_signal()
+        comp = check.comparison
+        try:
+            output = PreparedSignalComparison.from_signal(
+                signal=signal, comparison=comp, parent=parent
+            )
+        except Exception as ex:
+            output = PreparedComparisonException(
+                exception=ex,
+                identifier=getattr(signal, 'pvname', ''),
+                message='Failed to initialize comparison',
+                comparison=comp,
+                name=comp.name
+            )
+
+    elif isinstance(check, ComparisonToPlanData):
+        comp = check.comparison
+        try:
+            output = PreparedPlanComparison.from_comp_to_plan(
+                check, parent=parent
+            )
+        except Exception as ex:
+            output = PreparedComparisonException(
+                exception=ex,
+                identifier=getattr(check, 'plan_id', ''),
+                message='Failed to initialize comparison',
+                comparison=comp,
+                name=comp.name
+            )
+
+    return output
+
+
+def get_bs_state(dclass: PreparedProcedureStep) -> BlueskyState:
+    """
+    Get the BlueskyState instance corresponding to ``dclass``.
+    Each ProcedureFile gets assigned a single BlueskyState.
+    Walk parents up to the top-level PreparedProcedureFile, find its origin
+    (ProcedureFile), then return its correspoinding BlueskyState
+
+    Parameters
+    ----------
+    dclass : PreparedProcedureStep
+        the current prepared-variant procedure step
+
+    Returns
+    -------
+    BlueskyState
+        the BlueskyState holding run information and allowed devices/plans
+    """
+    # dclass should be a Prepared dataclass
+    if dclass is None:
+        top_dclass = None
+    else:
+        top_dclass = dclass
+        ctr = 0
+        # This isn't my finest work, but it does work
+        while ((getattr(top_dclass, 'parent', None) is not None) and
+                (ctr < MAX_PLAN_DEPTH)):
+            top_dclass = top_dclass.parent
+            ctr += 1
+
+        if ctr >= MAX_PLAN_DEPTH:
+            logger.warning(f'{ctr} "parents" traversed, either the depth of '
+                           'this file is excessive or an infinite loop occurred')
+        if not isinstance(top_dclass, PreparedProcedureFile):
+            logger.debug('top-level dataclass was not a PreparedProcedureFile, '
+                         f' {type(top_dclass)}, using default BlueskyState')
+            top_dclass = None
+        else:
+            top_dclass = top_dclass.file  # grab un-prepared ProcedureFile
+
+    top_dclass_id = id(top_dclass)
+    if top_dclass_id not in BS_STATE_MAP:
+        BS_STATE_MAP[top_dclass_id] = BlueskyState()
+
+    return BS_STATE_MAP[top_dclass_id]
+
+
+@dataclass
+class PreparedPlanComparison(PreparedComparison):
+    """
+    Unified representation for comparisons to Bluesky Plan data
+    """
+    #: Original plan data, holds relevant data coordinates
+    plan_data: Optional[ComparisonToPlanData] = None
+    #: The hierarchical parent of this comparison
+    parent: Optional[PreparedPlanStep] = field(default=None, repr=None)
+    #: The value from the plan, to which the comparison will take place
+    data: Optional[Any] = None
+
+    async def get_data_async(self) -> Any:
+        bs_state = get_bs_state(self.parent)
+        # get BSState, look for entry?
+        data = get_RE_data(bs_state, self.plan_data)
+        return data
+
+    async def _compare(self, data: Any) -> Result:
+        if data is None:
+            # 'None' is likely incompatible with our comparisons and should
+            # be raised for separately
+            return Result(
+                severity=self.comparison.if_disconnected,
+                reason=(
+                    f"No data available for signal {self.identifier!r} in "
+                    f"comparison {self.comparison}"
+                ),
+            )
+
+        return self.plan_data.comparison.compare(data, identifier=self.identifier)
+
+    @classmethod
+    def from_comp_to_plan(
+        cls,
+        origin: ComparisonToPlanData,
+        cache: Optional[DataCache] = None,
+        parent: Optional[PreparedPlanStep] = None
+    ) -> PreparedPlanComparison:
+
+        identifier = origin.comparison.name + f'[{origin.data_points}]'
+        name = origin.name
+
+        if cache is None:
+            cache = DataCache()
+
+        return cls(
+            plan_data=origin,
+            cache=cache,
+            identifier=identifier,
+            comparison=origin.comparison,
+            name=name,
+            parent=parent
+        )
+
+
+def get_RE_data(bs_state: BlueskyState, plan_data: PlanData) -> Any:
+    """
+    Get databroker data from the GlobalRunEngine from the plan specified by
+    ``plan_data``.
+
+    Parameters
+    ----------
+    bs_state : BlueskyState
+        the BlueskyState whose run_map holds the uuid for ``plan_data``
+    plan_data : PlanData
+        the plan data specification (data points, plan number, field names)
+
+    Returns
+    -------
+    Any
+        Array of data specified by ``plan_data``
+
+    Raises
+    ------
+    RuntimeError
+        if the data cannot be found in ``bs_state``
+    ValueError
+        if ``plan_data`` does not provide parsable datapoints
+    """
+    gre = GlobalRunEngine()
+    run_uuids = bs_state.run_map[plan_data.plan_id]
+    if run_uuids is None:
+        raise RuntimeError("Data unavailable, run cannot be found.  Has the "
+                           f"referenced plan (id: {plan_data.plan_id}) "
+                           "been run?")
+
+    # Use index to grab right uuid, data row
+    uuid = run_uuids[plan_data.plan_no]
+    plan_table: pd.DataFrame = gre.db[uuid].table()
+    field_series: pd.Series = plan_table[plan_data.field_names]
+
+    if isinstance(plan_data.data_points, tuple):
+        data_slice = slice(*plan_data.data_points)
+        data_table = field_series[data_slice].to_numpy()
+    elif isinstance(plan_data.data_points, list):
+        data_table = field_series.iloc[plan_data.data_points].to_numpy()
+    else:
+        raise ValueError(f'Unable to parse data point format: {plan_data.data_points}')
+
+    reduced_data = plan_data.reduction_mode.reduce_values(data_table)
+    return reduced_data
 
 
 AnyProcedure = Union[
@@ -887,6 +1286,7 @@ AnyProcedure = Union[
     DescriptionStep,
     PassiveStep,
     SetValueStep,
+    PlanStep
 ]
 
 AnyPreparedProcedure = Union[
@@ -894,4 +1294,5 @@ AnyPreparedProcedure = Union[
     PreparedDescriptionStep,
     PreparedPassiveStep,
     PreparedSetValueStep,
+    PreparedPlanStep
 ]

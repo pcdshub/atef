@@ -1,0 +1,14 @@
+user_groups:
+  root:  # Defines the rules for preliminary filtering of plan/device/function names for all groups.
+    allowed_plans:
+      - null  # Allow all
+    forbidden_plans:
+      - ":^_"  # All plans with names starting with '_'
+    allowed_devices:
+      - null  # Allow all
+    forbidden_devices:
+      - ":^_:?.*"  # All devices with names starting with '_'
+    allowed_functions:
+      - null  # Allow all
+    forbidden_functions:
+      - ":^_"  # All functions with names starting with '_'

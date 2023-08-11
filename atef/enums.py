@@ -19,3 +19,11 @@ class GroupResultMode(str, enum.Enum):
     all_ = "all"
     #: At least one item must succeed.
     any_ = "any"
+
+
+class PlanDestination(str, enum.Enum):
+    """Destination for plans to be executed"""
+    # local RunEngine
+    local = "local"
+    # queueserver, requires extra information
+    qserver = "queueserver"

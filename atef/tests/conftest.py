@@ -184,7 +184,7 @@ class EnumDevice(ophyd.sim.SynAxis):
         self.enum.get = partial(self.enum.get, as_string=False)
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def sim_db() -> List[happi.OphydItem]:
     items = []
     sim1 = {
@@ -234,7 +234,7 @@ def sim_db() -> List[happi.OphydItem]:
     return items
 
 
-@pytest.fixture()
+@pytest.fixture(scope='session')
 def mockjsonclient():
     # Write underlying database
     with tempfile.NamedTemporaryFile(mode='w') as handle:
@@ -246,15 +246,25 @@ def mockjsonclient():
         # tempfile will be deleted once context manager is resolved
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def happi_client(mockjsonclient: happi.Client, sim_db: List[happi.OphydItem]):
     for item in sim_db:
         mockjsonclient.add_item(item)
     return mockjsonclient
 
 
-@pytest.fixture(scope='function', autouse=True)
-def mock_happi(monkeypatch: Any, happi_client: happi.Client):
+@pytest.fixture(scope='session')
+def monkeymodule():
+    # monkeypatch requires function scope, which works fine for the first test
+    # that uses the final mock_happi fixture.  Note that all fixtures called by
+    # mock_happi must also be function-scoped as a result
+    # Subsequent tests will fail due to the
+    with pytest.MonkeyPatch.context() as mp:
+        yield mp
+
+
+@pytest.fixture(scope='session', autouse=True)
+def mock_happi(monkeymodule: Any, happi_client: happi.Client):
     # give `pvname` to all the components, since they don't exist on sim devices
     for result in happi_client.search():
         dev = result.get()
@@ -262,7 +272,15 @@ def mock_happi(monkeypatch: Any, happi_client: happi.Client):
             cpt = getattr(dev, cpt_name)
             if not hasattr(cpt, 'pvname'):
                 setattr(cpt, 'pvname', f'{dev.prefix}:{cpt_name}')
-    monkeypatch.setattr(atef.util, 'get_happi_client', lambda: happi_client)
+
+    def return_client():
+        return happi_client
+
+    monkeymodule.setattr(atef.util, 'get_happi_client', return_client)
+    # Only one of these should be needed, but after adding the PlanStep
+    # tests both were needed (test_plan_step failed without atef.util,
+    # test_gather_pvs failed with atef.util and without from_config)
+    monkeymodule.setattr(happi.Client, 'from_config', return_client)
 
 
 @pytest.fixture(scope='function')
