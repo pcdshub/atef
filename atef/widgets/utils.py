@@ -1,10 +1,10 @@
 """
 Non-core utilities. Primarily dynamic styling tools.
 """
-from typing import ClassVar, Optional
+from typing import ClassVar, Generator, Optional
 
 from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import QEvent, QObject, QRegularExpression
+from qtpy.QtCore import QEvent, QObject, QRegularExpression, Qt
 from qtpy.QtGui import QPalette, QRegularExpressionValidator
 from qtpy.QtWidgets import QLineEdit
 
@@ -216,3 +216,93 @@ class BusyCursorThread(QtCore.QThread):
         if self.ignore_events:
             self.app = QtWidgets.QApplication.instance()
             self.app.removeEventFilter(FILTER)
+
+
+def _create_vbox_layout(
+    widget: Optional[QtWidgets.QWidget] = None, alignment: Qt.Alignment = Qt.AlignTop
+) -> QtWidgets.QVBoxLayout:
+    if widget is not None:
+        layout = QtWidgets.QVBoxLayout(widget)
+    else:
+        layout = QtWidgets.QVBoxLayout()
+    layout.setAlignment(alignment)
+    return layout
+
+
+class ExpandableFrame(QtWidgets.QFrame):
+    """
+    A `QtWidgets.QFrame` that can be toggled with a mouse click.
+
+    Contains a QVBoxLayout layout which can have one or more user-provided
+    widgets.
+
+    Parameters
+    ----------
+    text : str
+        The title of the frame, shown on the toolbutton.
+
+    parent : QtWidgets.QWidget, optional
+        The parent widget.
+    """
+
+    toggle_button: QtWidgets.QToolButton
+    _button_text: str
+    _size_hint: QtCore.QSize
+
+    def __init__(self, text: str = "", parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent=parent)
+
+        self._button_text = text
+
+        self.toggle_button = QtWidgets.QToolButton(text=text)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(False)
+        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
+        self.toggle_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.toggle_button.setArrowType(Qt.RightArrow)
+        self.toggle_button.toggled.connect(self.on_toggle)
+
+        layout = _create_vbox_layout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.toggle_button)
+        self._size_hint = self.sizeHint()
+
+    def add_widget(self, widget: QtWidgets.QWidget) -> None:
+        """Add a widget to the content layout."""
+        self.layout().addWidget(widget)
+        widget.setVisible(self.expanded)
+
+    @property
+    def expanded(self) -> bool:
+        """Is the expandable frame expanded / not collapsed?"""
+        return self.toggle_button.isChecked()
+
+    @property
+    def layout_widgets(self) -> Generator[QtWidgets.QWidget, None, None]:
+        """Find all user-provided widgets in the content layout."""
+        for idx in range(self.layout().count()):
+            item = self.layout().itemAt(idx)
+            widget = item.widget()
+            if widget is not None and widget is not self.toggle_button:
+                yield widget
+
+    @QtCore.Slot()
+    def on_toggle(self):
+        """Toggle the content display."""
+        expanded = self.expanded
+        self.toggle_button.setText("" if expanded else self._button_text)
+        self.toggle_button.setArrowType(
+            Qt.DownArrow if expanded else Qt.RightArrow
+        )
+
+        widgets = list(self.layout_widgets)
+        for widget in widgets:
+            widget.setVisible(expanded)
+
+        # min_height = self._size_hint.height()
+        # if expanded and widgets:
+        #     min_height += sum(w.sizeHint().height() for w in widgets)
+
+        # self.setMinimumHeight(min_height)
+        self.updateGeometry()

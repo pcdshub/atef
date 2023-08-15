@@ -12,11 +12,10 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Signal as QSignal
 
 from atef import util
-from atef.widgets.config.data_active import ExpandableFrame
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData
-from atef.widgets.utils import insert_widget
+from atef.widgets.utils import ExpandableFrame, insert_widget
 
 logger = logging.getLogger(__file__)
 

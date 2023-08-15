@@ -39,7 +39,7 @@ from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             ProcedureGroup, ProcedureStep, SetValueStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.type_hints import AnyDataclass
-from atef.widgets.config.data_active import (CheckRowWidget, ExpandableFrame,
+from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
@@ -47,7 +47,7 @@ from atef.widgets.config.run_active import (DescriptionRunWidget,
                                             PassiveRunWidget,
                                             SetValueRunWidget)
 from atef.widgets.config.run_base import RunCheck
-from atef.widgets.utils import insert_widget
+from atef.widgets.utils import ExpandableFrame, insert_widget
 
 from ..core import DesignerDisplay
 from .data_base import DataWidget, NameDescTagsWidget
