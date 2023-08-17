@@ -58,6 +58,7 @@
     <addaction name="action_open_archive_viewer"/>
     <addaction name="action_print_report"/>
     <addaction name="action_clear_results"/>
+    <addaction name="action_find_replace"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDebug"/>
@@ -112,6 +113,11 @@
   <action name="action_clear_results">
    <property name="text">
     <string>Clear Results</string>
+   </property>
+  </action>
+  <action name="action_find_replace">
+   <property name="text">
+    <string>Find / Replace</string>
    </property>
   </action>
  </widget>

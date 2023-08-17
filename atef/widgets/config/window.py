@@ -29,6 +29,7 @@ from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep)
 from atef.qt_helpers import walk_tree_widget_items
 from atef.report import ActiveAtefReport, PassiveAtefReport
+from atef.widgets.config.find_replace import FindReplaceWidget
 from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
@@ -65,6 +66,7 @@ class Window(DesignerDisplay, QMainWindow):
     action_open_archive_viewer: QAction
     action_print_report: QAction
     action_clear_results: QAction
+    action_find_replace: QAction
 
     def __init__(self, *args, show_welcome: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
@@ -80,6 +82,7 @@ class Window(DesignerDisplay, QMainWindow):
         )
         self.action_print_report.triggered.connect(self.print_report)
         self.action_clear_results.triggered.connect(self.clear_results)
+        self.action_find_replace.triggered.connect(self.find_replace)
 
         tab_bar = self.tab_widget.tabBar()
         # always use scroll area and never truncate file names
@@ -366,6 +369,15 @@ class Window(DesignerDisplay, QMainWindow):
                 clear_results(config_file)
 
             current_tree.update_statuses()
+
+    def find_replace(self, *args, **kwargs):
+        """ find and replace in the current tree.  Open a find-replace widget """
+        print(f'starting find-replace: {self.get_current_tree().full_path}')
+        curr_tree = self.get_current_tree()
+        self._find_widget = FindReplaceWidget(
+            filepath=curr_tree.full_path, config_type=type(curr_tree.config_file)
+        )
+        self._find_widget.show()
 
 
 class LandingPage(DesignerDisplay, QWidget):
