@@ -133,7 +133,14 @@
     </layout>
    </item>
    <item>
-    <widget class="QListWidget" name="change_list"/>
+    <widget class="QListWidget" name="change_list">
+     <property name="sizeAdjustPolicy">
+      <enum>QAbstractScrollArea::AdjustToContents</enum>
+     </property>
+     <property name="resizeMode">
+      <enum>QListView::Adjust</enum>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>

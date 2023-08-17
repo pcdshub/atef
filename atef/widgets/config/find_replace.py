@@ -2,17 +2,18 @@ import json
 import logging
 import re
 from dataclasses import fields, is_dataclass
-from typing import (Any, Callable, Generator, Iterable, List, Tuple, Union,
-                    get_args)
+from enum import Enum
+from functools import partial
+from typing import (Any, Callable, Generator, Iterable, List, Optional, Tuple,
+                    Union, get_args)
 
 from apischema import deserialize
-from qtpy import QtWidgets
+from qtpy import QtCore, QtWidgets
 
 from atef.config import ConfigurationFile, PreparedFile
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.type_hints import PrimitiveType
 from atef.widgets.core import DesignerDisplay
-from atef.widgets.utils import ExpandableFrame, insert_widget
 
 logger = logging.getLogger(__name__)
 
@@ -63,75 +64,84 @@ def walk_find_match(
     elif isinstance(item, list):
         for idx, l_item in enumerate(item):
             # TODO: py3.10 allows isinstance with Unions
-            if not isinstance(l_item, get_args(PrimitiveType)) and match(l_item):
+            if isinstance(l_item, get_args(PrimitiveType)) and match(l_item):
                 yield parent + [(idx, '__list__')]
             else:
-                yield from walk_find_match(l_item,
-                                           match, parent=parent + [(idx, '__list__')])
+                yield from walk_find_match(l_item, match,
+                                           parent=parent + [(idx, '__list__')])
     elif isinstance(item, dict):
         for d_key, d_value in item.items():
-            if match(d_key):
-                yield parent + [('__key__', '__dict__')]
             # don't halt at first key match, values could also have matches
-            if not isinstance(d_value, get_args(PrimitiveType)) and match(d_value):
-                yield parent + [(d_key, '__dict__')]
+            if isinstance(d_value, get_args(PrimitiveType)) and match(d_value):
+                yield parent + [(d_key, '__dictvalue__')]
             else:
-                yield from walk_find_match(d_value,
-                                           match, parent=parent + [(d_key, '__dict__')])
+                yield from walk_find_match(d_value, match,
+                                           parent=parent + [(d_key, '__dictvalue__')])
+            if match(d_key):
+                yield parent + [(d_key, '__dictkey__')]
+
+    elif isinstance(item, Enum):
+        if match(item.value):
+            yield parent + [(item, '__enum__')]
 
     elif match(item):
         yield parent
 
 
-def get_deepest_dataclass_in_path(path) -> Any:
-    rev_idx = -1
-    while rev_idx > (-len(path) - 1):
-        if is_dataclass(path[rev_idx][1]):
-            break
-        else:
-            rev_idx -= 1
-    return path[rev_idx][1]
+# def get_deepest_dataclass_in_path(path) -> Any:
+#     rev_idx = -1
+#     while rev_idx > (-len(path) - 1):
+#         if is_dataclass(path[rev_idx][1]):
+#             break
+#         else:
+#             rev_idx -= 1
+#     return path[rev_idx][1]
 
 
-def get_item_from_path(item, path) -> Any:
+def get_item_from_path(path, item: Optional[Any] = None) -> Any:
+    # providing item shouldn't be necessary if item was used to trace the path before.
+    # in that case the objects are stashed in the path
+    # item is expected to be top-level, if provided.
+    if not item:
+        item = path[0][1]
     for seg in path:
-        # allow starting from an item that is partway down path
-        if seg[1] != item:
-            continue
-        if seg[1] == '__dict__':
-            if seg[0] == '__key__':
-                return item
-            else:
-                item = item[seg[0]]
+        if seg[1] == '__dictkey__':
+            item = seg[0]
+        elif seg[1] == '__dictvalue__':
+            item = item[seg[0]]
         elif seg[1] == '__list__':
             item = item[seg[0]]
+        elif seg[1] == '__enum__':
+            item = item.value
         else:
             # dataclass case
-            item = getattr(seg[1], seg[0])
+            item = getattr(item, seg[0])
     return item
 
 
-def replace_item_from_path(item: Any, search: Any, replace: Any, path: List[Tuple[Any, Any]]) -> Any:
-    # traverse backward until we get a dataclass (necessary?)
+def replace_item_from_path(
+    item: Any,
+    replace: Any,
+    path: List[Tuple[Any, Any]]
+) -> None:
     # walk forward until step -2
     # use step -1 to assign the new value
-    # TODO: consider enums.   How do we match those
     final_step = path[-1]
-    parent_item = get_item_from_path(item, path[:-1])
+    parent_item = get_item_from_path(path[:-1], item=item)
 
-    if final_step[1] == "__dict__":
-        if final_step[0] == '__key__':
-            # replace the key in this dictionary
-            parent_item[replace] = parent_item.pop(search)
-        else:
-            # replace value
-            parent_item[final_step[0]] = replace
+    if final_step[1] == "__dictkey__":
+        parent_item[replace] = parent_item.pop(final_step[0])
+    elif final_step[1] == "__dictvalue__":
+        # replace value
+        parent_item[final_step[0]] = replace
     elif final_step[1] == "__list__":
         # replace item in list
         parent_item[final_step[0]] = replace
+    elif final_step[1] == "__enum__":
+        new_enum = getattr(final_step[0], replace)
+        setattr(parent_item, path[-2][0], new_enum)
     else:
-        # replace value.  If is an enum, try to access the enum.
-        setattr(parent_item, final_step, replace)
+        setattr(parent_item, path[-2][0], replace)
 
 
 class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
@@ -177,10 +187,11 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
         logger.debug(f'Running search/replace with {replace_text, match_case}')
 
+        # TODO: actually support regex, for now just do complete matches
         if use_regex:
-            regex = re.compile(search_text)
+            regex = re.compile(f'^{search_text}$')
         else:
-            regex = re.compile(search_text)
+            regex = re.compile(f'^{search_text}$')
 
         def match_fn(match):
             return regex.search(str(match)) is not None
@@ -191,24 +202,34 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self.run_search_replace()
         # generate the previews in
         self.change_list.clear()
+        replace_text = self.replace_edit.text()
+        search_text = self.search_edit.text()
+
+        def remove_item(list_item):
+            self.change_list.takeItem(self.change_list.row(list_item))
+
+        def accept_change(list_item):
+            try:
+                replace_item_from_path(self.orig_file, replace_text, path)
+            except Exception as ex:
+                logger.warning(f'Unable to replace ({search_text}) with '
+                               f'({replace_text}) in file.  File may have '
+                               f'already been edited ({ex})')
+
+            remove_item(list_item)
+
         for path in self.match_paths:
             # find deepest dataclass
-            rev_idx = -1
-            while rev_idx > (-len(path) - 1):
-                if is_dataclass(path[rev_idx][1]):
-                    break
-                else:
-                    rev_idx -= 1
-
-            last_type = path[rev_idx][1]
-            dclass_type = type(last_type).__name__
-            # # add item to list
-            # preview_text = ''.join(region).strip('\n')
-            row_widget = FindReplaceRow(pre_text='', post_text='', dclass_text=dclass_type, path=path)
+            row_widget = FindReplaceRow(pre_text=search_text,
+                                        post_text=replace_text,
+                                        path=path)
             l_item = QtWidgets.QListWidgetItem()
-            l_item.setSizeHint(row_widget.sizeHint())
+            l_item.setSizeHint(QtCore.QSize(row_widget.width(), row_widget.height()))
             self.change_list.addItem(l_item)
             self.change_list.setItemWidget(l_item, row_widget)
+
+            row_widget.button_box.accepted.connect(partial(accept_change, l_item))
+            row_widget.button_box.rejected.connect(partial(remove_item, l_item))
 
     def verify_changes(self, *args, **kwargs):
         # check to make sure changes are valid
@@ -240,31 +261,42 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
 class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
 
-    details_frame: QtWidgets.QFrame
     button_box: QtWidgets.QDialogButtonBox
     dclass_label: QtWidgets.QLabel
     pre_label: QtWidgets.QLabel
     post_label: QtWidgets.QLabel
+    details_button: QtWidgets.QToolButton
 
     filename = 'find_replace_row_widget.ui'
 
     def __init__(
         self,
         *args,
-        dclass_text: str = 'dclass',
         pre_text: str = 'pre',
         post_text: str = 'post',
         path: List[Any] = [],
         **kwargs
     ) -> None:
         super().__init__(*args, *kwargs)
-        self.post_label.setText(post_text)
-        self.pre_label.setText(pre_text)
-        self.dclass_label.setText(dclass_text)
+        rev_idx = -1
+        while rev_idx > (-len(path) - 1):
+            if is_dataclass(path[rev_idx][1]):
+                break
+            else:
+                rev_idx -= 1
+
+        last_dclass = path[rev_idx][1]
+        dclass_type = type(last_dclass).__name__
+
+        self.dclass_label.setText(dclass_type)
+
+        self.pre_label.setText(str(get_item_from_path(path[:-1])))
+        self.post_label.hide()
+        self.arrow.hide()
+
         self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setText('')
         self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setText('')
 
-        new_frame = ExpandableFrame(text='details...')
         path_list = []
         for segment in path:
             if isinstance(segment[1], str):
@@ -274,7 +306,14 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
             path_list.append(f'({name}, {segment[0]})')
 
         path_str = '>'.join(path_list)
+        detail_scroll = QtWidgets.QScrollArea()
         detail_widget = QtWidgets.QLabel(path_str + '\n')
         detail_widget.setWordWrap(True)
-        new_frame.add_widget(detail_widget)
-        insert_widget(new_frame, self.details_frame)
+        detail_scroll.setWidget(detail_widget)
+
+        widget_action = QtWidgets.QWidgetAction(self.details_button)
+        widget_action.setDefaultWidget(detail_widget)
+
+        widget_menu = QtWidgets.QMenu(self.details_button)
+        widget_menu.addAction(widget_action)
+        self.details_button.setMenu(widget_menu)
