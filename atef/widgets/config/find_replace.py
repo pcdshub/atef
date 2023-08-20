@@ -81,7 +81,7 @@ def walk_find_match(
                 yield parent + [(d_key, '__dictkey__')]
 
     elif isinstance(item, Enum):
-        if match(item.value):
+        if match(item.name):
             yield parent + [(item, '__enum__')]
 
     elif match(item):
@@ -114,7 +114,7 @@ def get_item_from_path(path, item: Optional[Any] = None) -> Any:
         elif seg[1] == '__enum__':
             item = item.value
         else:
-            # dataclass case
+            # general dataclass case
             item = getattr(item, seg[0])
     return item
 
@@ -122,8 +122,10 @@ def get_item_from_path(path, item: Optional[Any] = None) -> Any:
 def replace_item_from_path(
     item: Any,
     replace: Any,
-    path: List[Tuple[Any, Any]]
+    path: List[Tuple[Any, Any]],
+    replace_fn: Optional[Callable] = None,
 ) -> None:
+    # regex_match used to do partial matches if values are strings, else ignored
     # walk forward until step -2
     # use step -1 to assign the new value
     final_step = path[-1]
@@ -131,13 +133,18 @@ def replace_item_from_path(
 
     if final_step[1] == "__dictkey__":
         parent_item[replace] = parent_item.pop(final_step[0])
-    elif final_step[1] == "__dictvalue__":
+    elif final_step[1] in ("__dictvalue__", "__list__"):
         # replace value
-        parent_item[final_step[0]] = replace
-    elif final_step[1] == "__list__":
-        # replace item in list
-        parent_item[final_step[0]] = replace
+        old_value = parent_item[final_step[0]]
+        if isinstance(parent_item[final_step[0]], str):
+            new_value = replace_fn(old_value)
+        else:
+            new_value = replace
+        parent_item[final_step[0]] = new_value
     elif final_step[1] == "__enum__":
+        # TODO: fix this in many ways
+        # severities read from integer but have to set from text
+        # have to re-preview if we add a replace text, update this on text edit
         new_enum = getattr(final_step[0], replace)
         setattr(parent_item, path[-2][0], new_enum)
     else:
@@ -172,36 +179,50 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self.verify_button.clicked.connect(self.verify_changes)
         self.open_button.clicked.connect(self.open_converted)
 
+        self.replace_edit.editingFinished.connect(self.update_replace_fn)
+        self.search_edit.editingFinished.connect(self.update_match_fn)
+        # placeholder no-op functions
+        self._match_fn = lambda x: False
+        self._replace_fn = lambda x: x
+
     def _refresh_original(self):
         with open(self.fp, 'r') as fp:
             self._original_json = json.load(fp)
 
         self.orig_file = deserialize(self.config_type, self._original_json)
 
-    def run_search_replace(self):
-        search_text = self.search_edit.text()
+    def update_replace_fn(self, *args, **kwargs):
         replace_text = self.replace_edit.text()
 
-        match_case = self.case_button.isChecked()
+        def replace_fn(value):
+            return self._search_regex.sub(replace_text, value)
+
+        self._replace_fn = replace_fn
+
+    def update_match_fn(self, *args, **kwargs):
+        search_text = self.search_edit.text()
+
+        flags = re.IGNORECASE if not self.case_button.isChecked() else 0
         use_regex = self.regex_button.isChecked()
 
-        logger.debug(f'Running search/replace with {replace_text, match_case}')
-
-        # TODO: actually support regex, for now just do complete matches
         if use_regex:
-            regex = re.compile(f'^{search_text}$')
+            self._search_regex = re.compile(f'{search_text}', flags=flags)
         else:
-            regex = re.compile(f'^{search_text}$')
+            # exact match
+            self._search_regex = re.compile(f'{re.escape(search_text)}', flags=flags)
 
         def match_fn(match):
-            return regex.search(str(match)) is not None
+            return self._search_regex.search(str(match)) is not None
 
-        self.match_paths = walk_find_match(self.orig_file, match_fn)
+        self._match_fn = match_fn
 
     def preview_changes(self, *args, **kwargs):
-        self.run_search_replace()
-        # generate the previews in
+        # update everything to be safe (finishedEditing can be uncertain)
+        self.update_match_fn()
+        self.update_replace_fn()
+
         self.change_list.clear()
+        self.match_paths = walk_find_match(self.orig_file, self._match_fn)
         replace_text = self.replace_edit.text()
         search_text = self.search_edit.text()
 
@@ -210,7 +231,8 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
         def accept_change(list_item):
             try:
-                replace_item_from_path(self.orig_file, replace_text, path)
+                replace_item_from_path(self.orig_file, replace_text, path,
+                                       replace_fn=self._replace_fn)
             except Exception as ex:
                 logger.warning(f'Unable to replace ({search_text}) with '
                                f'({replace_text}) in file.  File may have '
@@ -218,6 +240,8 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
             remove_item(list_item)
 
+        # generator can be unstable if dataclass changes during walk
+        # this is only ok because we consume generator entirely
         for path in self.match_paths:
             # find deepest dataclass
             row_widget = FindReplaceRow(pre_text=search_text,
@@ -233,14 +257,6 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
     def verify_changes(self, *args, **kwargs):
         # check to make sure changes are valid
-        # Create a new File
-        # Create prepared version of file
-        # new_json = json.loads(''.join(self._new))
-        # try:
-        #     deser = deserialize(self.config_type, new_json)
-        # except Exception as ex:
-        #     print(f'deserialize fail: {ex}')
-        #     return
 
         try:
             if self.config_type is ConfigurationFile:
