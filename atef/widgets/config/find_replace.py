@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 def walk_find_match(
     item: Any,
     match: Callable,
-    parent: List[Tuple[Union[str, int], Any]] = []
+    parent: List[Tuple[Any, Any]] = []
 ) -> Generator:
     """
     Walk the dataclass and find every key / field where ``match`` evaluates to True.
 
     Yields a list of 'paths' to the matching key / field. A path is a list of
-    (field, object) tuples that lead from the top level ``item`` to the matching
+    (object, field) tuples that lead from the top level ``item`` to the matching
     key / field.
     - If the object is a dataclass, `field` will be a field in that dataclass
     - If the object is a list, `field` will be the index in that list
@@ -39,7 +39,8 @@ def walk_find_match(
     commonly a simple lambda wrapping an equality or regex search.
 
     Ex:
-    paths = walk_find_match(ConfigFile, 'All Fields Demo')
+    paths = walk_find_match(ConfigFile, lambda x: x == 5)
+    paths = walk_find_match(ConfigFile, lambda x: re.compile('^warning$').search(x) is not None)
 
     Parameters
     ----------
@@ -54,7 +55,7 @@ def walk_find_match(
 
     Yields
     ------
-    Generator
+    List[Tuple[Any, Any]]
         paths leading to keys or fields where ``match`` is True
     """
     if is_dataclass(item):
@@ -89,20 +90,60 @@ def walk_find_match(
         yield parent
 
 
-def get_deepest_dataclass_in_path(path) -> Tuple[Any, str]:
+def get_deepest_dataclass_in_path(
+    path: List[Tuple[Any, Any]],
+    item: Optional[Any] = None
+) -> Tuple[Any, str]:
+    """
+    Grab the deepest dataclass in the path, and return its segment
+
+    Parameters
+    ----------
+    path : List[Tuple[Any, Any]]
+        A "path" to a search match, as returned by walk_find_match
+    item : Any
+        An object to start the path from
+
+    Returns
+    -------
+    Tuple[AnyDataclass, str]
+        The deepest dataclass, and field name for the next step
+    """
     rev_idx = -1
     while rev_idx > (-len(path) - 1):
         if is_dataclass(path[rev_idx][0]):
             break
         else:
             rev_idx -= 1
+    if item:
+        return get_item_from_path(path[:rev_idx], item), path[rev_idx][1]
+
     return path[rev_idx]
 
 
-def get_item_from_path(path, item: Optional[Any] = None) -> Any:
-    # providing item shouldn't be necessary if item was used to trace the path before.
-    # in that case the objects are stashed in the path
-    # item is expected to be top-level, if provided.
+def get_item_from_path(
+    path: List[Tuple[Any, Any]],
+    item: Optional[Any] = None
+) -> Any:
+    """
+    Get the item the path points to.  This can work for any subpath
+
+    If ``item`` is not provided, use the stashed objects in ``path``.
+    Item is expected to be top-level object, if provided.
+    (i.e. analagous to path[0][0]).
+
+    Parameters
+    ----------
+    path : List[Tuple[Any, Any]]
+        A "path" to a search match, as returned by walk_find_match
+    item : Optional[Any], optional
+        the item of interest to explore, by default None
+
+    Returns
+    -------
+    Any
+        the object at the end of ``path``, starting from ``item``
+    """
     if not item:
         item = path[0][0]
     for seg in path:
@@ -113,7 +154,7 @@ def get_item_from_path(path, item: Optional[Any] = None) -> Any:
         elif seg[0] == '__list__':
             item = item[seg[1]]
         elif seg[0] == '__enum__':
-            item = item.value
+            item = item.name
         else:
             # general dataclass case
             item = getattr(item, seg[1])
@@ -123,11 +164,28 @@ def get_item_from_path(path, item: Optional[Any] = None) -> Any:
 def replace_item_from_path(
     item: Any,
     path: List[Tuple[Any, Any]],
-    replace_fn: Optional[Callable] = None,
+    replace_fn: Callable
 ) -> None:
-    # walk forward until step -2
-    # use step -1 to assign the new value
+    """
+    replace some object in ``item`` located at the end of ``path``, according
+    to ``replace_fn``.
+
+    ``replace_fn`` should take the original value, and return the new value
+    for insertion into ``item``.  This function frequently involves string
+    substitution, and possibly type conversions
+
+    Parameters
+    ----------
+    item : Any
+        The object to replace information in
+    path : List[Tuple[Any, Any]]
+        A "path" to a search match, as returned by walk_find_match
+    replace_fn : Callable
+        A function that returns the replacement object
+    """
+    # need the final step to specify what is being replaced
     final_step = path[-1]
+    # need the item one step before the last to perform the assignment on
     parent_item = get_item_from_path(path[:-1], item=item)
 
     if final_step[0] == "__dictkey__":
@@ -210,6 +268,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         if not filename:
             return
 
+        self.fp = filename
         self.orig_file = self.load_file(filename)
         self.setWindowTitle(f'find and replace: ({os.path.basename(filename)})')
 

@@ -7,7 +7,8 @@ import pytest
 from atef.check import Equals, GreaterOrEqual
 from atef.config import DeviceConfiguration, PreparedDeviceConfiguration
 from atef.enums import Severity
-from atef.widgets.config.find_replace import (get_item_from_path,
+from atef.widgets.config.find_replace import (get_deepest_dataclass_in_path,
+                                              get_item_from_path,
                                               replace_item_from_path,
                                               walk_find_match)
 
@@ -61,6 +62,25 @@ def test_walk_find_match(
 
 
 @pytest.mark.parametrize(
+    "path, expected_item",
+    [
+        ([('PVCONFIG', 'name')], 'pv config 1'),  # simple field
+        ([('PVCONFIG', 'by_pv'), ('__dictvalue__', "MY:PREFIX:hello"),
+          ("__list__", 1), ('EQUALS', 'severity_on_failure'),
+          ("__enum__", Severity.warning)],
+         'error'),  # deep enum, grabs name for comparison purposes
+        ([('PVCONFIG', 'by_pv'), ("__dictkey__", "MY:PREFIX:hello")],
+         'MY:PREFIX:hello'),  # dictkey
+        ([('PVCONFIG', 'by_pv'), ('__dictvalue__', 'MY:PREFIX:hello'),
+          ("__list__", 1)], Equals(value=.1)),  # dclass in list
+    ]
+)
+def test_get_item_from_path(pv_configuration, path, expected_item):
+    found_item = get_item_from_path(path, item=pv_configuration)
+    assert found_item == expected_item
+
+
+@pytest.mark.parametrize(
     "search_str, replace_str, flags, num_changes",
     [
         ('motor1', 'enum1', re.UNICODE, 1),  # replace in list
@@ -110,3 +130,15 @@ def test_replace_pipeline(
 
     # smoke test preparation
     PreparedDeviceConfiguration.from_config(edited_config)
+
+
+def test_deepest_dclass(configuration_group):
+    path = list(walk_find_match(configuration_group, lambda x: x == -10))[0]
+    copy_group = copy.deepcopy(configuration_group)
+    deepest_orig = get_deepest_dataclass_in_path(path)
+    deepest_copy = get_deepest_dataclass_in_path(path, item=copy_group)
+
+    assert deepest_orig == deepest_copy
+
+# Add test for switching files
+# add test from widget side (instantiate widget from file, populate change_list)
