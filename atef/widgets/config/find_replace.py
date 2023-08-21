@@ -359,18 +359,20 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
 
         self.dclass_label.setText(f'{dclass_type}.{attr}')
         self.pre_label.setText(pre_text)
+        self.pre_label.setToolTip(pre_text)
         self.post_label.setText(post_text)
+        self.post_label.setToolTip(post_text)
 
         self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setText('')
         self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setText('')
 
         path_list = []
         for segment in path:
-            if isinstance(segment[1], str):
-                name = segment[1]
+            if isinstance(segment[0], str):
+                name = segment[0]
             else:
-                name = type(segment[1]).__name__
-            path_list.append(f'({name}, {segment[0]})')
+                name = type(segment[0]).__name__
+            path_list.append(f'({name}, {segment[1]})')
 
         path_str = '>'.join(path_list)
         detail_scroll = QtWidgets.QScrollArea()
