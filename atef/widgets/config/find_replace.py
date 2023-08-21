@@ -60,42 +60,42 @@ def walk_find_match(
         # get fields, recurse through fields
         for field in fields(item):
             yield from walk_find_match(getattr(item, field.name), match,
-                                       parent=parent + [(field.name, item)])
+                                       parent=parent + [(item, field.name)])
     elif isinstance(item, list):
         for idx, l_item in enumerate(item):
             # TODO: py3.10 allows isinstance with Unions
             if isinstance(l_item, get_args(PrimitiveType)) and match(l_item):
-                yield parent + [(idx, '__list__')]
+                yield parent + [('__list__', idx)]
             else:
                 yield from walk_find_match(l_item, match,
-                                           parent=parent + [(idx, '__list__')])
+                                           parent=parent + [('__list__', idx)])
     elif isinstance(item, dict):
         for d_key, d_value in item.items():
             # don't halt at first key match, values could also have matches
             if isinstance(d_value, get_args(PrimitiveType)) and match(d_value):
-                yield parent + [(d_key, '__dictvalue__')]
+                yield parent + [('__dictvalue__', d_key)]
             else:
                 yield from walk_find_match(d_value, match,
-                                           parent=parent + [(d_key, '__dictvalue__')])
+                                           parent=parent + [('__dictvalue__', d_key)])
             if match(d_key):
-                yield parent + [(d_key, '__dictkey__')]
+                yield parent + [('__dictkey__', d_key)]
 
     elif isinstance(item, Enum):
         if match(item.name):
-            yield parent + [(item, '__enum__')]
+            yield parent + [('__enum__', item)]
 
     elif match(item):
         yield parent
 
 
-# def get_deepest_dataclass_in_path(path) -> Any:
-#     rev_idx = -1
-#     while rev_idx > (-len(path) - 1):
-#         if is_dataclass(path[rev_idx][1]):
-#             break
-#         else:
-#             rev_idx -= 1
-#     return path[rev_idx][1]
+def get_deepest_dataclass_in_path(path) -> Tuple[Any, str]:
+    rev_idx = -1
+    while rev_idx > (-len(path) - 1):
+        if is_dataclass(path[rev_idx][0]):
+            break
+        else:
+            rev_idx -= 1
+    return path[rev_idx]
 
 
 def get_item_from_path(path, item: Optional[Any] = None) -> Any:
@@ -103,19 +103,19 @@ def get_item_from_path(path, item: Optional[Any] = None) -> Any:
     # in that case the objects are stashed in the path
     # item is expected to be top-level, if provided.
     if not item:
-        item = path[0][1]
+        item = path[0][0]
     for seg in path:
-        if seg[1] == '__dictkey__':
-            item = seg[0]
-        elif seg[1] == '__dictvalue__':
-            item = item[seg[0]]
-        elif seg[1] == '__list__':
-            item = item[seg[0]]
-        elif seg[1] == '__enum__':
+        if seg[0] == '__dictkey__':
+            item = seg[1]
+        elif seg[0] == '__dictvalue__':
+            item = item[seg[1]]
+        elif seg[0] == '__list__':
+            item = item[seg[1]]
+        elif seg[0] == '__enum__':
             item = item.value
         else:
             # general dataclass case
-            item = getattr(item, seg[0])
+            item = getattr(item, seg[1])
     return item
 
 
@@ -129,21 +129,21 @@ def replace_item_from_path(
     final_step = path[-1]
     parent_item = get_item_from_path(path[:-1], item=item)
 
-    if final_step[1] == "__dictkey__":
-        parent_item[replace_fn(final_step[0])] = parent_item.pop(final_step[0])
-    elif final_step[1] in ("__dictvalue__", "__list__"):
+    if final_step[0] == "__dictkey__":
+        parent_item[replace_fn(final_step[1])] = parent_item.pop(final_step[1])
+    elif final_step[0] in ("__dictvalue__", "__list__"):
         # replace value
-        old_value = parent_item[final_step[0]]
-        parent_item[final_step[0]] = replace_fn(old_value)
-    elif final_step[1] == "__enum__":
+        old_value = parent_item[final_step[1]]
+        parent_item[final_step[1]] = replace_fn(old_value)
+    elif final_step[0] == "__enum__":
         parent_item = get_item_from_path(path[:-2], item=item)
-        old_enum: Enum = getattr(parent_item, path[-2][0])
-        new_enum = getattr(final_step[0], replace_fn(old_enum.name))
-        setattr(parent_item, path[-2][0], new_enum)
+        old_enum: Enum = getattr(parent_item, path[-2][1])
+        new_enum = getattr(final_step[1], replace_fn(old_enum.name))
+        setattr(parent_item, path[-2][1], new_enum)
     else:
         # simple field paths don't have a final (__sth__, ?) segement
-        old_value = getattr(parent_item, path[-1][0])
-        setattr(parent_item, path[-1][0], replace_fn(old_value))
+        old_value = getattr(parent_item, path[-1][1])
+        setattr(parent_item, path[-1][1], replace_fn(old_value))
 
 
 class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
@@ -312,17 +312,10 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
         **kwargs
     ) -> None:
         super().__init__(*args, *kwargs)
-        rev_idx = -1
-        while rev_idx > (-len(path) - 1):
-            if is_dataclass(path[rev_idx][1]):
-                break
-            else:
-                rev_idx -= 1
-
-        last_dclass = path[rev_idx][1]
+        last_dclass, attr = get_deepest_dataclass_in_path(path)
         dclass_type = type(last_dclass).__name__
 
-        self.dclass_label.setText(f'{dclass_type}.{path[rev_idx][0]}')
+        self.dclass_label.setText(f'{dclass_type}.{attr}')
         self.pre_label.setText(pre_text)
         self.post_label.setText(post_text)
 
