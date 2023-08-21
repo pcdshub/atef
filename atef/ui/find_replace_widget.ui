@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
+    <width>443</width>
     <height>300</height>
    </rect>
   </property>
@@ -124,7 +124,14 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="open_button">
+      <widget class="QPushButton" name="open_file_button">
+       <property name="text">
+        <string>Open File</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="open_converted_button">
        <property name="text">
         <string>Open Converted</string>
        </property>

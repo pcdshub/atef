@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 from dataclasses import fields, is_dataclass
 from enum import Enum
@@ -7,7 +8,7 @@ from functools import partial
 from typing import (Any, Callable, Generator, Iterable, List, Optional, Tuple,
                     Union, get_args)
 
-from apischema import deserialize
+from apischema import ValidationError, deserialize
 from qtpy import QtCore, QtWidgets
 
 from atef.config import ConfigurationFile, PreparedFile
@@ -156,23 +157,39 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
     preview_button: QtWidgets.QPushButton
     verify_button: QtWidgets.QPushButton
-    open_button: QtWidgets.QPushButton
+    open_file_button: QtWidgets.QPushButton
+    open_converted_button: QtWidgets.QPushButton
 
     change_list: QtWidgets.QListWidget
 
     filename = 'find_replace_widget.ui'
 
-    def __init__(self, *args, filepath: str, config_type: Any, **kwargs):
+    def __init__(
+        self,
+        *args,
+        filepath: Optional[str] = None,
+        window: Optional[Any] = None,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.fp = filepath
-        self.config_type = config_type
+        self.window = window
         self.match_paths: Iterable[List[Any]] = []
+        self.orig_file = None
 
-        self.orig_file = self.load_file()
+        if not filepath:
+            self.open_converted_button.hide()
+        else:
+            self.open_file(filename=filepath)
 
+        if window:
+            self.open_converted_button.clicked.connect(self.open_converted)
+        else:
+            self.open_converted_button.hide()
+
+        self.setup_open_file_button()
         self.preview_button.clicked.connect(self.preview_changes)
         self.verify_button.clicked.connect(self.verify_changes)
-        self.open_button.clicked.connect(self.open_converted)
 
         self.replace_edit.editingFinished.connect(self.update_replace_fn)
         self.search_edit.editingFinished.connect(self.update_match_fn)
@@ -180,11 +197,36 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self._match_fn = lambda x: False
         self._replace_fn = lambda x: x
 
-    def load_file(self) -> Union[ConfigurationFile, ProcedureFile]:
-        with open(self.fp, 'r') as fp:
-            self._original_json = json.load(fp)
+    def setup_open_file_button(self):
+        self.open_file_button.clicked.connect(self.open_file)
 
-        return deserialize(self.config_type, self._original_json)
+    def open_file(self, *args, filename: Optional[str] = None, **kwargs):
+        if filename is None:
+            filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+                parent=self,
+                caption='Select a config',
+                filter='Json Files (*.json)',
+            )
+        if not filename:
+            return
+
+        self.orig_file = self.load_file(filename)
+        self.setWindowTitle(f'find and replace: ({os.path.basename(filename)})')
+
+    def load_file(self, filepath) -> Union[ConfigurationFile, ProcedureFile]:
+        with open(filepath, 'r') as fp:
+            self._original_json = json.load(fp)
+        try:
+            data = deserialize(ConfigurationFile, self._original_json)
+        except ValidationError:
+            logger.debug('failed to open as passive checkout')
+            try:
+                data = deserialize(ProcedureFile, self._original_json)
+            except ValidationError:
+                logger.error('failed to open file as either active '
+                             'or passive checkout')
+
+        return data
 
     def update_replace_fn(self, *args, **kwargs):
         replace_text = self.replace_edit.text()
@@ -247,7 +289,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         # this is only ok because we consume generator entirely
         for path in self.match_paths:
             # Modify a preview file to create preview
-            preview_file = self.load_file()
+            preview_file = self.load_file(self.fp)
             if replace_text:
                 try:
                     replace_item_from_path(preview_file, path,
@@ -290,7 +332,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
     def open_converted(self, *args, **kwargs):
         # open new file in new tab
-        return
+        self.window._new_tab(data=self.orig_file, filename=self.fp)
 
 
 class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):

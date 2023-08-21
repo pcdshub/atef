@@ -373,10 +373,17 @@ class Window(DesignerDisplay, QMainWindow):
     def find_replace(self, *args, **kwargs):
         """ find and replace in the current tree.  Open a find-replace widget """
         print(f'starting find-replace: {self.get_current_tree().full_path}')
-        curr_tree = self.get_current_tree()
-        self._find_widget = FindReplaceWidget(
-            filepath=curr_tree.full_path, config_type=type(curr_tree.config_file)
-        )
+        try:
+            curr_tree = self.get_current_tree()
+        except AttributeError:
+            curr_tree = None
+
+        if curr_tree:
+            self._find_widget = FindReplaceWidget(
+                filepath=curr_tree.full_path, window=self
+            )
+        else:
+            self._find_widget = FindReplaceWidget()
         self._find_widget.show()
 
 
