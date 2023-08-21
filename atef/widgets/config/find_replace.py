@@ -121,7 +121,6 @@ def get_item_from_path(path, item: Optional[Any] = None) -> Any:
 
 def replace_item_from_path(
     item: Any,
-    replace: Any,
     path: List[Tuple[Any, Any]],
     replace_fn: Optional[Callable] = None,
 ) -> None:
@@ -131,14 +130,15 @@ def replace_item_from_path(
     parent_item = get_item_from_path(path[:-1], item=item)
 
     if final_step[1] == "__dictkey__":
-        parent_item[replace] = parent_item.pop(final_step[0])
+        parent_item[replace_fn(final_step[0])] = parent_item.pop(final_step[0])
     elif final_step[1] in ("__dictvalue__", "__list__"):
         # replace value
         old_value = parent_item[final_step[0]]
         parent_item[final_step[0]] = replace_fn(old_value)
     elif final_step[1] == "__enum__":
         parent_item = get_item_from_path(path[:-2], item=item)
-        new_enum = getattr(final_step[0], replace)
+        old_enum: Enum = getattr(parent_item, path[-2][0])
+        new_enum = getattr(final_step[0], replace_fn(old_enum.name))
         setattr(parent_item, path[-2][0], new_enum)
     else:
         # simple field paths don't have a final (__sth__, ?) segement
@@ -232,7 +232,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
         def accept_change(list_item):
             try:
-                replace_item_from_path(self.orig_file, replace_text, path,
+                replace_item_from_path(self.orig_file, path,
                                        replace_fn=self._replace_fn)
             except KeyError:
                 logger.warning(f'Unable to replace ({search_text}) with '
@@ -249,9 +249,14 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
             # Modify a preview file to create preview
             preview_file = self.load_file()
             if replace_text:
-                replace_item_from_path(preview_file, replace_text, path,
-                                       replace_fn=self._replace_fn)
-                post_text = str(get_item_from_path(path[:-1], item=preview_file))
+                try:
+                    replace_item_from_path(preview_file, path,
+                                           replace_fn=self._replace_fn)
+                    post_text = str(get_item_from_path(path[:-1], item=preview_file))
+                except Exception as ex:
+                    logger.warning('Unable to generate preview, provided replacement '
+                                   f'text is invalid: {ex}')
+                    post_text = '[INVALID]'
             else:
                 post_text = ''
 
