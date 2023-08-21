@@ -125,7 +125,6 @@ def replace_item_from_path(
     path: List[Tuple[Any, Any]],
     replace_fn: Optional[Callable] = None,
 ) -> None:
-    # regex_match used to do partial matches if values are strings, else ignored
     # walk forward until step -2
     # use step -1 to assign the new value
     final_step = path[-1]
@@ -136,19 +135,15 @@ def replace_item_from_path(
     elif final_step[1] in ("__dictvalue__", "__list__"):
         # replace value
         old_value = parent_item[final_step[0]]
-        if isinstance(parent_item[final_step[0]], str):
-            new_value = replace_fn(old_value)
-        else:
-            new_value = replace
-        parent_item[final_step[0]] = new_value
+        parent_item[final_step[0]] = replace_fn(old_value)
     elif final_step[1] == "__enum__":
-        # TODO: fix this in many ways
-        # severities read from integer but have to set from text
-        # have to re-preview if we add a replace text, update this on text edit
+        parent_item = get_item_from_path(path[:-2], item=item)
         new_enum = getattr(final_step[0], replace)
         setattr(parent_item, path[-2][0], new_enum)
     else:
-        setattr(parent_item, path[-2][0], replace)
+        # simple field paths don't have a final (__sth__, ?) segement
+        old_value = getattr(parent_item, path[-1][0])
+        setattr(parent_item, path[-1][0], replace_fn(old_value))
 
 
 class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
@@ -173,7 +168,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self.config_type = config_type
         self.match_paths: Iterable[List[Any]] = []
 
-        self._refresh_original()
+        self.orig_file = self.load_file()
 
         self.preview_button.clicked.connect(self.preview_changes)
         self.verify_button.clicked.connect(self.verify_changes)
@@ -185,17 +180,23 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self._match_fn = lambda x: False
         self._replace_fn = lambda x: x
 
-    def _refresh_original(self):
+    def load_file(self) -> Union[ConfigurationFile, ProcedureFile]:
         with open(self.fp, 'r') as fp:
             self._original_json = json.load(fp)
 
-        self.orig_file = deserialize(self.config_type, self._original_json)
+        return deserialize(self.config_type, self._original_json)
 
     def update_replace_fn(self, *args, **kwargs):
         replace_text = self.replace_edit.text()
 
         def replace_fn(value):
-            return self._search_regex.sub(replace_text, value)
+            if isinstance(value, str):
+                return self._search_regex.sub(replace_text, value)
+            elif isinstance(value, int):
+                # cast to float first
+                return int(float(value))
+            else:  # try to cast as original type
+                return type(value)(replace_text)
 
         self._replace_fn = replace_fn
 
@@ -233,20 +234,32 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
             try:
                 replace_item_from_path(self.orig_file, replace_text, path,
                                        replace_fn=self._replace_fn)
-            except Exception as ex:
+            except KeyError:
                 logger.warning(f'Unable to replace ({search_text}) with '
                                f'({replace_text}) in file.  File may have '
-                               f'already been edited ({ex})')
+                               f'already been edited')
+            except Exception as ex:
+                logger.warning(f'Unable to apply change. {ex}')
 
             remove_item(list_item)
 
         # generator can be unstable if dataclass changes during walk
         # this is only ok because we consume generator entirely
         for path in self.match_paths:
-            # find deepest dataclass
-            row_widget = FindReplaceRow(pre_text=search_text,
-                                        post_text=replace_text,
+            # Modify a preview file to create preview
+            preview_file = self.load_file()
+            if replace_text:
+                replace_item_from_path(preview_file, replace_text, path,
+                                       replace_fn=self._replace_fn)
+                post_text = str(get_item_from_path(path[:-1], item=preview_file))
+            else:
+                post_text = ''
+
+            pre_text = str(get_item_from_path(path[:-1], item=self.orig_file))
+            row_widget = FindReplaceRow(pre_text=pre_text,
+                                        post_text=post_text,
                                         path=path)
+
             l_item = QtWidgets.QListWidgetItem()
             l_item.setSizeHint(QtCore.QSize(row_widget.width(), row_widget.height()))
             self.change_list.addItem(l_item)
@@ -304,11 +317,9 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
         last_dclass = path[rev_idx][1]
         dclass_type = type(last_dclass).__name__
 
-        self.dclass_label.setText(dclass_type)
-
-        self.pre_label.setText(str(get_item_from_path(path[:-1])))
-        self.post_label.hide()
-        self.arrow.hide()
+        self.dclass_label.setText(f'{dclass_type}.{path[rev_idx][0]}')
+        self.pre_label.setText(pre_text)
+        self.post_label.setText(post_text)
 
         self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setText('')
         self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setText('')
