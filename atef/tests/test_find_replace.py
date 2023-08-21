@@ -1,12 +1,63 @@
 import copy
 import re
+from typing import Any, List, Tuple
 
 import pytest
 
+from atef.check import Equals, GreaterOrEqual
 from atef.config import DeviceConfiguration, PreparedDeviceConfiguration
+from atef.enums import Severity
 from atef.widgets.config.find_replace import (get_item_from_path,
                                               replace_item_from_path,
                                               walk_find_match)
+
+
+@pytest.mark.parametrize(
+    "search_str, simple_path",
+    [
+        ('motor1', [[(DeviceConfiguration, 'devices'), ("__list__", 0)]]),
+        ('motor', [
+            [(DeviceConfiguration, 'devices'), ("__list__", 0)],
+            [(DeviceConfiguration, 'devices'), ("__list__", 1)]
+        ]),
+        ('device config 1', [[(DeviceConfiguration, 'name')]]),
+        ('setpo', [[(DeviceConfiguration, 'by_attr'), ("__dictkey__", "setpoint")]]),
+        ('error', [
+            [(DeviceConfiguration, 'by_attr'), ("__dictvalue__", "setpoint"),
+             ("__list__", 0), (Equals, 'severity_on_failure'),
+             ("__enum__", Severity.error)],
+            [(DeviceConfiguration, 'by_attr'), ("__dictvalue__", "setpoint"),
+             ("__list__", 0), (Equals, 'if_disconnected'),
+             ("__enum__", Severity.error)],
+            [(DeviceConfiguration, 'by_attr'), ("__dictvalue__", "readback"),
+             ("__list__", 0), (GreaterOrEqual, 'severity_on_failure'),
+             ("__enum__", Severity.error)],
+            [(DeviceConfiguration, 'by_attr'), ("__dictvalue__", "readback"),
+             ("__list__", 0), (GreaterOrEqual, 'if_disconnected'),
+             ("__enum__", Severity.error)],
+        ]),
+    ]
+)
+def test_walk_find_match(
+    device_configuration: DeviceConfiguration,
+    search_str: str,
+    simple_path: List[Tuple[Any, Any]]
+):
+    regex = re.compile(search_str)
+
+    def match_fn(input):
+        return regex.search(str(input)) is not None
+
+    path = walk_find_match(device_configuration, match_fn)
+    for expected_path, found_path in zip(simple_path, path):
+        simplified_path = []
+        for seg in found_path:
+            if not isinstance(seg[0], str):
+                item = type(seg[0])
+            else:
+                item = seg[0]
+            simplified_path.append((item, seg[1]))
+        assert expected_path == simplified_path
 
 
 @pytest.mark.parametrize(
