@@ -229,7 +229,21 @@ def sim_db() -> List[happi.OphydItem]:
         'functional_group': 'FUNC',
     }
 
-    for info in [sim1, sim2, sim3]:
+    sim4 = {
+        'name': 'enum2',
+        'z': 600,
+        '_id': 'enum2',
+        'prefix': 'MY:MOTORENUM',
+        'beamline': 'LCLS',
+        'type': 'OphydItem',
+        'device_class': 'atef.tests.conftest.EnumDevice',
+        'args': list(),
+        'kwargs': {'name': '{{name}}', 'prefix': '{{prefix}}'},
+        'location_group': 'LOC',
+        'functional_group': 'FUNC',
+    }
+
+    for info in [sim1, sim2, sim3, sim4]:
         items.append(happi.OphydItem(**info))
     return items
 
