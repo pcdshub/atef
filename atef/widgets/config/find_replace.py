@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 import os
@@ -8,13 +9,16 @@ from functools import partial
 from typing import (Any, Callable, Generator, Iterable, List, Optional, Tuple,
                     Union, get_args)
 
+import qtawesome as qta
 from apischema import ValidationError, deserialize
 from qtpy import QtCore, QtWidgets
 
 from atef.config import ConfigurationFile, PreparedFile
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.type_hints import PrimitiveType
+from atef.widgets.config.utils import TableWidgetWithAddRow
 from atef.widgets.core import DesignerDisplay
+from atef.widgets.utils import insert_widget
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +209,29 @@ def replace_item_from_path(
         setattr(parent_item, path[-1][1], replace_fn(old_value))
 
 
+def get_default_match_fn(search_regex: re.Pattern) -> Callable:
+    def match_fn(match):
+        return search_regex.search(str(match)) is not None
+
+    return match_fn
+
+
+def get_default_replace_fn(replace_text: str, search_regex: re.Pattern) -> Callable:
+    def replace_fn(value):
+        if isinstance(value, str):
+            return search_regex.sub(replace_text, value)
+        elif isinstance(value, int):
+            # cast to float first
+            return int(float(value))
+        else:  # try to cast as original type
+            return type(value)(replace_text)
+
+    return replace_fn
+
+
+# TODO: consider refactoring an edit into a dataclass?
+# (FindReplaceAction with a file, path, replace_fn)?
+
 class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
     search_edit: QtWidgets.QLineEdit
@@ -289,16 +316,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
     def update_replace_fn(self, *args, **kwargs):
         replace_text = self.replace_edit.text()
-
-        def replace_fn(value):
-            if isinstance(value, str):
-                return self._search_regex.sub(replace_text, value)
-            elif isinstance(value, int):
-                # cast to float first
-                return int(float(value))
-            else:  # try to cast as original type
-                return type(value)(replace_text)
-
+        replace_fn = get_default_replace_fn(replace_text, self._search_regex)
         self._replace_fn = replace_fn
 
     def update_match_fn(self, *args, **kwargs):
@@ -313,9 +331,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
             # exact match
             self._search_regex = re.compile(f'{re.escape(search_text)}', flags=flags)
 
-        def match_fn(match):
-            return self._search_regex.search(str(match)) is not None
-
+        match_fn = get_default_match_fn(self._search_regex)
         self._match_fn = match_fn
 
     def preview_changes(self, *args, **kwargs):
@@ -434,10 +450,8 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
             path_list.append(f'({name}, {segment[1]})')
 
         path_str = '>'.join(path_list)
-        detail_scroll = QtWidgets.QScrollArea()
         detail_widget = QtWidgets.QLabel(path_str + '\n')
         detail_widget.setWordWrap(True)
-        detail_scroll.setWidget(detail_widget)
 
         widget_action = QtWidgets.QWidgetAction(self.details_button)
         widget_action.setDefaultWidget(detail_widget)
@@ -445,3 +459,263 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
         widget_menu = QtWidgets.QMenu(self.details_button)
         widget_menu.addAction(widget_action)
         self.details_button.setMenu(widget_menu)
+
+
+class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
+
+    file_name_label: QtWidgets.QLabel
+    # update with * when unsaved,
+    type_label: QtWidgets.QLabel
+
+    details_list: QtWidgets.QListWidget
+    # show list of edits (find_replace_rows) depending on selected edit
+    devices_list: QtWidgets.QListWidget
+    # scan through devices in original checkout?
+    # filter by device type?  look at specific device types?
+    edits_table: TableWidgetWithAddRow
+    edits_table_placeholder: QtWidgets.QWidget
+    # possibly a table widget?  starting device / string, happi selector for replace
+    # go button for calculation, refresh on select
+
+    apply_all_button: QtWidgets.QPushButton
+    # update with number of unsaved changes
+    open_button: QtWidgets.QPushButton
+    save_button: QtWidgets.QPushButton
+    # open message box for save-as functionality
+
+    filename = 'fill_template_page.ui'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.orig_file = None
+        self.setup_ui()
+
+    def setup_ui(self):
+        self.open_button.clicked.connect(self.open_file)
+        self.save_button.clicked.connect(self.save_file)
+        self.apply_all_button.clicked.connect(self.apply_all)
+
+        self.setup_edits_table()
+
+    def setup_edits_table(self):
+        # set up add row widget for edits
+        self.edits_table = TableWidgetWithAddRow(
+            add_row_text='add edit', title_text='edits',
+            row_widget_cls=partial(TemplateEditRowWidget, orig_file=self.orig_file)
+        )
+        insert_widget(self.edits_table, self.edits_table_placeholder)
+        self.edits_table.table_updated.connect(
+            self.update_change_list
+        )
+        # connect an update-change-list slot to edits_table.table_updated
+        self.edits_table.itemSelectionChanged.connect(self.show_changes_from_edit)
+        self.edits_table.setSelectionMode(self.edits_table.SingleSelection)
+
+    def open_file(self, *args, filename: Optional[str] = None, **kwargs):
+        # open file with message box
+        if filename is None:
+            filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+                parent=self,
+                caption='Select a config',
+                filter='Json Files (*.json)',
+            )
+        if not filename:
+            return
+
+        # update title label
+        self.fp = filename
+        with open(self.fp, 'r') as fp:
+            self._original_json = json.load(fp)
+        try:
+            self.orig_file = deserialize(ConfigurationFile, self._original_json)
+        except ValidationError:
+            logger.debug('failed to open as passive checkout')
+            try:
+                self.orig_file = deserialize(ProcedureFile, self._original_json)
+            except ValidationError:
+                logger.error('failed to open file as either active '
+                             'or passive checkout')
+        self.setup_edits_table()
+        self.update_title()
+
+    def save_file(self):
+        # open save message box
+        self.prompt_apply()
+        raise NotImplementedError
+
+    def apply_all(self):
+        self.prompt_apply()
+        self.update_title()
+        raise NotImplementedError
+
+    def prompt_apply(self):
+        # message box with details on remaining changes
+        raise NotImplementedError
+
+    def update_title(self):
+        file_name = os.path.basename(self.fp)
+        if len(self.remaining_changes()) > 0:
+            file_name += '*'
+        # if edited (items in change list), add *
+        # update type
+        # update tab title?
+        self.file_name_label.setText(file_name)
+        self.type_label.setText(type(self.orig_file).__name__)
+
+    def update_change_list(self):
+        # walk through edits_table, gather list of list of paths
+        # store total count
+        raise NotImplementedError
+
+    def show_changes_from_edit(self, *args, **kwargs):
+        self.details_list.clear()
+        # on selected callback, populate details table
+        selected_range = self.edits_table.selectedRanges()[0]
+        edit_row_widget: TemplateEditRowWidget = self.edits_table.cellWidget(
+            selected_range.topRow(), 0
+        )
+        print(selected_range.topRow(), edit_row_widget)
+        if not isinstance(edit_row_widget, TemplateEditRowWidget):
+            return
+        # use FindRowWidgets
+        for row_widget in edit_row_widget.get_details_rows():
+            def remove_item(list_item):
+                self.change_list.takeItem(self.change_list.row(list_item))
+
+            l_item = QtWidgets.QListWidgetItem()
+            l_item.setSizeHint(QtCore.QSize(row_widget.width(), row_widget.height()))
+            self.details_list.addItem(l_item)
+            self.details_list.setItemWidget(l_item, row_widget)
+            row_widget.button_box.accepted.connect(remove_item)
+            row_widget.button_box.rejected.connect(remove_item)
+
+    def get_changes_from_edit(self, replace_fn, path):
+        # create match fn, replace fn from row information
+        # stash a change list
+        # (to be called on selection and on go-button)
+        raise NotImplementedError
+
+
+class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
+    button_box: QtWidgets.QDialogButtonBox
+    child_button: QtWidgets.QPushButton
+
+    setting_button: QtWidgets.QToolButton
+    regex_button: QtWidgets.QToolButton
+    case_button: QtWidgets.QToolButton
+
+    search_edit: QtWidgets.QLineEdit
+    replace_edit: QtWidgets.QLineEdit
+
+    filename = 'template_edit_row_widget.ui'
+
+    def __init__(self, *args, data=None, orig_file: Union[ConfigurationFile, ProcedureFile], **kwargs):
+        # Expected SimpleRowWidgets are DataWidgets, expecting a dataclass
+        super().__init__(*args, **kwargs)
+        self.orig_file = orig_file
+        self.match_paths: Iterable[List[Any]] = []
+        self.details_rows: List[FindReplaceRow] = []
+        self.setup_ui()
+
+    def setup_ui(self):
+        self.child_button.hide()
+
+        # self.button_box.button(QtWidgets.QDialogButtonBox.Apply).setText('')
+        # self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setText('')
+        self.button_box.button(QtWidgets.QDialogButtonBox.Retry).clicked.connect(self.refresh_paths)
+        # settings menu (regex, case)
+        self.setting_widget = QtWidgets.QWidget()
+        self.setting_layout = QtWidgets.QHBoxLayout()
+        self.regex_button = QtWidgets.QToolButton()
+        self.regex_button.setCheckable(True)
+        self.regex_button.setText('.*')
+        self.regex_button.setToolTip('use regex')
+        self.case_button = QtWidgets.QToolButton()
+        self.case_button.setCheckable(True)
+        self.case_button.setText('Aa')
+        self.case_button.setToolTip('case sensitive')
+        self.setting_layout.addWidget(self.regex_button)
+        self.setting_layout.addWidget(self.case_button)
+        self.setting_widget.setLayout(self.setting_layout)
+        widget_action = QtWidgets.QWidgetAction(self.setting_button)
+        widget_action.setDefaultWidget(self.setting_widget)
+
+        widget_menu = QtWidgets.QMenu(self.setting_button)
+        widget_menu.addAction(widget_action)
+        self.setting_button.setMenu(widget_menu)
+        self.setting_button.setIcon(qta.icon('fa.gear'))
+
+    def update_replace_fn(self, *args, **kwargs):
+        replace_text = self.replace_edit.text()
+        replace_fn = get_default_replace_fn(replace_text, self._search_regex)
+        self._replace_fn = replace_fn
+
+    def update_match_fn(self, *args, **kwargs):
+        search_text = self.search_edit.text()
+
+        flags = re.IGNORECASE if not self.case_button.isChecked() else 0
+        use_regex = self.regex_button.isChecked()
+
+        if use_regex:
+            self._search_regex = re.compile(f'{search_text}', flags=flags)
+        else:
+            # exact match
+            self._search_regex = re.compile(f'{re.escape(search_text)}',
+                                            flags=flags)
+
+        match_fn = get_default_match_fn(self._search_regex)
+        self._match_fn = match_fn
+
+    def refresh_paths(self):
+        print(f'refresh_paths, {type(self.orig_file)}')
+        if self.orig_file is None:
+            return
+        # update everything to be safe (finishedEditing can be uncertain)
+        self.update_match_fn()
+        self.update_replace_fn()
+
+        self.details_rows.clear()
+        self.match_paths = walk_find_match(self.orig_file, self._match_fn)
+        replace_text = self.replace_edit.text()
+        search_text = self.search_edit.text()
+
+        # generator can be unstable if dataclass changes during walk
+        # this is only ok because we consume generator entirely
+        for path in self.match_paths:
+            # Modify a preview file to create preview
+            preview_file = copy.deepcopy(self.orig_file)
+            if replace_text:
+                try:
+                    replace_item_from_path(preview_file, path,
+                                           replace_fn=self._replace_fn)
+                    post_text = str(get_item_from_path(path[:-1], item=preview_file))
+                except Exception as ex:
+                    logger.warning('Unable to generate preview, provided replacement '
+                                   f'text is invalid: {ex}')
+                    post_text = '[INVALID]'
+            else:
+                post_text = ''
+
+            def accept_change():
+                try:
+                    replace_item_from_path(self.orig_file, path,
+                                           replace_fn=self._replace_fn)
+                except KeyError:
+                    logger.warning(f'Unable to replace ({search_text}) with '
+                                   f'({replace_text}) in file.  File may have '
+                                   f'already been edited')
+                except Exception as ex:
+                    logger.warning(f'Unable to apply change. {ex}')
+
+                print(len(self.details_rows))
+
+            pre_text = str(get_item_from_path(path[:-1], item=self.orig_file))
+            row_widget = FindReplaceRow(pre_text=pre_text,
+                                        post_text=post_text,
+                                        path=path)
+            row_widget.button_box.accepted.connect(accept_change)
+
+            self.details_rows.append(row_widget)
+
+    def get_details_rows(self) -> List[FindReplaceRow]:
+        return self.details_rows

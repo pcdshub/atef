@@ -29,7 +29,8 @@ from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep)
 from atef.qt_helpers import walk_tree_widget_items
 from atef.report import ActiveAtefReport, PassiveAtefReport
-from atef.widgets.config.find_replace import FindReplaceWidget
+from atef.widgets.config.find_replace import (FillTemplatePage,
+                                              FindReplaceWidget)
 from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
@@ -116,6 +117,9 @@ class Window(DesignerDisplay, QMainWindow):
         )
         widget.new_active_button.clicked.connect(
             partial(self.new_file, checkout_type='active')
+        )
+        widget.fill_template_button.clicked.connect(
+            self.open_fill_template
         )
         widget.sample_active_button.clicked.connect(partial(
             self.open_file, filename=str(TEST_CONFIG_PATH / 'active_test.json')
@@ -386,6 +390,15 @@ class Window(DesignerDisplay, QMainWindow):
             self._find_widget = FindReplaceWidget()
         self._find_widget.show()
 
+    def open_fill_template(self, *args, **kwargs):
+        """
+        Open a fill-template page.
+        """
+        widget = FillTemplatePage()
+        self.tab_widget.addTab(widget, 'fill template')
+        curr_idx = self.tab_widget.count() - 1
+        self.tab_widget.setCurrentIndex(curr_idx)
+
 
 class LandingPage(DesignerDisplay, QWidget):
     """ Landing Page for selecting a subsequent action """
@@ -393,6 +406,7 @@ class LandingPage(DesignerDisplay, QWidget):
 
     new_passive_button: QtWidgets.QPushButton
     new_active_button: QtWidgets.QPushButton
+    fill_template_button: QtWidgets.QPushButton
     open_button: QtWidgets.QPushButton
     exit_button: QtWidgets.QPushButton
 

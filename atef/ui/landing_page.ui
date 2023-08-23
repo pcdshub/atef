@@ -72,6 +72,13 @@
         </widget>
        </item>
        <item>
+        <widget class="QPushButton" name="fill_template_button">
+         <property name="text">
+          <string>Fill Template</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QPushButton" name="open_button">
          <property name="text">
           <string>Open ...</string>
