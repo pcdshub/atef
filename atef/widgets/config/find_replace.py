@@ -3,11 +3,11 @@ import json
 import logging
 import os
 import re
-from dataclasses import fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
 from functools import partial
-from typing import (Any, Callable, Generator, Iterable, List, Optional, Tuple,
-                    Union, get_args)
+from typing import (Any, Callable, ClassVar, Generator, Iterable, List,
+                    Optional, Tuple, Union, get_args)
 
 import qtawesome as qta
 from apischema import ValidationError, deserialize
@@ -229,8 +229,24 @@ def get_default_replace_fn(replace_text: str, search_regex: re.Pattern) -> Calla
     return replace_fn
 
 
-# TODO: consider refactoring an edit into a dataclass?
-# (FindReplaceAction with a file, path, replace_fn)?
+@dataclass
+class FindReplaceAction:
+    target: Union[ConfigurationFile, ProcedureFile]
+    path: List[Tuple[Any, Any]]
+    replace_fn: Callable
+
+    def apply(self, target=None, path=None, replace_fn=None):
+        target = target or self.target
+        path = path or self.path
+        replace_fn = replace_fn or self.replace_fn
+        try:
+            replace_item_from_path(target, path, replace_fn)
+        except KeyError as ex:
+            logger.warning(f'Unable to find key ({ex}) in file. '
+                           'File may have already been edited')
+        except Exception as ex:
+            logger.warning(f'Unable to apply change. {ex}')
+
 
 class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
@@ -341,46 +357,21 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
         self.change_list.clear()
         self.match_paths = walk_find_match(self.orig_file, self._match_fn)
-        replace_text = self.replace_edit.text()
-        search_text = self.search_edit.text()
 
         def remove_item(list_item):
             self.change_list.takeItem(self.change_list.row(list_item))
 
         def accept_change(list_item):
-            try:
-                replace_item_from_path(self.orig_file, path,
-                                       replace_fn=self._replace_fn)
-            except KeyError:
-                logger.warning(f'Unable to replace ({search_text}) with '
-                               f'({replace_text}) in file.  File may have '
-                               f'already been edited')
-            except Exception as ex:
-                logger.warning(f'Unable to apply change. {ex}')
-
+            # make sure this only runs if action was successful
             remove_item(list_item)
 
         # generator can be unstable if dataclass changes during walk
         # this is only ok because we consume generator entirely
         for path in self.match_paths:
-            # Modify a preview file to create preview
-            preview_file = self.load_file(self.fp)
-            if replace_text:
-                try:
-                    replace_item_from_path(preview_file, path,
-                                           replace_fn=self._replace_fn)
-                    post_text = str(get_item_from_path(path[:-1], item=preview_file))
-                except Exception as ex:
-                    logger.warning('Unable to generate preview, provided replacement '
-                                   f'text is invalid: {ex}')
-                    post_text = '[INVALID]'
-            else:
-                post_text = ''
-
-            pre_text = str(get_item_from_path(path[:-1], item=self.orig_file))
-            row_widget = FindReplaceRow(pre_text=pre_text,
-                                        post_text=post_text,
-                                        path=path)
+            find_replace_action = FindReplaceAction(target=self.orig_file,
+                                                    path=path,
+                                                    replace_fn=self._replace_fn)
+            row_widget = FindReplaceRow(data=find_replace_action)
 
             l_item = QtWidgets.QListWidgetItem()
             l_item.setSizeHint(QtCore.QSize(row_widget.width(), row_widget.height()))
@@ -392,7 +383,6 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
     def verify_changes(self, *args, **kwargs):
         # check to make sure changes are valid
-
         try:
             if self.config_type is ConfigurationFile:
                 self.prepared_file = PreparedFile.from_config(self.orig_file)
@@ -411,38 +401,51 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
 
 class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
-
+    """ A widget for displaying a single find/replace action """
     button_box: QtWidgets.QDialogButtonBox
     dclass_label: QtWidgets.QLabel
     pre_label: QtWidgets.QLabel
     post_label: QtWidgets.QLabel
     details_button: QtWidgets.QToolButton
 
+    remove_item: ClassVar[QtCore.Signal] = QtCore.Signal()
+
     filename = 'find_replace_row_widget.ui'
 
     def __init__(
         self,
         *args,
-        pre_text: str = 'pre',
-        post_text: str = 'post',
-        path: List[Any] = [],
+        data: FindReplaceAction,
         **kwargs
     ) -> None:
         super().__init__(*args, *kwargs)
-        last_dclass, attr = get_deepest_dataclass_in_path(path)
-        dclass_type = type(last_dclass).__name__
+        self.data = data
 
+        last_dclass, attr = get_deepest_dataclass_in_path(self.data.path)
+        dclass_type = type(last_dclass).__name__
         self.dclass_label.setText(f'{dclass_type}.{attr}')
+
+        pre_text = str(get_item_from_path(self.data.path[:-1], item=self.data.target))
         self.pre_label.setText(pre_text)
         self.pre_label.setToolTip(pre_text)
+        preview_file = copy.deepcopy(self.data.target)
+
+        try:
+            data.apply(target=preview_file)
+            post_text = str(get_item_from_path(self.data.path[:-1], item=preview_file))
+        except Exception as ex:
+            logger.warning('Unable to generate preview, provided replacement '
+                           f'text is invalid: {ex}')
+            post_text = '[INVALID]'
         self.post_label.setText(post_text)
         self.post_label.setToolTip(post_text)
 
         self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setText('')
         self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setText('')
 
+        # path details
         path_list = []
-        for segment in path:
+        for segment in self.data.path:
             if isinstance(segment[0], str):
                 name = segment[0]
             else:
@@ -459,6 +462,12 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
         widget_menu = QtWidgets.QMenu(self.details_button)
         widget_menu.addAction(widget_action)
         self.details_button.setMenu(widget_menu)
+
+        self.button_box.accepted.connect(self.apply_action)
+
+    def apply_action(self):
+        self.data.apply()
+        self.remove_item.emit()
 
 
 class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
@@ -574,7 +583,6 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         edit_row_widget: TemplateEditRowWidget = self.edits_table.cellWidget(
             selected_range.topRow(), 0
         )
-        print(selected_range.topRow(), edit_row_widget)
         if not isinstance(edit_row_widget, TemplateEditRowWidget):
             return
         # use FindRowWidgets
@@ -597,6 +605,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
 
 class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
+    """ A widget for specifying the information for find/replace actions """
     button_box: QtWidgets.QDialogButtonBox
     child_button: QtWidgets.QPushButton
 
@@ -614,7 +623,7 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         super().__init__(*args, **kwargs)
         self.orig_file = orig_file
         self.match_paths: Iterable[List[Any]] = []
-        self.details_rows: List[FindReplaceRow] = []
+        self.actions: List[FindReplaceAction] = []
         self.setup_ui()
 
     def setup_ui(self):
@@ -623,6 +632,7 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         # self.button_box.button(QtWidgets.QDialogButtonBox.Apply).setText('')
         # self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setText('')
         self.button_box.button(QtWidgets.QDialogButtonBox.Retry).clicked.connect(self.refresh_paths)
+
         # settings menu (regex, case)
         self.setting_widget = QtWidgets.QWidget()
         self.setting_layout = QtWidgets.QHBoxLayout()
@@ -667,55 +677,34 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         self._match_fn = match_fn
 
     def refresh_paths(self):
-        print(f'refresh_paths, {type(self.orig_file)}')
         if self.orig_file is None:
             return
         # update everything to be safe (finishedEditing can be uncertain)
         self.update_match_fn()
         self.update_replace_fn()
 
-        self.details_rows.clear()
+        self.actions.clear()
         self.match_paths = walk_find_match(self.orig_file, self._match_fn)
-        replace_text = self.replace_edit.text()
-        search_text = self.search_edit.text()
-
         # generator can be unstable if dataclass changes during walk
         # this is only ok because we consume generator entirely
         for path in self.match_paths:
-            # Modify a preview file to create preview
-            preview_file = copy.deepcopy(self.orig_file)
-            if replace_text:
-                try:
-                    replace_item_from_path(preview_file, path,
-                                           replace_fn=self._replace_fn)
-                    post_text = str(get_item_from_path(path[:-1], item=preview_file))
-                except Exception as ex:
-                    logger.warning('Unable to generate preview, provided replacement '
-                                   f'text is invalid: {ex}')
-                    post_text = '[INVALID]'
-            else:
-                post_text = ''
+            action = FindReplaceAction(target=self.orig_file, path=path,
+                                       replace_fn=self._replace_fn)
 
-            def accept_change():
-                try:
-                    replace_item_from_path(self.orig_file, path,
-                                           replace_fn=self._replace_fn)
-                except KeyError:
-                    logger.warning(f'Unable to replace ({search_text}) with '
-                                   f'({replace_text}) in file.  File may have '
-                                   f'already been edited')
-                except Exception as ex:
-                    logger.warning(f'Unable to apply change. {ex}')
-
-                print(len(self.details_rows))
-
-            pre_text = str(get_item_from_path(path[:-1], item=self.orig_file))
-            row_widget = FindReplaceRow(pre_text=pre_text,
-                                        post_text=post_text,
-                                        path=path)
-            row_widget.button_box.accepted.connect(accept_change)
-
-            self.details_rows.append(row_widget)
+            self.actions.append(action)
 
     def get_details_rows(self) -> List[FindReplaceRow]:
-        return self.details_rows
+        details_row_widgets = []
+        for action in self.actions:
+            row_widget = FindReplaceRow(data=action)
+
+            def remove_from_list():
+                self.actions.remove(action)
+
+            row_widget.remove_item.connect(remove_from_list)
+            details_row_widgets.append(row_widget)
+
+        return details_row_widgets
+
+    def get_actions(self) -> List[FindReplaceAction]:
+        return self.actions
