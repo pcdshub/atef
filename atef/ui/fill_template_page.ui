@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>570</width>
+    <width>750</width>
     <height>481</height>
    </rect>
   </property>
@@ -22,14 +22,14 @@
      <item>
       <widget class="QLabel" name="file_name_label">
        <property name="text">
-        <string>checkout_name</string>
+        <string>[file name]</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QLabel" name="type_label">
        <property name="text">
-        <string>type_name</string>
+        <string>[file type]</string>
        </property>
       </widget>
      </item>
