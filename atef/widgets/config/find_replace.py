@@ -476,8 +476,15 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
         self.post_label.setText(post_text)
         self.post_label.setToolTip(post_text)
 
-        self.button_box.button(QtWidgets.QDialogButtonBox.Ok).setText('')
-        self.button_box.button(QtWidgets.QDialogButtonBox.Cancel).setText('')
+        ok_button = self.button_box.button(QtWidgets.QDialogButtonBox.Ok)
+        ok_button.setText('')
+        ok_button.setIcon(qta.icon('ei.check'))
+        delete_button = self.button_box.button(QtWidgets.QDialogButtonBox.Cancel)
+        delete_button.setText('')
+        delete_icon = self.style().standardIcon(
+            QtWidgets.QStyle.SP_TitleBarCloseButton
+        )
+        delete_button.setIcon(delete_icon)
 
         # path details
         path_list = []
@@ -553,8 +560,6 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.open_button.clicked.connect(self.open_file)
         self.save_button.clicked.connect(self.save_file)
         self.apply_all_button.clicked.connect(self.apply_all)
-
-        self.setup_edits_table()
 
     def setup_edits_table(self):
         # set up add row widget for edits
@@ -723,8 +728,15 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         # TODO: check if icons are reasonable before removing text
         refresh_button = self.button_box.button(QtWidgets.QDialogButtonBox.Retry)
         refresh_button.clicked.connect(self.refresh_paths)
+        refresh_button.setText('')
+        refresh_button.setToolTip('refresh edit details')
+        refresh_button.setIcon(qta.icon('ei.refresh'))
+
         apply_button = self.button_box.button(QtWidgets.QDialogButtonBox.Apply)
         apply_button.clicked.connect(self.apply_edits)
+        apply_button.setText('')
+        apply_button.setToolTip('apply all changes')
+        apply_button.setIcon(qta.icon('ei.check'))
 
         # settings menu (regex, case)
         self.setting_widget = QtWidgets.QWidget()

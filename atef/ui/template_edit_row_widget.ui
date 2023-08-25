@@ -6,15 +6,9 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>612</width>
-    <height>50</height>
+    <width>482</width>
+    <height>62</height>
    </rect>
-  </property>
-  <property name="sizePolicy">
-   <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-    <horstretch>0</horstretch>
-    <verstretch>0</verstretch>
-   </sizepolicy>
   </property>
   <property name="windowTitle">
    <string>Form</string>
@@ -52,14 +46,14 @@
    <item>
     <widget class="QLineEdit" name="search_edit">
      <property name="sizePolicy">
-      <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
      <property name="minimumSize">
       <size>
-       <width>75</width>
+       <width>60</width>
        <height>0</height>
       </size>
      </property>
@@ -83,15 +77,9 @@
    </item>
    <item>
     <widget class="PyDMDrawingLine" name="arrow" native="true">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
      <property name="minimumSize">
       <size>
-       <width>50</width>
+       <width>20</width>
        <height>0</height>
       </size>
      </property>
@@ -109,14 +97,14 @@
    <item>
     <widget class="QLineEdit" name="replace_edit">
      <property name="sizePolicy">
-      <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+      <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
      <property name="minimumSize">
       <size>
-       <width>75</width>
+       <width>60</width>
        <height>0</height>
       </size>
      </property>
@@ -139,7 +127,7 @@
      </property>
      <property name="sizeHint" stdset="0">
       <size>
-       <width>40</width>
+       <width>6</width>
        <height>20</height>
       </size>
      </property>
