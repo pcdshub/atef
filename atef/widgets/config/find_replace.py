@@ -1,26 +1,44 @@
+import asyncio
 import copy
 import json
 import logging
 import os
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
 from functools import partial
 from typing import (Any, Callable, ClassVar, Generator, Iterable, List,
                     Optional, Tuple, Union, get_args)
 
+import happi
 import qtawesome as qta
 from apischema import ValidationError, deserialize
 from qtpy import QtCore, QtWidgets
 
+from atef.cache import DataCache, get_signal_cache
 from atef.config import ConfigurationFile, PreparedFile
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.type_hints import PrimitiveType
+from atef.util import get_happi_client
 from atef.widgets.config.utils import TableWidgetWithAddRow
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import insert_widget
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def patch_client_cache():
+    old_happi_cache = happi.loader.cache
+    try:
+        happi.loader.cache = {}
+        dcache = DataCache()
+        dcache.signals.clear()
+        yield
+    finally:
+        happi.loader.cache = old_happi_cache
+        dcache.signals.clear()
 
 
 def walk_find_match(
@@ -527,10 +545,12 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     file_name_label: QtWidgets.QLabel
     type_label: QtWidgets.QLabel
 
-    details_list: QtWidgets.QListWidget
-    devices_list: QtWidgets.QListWidget
+    device_table: QtWidgets.QTableWidget
     # scan through devices in original checkout?
     # filter by device type?  look at specific device types?
+    vert_splitter: QtWidgets.QSplitter
+    horiz_splitter: QtWidgets.QSplitter
+    details_list: QtWidgets.QListWidget
     edits_table: TableWidgetWithAddRow
     edits_table_placeholder: QtWidgets.QWidget
     # smart initialization?
@@ -561,6 +581,9 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.save_button.clicked.connect(self.save_file)
         self.apply_all_button.clicked.connect(self.apply_all)
 
+        self.horiz_splitter.setSizes([375, 375])  # in pixels, a good first shot
+        self.vert_splitter.setSizes([175, 375])  # in pixels, a good first shot
+
     def setup_edits_table(self):
         # set up add row widget for edits
         self.edits_table = TableWidgetWithAddRow(
@@ -587,6 +610,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
         self.load_file(filepath=filename)
         self.setup_edits_table()
+        self.setup_devices_list()
         self.update_title()
 
     def load_file(self, filepath) -> Union[ConfigurationFile, ProcedureFile]:
@@ -605,10 +629,28 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
         self.fp = filepath
         self.orig_file = data
-        # comb through data to find happi devices?  But might also want signals...
-        # could prepare and look at signalcache.keys()?
-        # could prepare and look at happi.loader.cache?
-        # Could monkeypatch to clear this before inspecting?...
+
+    def setup_devices_list(self):
+        with patch_client_cache():
+            client = get_happi_client()
+            if isinstance(self.orig_file, ConfigurationFile):
+                prep_file = PreparedFile.from_config(self.orig_file, client=client)
+                asyncio.run(prep_file.fill_cache())
+            elif isinstance(self.open_file, ProcedureFile):
+                prep_file = PreparedProcedureFile.from_origin(self.orig_file)
+
+            cache = get_signal_cache()
+            signals = list(cache.keys())
+            devices = list(happi.loader.cache.keys())
+
+        horiz_header = self.device_table.horizontalHeader()
+        horiz_header.setSectionResizeMode(horiz_header.Stretch)
+        self.device_table.setRowCount(max(len(signals), len(devices)))
+
+        for i, sig in enumerate(signals):
+            self.device_table.setItem(i, 0, QtWidgets.QTableWidgetItem(sig))
+        for i, dev in enumerate(devices):
+            self.device_table.setItem(i, 1, QtWidgets.QTableWidgetItem(dev))
 
     def save_file(self):
         # open save message box
