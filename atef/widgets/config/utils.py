@@ -1306,6 +1306,7 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         self.setHorizontalHeaderLabels([title_text])
         self.verticalHeader().setHidden(True)
         self.row_widget_cls = row_widget_cls
+        self.add_row_text = add_row_text
         self.add_add_row_widget(text=add_row_text)
         self.setSelectionMode(self.NoSelection)
 
@@ -1379,6 +1380,11 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
                 break
 
         self.table_updated.emit()
+
+    def clearContents(self):
+        super().clearContents()
+        self.setRowCount(0)
+        self.add_add_row_widget(text=self.add_row_text)
 
 
 def set_widget_font_size(widget: QWidget, size: int):

@@ -546,7 +546,6 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     type_label: QtWidgets.QLabel
 
     device_table: QtWidgets.QTableWidget
-    # scan through devices in original checkout?
     # filter by device type?  look at specific device types?
     vert_splitter: QtWidgets.QSplitter
     horiz_splitter: QtWidgets.QSplitter
@@ -582,7 +581,10 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.apply_all_button.clicked.connect(self.apply_all)
 
         self.horiz_splitter.setSizes([375, 375])  # in pixels, a good first shot
-        self.vert_splitter.setSizes([175, 375])  # in pixels, a good first shot
+        self.vert_splitter.setSizes([175, 375])
+
+        horiz_header = self.device_table.horizontalHeader()
+        horiz_header.setSectionResizeMode(horiz_header.Stretch)
 
     def setup_edits_table(self):
         # set up add row widget for edits
@@ -643,14 +645,12 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             signals = list(cache.keys())
             devices = list(happi.loader.cache.keys())
 
-        horiz_header = self.device_table.horizontalHeader()
-        horiz_header.setSectionResizeMode(horiz_header.Stretch)
         self.device_table.setRowCount(max(len(signals), len(devices)))
 
         for i, sig in enumerate(signals):
-            self.device_table.setItem(i, 0, QtWidgets.QTableWidgetItem(sig))
+            self.device_table.setItem(i, 1, QtWidgets.QTableWidgetItem(sig))
         for i, dev in enumerate(devices):
-            self.device_table.setItem(i, 1, QtWidgets.QTableWidgetItem(dev))
+            self.device_table.setItem(i, 0, QtWidgets.QTableWidgetItem(dev))
 
     def save_file(self):
         # open save message box
@@ -679,7 +679,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
                 action.apply()
 
             # clear all rows
-            self.edits_table.clear()
+            self.edits_table.clearContents()
             self.details_list.clear()
 
     def update_title(self):
@@ -705,9 +705,12 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         # could separate this out and parametrize by row
         self.details_list.clear()
         # on selected callback, populate details table
-        selected_range = self.edits_table.selectedRanges()[0]
+        selected_ranges = self.edits_table.selectedRanges()
+        if not selected_ranges:
+            return
+
         edit_row_widget: TemplateEditRowWidget = self.edits_table.cellWidget(
-            selected_range.topRow(), 0
+            selected_ranges[0].topRow(), 0
         )
 
         if not isinstance(edit_row_widget, TemplateEditRowWidget):
