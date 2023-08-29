@@ -23,7 +23,7 @@ from atef.type_hints import PrimitiveType
 from atef.util import get_happi_client
 from atef.widgets.config.utils import TableWidgetWithAddRow
 from atef.widgets.core import DesignerDisplay
-from atef.widgets.utils import insert_widget
+from atef.widgets.utils import BusyCursorThread, insert_widget
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +247,37 @@ def get_default_replace_fn(replace_text: str, search_regex: re.Pattern) -> Calla
     return replace_fn
 
 
+def verify_changes(parent, orig_file: Union[ConfigurationFile, ProcedureFile]) -> None:
+    # check to make sure changes are valid
+    try:
+        if isinstance(orig_file, ConfigurationFile):
+            _ = PreparedFile.from_config(orig_file)
+        elif isinstance(orig_file, ProcedureFile):
+            # clear all results when making a new run tree
+            _ = PreparedProcedureFile.from_origin(orig_file)
+        else:
+            QtWidgets.QMessageBox.warning(
+                parent,
+                'Verification FAIL',
+                'File type not recognized.'
+            )
+            return
+    except Exception as ex:
+        logger.debug(ex)
+        QtWidgets.QMessageBox.warning(
+            parent,
+            'Verification FAIL',
+            'File could not be prepared successfully, edits will not work'
+        )
+        return
+
+    QtWidgets.QMessageBox.information(
+        parent,
+        'Verification PASS',
+        'File prepared successfully, edits should work'
+    )
+
+
 @dataclass
 class FindReplaceAction:
     target: Union[ConfigurationFile, ProcedureFile]
@@ -349,6 +380,9 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self._match_fn = lambda x: False
         self._replace_fn = lambda x: x
 
+    def verify_changes(self):
+        verify_changes(self, self.orig_file)
+
     def setup_open_file_button(self):
         self.open_file_button.clicked.connect(self.open_file)
 
@@ -432,23 +466,6 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
             row_widget.button_box.accepted.connect(partial(accept_change, l_item))
             row_widget.button_box.rejected.connect(partial(remove_item, l_item))
 
-    def verify_changes(self, *args, **kwargs):
-        # check to make sure changes are valid
-        try:
-            if self.config_type is ConfigurationFile:
-                self.prepared_file = PreparedFile.from_config(self.orig_file)
-            if self.config_type is ProcedureFile:
-                # clear all results when making a new run tree
-                self.prepared_file = PreparedProcedureFile.from_origin(self.orig_file)
-        except Exception as ex:
-            print(f'prepare fail: {ex}')
-            return
-
-        QtWidgets.QMessageBox.information(
-            self,
-            'File prepared successfully, edits should work'
-        )
-
     def open_converted(self, *args, **kwargs):
         # open new file in new tab
         self.window._new_tab(data=self.orig_file, filename=self.fp)
@@ -480,8 +497,9 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
         self.dclass_label.setText(f'{dclass_type}.{attr}')
 
         pre_text = str(get_item_from_path(self.data.path[:-1], item=self.data.target))
-        self.pre_label.setText(pre_text)
-        self.pre_label.setToolTip(pre_text)
+        # html wrapping to get some line wrapping
+        self.pre_label.setText(f'<font>{pre_text}</font>')
+        self.pre_label.setToolTip(f'<font>{pre_text}</font>')
         preview_file = copy.deepcopy(self.data.target)
 
         try:
@@ -491,8 +509,8 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
             logger.warning('Unable to generate preview, provided replacement '
                            f'text is invalid: {ex}')
             post_text = '[INVALID]'
-        self.post_label.setText(post_text)
-        self.post_label.setToolTip(post_text)
+        self.post_label.setText(f'<font>{post_text}</font>')
+        self.post_label.setToolTip(f'<font>{post_text}</font>')
 
         ok_button = self.button_box.button(QtWidgets.QDialogButtonBox.Ok)
         ok_button.setText('')
@@ -559,7 +577,9 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     apply_all_button: QtWidgets.QPushButton
     open_button: QtWidgets.QPushButton
     save_button: QtWidgets.QPushButton
-    # add prepare-check?
+    verify_button: QtWidgets.QPushButton
+
+    busy_thread: Optional[BusyCursorThread]
 
     filename = 'fill_template_page.ui'
 
@@ -571,6 +591,10 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     ):
         super().__init__(*args, **kwargs)
         self.all_actions: List[FindReplaceAction] = []
+        self._signals: List[str] = []
+        self._devices: List[str] = []
+        self.busy_thread = None
+
         if filepath:
             self.open_file(filename=filepath)
         self.setup_ui()
@@ -579,6 +603,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.open_button.clicked.connect(self.open_file)
         self.save_button.clicked.connect(self.save_file)
         self.apply_all_button.clicked.connect(self.apply_all)
+        self.verify_button.clicked.connect(self.verify_changes)
 
         self.horiz_splitter.setSizes([375, 375])  # in pixels, a good first shot
         self.vert_splitter.setSizes([175, 375])
@@ -616,10 +641,14 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         if not filename:
             return
 
-        self.load_file(filepath=filename)
-        self.setup_edits_table()
-        self.setup_devices_list()
-        self.update_title()
+        def finish_setup():
+            self.setup_edits_table()
+            self.setup_devices_list()
+            self.update_title()
+
+        self.busy_thread = BusyCursorThread(func=partial(self.load_file, filepath=filename))
+        self.busy_thread.task_finished.connect(finish_setup)
+        self.busy_thread.start()
 
     def load_file(self, filepath) -> Union[ConfigurationFile, ProcedureFile]:
         with open(filepath, 'r') as fp:
@@ -639,6 +668,11 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.orig_file = data
 
     def setup_devices_list(self):
+        self.busy_thread = BusyCursorThread(func=self._get_devices_in_file)
+        self.busy_thread.task_finished.connect(self._fill_devices_list)
+        self.busy_thread.start()
+
+    def _get_devices_in_file(self):
         with patch_client_cache():
             client = get_happi_client()
             if isinstance(self.orig_file, ConfigurationFile):
@@ -648,15 +682,18 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
                 prep_file = PreparedProcedureFile.from_origin(self.orig_file)
 
             cache = get_signal_cache()
-            signals = list(cache.keys())
-            devices = list(happi.loader.cache.keys())
+            self._signals = list(cache.keys())
+            self._devices = list(happi.loader.cache.keys())
 
-        self.device_table.setRowCount(max(len(signals), len(devices)))
-
-        for i, sig in enumerate(signals):
+    def _fill_devices_list(self):
+        self.device_table.setRowCount(max(len(self._signals), len(self._devices)))
+        for i, sig in enumerate(self._signals):
             self.device_table.setItem(i, 1, QtWidgets.QTableWidgetItem(sig))
-        for i, dev in enumerate(devices):
+        for i, dev in enumerate(self._devices):
             self.device_table.setItem(i, 0, QtWidgets.QTableWidgetItem(dev))
+
+    def verify_changes(self):
+        verify_changes(self, self.orig_file)
 
     def save_file(self):
         # open save message box

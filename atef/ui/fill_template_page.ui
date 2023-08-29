@@ -60,9 +60,21 @@
        </item>
        <item>
         <widget class="QTableWidget" name="device_table">
+         <property name="toolTip">
+          <string>Devices and Signals found in the original checkout</string>
+         </property>
+         <property name="editTriggers">
+          <set>QAbstractItemView::NoEditTriggers</set>
+         </property>
+         <property name="selectionMode">
+          <enum>QAbstractItemView::NoSelection</enum>
+         </property>
          <property name="columnCount">
           <number>2</number>
          </property>
+         <attribute name="verticalHeaderVisible">
+          <bool>false</bool>
+         </attribute>
          <column>
           <property name="text">
            <string>Devices</string>
@@ -194,6 +206,13 @@
       <widget class="QPushButton" name="apply_all_button">
        <property name="text">
         <string>Apply All</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="verify_button">
+       <property name="text">
+        <string>Verify</string>
        </property>
       </widget>
      </item>
