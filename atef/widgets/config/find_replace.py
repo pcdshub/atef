@@ -596,9 +596,15 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.edits_table.table_updated.connect(
             self.update_change_list
         )
+
+        self.edits_table.setSelectionMode(self.edits_table.SingleSelection)
+        self.edits_table.setSelectionBehavior(self.edits_table.SelectRows)
         # connect an update-change-list slot to edits_table.table_updated
         self.edits_table.itemSelectionChanged.connect(self.show_changes_from_edit)
-        self.edits_table.setSelectionMode(self.edits_table.SingleSelection)
+        # refresh details on row interaction as well
+        # this might call show_changes_from_edit twice if clicking refresh
+        # on a row different from the currently selected one
+        self.edits_table.row_interacted.connect(self.show_changes_from_edit)
 
     def open_file(self, *args, filename: Optional[str] = None, **kwargs):
         if filename is None:
@@ -870,7 +876,12 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
             self.actions.append(action)
 
         # this could work, but is smelly and bad
-        self.parent().parent().table_updated.emit()
+        try:
+            # TERW -> TableWidgetItem -> TableWidgetWithAddRow
+            self.parent().parent().table_updated.emit()
+            self.parent().parent().row_interacted.emit(self.row_num)
+        except AttributeError:
+            ...
 
     def get_details_rows(self) -> List[FindReplaceRow]:
         details_row_widgets = []

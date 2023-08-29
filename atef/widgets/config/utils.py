@@ -1296,6 +1296,7 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
     add_row_widget: AddRowWidget
 
     table_updated: ClassVar[QtCore.Signal] = QtCore.Signal()
+    row_interacted: ClassVar[QtCore.Signal] = QtCore.Signal(int)
 
     def __init__(self, *args, add_row_text: str, title_text: str, row_widget_cls: QtWidgets.QWidget, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1309,6 +1310,8 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         self.add_row_text = add_row_text
         self.add_add_row_widget(text=add_row_text)
         self.setSelectionMode(self.NoSelection)
+        self.table_updated.connect(self.stash_row_numbers)
+        self.row_interacted.connect(lambda row_num: self.selectRow(row_num))
 
     def add_add_row_widget(self, text: str):
         """ add the AddRowWidget to the end of the specified table-widget"""
@@ -1380,6 +1383,12 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
                 break
 
         self.table_updated.emit()
+
+    def stash_row_numbers(self, *args, **kwargs):
+        """ Stash row numbers in row widgets """
+        for row_num in range(self.rowCount()):
+            row_widget = self.cellWidget(row_num, 0)
+            row_widget.row_num = row_num
 
     def clearContents(self):
         super().clearContents()
