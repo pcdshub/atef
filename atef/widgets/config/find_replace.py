@@ -644,7 +644,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             if isinstance(self.orig_file, ConfigurationFile):
                 prep_file = PreparedFile.from_config(self.orig_file, client=client)
                 asyncio.run(prep_file.fill_cache())
-            elif isinstance(self.open_file, ProcedureFile):
+            elif isinstance(self.orig_file, ProcedureFile):
                 prep_file = PreparedProcedureFile.from_origin(self.orig_file)
 
             cache = get_signal_cache()
