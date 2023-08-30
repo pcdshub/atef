@@ -13,7 +13,7 @@ from typing import (Any, Callable, ClassVar, Generator, Iterable, List,
 
 import happi
 import qtawesome as qta
-from apischema import ValidationError, deserialize
+from apischema import ValidationError, deserialize, serialize
 from qtpy import QtCore, QtWidgets
 
 from atef.cache import DataCache, get_signal_cache
@@ -353,7 +353,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         filepath: Optional[str] = None,
         window: Optional[Any] = None,
         **kwargs
-    ):
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.fp = filepath
         self.window = window
@@ -380,13 +380,13 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self._match_fn = lambda x: False
         self._replace_fn = lambda x: x
 
-    def verify_changes(self):
+    def verify_changes(self) -> None:
         verify_changes(self, self.orig_file)
 
-    def setup_open_file_button(self):
+    def setup_open_file_button(self) -> None:
         self.open_file_button.clicked.connect(self.open_file)
 
-    def open_file(self, *args, filename: Optional[str] = None, **kwargs):
+    def open_file(self, *args, filename: Optional[str] = None, **kwargs) -> None:
         if filename is None:
             filename, _ = QtWidgets.QFileDialog.getOpenFileName(
                 parent=self,
@@ -415,12 +415,12 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
         return data
 
-    def update_replace_fn(self, *args, **kwargs):
+    def update_replace_fn(self, *args, **kwargs) -> None:
         replace_text = self.replace_edit.text()
         replace_fn = get_default_replace_fn(replace_text, self._search_regex)
         self._replace_fn = replace_fn
 
-    def update_match_fn(self, *args, **kwargs):
+    def update_match_fn(self, *args, **kwargs) -> None:
         search_text = self.search_edit.text()
 
         flags = re.IGNORECASE if not self.case_button.isChecked() else 0
@@ -435,8 +435,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         match_fn = get_default_match_fn(self._search_regex)
         self._match_fn = match_fn
 
-    def preview_changes(self, *args, **kwargs):
-        # update everything to be safe (finishedEditing can be uncertain)
+    def preview_changes(self, *args, **kwargs) -> None:
         self.update_match_fn()
         self.update_replace_fn()
 
@@ -466,7 +465,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
             row_widget.button_box.accepted.connect(partial(accept_change, l_item))
             row_widget.button_box.rejected.connect(partial(remove_item, l_item))
 
-    def open_converted(self, *args, **kwargs):
+    def open_converted(self, *args, **kwargs) -> None:
         # open new file in new tab
         self.window._new_tab(data=self.orig_file, filename=self.fp)
 
@@ -545,7 +544,7 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
         self.button_box.accepted.connect(self.apply_action)
         self.button_box.rejected.connect(self.reject_action)
 
-    def apply_action(self):
+    def apply_action(self) -> None:
         success = self.data.apply()
         if not success:
             QtWidgets.QMessageBox.warning(
@@ -554,7 +553,7 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
             )
         self.remove_item.emit()
 
-    def reject_action(self):
+    def reject_action(self) -> None:
         self.remove_item.emit()
 
 
@@ -564,15 +563,14 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     type_label: QtWidgets.QLabel
 
     device_table: QtWidgets.QTableWidget
-    # filter by device type?  look at specific device types?
+    # TODO?: filter by device type?  look at specific device types?
     vert_splitter: QtWidgets.QSplitter
     horiz_splitter: QtWidgets.QSplitter
     details_list: QtWidgets.QListWidget
     edits_table: TableWidgetWithAddRow
     edits_table_placeholder: QtWidgets.QWidget
-    # smart initialization?
-    # starting device / string, happi selector for replace
-    # go button for calculation, refresh on select
+    # TODO?: smart initialization?  Choosing edits by clicking on devices?
+    # TODO?: starting device / string, happi selector for replace?
 
     apply_all_button: QtWidgets.QPushButton
     open_button: QtWidgets.QPushButton
@@ -588,7 +586,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         *args,
         filepath: Optional[str] = None,
         **kwargs
-    ):
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.all_actions: List[FindReplaceAction] = []
         self._signals: List[str] = []
@@ -599,7 +597,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.open_file(filename=filepath)
         self.setup_ui()
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         self.open_button.clicked.connect(self.open_file)
         self.save_button.clicked.connect(self.save_file)
         self.apply_all_button.clicked.connect(self.apply_all)
@@ -611,7 +609,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         horiz_header = self.device_table.horizontalHeader()
         horiz_header.setSectionResizeMode(horiz_header.Stretch)
 
-    def setup_edits_table(self):
+    def setup_edits_table(self) -> None:
         # set up add row widget for edits
         self.edits_table = TableWidgetWithAddRow(
             add_row_text='add edit', title_text='edits',
@@ -631,7 +629,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         # on a row different from the currently selected one
         self.edits_table.row_interacted.connect(self.show_changes_from_edit)
 
-    def open_file(self, *args, filename: Optional[str] = None, **kwargs):
+    def open_file(self, *args, filename: Optional[str] = None, **kwargs) -> None:
         if filename is None:
             filename, _ = QtWidgets.QFileDialog.getOpenFileName(
                 parent=self,
@@ -646,11 +644,13 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.setup_devices_list()
             self.update_title()
 
-        self.busy_thread = BusyCursorThread(func=partial(self.load_file, filepath=filename))
+        self.busy_thread = BusyCursorThread(
+            func=partial(self.load_file, filepath=filename)
+        )
         self.busy_thread.task_finished.connect(finish_setup)
         self.busy_thread.start()
 
-    def load_file(self, filepath) -> Union[ConfigurationFile, ProcedureFile]:
+    def load_file(self, filepath: str) -> Union[ConfigurationFile, ProcedureFile]:
         with open(filepath, 'r') as fp:
             self._original_json = json.load(fp)
 
@@ -667,12 +667,21 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.fp = filepath
         self.orig_file = data
 
-    def setup_devices_list(self):
+    def setup_devices_list(self) -> None:
+        """
+        Set up the devices list.  Runs the preparation and cache inspection
+        in a BusyCursorThread, and fills the devices list after its completion
+        """
         self.busy_thread = BusyCursorThread(func=self._get_devices_in_file)
         self.busy_thread.task_finished.connect(self._fill_devices_list)
         self.busy_thread.start()
 
-    def _get_devices_in_file(self):
+    def _get_devices_in_file(self) -> None:
+        """
+        Gather devices and signal in the original file by preparing it and
+        inspecting caches.  Temporarily clears the happi loader cache, but
+        actually clears the DataCache
+        """
         with patch_client_cache():
             client = get_happi_client()
             if isinstance(self.orig_file, ConfigurationFile):
@@ -685,25 +694,42 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self._signals = list(cache.keys())
             self._devices = list(happi.loader.cache.keys())
 
-    def _fill_devices_list(self):
+    def _fill_devices_list(self) -> None:
         self.device_table.setRowCount(max(len(self._signals), len(self._devices)))
         for i, sig in enumerate(self._signals):
             self.device_table.setItem(i, 1, QtWidgets.QTableWidgetItem(sig))
         for i, dev in enumerate(self._devices):
             self.device_table.setItem(i, 0, QtWidgets.QTableWidgetItem(dev))
 
-    def verify_changes(self):
+    def verify_changes(self) -> None:
         verify_changes(self, self.orig_file)
 
-    def save_file(self):
+    def save_file(self) -> None:
         # open save message box
         self.prompt_apply()
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+            parent=self,
+            caption='Save as',
+            filter='Json Files (*.json)',
+        )
+        if not filename.endswith('.json'):
+            filename += '.json'
 
-    def apply_all(self):
+        # get serialized
+        serialized = serialize(type(self.orig_file), self.orig_file)
+        try:
+            with open(filename, 'w') as fd:
+                json.dump(serialized, fd, indent=2)
+                # Ends file on newline as per pre-commit
+                fd.write('\n')
+        except OSError:
+            logger.exception(f'Error saving file {filename}')
+
+    def apply_all(self) -> None:
         self.prompt_apply()
         self.update_title()
 
-    def prompt_apply(self):
+    def prompt_apply(self) -> None:
         # message box with details on remaining changes
         self.update_change_list()
         if len(self.all_actions) <= 0:
@@ -725,17 +751,21 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.edits_table.clearContents()
             self.details_list.clear()
 
-    def update_title(self):
+    def update_title(self) -> None:
+        """
+        Update the title.  Will be the name and the number of unapplied edits
+        """
         file_name = os.path.basename(self.fp)
         if len(self.all_actions) > 0:
-            file_name += '*'
-        # update tab title?
+            file_name += f'[{len(self.all_actions)}]'
         self.file_name_label.setText(file_name)
         self.type_label.setText(type(self.orig_file).__name__)
 
-    def update_change_list(self):
+    def update_change_list(self) -> None:
+        """
+        update the global change list, gathering all ``FindReplaceAction``'s
+        """
         # walk through edits_table, gather list of list of paths
-        # store total count
         self.all_actions = []
         for row_idx in range(self.edits_table.rowCount()):
             template_widget = self.edits_table.cellWidget(row_idx, 0)
@@ -743,9 +773,11 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
         self.update_title()
 
-    def show_changes_from_edit(self, *args, **kwargs):
-        # TODO: can we show this also on button click?  Does selection count?
-        # could separate this out and parametrize by row
+    def show_changes_from_edit(self, *args, **kwargs) -> None:
+        """
+        Populate the details_list with each action from the selected edit.
+        Provide helpful text if the edit is incomplete or invalid.
+        """
         self.details_list.clear()
         # on selected callback, populate details table
         selected_ranges = self.edits_table.selectedRanges()
@@ -767,22 +799,27 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.details_list.addItem(l_item)
             return
 
-        # use FindRowWidgets
+        row_widget: FindReplaceRow
         for row_widget in edit_row_widget.get_details_rows():
             l_item = QtWidgets.QListWidgetItem()
             l_item.setSizeHint(QtCore.QSize(row_widget.width(), row_widget.height()))
             self.details_list.addItem(l_item)
             self.details_list.setItemWidget(l_item, row_widget)
 
-            row_widget.remove_item.connect(partial(self.remove_item, l_item))
+            row_widget.remove_item.connect(partial(self.remove_item_from_details, l_item))
 
-    def remove_item(self, item):
+    def remove_item_from_details(self, item: QtWidgets.QListWidgetItem) -> None:
+        """ remove an item from the details list """
         self.details_list.takeItem(self.details_list.row(item))
 
 
 class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
-    """ A widget for specifying the information for find/replace actions """
-    # apply, reset
+    """
+    A widget for specifying the information for find/replace actions
+
+    Each edit can correspond to multiple ``FindReplaceAction``'s
+    Generates ``FindReplaceRow``'s for each ``FindReplaceAction``
+    """
     button_box: QtWidgets.QDialogButtonBox
     child_button: QtWidgets.QPushButton
 
@@ -793,8 +830,6 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
     search_edit: QtWidgets.QLineEdit
     replace_edit: QtWidgets.QLineEdit
 
-    # updated: ClassVar[QtCore.Signal] = QtCore.Signal()
-
     filename = 'template_edit_row_widget.ui'
 
     def __init__(
@@ -803,17 +838,18 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         data=None,
         orig_file: Union[ConfigurationFile, ProcedureFile],
         **kwargs
-    ):
+    ) -> None:
         # Expected SimpleRowWidgets are DataWidgets, expecting a dataclass
         super().__init__(*args, **kwargs)
         self.orig_file = orig_file
         self.match_paths: Iterable[List[Any]] = []
         self.actions: List[FindReplaceAction] = []
+        self._match_fn = lambda x: False
+        self._replace_fn = lambda x: x
         self.setup_ui()
 
     def setup_ui(self):
         self.child_button.hide()
-        # TODO: check if icons are reasonable before removing text
         refresh_button = self.button_box.button(QtWidgets.QDialogButtonBox.Retry)
         refresh_button.clicked.connect(self.refresh_paths)
         refresh_button.setText('')
@@ -848,12 +884,14 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         self.setting_button.setMenu(widget_menu)
         self.setting_button.setIcon(qta.icon('fa.gear'))
 
-    def update_replace_fn(self, *args, **kwargs):
+    def update_replace_fn(self, *args, **kwargs) -> None:
+        """ Update the standard replace function for this edit """
         replace_text = self.replace_edit.text()
         replace_fn = get_default_replace_fn(replace_text, self._search_regex)
         self._replace_fn = replace_fn
 
-    def update_match_fn(self, *args, **kwargs):
+    def update_match_fn(self, *args, **kwargs) -> None:
+        """ Update the standard match function for this edit """
         search_text = self.search_edit.text()
 
         flags = re.IGNORECASE if not self.case_button.isChecked() else 0
@@ -869,7 +907,8 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         match_fn = get_default_match_fn(self._search_regex)
         self._match_fn = match_fn
 
-    def apply_edits(self):
+    def apply_edits(self) -> None:
+        """ Apply all the actions corresponding to this edit """
         self.refresh_paths()
         if len(self.actions) <= 0:
             return
@@ -892,13 +931,15 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
 
         self.refresh_paths()
 
-    def refresh_paths(self):
+    def refresh_paths(self) -> None:
+        """
+        Refresh the paths generated by the edit and create FindReplaceActions
+        """
         if self.orig_file is None:
             return
         if not self.search_edit.text():
             return
 
-        # update everything to be safe (finishedEditing can be uncertain)
         self.update_match_fn()
         self.update_replace_fn()
 
@@ -912,7 +953,7 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
 
             self.actions.append(action)
 
-        # this could work, but is smelly and bad
+        # this works, but is smelly and bad.  Access parent table signals
         try:
             # TERW -> TableWidgetItem -> TableWidgetWithAddRow
             self.parent().parent().table_updated.emit()
@@ -921,16 +962,27 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
             ...
 
     def get_details_rows(self) -> List[FindReplaceRow]:
+        """ return a ``FindReplaceRow`` for each action generated by the edit """
         details_row_widgets = []
         for action in self.actions:
             row_widget = FindReplaceRow(data=action)
 
-            row_widget.remove_item.connect(partial(self.remove_from_list, action=action))
+            row_widget.remove_item.connect(partial(self.remove_from_action_list, action=action))
             details_row_widgets.append(row_widget)
 
         return details_row_widgets
 
-    def remove_from_list(self, *args, action=None, **kwargs):
+    def remove_from_action_list(
+        self, *args, action: Optional[FindReplaceAction] = None, **kwargs
+    ) -> None:
+        """
+        Helper to remove an action from the action list after application
+
+        Parameters
+        ----------
+        action : Optional[FindReplaceAction], optional
+            the action to be removed, by default None
+        """        """"""
         try:
             self.actions.remove(action)
         except ValueError:
