@@ -806,7 +806,8 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
         if not isinstance(edit_row_widget, TemplateEditRowWidget):
             # placeholder text if nothing is selected
-            l_item = QtWidgets.QListWidgetItem('select an edit to show details...')
+            l_item = QtWidgets.QListWidgetItem("select an edit or click an edit's"
+                                               "refresh button to show details.")
             return
         elif not edit_row_widget.get_details_rows():
             l_item = QtWidgets.QListWidgetItem(

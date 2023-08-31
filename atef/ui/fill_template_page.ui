@@ -129,12 +129,12 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="QWidget" name="edits_table_placeholder" native="true">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
+         <widget class="QLabel" name="edits_table_placeholder">
+          <property name="text">
+           <string>Open a file to get started!</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
           </property>
          </widget>
         </item>
