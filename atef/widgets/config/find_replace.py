@@ -356,7 +356,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
     ) -> None:
         super().__init__(*args, **kwargs)
         self.fp = filepath
-        self.window = window
+        self._window = window
         self.match_paths: Iterable[List[Any]] = []
         self.orig_file = None
 
@@ -436,6 +436,8 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self._match_fn = match_fn
 
     def preview_changes(self, *args, **kwargs) -> None:
+        if not self.search_edit.text():
+            return  # don't allow searching everything
         self.update_match_fn()
         self.update_replace_fn()
 
@@ -467,7 +469,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
     def open_converted(self, *args, **kwargs) -> None:
         # open new file in new tab
-        self.window._new_tab(data=self.orig_file, filename=self.fp)
+        self._window._new_tab(data=self.orig_file, filename=self.fp)
 
 
 class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
@@ -495,18 +497,18 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
         dclass_type = type(last_dclass).__name__
         self.dclass_label.setText(f'{dclass_type}.{attr}')
 
-        pre_text = str(get_item_from_path(self.data.path[:-1], item=self.data.target))
+        pre_text = str(get_item_from_path(self.data.path, item=self.data.target))
         # html wrapping to get some line wrapping
         self.pre_label.setText(f'<font>{pre_text}</font>')
         self.pre_label.setToolTip(f'<font>{pre_text}</font>')
         preview_file = copy.deepcopy(self.data.target)
 
-        try:
-            _ = data.apply(target=preview_file)
-            post_text = str(get_item_from_path(self.data.path[:-1], item=preview_file))
-        except Exception as ex:
+        preview_success = data.apply(target=preview_file)
+        if preview_success:
+            post_text = str(get_item_from_path(self.data.path, item=preview_file))
+        else:
             logger.warning('Unable to generate preview, provided replacement '
-                           f'text is invalid: {ex}')
+                           'text is invalid')
             post_text = '[INVALID]'
         self.post_label.setText(f'<font>{post_text}</font>')
         self.post_label.setToolTip(f'<font>{post_text}</font>')
@@ -585,9 +587,12 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self,
         *args,
         filepath: Optional[str] = None,
+        window: Optional[Any] = None,
         **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
+        self._window = window
+        self.fp = filepath
         self.all_actions: List[FindReplaceAction] = []
         self._signals: List[str] = []
         self._devices: List[str] = []
@@ -640,6 +645,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             return
 
         def finish_setup():
+            self.details_list.clear()
             self.setup_edits_table()
             self.setup_devices_list()
             self.update_title()
@@ -724,6 +730,16 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
                 fd.write('\n')
         except OSError:
             logger.exception(f'Error saving file {filename}')
+
+        # inform about saving
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            'File saved',
+            'File saved successfully, would you like to open this file?'
+        )
+
+        if reply == QtWidgets.QMessageBox.Yes:
+            self._window._new_tab(data=self.orig_file, filename=filename)
 
     def apply_all(self) -> None:
         self.prompt_apply()

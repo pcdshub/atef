@@ -394,7 +394,7 @@ class Window(DesignerDisplay, QMainWindow):
         """
         Open a fill-template page.
         """
-        widget = FillTemplatePage()
+        widget = FillTemplatePage(window=self)
         self.tab_widget.addTab(widget, 'fill template')
         curr_idx = self.tab_widget.count() - 1
         self.tab_widget.setCurrentIndex(curr_idx)
