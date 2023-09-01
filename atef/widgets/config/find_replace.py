@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import copy
 import json
@@ -8,6 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
 from functools import partial
+from pathlib import Path
 from typing import (TYPE_CHECKING, Any, Callable, ClassVar, Generator,
                     Iterable, List, Optional, Tuple, Union, get_args)
 
@@ -392,7 +395,9 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
     preview_button: QtWidgets.QPushButton
     verify_button: QtWidgets.QPushButton
-    open_file_button: QtWidgets.QPushButton
+    save_button: QtWidgets.QPushButton
+    open_input_file_button: QtWidgets.QPushButton
+    open_output_file_button: QtWidgets.QPushButton
     open_converted_button: QtWidgets.QPushButton
 
     change_list: QtWidgets.QListWidget
@@ -422,10 +427,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         else:
             self.open_converted_button.hide()
 
-        self.setup_open_file_button()
-        self.preview_button.clicked.connect(self.preview_changes)
-        self.verify_button.clicked.connect(self.verify_changes)
-
+        self.setup_buttons()
         self.replace_edit.editingFinished.connect(self.update_replace_fn)
         self.search_edit.editingFinished.connect(self.update_match_fn)
         # placeholder no-op functions
@@ -435,8 +437,12 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
     def verify_changes(self) -> None:
         verify_file_and_notify(self.orig_file, self)
 
-    def setup_open_file_button(self) -> None:
-        self.open_file_button.clicked.connect(self.open_file)
+    def setup_buttons(self) -> None:
+        self.open_input_file_button.clicked.connect(self.open_file)
+        self.open_output_file_button.clicked.connect(self.open_out_file)
+        self.preview_button.clicked.connect(self.preview_changes)
+        self.verify_button.clicked.connect(self.verify_changes)
+        self.save_button.clicked.connect(self.save_file)
 
     def open_file(self, *args, filename: Optional[str] = None, **kwargs) -> None:
         if filename is None:
@@ -450,6 +456,9 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
         self.fp = filename
         self.orig_file = self.load_file(filename)
+        short_fp = f'{Path(self.fp).parent.name}/{Path(self.fp).name}'
+        self.open_input_file_button.setText(f'Input File: {short_fp}')
+        self.open_input_file_button.setToolTip(str(self.fp))
         self.setWindowTitle(f'find and replace: ({os.path.basename(filename)})')
 
     def load_file(self, filepath) -> Union[ConfigurationFile, ProcedureFile]:
@@ -466,6 +475,42 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
                                  'passive checkout.')
 
         return data
+
+    def open_out_file(self, *args, **kwargs) -> None:
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+            parent=self,
+            caption='Select an output file',
+            filter='Json Files (*.json)',
+        )
+        if not filename:
+            return
+
+        self.output_fp = filename
+        short_fp = f'{Path(self.output_fp).parent.name}/{Path(self.output_fp).name}'
+        self.open_output_file_button.setText(f'Output File: {short_fp}')
+        self.open_output_file_button.setToolTip(str(filename))
+
+    def save_file(self) -> None:
+        if not self.output_fp:
+            logger.error('No ouptut file provided')
+            return
+
+        # get serialized
+        serialized = serialize(type(self.orig_file), self.orig_file)
+        try:
+            with open(self.output_fp, 'w') as fd:
+                json.dump(serialized, fd, indent=2)
+                # Ends file on newline as per pre-commit
+                fd.write('\n')
+        except OSError:
+            logger.exception(f'Error saving file {self.fp}')
+            return
+
+        QtWidgets.QMessageBox.information(
+            self,
+            'File Saved',
+            f'File saved successfully to {self.output_fp}'
+        )
 
     def update_replace_fn(self, *args, **kwargs) -> None:
         """
