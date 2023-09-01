@@ -312,6 +312,7 @@ def mock_pv(monkeypatch: Any):
 def configuration_group():
     group = ConfigurationGroup(
         name='config_group',
+        values={'integer': 1, 'string': 'a sample string'},
         configs=[
             PVConfiguration(
                 name='pv config 1',

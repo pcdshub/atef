@@ -5,7 +5,8 @@ from typing import Any, List, Tuple
 import pytest
 
 from atef.check import Equals, GreaterOrEqual
-from atef.config import DeviceConfiguration, PreparedDeviceConfiguration
+from atef.config import (ConfigurationGroup, DeviceConfiguration,
+                         PreparedDeviceConfiguration)
 from atef.enums import Severity
 from atef.widgets.config.find_replace import (get_deepest_dataclass_in_path,
                                               get_item_from_path,
@@ -50,6 +51,36 @@ def test_walk_find_match(
         return regex.search(str(input)) is not None
 
     path = walk_find_match(device_configuration, match_fn)
+    for expected_path, found_path in zip(simple_path, path):
+        simplified_path = []
+        for seg in found_path:
+            if not isinstance(seg[0], str):
+                item = type(seg[0])
+            else:
+                item = seg[0]
+            simplified_path.append((item, seg[1]))
+        assert expected_path == simplified_path
+
+
+@pytest.mark.parametrize(
+    "search_str, simple_path",
+    [
+        ('integer', [[(ConfigurationGroup, 'values'), ("__dictkey__", "integer")]]),
+        ('^1$', [[(ConfigurationGroup, 'values'), ("__dictvalue__", "integer")]])
+    ]
+)
+def test_walk_find_match_2(
+    configuration_group: ConfigurationGroup,
+    search_str: str,
+    simple_path: List[Tuple[Any, Any]]
+):
+    regex = re.compile(search_str)
+
+    def match_fn(input):
+        # if type(input)
+        return regex.search(str(input)) is not None
+
+    path = walk_find_match(configuration_group, match_fn)
     for expected_path, found_path in zip(simple_path, path):
         simplified_path = []
         for seg in found_path:

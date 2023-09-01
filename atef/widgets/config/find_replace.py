@@ -8,12 +8,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
 from functools import partial
-from typing import (Any, Callable, ClassVar, Generator, Iterable, List,
-                    Optional, Tuple, Union, get_args)
+from typing import (TYPE_CHECKING, Any, Callable, ClassVar, Generator,
+                    Iterable, List, Optional, Tuple, Union, get_args)
 
 import happi
 import qtawesome as qta
-from apischema import ValidationError, deserialize, serialize
+from apischema import ValidationError, serialize
 from qtpy import QtCore, QtWidgets
 
 from atef.cache import DataCache, get_signal_cache
@@ -25,7 +25,13 @@ from atef.widgets.config.utils import TableWidgetWithAddRow
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import BusyCursorThread, insert_widget
 
+if TYPE_CHECKING:
+    from .window import Window
+
 logger = logging.getLogger(__name__)
+
+ReplaceFunction = Callable[[Any], Any]
+MatchFunction = Callable[[Any], bool]
 
 
 @contextmanager
@@ -45,7 +51,7 @@ def walk_find_match(
     item: Any,
     match: Callable,
     parent: List[Tuple[Any, Any]] = []
-) -> Generator:
+) -> Generator[List[Tuple[Any, Any]], None, None]:
     """
     Walk the dataclass and find every key / field where ``match`` evaluates to True.
 
@@ -186,7 +192,7 @@ def get_item_from_path(
 def replace_item_from_path(
     item: Any,
     path: List[Tuple[Any, Any]],
-    replace_fn: Callable
+    replace_fn: ReplaceFunction
 ) -> None:
     """
     replace some object in ``item`` located at the end of ``path``, according
@@ -202,7 +208,7 @@ def replace_item_from_path(
         The object to replace information in
     path : List[Tuple[Any, Any]]
         A "path" to a search match, as returned by walk_find_match
-    replace_fn : Callable
+    replace_fn : ReplaceFunction
         A function that returns the replacement object
     """
     # need the final step to specify what is being replaced
@@ -222,19 +228,51 @@ def replace_item_from_path(
         new_enum = getattr(final_step[1], replace_fn(old_enum.name))
         setattr(parent_item, path[-2][1], new_enum)
     else:
-        # simple field paths don't have a final (__sth__, ?) segement
+        # simple field paths don't have a final (__sth__, ?) segment
         old_value = getattr(parent_item, path[-1][1])
         setattr(parent_item, path[-1][1], replace_fn(old_value))
 
 
-def get_default_match_fn(search_regex: re.Pattern) -> Callable:
+def get_default_match_fn(search_regex: re.Pattern) -> MatchFunction:
+    """
+    Returns a standard match function using the provided regex pattern
+
+    Parameters
+    ----------
+    search_regex : re.Pattern
+        compiled regex pattern to match items against
+
+    Returns
+    -------
+    MatchFunction
+        a match function to be used in ``walk_find_match``
+    """
     def match_fn(match):
         return search_regex.search(str(match)) is not None
 
     return match_fn
 
 
-def get_default_replace_fn(replace_text: str, search_regex: re.Pattern) -> Callable:
+def get_default_replace_fn(
+    replace_text: str,
+    search_regex: re.Pattern
+) -> ReplaceFunction:
+    """
+    Returns a standard replace function, which attempts to match the type of the
+    item being replaced
+
+    Parameters
+    ----------
+    replace_text : str
+        text to replace
+    search_regex : re.Pattern
+        the compiled regex search pattern, for use in string replacements
+
+    Returns
+    -------
+    ReplaceFunction
+        a replacement function for use in ``replace_item_from_path``
+    """
     def replace_fn(value):
         if isinstance(value, str):
             return search_regex.sub(replace_text, value)
@@ -247,17 +285,30 @@ def get_default_replace_fn(replace_text: str, search_regex: re.Pattern) -> Calla
     return replace_fn
 
 
-def verify_changes(parent, orig_file: Union[ConfigurationFile, ProcedureFile]) -> None:
-    # check to make sure changes are valid
+def verify_file_and_notify(
+    file: Union[ConfigurationFile, ProcedureFile],
+    parent_widget: QtWidgets.QWidget
+) -> None:
+    """
+    Verify the provided file is valid by attempting to prepare it.
+    Requires a parent QWidget to spawn QMessageBox notices from.
+
+    Parameters
+    ----------
+    parent_widget : QtWidgets.QWidget
+        Parent widget to bind the QMessageBox to
+    file : Union[ConfigurationFile, ProcedureFile]
+        the file to verify
+    """
     try:
-        if isinstance(orig_file, ConfigurationFile):
-            _ = PreparedFile.from_config(orig_file)
-        elif isinstance(orig_file, ProcedureFile):
+        if isinstance(file, ConfigurationFile):
+            _ = PreparedFile.from_config(file)
+        elif isinstance(file, ProcedureFile):
             # clear all results when making a new run tree
-            _ = PreparedProcedureFile.from_origin(orig_file)
+            _ = PreparedProcedureFile.from_origin(file)
         else:
             QtWidgets.QMessageBox.warning(
-                parent,
+                parent_widget,
                 'Verification FAIL',
                 'File type not recognized.'
             )
@@ -265,14 +316,14 @@ def verify_changes(parent, orig_file: Union[ConfigurationFile, ProcedureFile]) -
     except Exception as ex:
         logger.debug(ex)
         QtWidgets.QMessageBox.warning(
-            parent,
+            parent_widget,
             'Verification FAIL',
             'File could not be prepared successfully, edits will not work'
         )
         return
 
     QtWidgets.QMessageBox.information(
-        parent,
+        parent_widget,
         'Verification PASS',
         'File prepared successfully, edits should work'
     )
@@ -282,13 +333,13 @@ def verify_changes(parent, orig_file: Union[ConfigurationFile, ProcedureFile]) -
 class FindReplaceAction:
     target: Union[ConfigurationFile, ProcedureFile]
     path: List[Tuple[Any, Any]]
-    replace_fn: Callable
+    replace_fn: ReplaceFunction
 
     def apply(
         self,
         target: Optional[Union[ConfigurationFile, ProcedureFile]] = None,
         path: Optional[List[Tuple[Any, Any]]] = None,
-        replace_fn: Optional[Callable] = None
+        replace_fn: Optional[ReplaceFunction] = None
     ) -> bool:
         """
         Apply the find-replace action, return True if action was applied
@@ -300,11 +351,12 @@ class FindReplaceAction:
         Parameters
         ----------
         target : Optional[Union[ConfigurationFile, ProcedureFile]], optional
-            the file to apply the find-replace action to, by default None
+            The file to apply the find-replace action to, by default this applies
+            to the current target of the action, by default None
         path : Optional[List[Tuple[Any, Any]]], optional
             A "path" to a search match, as returned by walk_find_match,
             by default None
-        replace_fn : Optional[Callable], optional
+        replace_fn : Optional[ReplaceFunction], optional
             A function that takes the value and returns the replaced value,
             by default None
 
@@ -351,7 +403,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self,
         *args,
         filepath: Optional[str] = None,
-        window: Optional[Any] = None,
+        window: Optional[Window] = None,
         **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -377,11 +429,11 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self.replace_edit.editingFinished.connect(self.update_replace_fn)
         self.search_edit.editingFinished.connect(self.update_match_fn)
         # placeholder no-op functions
-        self._match_fn = lambda x: False
-        self._replace_fn = lambda x: x
+        self._match_fn: MatchFunction = lambda x: False
+        self._replace_fn: ReplaceFunction = lambda x: x
 
     def verify_changes(self) -> None:
-        verify_changes(self, self.orig_file)
+        verify_file_and_notify(self.orig_file, self)
 
     def setup_open_file_button(self) -> None:
         self.open_file_button.clicked.connect(self.open_file)
@@ -401,26 +453,34 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self.setWindowTitle(f'find and replace: ({os.path.basename(filename)})')
 
     def load_file(self, filepath) -> Union[ConfigurationFile, ProcedureFile]:
-        with open(filepath, 'r') as fp:
-            self._original_json = json.load(fp)
         try:
-            data = deserialize(ConfigurationFile, self._original_json)
+            data = ConfigurationFile.from_filename(filepath)
         except ValidationError:
             logger.debug('failed to open as passive checkout')
             try:
-                data = deserialize(ProcedureFile, self._original_json)
+                data = ProcedureFile.from_filename(filepath)
             except ValidationError:
                 logger.error('failed to open file as either active '
                              'or passive checkout')
+                raise ValueError('Could not open the file as either active or '
+                                 'passive checkout.')
 
         return data
 
     def update_replace_fn(self, *args, **kwargs) -> None:
+        """
+        Update the stored replacement function using the text in ``self.replace_edit``
+        """
         replace_text = self.replace_edit.text()
         replace_fn = get_default_replace_fn(replace_text, self._search_regex)
         self._replace_fn = replace_fn
 
     def update_match_fn(self, *args, **kwargs) -> None:
+        """
+        Update the stored match function using the text in ``self.search_edit``
+        Reads the settings buttons (match case, use_regex) to properly compile
+        the regex search pattern
+        """
         search_text = self.search_edit.text()
 
         flags = re.IGNORECASE if not self.case_button.isChecked() else 0
@@ -436,13 +496,16 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self._match_fn = match_fn
 
     def preview_changes(self, *args, **kwargs) -> None:
+        """
+        Update the change list according to the provided find and replace settings
+        """
         if not self.search_edit.text():
             return  # don't allow searching everything
         self.update_match_fn()
         self.update_replace_fn()
 
         self.change_list.clear()
-        self.match_paths = walk_find_match(self.orig_file, self._match_fn)
+        self.match_paths = list(walk_find_match(self.orig_file, self._match_fn))
 
         def remove_item(list_item):
             self.change_list.takeItem(self.change_list.row(list_item))
@@ -468,8 +531,9 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
             row_widget.button_box.rejected.connect(partial(remove_item, l_item))
 
     def open_converted(self, *args, **kwargs) -> None:
-        # open new file in new tab
-        self._window._new_tab(data=self.orig_file, filename=self.fp)
+        """ open new file in new tab """
+        if self._window is not None:
+            self._window._new_tab(data=self.orig_file, filename=self.fp)
 
 
 class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
@@ -587,7 +651,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self,
         *args,
         filepath: Optional[str] = None,
-        window: Optional[Any] = None,
+        window: Optional[Window] = None,
         **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -656,16 +720,13 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.busy_thread.task_finished.connect(finish_setup)
         self.busy_thread.start()
 
-    def load_file(self, filepath: str) -> Union[ConfigurationFile, ProcedureFile]:
-        with open(filepath, 'r') as fp:
-            self._original_json = json.load(fp)
-
+    def load_file(self, filepath: str) -> None:
         try:
-            data = deserialize(ConfigurationFile, self._original_json)
+            data = ConfigurationFile.from_filename(filepath)
         except ValidationError:
             logger.debug('failed to open as passive checkout')
             try:
-                data = deserialize(ProcedureFile, self._original_json)
+                data = ProcedureFile.from_filename(filepath)
             except ValidationError:
                 logger.error('failed to open file as either active '
                              'or passive checkout')
@@ -708,9 +769,11 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.device_table.setItem(i, 0, QtWidgets.QTableWidgetItem(dev))
 
     def verify_changes(self) -> None:
-        verify_changes(self, self.orig_file)
+        if self.orig_file is not None:
+            verify_file_and_notify(self.orig_file, self)
 
     def save_file(self) -> None:
+        self.verify_changes()
         # open save message box
         self.prompt_apply()
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -771,6 +834,9 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         """
         Update the title.  Will be the name and the number of unapplied edits
         """
+        if self.fp is None:
+            return
+
         file_name = os.path.basename(self.fp)
         if len(self.all_actions) > 0:
             file_name += f'[{len(self.all_actions)}]'
@@ -806,12 +872,15 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
         if not isinstance(edit_row_widget, TemplateEditRowWidget):
             # placeholder text if nothing is selected
-            l_item = QtWidgets.QListWidgetItem("select an edit or click an edit's"
+            l_item = QtWidgets.QListWidgetItem("Select an edit or click an edit's "
                                                "refresh button to show details.")
+            self.details_list.addItem(l_item)
             return
         elif not edit_row_widget.get_details_rows():
             l_item = QtWidgets.QListWidgetItem(
-                'provide search and replace text to show details...'
+                'Provide search and replace text to show details.\n'
+                'If nothing appears after clicking the refresh button,\nthere'
+                'are no matches.'
             )
             self.details_list.addItem(l_item)
             return
@@ -861,8 +930,8 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         self.orig_file = orig_file
         self.match_paths: Iterable[List[Any]] = []
         self.actions: List[FindReplaceAction] = []
-        self._match_fn = lambda x: False
-        self._replace_fn = lambda x: x
+        self._match_fn: MatchFunction = lambda x: False
+        self._replace_fn: ReplaceFunction = lambda x: x
         self.setup_ui()
 
     def setup_ui(self):
@@ -961,7 +1030,7 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         self.update_replace_fn()
 
         self.actions.clear()
-        self.match_paths = walk_find_match(self.orig_file, self._match_fn)
+        self.match_paths = list(walk_find_match(self.orig_file, self._match_fn))
         # generator can be unstable if dataclass changes during walk
         # this is only ok because we consume generator entirely
         for path in self.match_paths:
