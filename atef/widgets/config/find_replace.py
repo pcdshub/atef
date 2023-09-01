@@ -291,45 +291,63 @@ def get_default_replace_fn(
 def verify_file_and_notify(
     file: Union[ConfigurationFile, ProcedureFile],
     parent_widget: QtWidgets.QWidget
-) -> None:
+) -> bool:
     """
     Verify the provided file is valid by attempting to prepare it.
     Requires a parent QWidget to spawn QMessageBox notices from.
 
     Parameters
     ----------
-    parent_widget : QtWidgets.QWidget
-        Parent widget to bind the QMessageBox to
     file : Union[ConfigurationFile, ProcedureFile]
         the file to verify
+    parent_widget : QtWidgets.QWidget
+        Parent widget to bind the QMessageBox to
+
+    Returns
+    -------
+    bool
+        the verification success
     """
+    verified = True
     try:
         if isinstance(file, ConfigurationFile):
-            _ = PreparedFile.from_config(file)
+            prep_file = PreparedFile.from_config(file)
+            if len(prep_file.root.prepare_failures) > 0:
+                verified = False
         elif isinstance(file, ProcedureFile):
             # clear all results when making a new run tree
-            _ = PreparedProcedureFile.from_origin(file)
+            prep_file = PreparedProcedureFile.from_origin(file)
+            if len(prep_file.root.prepare_failures) > 0:
+                verified = False
         else:
             QtWidgets.QMessageBox.warning(
                 parent_widget,
                 'Verification FAIL',
                 'File type not recognized.'
             )
-            return
+            return False
     except Exception as ex:
         logger.debug(ex)
         QtWidgets.QMessageBox.warning(
             parent_widget,
             'Verification FAIL',
+            f'Unknown Error: {ex}.'
+        )
+        return False
+
+    if not verified:
+        QtWidgets.QMessageBox.warning(
+            parent_widget,
+            'Verification FAIL',
             'File could not be prepared successfully, edits will not work'
         )
-        return
-
-    QtWidgets.QMessageBox.information(
-        parent_widget,
-        'Verification PASS',
-        'File prepared successfully, edits should work'
-    )
+    else:
+        QtWidgets.QMessageBox.information(
+            parent_widget,
+            'Verification PASS',
+            'File prepared successfully, edits should work'
+        )
+    return verified
 
 
 @dataclass
@@ -818,14 +836,29 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             verify_file_and_notify(self.orig_file, self)
 
     def save_file(self) -> None:
-        self.verify_changes()
-        # open save message box
+        if self.orig_file is None:
+            return
         self.prompt_apply()
+        verified = verify_file_and_notify(self.orig_file, self)
+
+        if not verified:
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                'Continue Saving?',
+                'Verification failed, save anyway?'
+            )
+
+            if reply == QtWidgets.QMessageBox.No:
+                return
+
+        # open save message box
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(
             parent=self,
             caption='Save as',
             filter='Json Files (*.json)',
         )
+        if not filename:
+            return
         if not filename.endswith('.json'):
             filename += '.json'
 
@@ -838,16 +871,24 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
                 fd.write('\n')
         except OSError:
             logger.exception(f'Error saving file {filename}')
+            return
 
         # inform about saving
-        reply = QtWidgets.QMessageBox.question(
-            self,
-            'File saved',
-            'File saved successfully, would you like to open this file?'
-        )
+        if self._window:
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                'File saved',
+                'File saved successfully, would you like to open this file?'
+            )
 
-        if reply == QtWidgets.QMessageBox.Yes:
-            self._window._new_tab(data=self.orig_file, filename=filename)
+            if reply == QtWidgets.QMessageBox.Yes:
+                self._window._new_tab(data=self.orig_file, filename=filename)
+        else:
+            QtWidgets.QMessageBox.information(
+                self,
+                'File saved',
+                'File saved successfully'
+            )
 
     def apply_all(self) -> None:
         self.prompt_apply()
