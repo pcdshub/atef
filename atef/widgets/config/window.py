@@ -29,6 +29,8 @@ from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep)
 from atef.qt_helpers import walk_tree_widget_items
 from atef.report import ActiveAtefReport, PassiveAtefReport
+from atef.widgets.config.find_replace import (FillTemplatePage,
+                                              FindReplaceWidget)
 from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
@@ -65,6 +67,7 @@ class Window(DesignerDisplay, QMainWindow):
     action_open_archive_viewer: QAction
     action_print_report: QAction
     action_clear_results: QAction
+    action_find_replace: QAction
 
     def __init__(self, *args, show_welcome: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
@@ -80,6 +83,7 @@ class Window(DesignerDisplay, QMainWindow):
         )
         self.action_print_report.triggered.connect(self.print_report)
         self.action_clear_results.triggered.connect(self.clear_results)
+        self.action_find_replace.triggered.connect(self.find_replace)
 
         tab_bar = self.tab_widget.tabBar()
         # always use scroll area and never truncate file names
@@ -113,6 +117,9 @@ class Window(DesignerDisplay, QMainWindow):
         )
         widget.new_active_button.clicked.connect(
             partial(self.new_file, checkout_type='active')
+        )
+        widget.fill_template_button.clicked.connect(
+            self.open_fill_template
         )
         widget.sample_active_button.clicked.connect(partial(
             self.open_file, filename=str(TEST_CONFIG_PATH / 'active_test.json')
@@ -367,6 +374,31 @@ class Window(DesignerDisplay, QMainWindow):
 
             current_tree.update_statuses()
 
+    def find_replace(self, *args, **kwargs):
+        """ find and replace in the current tree.  Open a find-replace widget """
+        try:
+            curr_tree = self.get_current_tree()
+            logger.debug(f'starting find-replace: {self.get_current_tree().full_path}')
+        except AttributeError:
+            curr_tree = None
+
+        if curr_tree:
+            self._find_widget = FindReplaceWidget(
+                filepath=curr_tree.full_path, window=self
+            )
+        else:
+            self._find_widget = FindReplaceWidget()
+        self._find_widget.show()
+
+    def open_fill_template(self, *args, **kwargs):
+        """
+        Open a fill-template page.
+        """
+        widget = FillTemplatePage(window=self)
+        self.tab_widget.addTab(widget, 'fill template')
+        curr_idx = self.tab_widget.count() - 1
+        self.tab_widget.setCurrentIndex(curr_idx)
+
 
 class LandingPage(DesignerDisplay, QWidget):
     """ Landing Page for selecting a subsequent action """
@@ -374,6 +406,7 @@ class LandingPage(DesignerDisplay, QWidget):
 
     new_passive_button: QtWidgets.QPushButton
     new_active_button: QtWidgets.QPushButton
+    fill_template_button: QtWidgets.QPushButton
     open_button: QtWidgets.QPushButton
     exit_button: QtWidgets.QPushButton
 

@@ -432,7 +432,7 @@ class FailedStep:
     #: Configuration instance.
     origin: AnyProcedure
     #: overall result of running the step
-    combined_result: Result
+    combined_result: Result = field(default_factory=incomplete_result)
     #: confirmation by the user that result matches expectations
     verify_result: Result = field(default_factory=incomplete_result)
     #: whether or not the step completed successfully
@@ -739,14 +739,8 @@ class PreparedSetValueStep(PreparedProcedureStep):
     prepared_actions: List[PreparedValueToSignal] = field(
         default_factory=list
     )
-    #: list of actions that failed to be prepared, as they were
-    prepare_action_failures: List[ValueToTarget] = field(default_factory=list)
     #: list of prepared success criteria (comparisons)
     prepared_criteria: List[PreparedSignalComparison] = field(
-        default_factory=list
-    )
-    #: list of success criteria that failed to be prepared, as an exception
-    prepare_criteria_failures: List[PreparedComparisonException] = field(
         default_factory=list
     )
 
@@ -777,25 +771,11 @@ class PreparedSetValueStep(PreparedProcedureStep):
             await prep_criteria.compare()
 
         if self.origin.require_action_success:
-            if self.prepare_action_failures:
-                return Result(
-                    severity=Severity.error,
-                    reason=('One or more actions failed to initialize: '
-                            f'{[act.name for act in self.prepare_action_failures]}')
-                )
-
             action_results = [action.result for action in self.prepared_actions]
         else:
             action_results = []
 
         criteria_results = [crit.result for crit in self.prepared_criteria]
-
-        if self.prepare_criteria_failures:
-            return Result(
-                severity=Severity.error,
-                reason=('One or more success criteria failed to initialize: '
-                        f'{[crit.name for crit in self.prepare_criteria_failures]}')
-            )
 
         severity = _summarize_result_severity(GroupResultMode.all_,
                                               criteria_results + action_results)
@@ -837,13 +817,13 @@ class PreparedSetValueStep(PreparedProcedureStep):
                     origin=value_to_target, parent=prep_step
                 )
                 prep_step.prepared_actions.append(prep_value_to_signal)
-            except Exception:
-                prep_step.prepare_action_failures.append(value_to_target)
+            except Exception as ex:
+                return FailedStep(parent=parent, origin=step, exception=ex)
 
         for comp_to_target in step.success_criteria:
             res = create_prepared_comparison(comp_to_target)
             if isinstance(res, Exception):
-                prep_step.prepare_criteria_failures.append(res)
+                return FailedStep(parent=parent, origin=step, exception=res)
             else:
                 prep_step.prepared_criteria.append(res)
 

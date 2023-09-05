@@ -16,8 +16,8 @@ import datetime
 import logging
 import pathlib
 import pprint
-from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
-                    Sequence, Type, TypeVar, Union)
+from typing import (Any, Callable, ClassVar, Dict, List, Optional, Sequence,
+                    Type, TypeVar, Union)
 
 import pydm
 import pydm.display
@@ -42,8 +42,9 @@ from atef.widgets.config.utils import (ConfigTreeModel, MultiInputDialog,
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData
-from atef.widgets.utils import (BusyCursorThread, PV_validator, insert_widget,
-                                match_line_edit_text_width)
+from atef.widgets.utils import (BusyCursorThread, ExpandableFrame,
+                                PV_validator, _create_vbox_layout,
+                                insert_widget, match_line_edit_text_width)
 
 from ...procedure import (ComparisonToTarget, DescriptionStep, DisplayOptions,
                           PassiveStep, PlanOptions, PlanStep, ProcedureGroup,
@@ -144,17 +145,6 @@ class GeneralProcedureWidget(DesignerDisplay, DataWidget):
             The index of the combo box.
         """
         self.bridge.verify_required.put(bool(index))
-
-
-def _create_vbox_layout(
-    widget: Optional[QtWidgets.QWidget] = None, alignment: Qt.Alignment = Qt.AlignTop
-) -> QtWidgets.QVBoxLayout:
-    if widget is not None:
-        layout = QtWidgets.QVBoxLayout(widget)
-    else:
-        layout = QtWidgets.QVBoxLayout()
-    layout.setAlignment(alignment)
-    return layout
 
 
 class StepWidgetBase(QtWidgets.QWidget):
@@ -344,85 +334,6 @@ class DescriptionStepWidget(StepWidgetBase, QtWidgets.QFrame):
         self.description_widget = _add_label(
             layout, self.description, object_name="step_description"
         )
-
-
-class ExpandableFrame(QtWidgets.QFrame):
-    """
-    A `QtWidgets.QFrame` that can be toggled with a mouse click.
-
-    Contains a QVBoxLayout layout which can have one or more user-provided
-    widgets.
-
-    Parameters
-    ----------
-    text : str
-        The title of the frame, shown on the toolbutton.
-
-    parent : QtWidgets.QWidget, optional
-        The parent widget.
-    """
-
-    toggle_button: QtWidgets.QToolButton
-    _button_text: str
-    _size_hint: QtCore.QSize
-
-    def __init__(self, text: str = "", parent: Optional[QtWidgets.QWidget] = None):
-        super().__init__(parent=parent)
-
-        self._button_text = text
-
-        self.toggle_button = QtWidgets.QToolButton(text=text)
-        self.toggle_button.setCheckable(True)
-        self.toggle_button.setChecked(False)
-        self.toggle_button.setStyleSheet("QToolButton { border: none; }")
-        self.toggle_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-        self.toggle_button.setArrowType(Qt.RightArrow)
-        self.toggle_button.toggled.connect(self.on_toggle)
-
-        layout = _create_vbox_layout(self)
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.toggle_button)
-        self._size_hint = self.sizeHint()
-
-    def add_widget(self, widget: QtWidgets.QWidget) -> None:
-        """Add a widget to the content layout."""
-        self.layout().addWidget(widget)
-        widget.setVisible(self.expanded)
-
-    @property
-    def expanded(self) -> bool:
-        """Is the expandable frame expanded / not collapsed?"""
-        return self.toggle_button.isChecked()
-
-    @property
-    def layout_widgets(self) -> Generator[QtWidgets.QWidget, None, None]:
-        """Find all user-provided widgets in the content layout."""
-        for idx in range(self.layout().count()):
-            item = self.layout().itemAt(idx)
-            widget = item.widget()
-            if widget is not None and widget is not self.toggle_button:
-                yield widget
-
-    @QtCore.Slot()
-    def on_toggle(self):
-        """Toggle the content display."""
-        expanded = self.expanded
-        self.toggle_button.setText("" if expanded else self._button_text)
-        self.toggle_button.setArrowType(
-            Qt.DownArrow if expanded else Qt.RightArrow
-        )
-
-        widgets = list(self.layout_widgets)
-        for widget in widgets:
-            widget.setVisible(expanded)
-
-        # min_height = self._size_hint.height()
-        # if expanded and widgets:
-        #     min_height += sum(w.sizeHint().height() for w in widgets)
-
-        # self.setMinimumHeight(min_height)
-        self.updateGeometry()
 
 
 class ProcedureGroupWidget(StepWidgetBase, QtWidgets.QFrame):

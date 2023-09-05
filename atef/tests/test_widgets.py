@@ -7,7 +7,7 @@ import happi
 import pytest
 import yaml
 from pytestqt.qtbot import QtBot
-from qtpy import QtCore
+from qtpy import QtCore, QtWidgets
 
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydDeviceTableWidget
@@ -222,12 +222,16 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path,
 
 
 @pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
-def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike):
+def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike, monkeypatch):
     """
     Pass if the RunTree can be created from an EditTree
+    This can hang if a checkout cannot be prepared, so patch to ensure
+    the gui continues
     """
+    monkeypatch.setattr(QtWidgets.QMessageBox, 'exec', lambda *a, **k: True)
     window = Window(show_welcome=False)
     window.open_file(filename=str(config))
+    print(config)
     qtbot.addWidget(window)
     toggle = window.tab_widget.widget(0).toggle
     toggle.setChecked(True)
