@@ -1,0 +1,34 @@
+atef.procedure.PlanStep
+=======================
+
+.. currentmodule:: atef.procedure
+
+.. autoclass:: PlanStep
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: allow_verify
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: description
+    .. autoattribute:: destination
+    .. autoattribute:: halt_on_fail
+    .. autoattribute:: name
+    .. autoattribute:: parent
+    .. autoattribute:: require_plan_success
+    .. autoattribute:: step_success_required
+    .. autoattribute:: verify_required
+    .. autoattribute:: plans
+    .. autoattribute:: checks
+    
+    
