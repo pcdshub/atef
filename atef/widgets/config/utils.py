@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
-import re
 import time
 from dataclasses import fields
 from enum import IntEnum
@@ -1405,30 +1404,17 @@ def set_widget_font_size(widget: QWidget, size: int):
     widget.setFont(font)
 
 
-_float_re = re.compile(r'(([+-]?\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?)')
-
-
 def valid_float_string(string):
-    match = _float_re.search(string)
-    return match.groups()[0] == string if match else False
-
-
-class FloatValidator(QValidator):
-
-    def validate(self, string: str, position: int) -> Tuple[QValidator.State, str, int]:
-        if valid_float_string(string):
-            return (QValidator.Acceptable, string, position)
-        if string == "" or string[position-1] in 'e.-+':
-            return (QValidator.Intermediate, string, position)
-        return (QValidator.Invalid, string, position)
-
-    def fixup(self, text: str) -> str:
-        match = _float_re.search(text)
-        return match.groups()[0] if match else ""
+    try:
+        float(string)
+    except ValueError:
+        return False
+    return True
 
 
 class ScientificDoubleSpinBox(QDoubleSpinBox):
     """
+    A double spinbox that supports scientific notation
     Thanks to jdreaver (https://gist.github.com/jdreaver/0be2e44981159d0854f5)
     for doing the hard work
     """
@@ -1436,35 +1422,39 @@ class ScientificDoubleSpinBox(QDoubleSpinBox):
         super().__init__(*args, **kwargs)
         self.setMinimum(-np.inf)
         self.setMaximum(np.inf)
-        self.validator = FloatValidator(parent=self)
         self.setDecimals(1000)
 
     def validate(self, text, position):
-        return self.validator.validate(text, position)
+        if valid_float_string(text):
+            return (QValidator.Acceptable, text, position)
+        if text == "" or text[position-1] in 'e.-+':
+            return (QValidator.Intermediate, text, position)
+        return (QValidator.Invalid, text, position)
 
     def fixup(self, text):
-        return self.validator.fixup(text)
+        try:
+            value = float(text)
+        except ValueError:
+            return ""
+        return value
 
     def valueFromText(self, text):
         return float(text)
 
     def textFromValue(self, value):
-        return format_float(value)
+        return str(float(value))
 
     def stepBy(self, steps):
         text = self.cleanText()
-        groups = _float_re.search(text).groups()
-        decimal = float(groups[1])
+        if 'e' in text:
+            decimal, exp = text.split('e')
+        else:
+            decimal = text
+            exp = None
+        decimal = float(decimal)
         decimal += steps
-        new_string = "{:g}".format(decimal) + (groups[3] if groups[3] else "")
+        new_string = "{:g}".format(decimal) + (f'e{exp}' if exp else "")
         self.lineEdit().setText(new_string)
-
-
-def format_float(value):
-    """Modified form of the 'g' format specifier."""
-    string = "{:g}".format(value).replace("e+", "e")
-    string = re.sub(r"e(-?)0*(\d+)", r"e\1\2", string)
-    return string
 
 
 class EditMode(IntEnum):
