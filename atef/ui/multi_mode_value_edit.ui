@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>163</width>
-    <height>199</height>
+    <width>186</width>
+    <height>213</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -140,7 +140,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QDoubleSpinBox" name="float_input">
+      <widget class="ScientificDoubleSpinBox" name="float_input">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -151,7 +151,7 @@
         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
        </property>
        <property name="decimals">
-        <number>4</number>
+        <number>10</number>
        </property>
        <property name="minimum">
         <double>-2147483647.000000000000000</double>
@@ -194,6 +194,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ScientificDoubleSpinBox</class>
+   <extends>QDoubleSpinBox</extends>
+   <header>atef.widgets.config.utils</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
