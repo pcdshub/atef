@@ -11,7 +11,8 @@ Features
 
 Bugfixes
 --------
-- N/A
+- Waits for signal connection during :class:`ActionRowWidget` initialization to properly
+  read enum strings from signal.
 
 Maintenance
 -----------
