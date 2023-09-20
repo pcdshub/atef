@@ -11,6 +11,7 @@ from itertools import zip_longest
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
 
+import numpy as np
 import qtawesome as qta
 from ophyd import EpicsSignal, EpicsSignalRO
 from qtpy import QtCore, QtWidgets
@@ -18,7 +19,8 @@ from qtpy.QtCore import (QPoint, QPointF, QRect, QRectF, QRegularExpression,
                          QSize, Qt, QTimer)
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtGui import (QBrush, QClipboard, QColor, QGuiApplication, QPainter,
-                        QPaintEvent, QPen, QRegularExpressionValidator)
+                        QPaintEvent, QPen, QRegularExpressionValidator,
+                        QValidator)
 from qtpy.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QInputDialog,
                             QLabel, QLayout, QLineEdit, QMenu, QPushButton,
                             QSizePolicy, QSpinBox, QStyle, QToolButton,
@@ -1402,6 +1404,59 @@ def set_widget_font_size(widget: QWidget, size: int):
     widget.setFont(font)
 
 
+def valid_float_string(string):
+    try:
+        float(string)
+    except ValueError:
+        return False
+    return True
+
+
+class ScientificDoubleSpinBox(QDoubleSpinBox):
+    """
+    A double spinbox that supports scientific notation
+    Thanks to jdreaver (https://gist.github.com/jdreaver/0be2e44981159d0854f5)
+    for doing the hard work
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setMinimum(-np.inf)
+        self.setMaximum(np.inf)
+        self.setDecimals(1000)
+
+    def validate(self, text, position):
+        if valid_float_string(text):
+            return (QValidator.Acceptable, text, position)
+        if text == "" or text[position-1] in 'e.-+':
+            return (QValidator.Intermediate, text, position)
+        return (QValidator.Invalid, text, position)
+
+    def fixup(self, text):
+        try:
+            value = float(text)
+        except ValueError:
+            return ""
+        return value
+
+    def valueFromText(self, text):
+        return float(text)
+
+    def textFromValue(self, value):
+        return str(float(value))
+
+    def stepBy(self, steps):
+        text = self.cleanText()
+        if 'e' in text:
+            decimal, exp = text.split('e')
+        else:
+            decimal = text
+            exp = None
+        decimal = float(decimal)
+        decimal += steps
+        new_string = "{:g}".format(decimal) + (f'e{exp}' if exp else "")
+        self.lineEdit().setText(new_string)
+
+
 class EditMode(IntEnum):
     BOOL = 0
     ENUM = 1
@@ -1461,7 +1516,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
     happi_select_component: QPushButton
     happi_value_preview: QLabel
     happi_refresh: QToolButton
-    float_input: QDoubleSpinBox
+    float_input: ScientificDoubleSpinBox
     int_input: QSpinBox
     str_input: QLineEdit
 

@@ -25,6 +25,7 @@ import qtawesome
 import typhos
 import typhos.cli
 import typhos.display
+from ophyd.signal import EpicsSignalBase
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QDialogButtonBox
@@ -931,7 +932,7 @@ class ActionRowWidget(TargetRowWidget):
         Updates value input widget with a QLineEdit with the approriate validator
         given the target's datatype
         """
-        sig = self.data.to_signal()
+        sig: EpicsSignalBase = self.data.to_signal()
         if sig is None:
             self.edit_widget = QtWidgets.QLabel('(no target set)')
             insert_widget(self.edit_widget, self.value_input_placeholder)
@@ -943,6 +944,7 @@ class ActionRowWidget(TargetRowWidget):
         self._enum_strs = None
 
         def get_curr_value():
+            sig.wait_for_connection()
             self._curr_value = self.bridge.value.get() or sig.get()
             self._dtype = type(self._curr_value)
             self._enum_strs = getattr(sig, 'enum_strs', None)
