@@ -48,18 +48,24 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="api.html">ATEF API</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Release History</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#v1-1-0-2023-09-14">v1.1.0 (2023-09-14)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#v1-2-0-2023-09-27">v1.2.0 (2023-09-27)</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#features">Features</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#bugfixes">Bugfixes</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#maintenance">Maintenance</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#contributors">Contributors</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#v1-0-0-2023-06-22">v1.0.0 (2023-06-22)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#v1-1-0-2023-09-14">v1.1.0 (2023-09-14)</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#id1">Features</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#id2">Bugfixes</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id3">Maintenance</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#id4">Contributors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#maintenance">Maintenance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3">Contributors</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#v1-0-0-2023-06-22">v1.0.0 (2023-06-22)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id4">Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id5">Bugfixes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id6">Maintenance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id7">Contributors</a></li>
 </ul>
 </li>
 </ul>
@@ -97,10 +103,32 @@
              
   <section id="release-history">
 <h1>Release History<a class="headerlink" href="#release-history" title="Link to this heading"></a></h1>
-<section id="v1-1-0-2023-09-14">
-<h2>v1.1.0 (2023-09-14)<a class="headerlink" href="#v1-1-0-2023-09-14" title="Link to this heading"></a></h2>
+<section id="v1-2-0-2023-09-27">
+<h2>v1.2.0 (2023-09-27)<a class="headerlink" href="#v1-2-0-2023-09-27" title="Link to this heading"></a></h2>
 <section id="features">
 <h3>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Adds <code class="xref any docutils literal notranslate"><span class="pre">ScientificDoubleSpinbox</span></code> and uses it in MultiModeValueEdit.</p></li>
+</ul>
+</section>
+<section id="bugfixes">
+<h3>Bugfixes<a class="headerlink" href="#bugfixes" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Waits for signal connection during <code class="xref py py-class docutils literal notranslate"><span class="pre">ActionRowWidget</span></code> initialization to properly
+read enum strings from signal.</p></li>
+</ul>
+</section>
+<section id="contributors">
+<h3>Contributors<a class="headerlink" href="#contributors" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>tangkong</p></li>
+</ul>
+</section>
+</section>
+<section id="v1-1-0-2023-09-14">
+<h2>v1.1.0 (2023-09-14)<a class="headerlink" href="#v1-1-0-2023-09-14" title="Link to this heading"></a></h2>
+<section id="id1">
+<h3>Features<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Adds find-replace functionality and helpers.  These procedures walk through the dataclass, rather than blindly modifying serialized json.</p></li>
 <li><p>Adds a simple find-replace widget and more fully-featured fill-template page.</p></li>
@@ -111,8 +139,8 @@
 <li><p>Adds <code class="xref py py-class docutils literal notranslate"><span class="pre">MultiModeValueEdit</span></code> widget for modifying values give a specified type, including dynamic values.</p></li>
 </ul>
 </section>
-<section id="bugfixes">
-<h3>Bugfixes<a class="headerlink" href="#bugfixes" title="Link to this heading"></a></h3>
+<section id="id2">
+<h3>Bugfixes<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Ensure filenames get cast as strings properly.</p></li>
 <li><p>Allow cast_dataclass to transfer objects from old to new dataclass, previously nested dataclasses would be converted to dicts.</p></li>
@@ -126,8 +154,8 @@
 <li><p>Reduce randomness in test suite, try all combo box options when available.</p></li>
 </ul>
 </section>
-<section id="contributors">
-<h3>Contributors<a class="headerlink" href="#contributors" title="Link to this heading"></a></h3>
+<section id="id3">
+<h3>Contributors<a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>tangkong</p></li>
 </ul>
@@ -142,8 +170,8 @@ tag must be converted to the modern format.  Most users will not have issues
 with this.</p>
 <p>Shoutout to all the contributors who helped before the pre-release notes framework
 was added.</p>
-<section id="id1">
-<h3>Features<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
+<section id="id4">
+<h3>Features<a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Replaces the welcome dialog with a welcome landing tab</p></li>
 <li><p>Enable the close-tab button</p></li>
@@ -156,8 +184,8 @@ was added.</p>
 <li><p>Adds report generation for active checkouts</p></li>
 </ul>
 </section>
-<section id="id2">
-<h3>Bugfixes<a class="headerlink" href="#id2" title="Link to this heading"></a></h3>
+<section id="id5">
+<h3>Bugfixes<a class="headerlink" href="#id5" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Fixes a bug where False-y observed values would fail to be reported</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">BusyCursorThread.raised_exception</span></code> now properly expects to emit an <code class="docutils literal notranslate"><span class="pre">Exception</span></code></p></li>
@@ -174,8 +202,8 @@ was added.</p>
 <li><p>Allows device selection via double-click in the <code class="docutils literal notranslate"><span class="pre">HappiSearchWidget</span></code> tree-view</p></li>
 </ul>
 </section>
-<section id="id3">
-<h3>Maintenance<a class="headerlink" href="#id3" title="Link to this heading"></a></h3>
+<section id="id6">
+<h3>Maintenance<a class="headerlink" href="#id6" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>Improves <code class="docutils literal notranslate"><span class="pre">ResultStatus</span></code> refresh handling, now also updates on paint events</p></li>
 <li><p>In the case of errors during a mode switch, the error will be revealed to the user and the switch will be reverted.</p></li>
@@ -188,8 +216,8 @@ was added.</p>
 <li><p>Wraps signal.get call used for setting input type validators in <code class="docutils literal notranslate"><span class="pre">BusyCursorThread</span></code></p></li>
 </ul>
 </section>
-<section id="id4">
-<h3>Contributors<a class="headerlink" href="#id4" title="Link to this heading"></a></h3>
+<section id="id7">
+<h3>Contributors<a class="headerlink" href="#id7" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>tangkong</p></li>
 </ul>
