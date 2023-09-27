@@ -2,6 +2,24 @@ Release History
 ###############
 
 
+v1.2.0 (2023-09-27)
+===================
+
+Features
+--------
+- Adds `ScientificDoubleSpinbox` and uses it in MultiModeValueEdit.
+
+Bugfixes
+--------
+- Waits for signal connection during :class:`ActionRowWidget` initialization to properly
+  read enum strings from signal.
+
+Contributors
+------------
+- tangkong
+
+
+
 v1.1.0 (2023-09-14)
 ===================
 
