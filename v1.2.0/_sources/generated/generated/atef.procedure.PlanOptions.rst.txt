@@ -1,0 +1,29 @@
+atef.procedure.PlanOptions
+==========================
+
+.. currentmodule:: atef.procedure
+
+.. autoclass:: PlanOptions
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: to_plan_item
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: fixed_arguments
+    .. autoattribute:: name
+    .. autoattribute:: plan
+    .. autoattribute:: args
+    .. autoattribute:: kwargs
+    
+    

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>atef.check &mdash; atef  documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../_static/doctools.js?v=888ff710"></script>
+        <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="../_static/docs-versions-menu.js?v=3d6a1aea"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="atef.check.AnyComparison" href="generated/atef.check.AnyComparison.html" />
+    <link rel="prev" title="ATEF API" href="../api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            atef
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">ATEF API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../api.html#dataclasses">Dataclasses</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">atef.check</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.AnyComparison.html">atef.check.AnyComparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.AnyValue.html">atef.check.AnyValue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.BasicDynamic.html">atef.check.BasicDynamic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.Comparison.html">atef.check.Comparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.DynamicValue.html">atef.check.DynamicValue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.EpicsValue.html">atef.check.EpicsValue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.Equals.html">atef.check.Equals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.Greater.html">atef.check.Greater</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.GreaterOrEqual.html">atef.check.GreaterOrEqual</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.HappiValue.html">atef.check.HappiValue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.Less.html">atef.check.Less</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.LessOrEqual.html">atef.check.LessOrEqual</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.NotEquals.html">atef.check.NotEquals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.Range.html">atef.check.Range</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.Value.html">atef.check.Value</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.ValueRange.html">atef.check.ValueRange</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.check.ValueSet.html">atef.check.ValueSet</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="atef.config.html">atef.config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="atef.procedure.html">atef.procedure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="atef.tools.html">atef.tools</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../releases.html">Release History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../upcoming_changes.html">Upcoming Changes</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/pcdshub/atef">Github Repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">atef</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../api.html">ATEF API</a></li>
+      <li class="breadcrumb-item active">atef.check</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/generated/atef.check.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-atef.check">
+<span id="atef-check"></span><h1>atef.check<a class="headerlink" href="#module-atef.check" title="Link to this heading"></a></h1>
+<p>Dataclasses for describing comparisons.  Comparisons generally subclass <code class="docutils literal notranslate"><span class="pre">Comparison</span></code>,
+which hold <code class="docutils literal notranslate"><span class="pre">Value</span></code> and <code class="docutils literal notranslate"><span class="pre">DynamicValue</span></code> objects.  Comparisons involving
+<code class="docutils literal notranslate"><span class="pre">DynamicValue</span></code> must be prepared before comparisons can be run.</p>
+<p class="rubric">Classes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.check.AnyComparison.html#atef.check.AnyComparison" title="atef.check.AnyComparison"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AnyComparison</span></code></a>(name, description, invert, ...)</p></td>
+<td><p>Comparison passes if <em>any</em> contained comparison passes.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.check.AnyValue.html#atef.check.AnyValue" title="atef.check.AnyValue"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AnyValue</span></code></a>(name, description, invert, ...)</p></td>
+<td><p>Comparison passes if the value is in the <code class="docutils literal notranslate"><span class="pre">values</span></code> list.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.check.BasicDynamic.html#atef.check.BasicDynamic" title="atef.check.BasicDynamic"><code class="xref py py-obj docutils literal notranslate"><span class="pre">BasicDynamic</span></code></a>(name, description, invert, ...)</p></td>
+<td><p><dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.check.Comparison.html#atef.check.Comparison" title="atef.check.Comparison"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Comparison</span></code></a>([name, description, invert, ...])</p></td>
+<td><p>Base class for all atef value comparisons.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.check.DynamicValue.html#atef.check.DynamicValue" title="atef.check.DynamicValue"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DynamicValue</span></code></a>([value, reduce_period, ...])</p></td>
+<td><p>A primitive value from an external source that may change over time.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.check.EpicsValue.html#atef.check.EpicsValue" title="atef.check.EpicsValue"><code class="xref py py-obj docutils literal notranslate"><span class="pre">EpicsValue</span></code></a>([value, reduce_period, ...])</p></td>
+<td><p>A primitive value sourced from an EPICS PV.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.check.Equals.html#atef.check.Equals" title="atef.check.Equals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Equals</span></code></a>(name, description, invert, ...)</p></td>
+<td><p><dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.check.Greater.html#atef.check.Greater" title="atef.check.Greater"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Greater</span></code></a>([name, description, invert, ...])</p></td>
+<td><p>Comparison: value &gt; self.value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.check.GreaterOrEqual.html#atef.check.GreaterOrEqual" title="atef.check.GreaterOrEqual"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GreaterOrEqual</span></code></a>([name, description, invert, ...])</p></td>
+<td><p>Comparison: value &gt;= self.value.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.check.HappiValue.html#atef.check.HappiValue" title="atef.check.HappiValue"><code class="xref py py-obj docutils literal notranslate"><span class="pre">HappiValue</span></code></a>([value, reduce_period, ...])</p></td>
+<td><p>A primitive value sourced from a specific happi device signal.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.check.Less.html#atef.check.Less" title="atef.check.Less"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Less</span></code></a>([name, description, invert, ...])</p></td>
+<td><p>Comparison: value &lt; self.value.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.check.LessOrEqual.html#atef.check.LessOrEqual" title="atef.check.LessOrEqual"><code class="xref py py-obj docutils literal notranslate"><span class="pre">LessOrEqual</span></code></a>([name, description, invert, ...])</p></td>
+<td><p>Comparison: value &lt;= self.value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.check.NotEquals.html#atef.check.NotEquals" title="atef.check.NotEquals"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NotEquals</span></code></a>(name, description, invert, ...)</p></td>
+<td><p><dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.check.Range.html#atef.check.Range" title="atef.check.Range"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Range</span></code></a>([name, description, invert, ...])</p></td>
+<td><p>A range comparison.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.check.Value.html#atef.check.Value" title="atef.check.Value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Value</span></code></a>(value[, description, rtol, atol, severity])</p></td>
+<td><p>A primitive (static) value with optional metadata.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.check.ValueRange.html#atef.check.ValueRange" title="atef.check.ValueRange"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ValueRange</span></code></a>(low, high[, inclusive, in_range, ...])</p></td>
+<td><p>A range of primitive values with optional metadata.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.check.ValueSet.html#atef.check.ValueSet" title="atef.check.ValueSet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ValueSet</span></code></a>(name, description, invert, ...)</p></td>
+<td><p>A set of values with corresponding severities and descriptions.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../api.html" class="btn btn-neutral float-left" title="ATEF API" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="generated/atef.check.AnyComparison.html" class="btn btn-neutral float-right" title="atef.check.AnyComparison" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, SLAC National Accelerator Laboratory.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

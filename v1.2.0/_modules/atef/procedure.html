@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>atef.procedure &mdash; atef  documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            atef
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">ATEF API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../releases.html">Release History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../upcoming_changes.html">Upcoming Changes</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/pcdshub/atef">Github Repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">atef</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">atef.procedure</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for atef.procedure</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Dataclasses for describing active checkout procedures.  These dataclasses come in</span>
+<span class="sd">normal (edit) and Prepared (run) variants</span>
+
+<span class="sd">Edit variants hold data needed to specify the step.</span>
+<span class="sd">Prepared variants hold a reference to their originating edit-step, along with</span>
+<span class="sd">Result objects and a .run() method.</span>
+
+<span class="sd">Adding a step requires:</span>
+<span class="sd">- write the edit-variant</span>
+<span class="sd">- add the edit-variant to the AnyProcedure type hint</span>
+<span class="sd">- write the run-variant, along with its ._run() and .from_origin() methods</span>
+<span class="sd">- add the step to PreparedProcedure.from_origin classmethod case statement</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span> <span class="nn">dataclasses</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">pathlib</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span>
+                    <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">cast</span><span class="p">)</span>
+
+<span class="kn">import</span> <span class="nn">apischema</span>
+<span class="kn">import</span> <span class="nn">ophyd</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">yaml</span>
+<span class="kn">from</span> <span class="nn">bluesky_queueserver.manager.profile_ops</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">existing_plans_and_devices_from_nspace</span><span class="p">,</span> <span class="n">validate_plan</span><span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">atef</span> <span class="kn">import</span> <span class="n">util</span>
+<span class="kn">from</span> <span class="nn">atef.cache</span> <span class="kn">import</span> <span class="n">DataCache</span><span class="p">,</span> <span class="n">_SignalCache</span><span class="p">,</span> <span class="n">get_signal_cache</span>
+<span class="kn">from</span> <span class="nn">atef.check</span> <span class="kn">import</span> <span class="n">Comparison</span>
+<span class="kn">from</span> <span class="nn">atef.config</span> <span class="kn">import</span> <span class="p">(</span><span class="n">ConfigurationFile</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">,</span> <span class="n">PreparedFile</span><span class="p">,</span>
+                         <span class="n">PreparedSignalComparison</span><span class="p">,</span> <span class="n">run_passive_step</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">atef.enums</span> <span class="kn">import</span> <span class="n">GroupResultMode</span><span class="p">,</span> <span class="n">PlanDestination</span><span class="p">,</span> <span class="n">Severity</span>
+<span class="kn">from</span> <span class="nn">atef.exceptions</span> <span class="kn">import</span> <span class="n">PreparedComparisonException</span>
+<span class="kn">from</span> <span class="nn">atef.plan_utils</span> <span class="kn">import</span> <span class="p">(</span><span class="n">BlueskyState</span><span class="p">,</span> <span class="n">GlobalRunEngine</span><span class="p">,</span>
+                             <span class="n">get_default_namespace</span><span class="p">,</span> <span class="n">register_run_identifier</span><span class="p">,</span>
+                             <span class="n">run_in_local_RE</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">atef.reduce</span> <span class="kn">import</span> <span class="n">ReduceMethod</span>
+<span class="kn">from</span> <span class="nn">atef.result</span> <span class="kn">import</span> <span class="n">Result</span><span class="p">,</span> <span class="n">_summarize_result_severity</span><span class="p">,</span> <span class="n">incomplete_result</span>
+<span class="kn">from</span> <span class="nn">atef.type_hints</span> <span class="kn">import</span> <span class="n">AnyDataclass</span><span class="p">,</span> <span class="n">AnyPath</span><span class="p">,</span> <span class="n">Number</span><span class="p">,</span> <span class="n">PrimitiveType</span>
+<span class="kn">from</span> <span class="nn">atef.yaml_support</span> <span class="kn">import</span> <span class="n">init_yaml_support</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">serialization</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="c1"># BlueskyState tracker.  Keys are the id of the top-level ProcedureFile</span>
+<span class="c1"># Includes one default BlueskyState, with key id(None)</span>
+<span class="n">BS_STATE_MAP</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">BlueskyState</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="c1"># Max depth for plan steps</span>
+<span class="n">MAX_PLAN_DEPTH</span> <span class="o">=</span> <span class="mi">200</span>
+
+
+<div class="viewcode-block" id="walk_steps">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.walk_steps.html#atef.procedure.walk_steps">[docs]</a>
+<span class="k">def</span> <span class="nf">walk_steps</span><span class="p">(</span><span class="n">step</span><span class="p">:</span> <span class="n">ProcedureStep</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">ProcedureStep</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Yield ProedureSteps in ``step``, depth-first.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    step : ProcedureStep</span>
+<span class="sd">        Step to yield ProcedureSteps from</span>
+
+<span class="sd">    Yields</span>
+<span class="sd">    ------</span>
+<span class="sd">    Generator[ProcedureStep, None, None]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">yield</span> <span class="n">step</span>
+    <span class="k">for</span> <span class="n">sub_step</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="s1">&#39;steps&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="k">yield from</span> <span class="n">walk_steps</span><span class="p">(</span><span class="n">sub_step</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ProcedureStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureStep.html#atef.procedure.ProcedureStep">[docs]</a>
+<span class="nd">@dataclasses</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="nd">@serialization</span><span class="o">.</span><span class="n">as_tagged_union</span>
+<span class="k">class</span> <span class="nc">ProcedureStep</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A basic step in an atef procedure.</span>
+
+<span class="sd">    This is used as a base class for all valid procedure steps (and groups).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#: The title of the procedure</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: A description of narrative explanation of setup steps, what is to happen, etc.</span>
+    <span class="n">description</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: The hierarchical parent of this step.</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ProcedureGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: verification requirements, is human verification required?</span>
+    <span class="n">verify_required</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="c1">#: step success requirements, does the step need to complete?</span>
+    <span class="n">step_success_required</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="ProcedureStep.allow_verify">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureStep.html#atef.procedure.ProcedureStep.allow_verify">[docs]</a>
+    <span class="k">def</span> <span class="nf">allow_verify</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Whether or not the step can be verified.</span>
+<span class="sd">        To be further expanded or overloaded in subclass,</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">severity</span> <span class="o">==</span> <span class="n">Severity</span><span class="o">.</span><span class="n">success</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ProcedureGroup">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureGroup.html#atef.procedure.ProcedureGroup">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ProcedureGroup</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A group of procedure steps (or nested groups).&quot;&quot;&quot;</span>
+    <span class="c1">#: Steps included in the procedure.</span>
+    <span class="n">steps</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">ProcedureStep</span><span class="p">,</span> <span class="n">ProcedureGroup</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ProcedureGroup.walk_steps">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureGroup.html#atef.procedure.ProcedureGroup.walk_steps">[docs]</a>
+    <span class="k">def</span> <span class="nf">walk_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">AnyProcedure</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">steps</span><span class="p">:</span>
+            <span class="n">step</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">AnyProcedure</span><span class="p">,</span> <span class="n">step</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="n">step</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">ProcedureGroup</span><span class="p">):</span>
+                <span class="k">yield from</span> <span class="n">step</span><span class="o">.</span><span class="n">walk_steps</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="DescriptionStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.DescriptionStep.html#atef.procedure.DescriptionStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">DescriptionStep</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A simple title or descriptive step in the procedure.&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="PassiveStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PassiveStep.html#atef.procedure.PassiveStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PassiveStep</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A step that runs a passive checkout file&quot;&quot;&quot;</span>
+    <span class="n">filepath</span><span class="p">:</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="SetValueStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.SetValueStep.html#atef.procedure.SetValueStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">SetValueStep</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; A step that sets one or more values and checks one or more values after &quot;&quot;&quot;</span>
+    <span class="n">actions</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ValueToTarget</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">success_criteria</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ComparisonToTarget</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+    <span class="c1">#: Stop performing actions if one fails</span>
+    <span class="n">halt_on_fail</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="c1">#: Only mark the step_result as successful if all actions have succeeded</span>
+    <span class="n">require_action_success</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="Target">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.Target.html#atef.procedure.Target">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Target</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A destination for a value.  Either an ophyd device+attr pair or EPICS PV</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#: name of target</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: device name and attr</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">attr</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: EPICS PV</span>
+    <span class="n">pv</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Target.to_signal">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.Target.html#atef.procedure.Target.to_signal">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_signal</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">signal_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">_SignalCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ophyd</span><span class="o">.</span><span class="n">EpicsSignal</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the signal described by this Target.  First attempts to use the</span>
+<span class="sd">        device + attr information to look up the signal in happi, falling back</span>
+<span class="sd">        to the raw PV.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ophyd.EpicsSignal</span>
+<span class="sd">            the signal described by this Target</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">attr</span><span class="p">:</span>
+                <span class="n">device</span> <span class="o">=</span> <span class="n">util</span><span class="o">.</span><span class="n">get_happi_device_by_name</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+                <span class="n">signal</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attr</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">pv</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">signal_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">signal_cache</span> <span class="o">=</span> <span class="n">get_signal_cache</span><span class="p">()</span>
+                <span class="n">signal</span> <span class="o">=</span> <span class="n">signal_cache</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">pv</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;unable to create signal, insufficient information &#39;</span>
+                             <span class="s1">&#39;to specify signal&#39;</span><span class="p">)</span>
+                <span class="k">return</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;unable to create signal: (</span><span class="si">{</span><span class="n">ex</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">return</span> <span class="n">signal</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ValueToTarget">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ValueToTarget.html#atef.procedure.ValueToTarget">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ValueToTarget</span><span class="p">(</span><span class="n">Target</span><span class="p">):</span>
+    <span class="c1">#: the value to set to the target</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PrimitiveType</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1"># ophyd.Signal.set() parameters</span>
+    <span class="c1">#: write timeout</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: settle time</span>
+    <span class="n">settle_time</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="ComparisonToTarget">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ComparisonToTarget.html#atef.procedure.ComparisonToTarget">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ComparisonToTarget</span><span class="p">(</span><span class="n">Target</span><span class="p">):</span>
+    <span class="c1">#: the comparison to apply to the target</span>
+    <span class="n">comparison</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="PlanData">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PlanData.html#atef.procedure.PlanData">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PlanData</span><span class="p">:</span>
+    <span class="c1">#: user-provided name for this plan data.  Not used to identify the run</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="c1">#: identifier of PlanStep to grab data from.</span>
+    <span class="c1">#: set via GUI, must match a PreparedPlan.plan_id.  Options should be fixed</span>
+    <span class="c1">#: and regenerated with every view</span>
+    <span class="n">plan_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: plan number (for plans containing nested plans, which return multiple uuids)</span>
+    <span class="n">plan_no</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="c1">#: data point(s) in plan (0-indexed) or slice notation</span>
+    <span class="c1">#: [row_start, row_end)</span>
+    <span class="n">data_points</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="c1">#: Field / column names to grab data from</span>
+    <span class="n">field_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="c1">#: data reduction / operation</span>
+    <span class="n">reduction_mode</span><span class="p">:</span> <span class="n">ReduceMethod</span> <span class="o">=</span> <span class="n">ReduceMethod</span><span class="o">.</span><span class="n">average</span></div>
+
+
+
+<div class="viewcode-block" id="ComparisonToPlanData">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ComparisonToPlanData.html#atef.procedure.ComparisonToPlanData">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ComparisonToPlanData</span><span class="p">(</span><span class="n">PlanData</span><span class="p">):</span>
+    <span class="c1">#: the comparison to apply to the target</span>
+    <span class="n">comparison</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="CodeStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.CodeStep.html#atef.procedure.CodeStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">CodeStep</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Run source code in a procedure.&quot;&quot;&quot;</span>
+    <span class="c1">#: The source code to execute.</span>
+    <span class="n">source_code</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="c1">#: Arguments to pass into the code.</span>
+    <span class="n">arguments</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PlanOptions">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PlanOptions.html#atef.procedure.PlanOptions">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PlanOptions</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Options for a bluesky plan scan.&quot;&quot;&quot;</span>
+    <span class="c1">#: Name to identify this plan</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="c1">#: The plan name.  Bluesky plan or otherwise</span>
+    <span class="n">plan</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="c1">#: Plan arguments dictionary - argument name to value.</span>
+    <span class="n">args</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="c1">#: Plan keyword  arguments dictionary - argument name to value.</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="c1">#: Arguments which should not be configurable.</span>
+    <span class="n">fixed_arguments</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="PlanOptions.to_plan_item">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PlanOptions.html#atef.procedure.PlanOptions.to_plan_item">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_plan_item</span><span class="p">(</span><span class="bp">self</span><span class="p">:</span> <span class="n">PlanOptions</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Makes a plan item (dictionary of parameters) for a given PlanStep &quot;&quot;&quot;</span>
+        <span class="n">it</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan</span><span class="p">,</span>
+            <span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">,</span>
+            <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="s2">&quot;user_group&quot;</span><span class="p">:</span> <span class="s2">&quot;root&quot;</span><span class="p">}</span>
+        <span class="k">return</span> <span class="n">it</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PlanStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PlanStep.html#atef.procedure.PlanStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PlanStep</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A procedure step comprised of one or more bluesky plans.&quot;&quot;&quot;</span>
+    <span class="n">plans</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">PlanOptions</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">checks</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">ComparisonToTarget</span><span class="p">,</span> <span class="n">ComparisonToPlanData</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span>
+    <span class="p">)</span>
+
+    <span class="c1">#: platform for plan to be run on</span>
+    <span class="n">destination</span><span class="p">:</span> <span class="n">PlanDestination</span> <span class="o">=</span> <span class="n">PlanDestination</span><span class="o">.</span><span class="n">local</span>
+    <span class="c1">#: Stop performing plans if one fails</span>
+    <span class="n">halt_on_fail</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="c1">#: Only mark step_result successfull if all steps have succeeded</span>
+    <span class="n">require_plan_success</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="DisplayOptions">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.DisplayOptions.html#atef.procedure.DisplayOptions">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">DisplayOptions</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Options for a typhos or PyDM display.&quot;&quot;&quot;</span>
+    <span class="c1">#: Macros for the display.</span>
+    <span class="n">macros</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="c1">#: The template name or screen display path.</span>
+    <span class="n">template</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;embedded_screen&quot;</span>
+    <span class="c1">#: Embed the display in the procedure? (or pop it out)</span>
+    <span class="n">embed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="DeviceConfiguration">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.DeviceConfiguration.html#atef.procedure.DeviceConfiguration">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">DeviceConfiguration</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Device configuration for comparison.&quot;&quot;&quot;</span>
+    <span class="c1">#: The timestamp this configuration is associated with.</span>
+    <span class="n">archiver_timestamp</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">]</span>
+    <span class="c1">#: The device dotted attribute name to value.</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="ConfigurationCheckStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ConfigurationCheckStep.html#atef.procedure.ConfigurationCheckStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ConfigurationCheckStep</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Step which checks device configuration versus a given timestamp.&quot;&quot;&quot;</span>
+    <span class="c1">#: Device name to device configuration information.</span>
+    <span class="n">devices</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DeviceConfiguration</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TyphosDisplayStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.TyphosDisplayStep.html#atef.procedure.TyphosDisplayStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">TyphosDisplayStep</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A procedure step which opens one or more typhos displays.&quot;&quot;&quot;</span>
+    <span class="c1">#: Happi device name to display options.</span>
+    <span class="n">devices</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DisplayOptions</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PydmDisplayStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PydmDisplayStep.html#atef.procedure.PydmDisplayStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PydmDisplayStep</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A procedure step which a opens a PyDM display.&quot;&quot;&quot;</span>
+    <span class="c1">#: The display path.</span>
+    <span class="n">display</span><span class="p">:</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">)</span>
+    <span class="c1">#: Options for displaying.</span>
+    <span class="n">options</span><span class="p">:</span> <span class="n">DisplayOptions</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">DisplayOptions</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ProcedureFile">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ProcedureFile</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    File comprised of several Procedure steps</span>
+
+<span class="sd">    Essentially identical to Configuration File.  Consider refactoring</span>
+<span class="sd">    if design/methods do not diverge</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#: atef configuration file version information.</span>
+    <span class="n">version</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="n">apischema</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">required</span><span class="p">)</span>
+    <span class="c1">#: Top-level configuration group.</span>
+    <span class="n">root</span><span class="p">:</span> <span class="n">ProcedureGroup</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">ProcedureGroup</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># register a BSState for this ProcedureFile</span>
+        <span class="n">BS_STATE_MAP</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)]</span> <span class="o">=</span> <span class="n">BlueskyState</span><span class="p">()</span>
+
+<div class="viewcode-block" id="ProcedureFile.walk_steps">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile.walk_steps">[docs]</a>
+    <span class="k">def</span> <span class="nf">walk_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">AnyProcedure</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">walk_steps</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ProcedureFile.from_filename">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile.from_filename">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_filename</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProcedureFile</span><span class="p">:</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;.json&#39;</span><span class="p">:</span>
+            <span class="n">config</span> <span class="o">=</span> <span class="n">ProcedureFile</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">config</span> <span class="o">=</span> <span class="n">ProcedureFile</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">config</span></div>
+
+
+<div class="viewcode-block" id="ProcedureFile.from_json">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile.from_json">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProcedureFile</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a configuration file from JSON.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+            <span class="n">serialized_config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">apischema</span><span class="o">.</span><span class="n">deserialize</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">serialized_config</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ProcedureFile.from_yaml">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile.from_yaml">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_yaml</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProcedureFile</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a configuration file from yaml.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+            <span class="n">serialized_config</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">apischema</span><span class="o">.</span><span class="n">deserialize</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">serialized_config</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ProcedureFile.to_json">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile.to_json">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump this configuration file to a JSON-compatible dictionary.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">apischema</span><span class="o">.</span><span class="n">serialize</span><span class="p">(</span><span class="n">ProcedureFile</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">exclude_defaults</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ProcedureFile.to_yaml">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile.to_yaml">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump this configuration file to yaml.&quot;&quot;&quot;</span>
+        <span class="n">init_yaml_support</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_json</span><span class="p">())</span></div>
+</div>
+
+
+
+<span class="c1">######################</span>
+<span class="c1"># Prepared Dataclasses</span>
+<span class="c1">######################</span>
+
+
+<div class="viewcode-block" id="PreparedProcedureFile">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedProcedureFile.html#atef.procedure.PreparedProcedureFile">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedProcedureFile</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A Prepared Procedure file.  Constructs prepared dataclasses for steps</span>
+<span class="sd">    in the root ProcedureGroup</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#: Corresponding ProcedureFile information</span>
+    <span class="n">file</span><span class="p">:</span> <span class="n">ProcedureFile</span>
+    <span class="c1">#: Procedure steps defined in the top-level file</span>
+    <span class="n">root</span><span class="p">:</span> <span class="n">PreparedProcedureGroup</span>
+
+<div class="viewcode-block" id="PreparedProcedureFile.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedProcedureFile.html#atef.procedure.PreparedProcedureFile.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">file</span><span class="p">:</span> <span class="n">ProcedureFile</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedProcedureFile</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare a ProcedureFile for running, based off an existing ProcedureFile</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        file : ProcedureFile</span>
+<span class="sd">            the procedure file instance</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">prep_proc_file</span> <span class="o">=</span> <span class="n">PreparedProcedureFile</span><span class="p">(</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">file</span><span class="p">,</span>
+            <span class="n">root</span><span class="o">=</span><span class="n">PreparedProcedureGroup</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="c1"># PreparedProcedureGroup needs to know about its parent from birth</span>
+        <span class="c1"># get_bs_state doesn&#39;t like orphans</span>
+        <span class="n">prepared_root</span> <span class="o">=</span> <span class="n">PreparedProcedureGroup</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
+            <span class="n">group</span><span class="o">=</span><span class="n">file</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">prep_proc_file</span>
+        <span class="p">)</span>
+        <span class="n">prep_proc_file</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">prepared_root</span>
+
+        <span class="k">return</span> <span class="n">prep_proc_file</span></div>
+
+
+<div class="viewcode-block" id="PreparedProcedureFile.run">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedProcedureFile.html#atef.procedure.PreparedProcedureFile.run">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">run</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FailedStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.FailedStep.html#atef.procedure.FailedStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">FailedStep</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; A step that failed to be prepared for running. &quot;&quot;&quot;</span>
+    <span class="c1">#: The data cache to use for the preparation step.</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span><span class="p">]</span>
+    <span class="c1">#: Configuration instance.</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">AnyProcedure</span>
+    <span class="c1">#: overall result of running the step</span>
+    <span class="n">combined_result</span><span class="p">:</span> <span class="n">Result</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">incomplete_result</span><span class="p">)</span>
+    <span class="c1">#: confirmation by the user that result matches expectations</span>
+    <span class="n">verify_result</span><span class="p">:</span> <span class="n">Result</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">incomplete_result</span><span class="p">)</span>
+    <span class="c1">#: whether or not the step completed successfully</span>
+    <span class="n">step_result</span><span class="p">:</span> <span class="n">Result</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">incomplete_result</span><span class="p">)</span>
+    <span class="c1">#: Exception that was caught, if available.</span>
+    <span class="n">exception</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="ne">Exception</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">combined_result</span></div>
+
+
+
+<div class="viewcode-block" id="PreparedProcedureStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedProcedureStep.html#atef.procedure.PreparedProcedureStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedProcedureStep</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base class for a ProcedureStep that has been prepared to run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#: name of this comparison</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: original procedure step, of which this is the prepared version</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">ProcedureStep</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">ProcedureStep</span><span class="p">)</span>
+    <span class="c1">#: hierarchical parent of this step</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1">#: overall result of running the step</span>
+    <span class="n">combined_result</span><span class="p">:</span> <span class="n">Result</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">incomplete_result</span><span class="p">)</span>
+    <span class="c1">#: confirmation by the user that result matches expectations</span>
+    <span class="n">verify_result</span><span class="p">:</span> <span class="n">Result</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">incomplete_result</span><span class="p">)</span>
+    <span class="c1">#: whether or not the step completed successfully</span>
+    <span class="n">step_result</span><span class="p">:</span> <span class="n">Result</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">incomplete_result</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Combines the step result and verification result based on settings</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Result</span>
+<span class="sd">            The overall result of this step</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">reason</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">verify_required</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">verify_result</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">verify_result</span><span class="o">.</span><span class="n">severity</span> <span class="o">!=</span> <span class="n">Severity</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+                <span class="n">reason</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;Not Verified (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">verify_result</span><span class="o">.</span><span class="n">reason</span><span class="si">}</span><span class="s1">)&#39;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">reason</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;Verified (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">verify_result</span><span class="o">.</span><span class="n">reason</span><span class="si">}</span><span class="s1">)&#39;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">step_success_required</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">step_result</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_result</span><span class="o">.</span><span class="n">severity</span> <span class="o">!=</span> <span class="n">Severity</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+                <span class="n">reason</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;, Not Successful (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">step_result</span><span class="o">.</span><span class="n">reason</span><span class="si">}</span><span class="s1">)&#39;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">results</span><span class="p">:</span>
+            <span class="c1"># Nothing required, auto-success</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">combined_result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">()</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">combined_result</span>
+
+        <span class="n">severity</span> <span class="o">=</span> <span class="n">_summarize_result_severity</span><span class="p">(</span><span class="n">GroupResultMode</span><span class="o">.</span><span class="n">all_</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">combined_result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="n">severity</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="n">reason</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">combined_result</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run the step.  To be implemented in subclass.</span>
+<span class="sd">        Returns the step_result</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+<div class="viewcode-block" id="PreparedProcedureStep.run">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedProcedureStep.html#atef.procedure.PreparedProcedureStep.run">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Run the step and return the result &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">internal_error</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># stash step result</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">step_result</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="c1"># return the overall result, including verification</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="PreparedProcedureStep.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedProcedureStep.html#atef.procedure.PreparedProcedureStep.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">step</span><span class="p">:</span> <span class="n">AnyProcedure</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedProcedureStep</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare a ProcedureStep for running.  If the creation of the prepared step</span>
+<span class="sd">        fails for any reason, a FailedStep is returned.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        step : AnyProcedure</span>
+<span class="sd">            the ProcedureStep to prepare</span>
+<span class="sd">        parent : Optional[PreparedProcedureGroup]</span>
+<span class="sd">            the parent of this step, by default None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">ProcedureGroup</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">PreparedProcedureGroup</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
+                    <span class="n">group</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">DescriptionStep</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">PreparedDescriptionStep</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
+                    <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">PassiveStep</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">PreparedPassiveStep</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
+                    <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">SetValueStep</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">PreparedSetValueStep</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
+                    <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">PlanStep</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">PreparedPlanStep</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
+                    <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+                <span class="p">)</span>
+
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Step type unsupported: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">step</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">FailedStep</span><span class="p">(</span>
+                <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
+                <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+                <span class="n">exception</span><span class="o">=</span><span class="n">ex</span><span class="p">,</span>
+                <span class="n">combined_result</span><span class="o">=</span><span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">internal_error</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Failed to instantiate step: </span><span class="si">{</span><span class="n">ex</span><span class="si">}</span><span class="s2">. &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Step is: </span><span class="si">{</span><span class="n">step</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">step</span><span class="o">.</span><span class="n">description</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">&#39;&#39;</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PreparedProcedureGroup">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedProcedureGroup.html#atef.procedure.PreparedProcedureGroup">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedProcedureGroup</span><span class="p">(</span><span class="n">PreparedProcedureStep</span><span class="p">):</span>
+    <span class="c1">#: hierarchical parent of this step</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PreparedProcedureFile</span><span class="p">,</span> <span class="n">PreparedProcedureGroup</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span>
+    <span class="p">)</span>
+    <span class="c1">#: the steps in this group</span>
+    <span class="n">steps</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">AnyPreparedProcedure</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="c1">#: Steps that failed to be prepared</span>
+    <span class="n">prepare_failures</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">FailedStep</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedProcedureGroup.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedProcedureGroup.html#atef.procedure.PreparedProcedureGroup.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">group</span><span class="p">:</span> <span class="n">ProcedureGroup</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span> <span class="o">|</span> <span class="n">PreparedProcedureFile</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedProcedureGroup</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare a ProcedureGroup for running.  Prepares all of the group&#39;s children</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        group : ProcedureGroup</span>
+<span class="sd">            the group to prepare</span>
+<span class="sd">        parent : Optional[PreparedProcedureGroup  |  PreparedProcedureFile]</span>
+<span class="sd">            the hierarchical parent of this step, by default None</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        PreparedProcedureGroup</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">prepared</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">origin</span><span class="o">=</span><span class="n">group</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span> <span class="n">steps</span><span class="o">=</span><span class="p">[])</span>
+
+        <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">steps</span><span class="p">:</span>
+            <span class="n">prep_step</span> <span class="o">=</span> <span class="n">PreparedProcedureStep</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
+                <span class="n">step</span><span class="o">=</span><span class="n">cast</span><span class="p">(</span><span class="n">AnyPreparedProcedure</span><span class="p">,</span> <span class="n">step</span><span class="p">),</span>
+                <span class="n">parent</span><span class="o">=</span><span class="n">prepared</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">prep_step</span><span class="p">,</span> <span class="n">FailedStep</span><span class="p">):</span>
+                <span class="n">prepared</span><span class="o">.</span><span class="n">prepare_failures</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">prep_step</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">prepared</span><span class="o">.</span><span class="n">steps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">prep_step</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">prepared</span></div>
+
+
+<div class="viewcode-block" id="PreparedProcedureGroup.run">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedProcedureGroup.html#atef.procedure.PreparedProcedureGroup.run">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Run all steps and return a combined result &quot;&quot;&quot;</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">steps</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="k">await</span> <span class="n">step</span><span class="o">.</span><span class="n">run</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepare_failures</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="s1">&#39;At least one step failed to initialize&#39;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">severity</span> <span class="o">=</span> <span class="n">_summarize_result_severity</span><span class="p">(</span><span class="n">GroupResultMode</span><span class="o">.</span><span class="n">all_</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="n">severity</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">step_result</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Re-compute the combined result and return it &quot;&quot;&quot;</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">steps</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">result</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepare_failures</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="s1">&#39;At least one step failed to initialize&#39;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">severity</span> <span class="o">=</span> <span class="n">_summarize_result_severity</span><span class="p">(</span><span class="n">GroupResultMode</span><span class="o">.</span><span class="n">all_</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="n">severity</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">step_result</span> <span class="o">=</span> <span class="n">result</span>
+
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="PreparedDescriptionStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedDescriptionStep.html#atef.procedure.PreparedDescriptionStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedDescriptionStep</span><span class="p">(</span><span class="n">PreparedProcedureStep</span><span class="p">):</span>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Result</span><span class="p">()</span>
+
+<div class="viewcode-block" id="PreparedDescriptionStep.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedDescriptionStep.html#atef.procedure.PreparedDescriptionStep.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">step</span><span class="p">:</span> <span class="n">DescriptionStep</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedDescriptionStep</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare a DescriptionStep for running</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        step : DescriptionStep</span>
+<span class="sd">            the description step to prepare</span>
+<span class="sd">        parent : Optional[PreparedProcedureGroup]</span>
+<span class="sd">            the hierarchical parent of this step, by default None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">step</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PreparedPassiveStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPassiveStep.html#atef.procedure.PreparedPassiveStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedPassiveStep</span><span class="p">(</span><span class="n">PreparedProcedureStep</span><span class="p">):</span>
+    <span class="c1">#: The prepared passive checkout file, holds Results</span>
+    <span class="n">prepared_passive_file</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedFile</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Load, prepare, and run the passive step &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_passive_file</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Result</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="s1">&#39;No passive checkout to run&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="n">run_passive_step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prepared_passive_file</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedPassiveStep.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPassiveStep.html#atef.procedure.PreparedPassiveStep.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">step</span><span class="p">:</span> <span class="n">PassiveStep</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedPassiveStep</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare a passive checkout step for running.  Requires the passive checkout</span>
+<span class="sd">        be accessible for read access</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        step : PassiveStep</span>
+<span class="sd">            the original PassiveStep to prepare</span>
+<span class="sd">        parent : Optional[PreparedProcedureGroup]</span>
+<span class="sd">            the hierarchical parent to assign to this PreparedPassiveStep</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        PreparedPassiveStep</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">passive_file</span> <span class="o">=</span> <span class="n">ConfigurationFile</span><span class="o">.</span><span class="n">from_filename</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+            <span class="n">prep_passive_file</span> <span class="o">=</span> <span class="n">PreparedFile</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">file</span><span class="o">=</span><span class="n">passive_file</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;failed to generate prepared passive checkout: </span><span class="si">{</span><span class="n">ex</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="n">prep_passive_file</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
+            <span class="n">prepared_passive_file</span><span class="o">=</span><span class="n">prep_passive_file</span><span class="p">,</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">step</span><span class="o">.</span><span class="n">name</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PreparedSetValueStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedSetValueStep.html#atef.procedure.PreparedSetValueStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedSetValueStep</span><span class="p">(</span><span class="n">PreparedProcedureStep</span><span class="p">):</span>
+    <span class="c1">#: list of prepared actions to take (values to set to a target)</span>
+    <span class="n">prepared_actions</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PreparedValueToSignal</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span>
+    <span class="p">)</span>
+    <span class="c1">#: list of prepared success criteria (comparisons)</span>
+    <span class="n">prepared_criteria</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PreparedSignalComparison</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedSetValueStep.walk_comparisons">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedSetValueStep.html#atef.procedure.PreparedSetValueStep.walk_comparisons">[docs]</a>
+    <span class="k">def</span> <span class="nf">walk_comparisons</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Yields PreparedComparisons in this ProcedureStep &quot;&quot;&quot;</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_criteria</span></div>
+
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare and execute the actions, record their Results</span>
+<span class="sd">        Prepare and execute success criteria, record their Results</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Result</span>
+<span class="sd">            the step_result for this step</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">origin</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">SetValueStep</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">prep_action</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_actions</span><span class="p">:</span>
+            <span class="n">action_result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">prep_action</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">halt_on_fail</span> <span class="ow">and</span> <span class="n">action_result</span><span class="o">.</span><span class="n">severity</span> <span class="o">&gt;</span> <span class="n">Severity</span><span class="o">.</span><span class="n">success</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">step_result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;action failed (</span><span class="si">{</span><span class="n">prep_action</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">), step halted&#39;</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_result</span>
+        <span class="k">for</span> <span class="n">prep_criteria</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_criteria</span><span class="p">:</span>
+            <span class="k">await</span> <span class="n">prep_criteria</span><span class="o">.</span><span class="n">compare</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">require_action_success</span><span class="p">:</span>
+            <span class="n">action_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">action</span><span class="o">.</span><span class="n">result</span> <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_actions</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">action_results</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">criteria_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">crit</span><span class="o">.</span><span class="n">result</span> <span class="k">for</span> <span class="n">crit</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_criteria</span><span class="p">]</span>
+
+        <span class="n">severity</span> <span class="o">=</span> <span class="n">_summarize_result_severity</span><span class="p">(</span><span class="n">GroupResultMode</span><span class="o">.</span><span class="n">all_</span><span class="p">,</span>
+                                              <span class="n">criteria_results</span> <span class="o">+</span> <span class="n">action_results</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">Result</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="n">severity</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedSetValueStep.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedSetValueStep.html#atef.procedure.PreparedSetValueStep.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">step</span><span class="p">:</span> <span class="n">SetValueStep</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedSetValueStep</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare a SetValueStep for running.  Gathers and prepares necessary</span>
+<span class="sd">        signals and comparisons.  Any actions and success criteria that fail</span>
+<span class="sd">        to be prepared will be stored under the `prepare_action_failures` and</span>
+<span class="sd">        `prepare_criteria_failures` fields respectively</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        step : SetValueStep</span>
+<span class="sd">            the original SetValueStep (not prepared)</span>
+<span class="sd">        parent : Optional[PreparedProcedureGroup]</span>
+<span class="sd">            the hierarchical parent for the prepared step.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        PreparedSetValueStep</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">prep_step</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">step</span><span class="o">.</span><span class="n">name</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">value_to_target</span> <span class="ow">in</span> <span class="n">step</span><span class="o">.</span><span class="n">actions</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">prep_value_to_signal</span> <span class="o">=</span> <span class="n">PreparedValueToSignal</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
+                    <span class="n">origin</span><span class="o">=</span><span class="n">value_to_target</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">prep_step</span>
+                <span class="p">)</span>
+                <span class="n">prep_step</span><span class="o">.</span><span class="n">prepared_actions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">prep_value_to_signal</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">FailedStep</span><span class="p">(</span><span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">exception</span><span class="o">=</span><span class="n">ex</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">comp_to_target</span> <span class="ow">in</span> <span class="n">step</span><span class="o">.</span><span class="n">success_criteria</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">create_prepared_comparison</span><span class="p">(</span><span class="n">comp_to_target</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">FailedStep</span><span class="p">(</span><span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">exception</span><span class="o">=</span><span class="n">res</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">prep_step</span><span class="o">.</span><span class="n">prepared_criteria</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">prep_step</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PreparedValueToSignal">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedValueToSignal.html#atef.procedure.PreparedValueToSignal">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedValueToSignal</span><span class="p">:</span>
+    <span class="c1">#: identifying name</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="c1">#: the signal, derived from a Target</span>
+    <span class="n">signal</span><span class="p">:</span> <span class="n">ophyd</span><span class="o">.</span><span class="n">Signal</span>
+    <span class="c1">#: value to set to the signal</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span>
+    <span class="c1">#: a link to the original ValueToTarget</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">ValueToTarget</span>
+    <span class="c1">#: parent step that owns this instance</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedSetValueStep</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: The result of the set action</span>
+    <span class="n">result</span><span class="p">:</span> <span class="n">Result</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">incomplete_result</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedValueToSignal.run">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedValueToSignal.html#atef.procedure.PreparedValueToSignal.run">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the stored value to the signal, specifying the settle time and timeout</span>
+<span class="sd">        if provided.  Returns a Result recording the success of this action</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Result</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># generate kwargs for set, exclude timeout and settle time if not provided</span>
+        <span class="c1"># in order to use ophyd defaults</span>
+        <span class="n">set_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">timeout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">set_kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;timeout&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">timeout</span><span class="p">})</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">settle_time</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">set_kwargs</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;settle_time&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">settle_time</span><span class="p">})</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">signal</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="o">**</span><span class="n">set_kwargs</span><span class="p">)</span>
+            <span class="k">await</span> <span class="n">util</span><span class="o">.</span><span class="n">run_in_executor</span><span class="p">(</span><span class="n">executor</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">func</span><span class="o">=</span><span class="n">status</span><span class="o">.</span><span class="n">wait</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="n">ex</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="PreparedValueToSignal.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedValueToSignal.html#atef.procedure.PreparedValueToSignal.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">origin</span><span class="p">:</span> <span class="n">ValueToTarget</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedSetValueStep</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedValueToSignal</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare the ValueToSignal for running.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        origin : ValueToTarget</span>
+<span class="sd">            the original ValueToTarget</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        PreparedValueToSignal</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            if the target cannot return a valid signal</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">signal</span> <span class="o">=</span> <span class="n">origin</span><span class="o">.</span><span class="n">to_signal</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">signal</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Target specification invalid: </span><span class="si">{</span><span class="n">origin</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+        <span class="n">pvts</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">origin</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">signal</span><span class="o">=</span><span class="n">signal</span><span class="p">,</span>
+            <span class="n">value</span><span class="o">=</span><span class="n">origin</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">pvts</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PreparedPlan">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPlan.html#atef.procedure.PreparedPlan">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedPlan</span><span class="p">:</span>
+    <span class="c1">#: identifying name</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="c1">#: a link to the original PlanOptions</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">PlanOptions</span>
+    <span class="c1">#: the hierarchical parent of this PreparedPlan</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedPlanStep</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: the plan item, suitable for submission to a bluesky queueserver</span>
+    <span class="n">item</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="c1">#: the plan identifer, may be different from origin.plan_id</span>
+    <span class="n">plan_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: stashed BlueskyState.  Passed to RunEngine runner</span>
+    <span class="n">bs_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">BlueskyState</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: result of this step. (did the plan run?)</span>
+    <span class="n">result</span><span class="p">:</span> <span class="n">Result</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">incomplete_result</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedPlan.run">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPlan.html#atef.procedure.PreparedPlan.run">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+        <span class="c1"># submit the plan to the destination</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">destination</span> <span class="o">!=</span> <span class="n">PlanDestination</span><span class="o">.</span><span class="n">local</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="s1">&#39;Only local RunEngine supported at this time&#39;</span>
+            <span class="p">)</span>
+
+        <span class="n">run_in_local_RE</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">item</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bs_state</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="PreparedPlan.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPlan.html#atef.procedure.PreparedPlan.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">origin</span><span class="p">:</span> <span class="n">PlanOptions</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedPlanStep</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedPlan</span><span class="p">:</span>
+        <span class="c1"># register run identifier, store in prepared_plan name</span>
+        <span class="n">bs_state</span> <span class="o">=</span> <span class="n">get_bs_state</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+        <span class="n">identifier</span> <span class="o">=</span> <span class="n">register_run_identifier</span><span class="p">(</span><span class="n">bs_state</span><span class="p">,</span> <span class="n">origin</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="n">origin</span><span class="o">.</span><span class="n">plan</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">origin</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">item</span><span class="o">=</span><span class="n">origin</span><span class="o">.</span><span class="n">to_plan_item</span><span class="p">(),</span>
+            <span class="n">plan_id</span><span class="o">=</span><span class="n">identifier</span><span class="p">,</span>
+            <span class="n">bs_state</span><span class="o">=</span><span class="n">bs_state</span><span class="p">,</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PreparedPlanStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPlanStep.html#atef.procedure.PreparedPlanStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedPlanStep</span><span class="p">(</span><span class="n">PreparedProcedureStep</span><span class="p">):</span>
+    <span class="c1">#: a link to the original PlanStep</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">PlanStep</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">PlanStep</span><span class="p">)</span>
+    <span class="c1">#: list of PreparedPlan</span>
+    <span class="n">prepared_plans</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PreparedPlan</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="c1">#: list of PlanOption&#39;s that led to failed PreparedPlan&#39;s</span>
+    <span class="n">prepared_plan_failures</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PlanOptions</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="c1">#: list of success criteria</span>
+    <span class="n">prepared_checks</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PreparedSignalComparison</span><span class="p">,</span>
+                                <span class="n">PreparedPlanComparison</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="c1">#: list of failed checks</span>
+    <span class="n">prepared_checks_failures</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PreparedComparisonException</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span>
+    <span class="p">)</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot; Gather plan options and run the bluesky plan &quot;&quot;&quot;</span>
+        <span class="c1"># Construct plan (get devices, organize args/kwargs, run)</span>
+        <span class="c1"># verify</span>
+        <span class="c1"># - gather namespace (plans, devices)</span>
+        <span class="c1"># - validate_plan</span>
+        <span class="c1"># send plan to destination (local, queue server, ...)</span>
+        <span class="c1"># local -&gt; get global run engine, setup</span>
+        <span class="c1"># qserver -&gt; send to queueserver</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">require_plan_success</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_plan_failures</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;One or more actions failed to prepare: &#39;</span>
+                        <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="p">[</span><span class="n">plan</span><span class="o">.</span><span class="n">name</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">plan</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">prepared_plan_failures</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># get namespace (based on destination?</span>
+        <span class="c1"># How will we know what&#39;s in the queueserver&#39;s destination?)</span>
+        <span class="c1"># Run the plans</span>
+        <span class="n">nspace</span> <span class="o">=</span> <span class="n">get_default_namespace</span><span class="p">()</span>
+        <span class="n">epd</span> <span class="o">=</span> <span class="n">existing_plans_and_devices_from_nspace</span><span class="p">(</span><span class="n">nspace</span><span class="o">=</span><span class="n">nspace</span><span class="p">)</span>
+        <span class="n">plans</span><span class="p">,</span> <span class="n">devices</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">__</span> <span class="o">=</span> <span class="n">epd</span>
+        <span class="n">plan_status</span> <span class="o">=</span> <span class="p">[</span><span class="n">validate_plan</span><span class="p">(</span><span class="n">plan</span><span class="o">.</span><span class="n">item</span><span class="p">,</span> <span class="n">allowed_plans</span><span class="o">=</span><span class="n">plans</span><span class="p">,</span>
+                                     <span class="n">allowed_devices</span><span class="o">=</span><span class="n">devices</span><span class="p">)</span>
+                       <span class="k">for</span> <span class="n">plan</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_plans</span><span class="p">]</span>
+
+        <span class="n">validation_status</span> <span class="o">=</span> <span class="p">[</span><span class="n">status</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">status</span> <span class="ow">in</span> <span class="n">plan_status</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">validation_status</span><span class="p">):</span>
+            <span class="c1"># raise an error, place info in result</span>
+            <span class="n">fail_plan_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">pl</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">pl</span><span class="p">,</span> <span class="n">st</span> <span class="ow">in</span>
+                               <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">prepared_plans</span><span class="p">,</span> <span class="n">validation_status</span><span class="p">)</span>
+                               <span class="k">if</span> <span class="ow">not</span> <span class="n">st</span><span class="p">]</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;One or more plans (</span><span class="si">{</span><span class="n">fail_plan_names</span><span class="si">}</span><span class="s1">) failed validation&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;One or more plans (</span><span class="si">{</span><span class="n">fail_plan_names</span><span class="si">}</span><span class="s1">) failed validation&#39;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># send each plan to correct destination</span>
+        <span class="n">plan_results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pplan</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_plans</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;running plan: </span><span class="si">{</span><span class="n">pplan</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">...&#39;</span><span class="p">)</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pplan</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;run completed: </span><span class="si">{</span><span class="n">res</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="n">plan_results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+
+        <span class="c1"># run the checks</span>
+        <span class="k">for</span> <span class="n">prep_check</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_checks</span><span class="p">:</span>
+            <span class="k">await</span> <span class="n">prep_check</span><span class="o">.</span><span class="n">compare</span><span class="p">()</span>
+
+        <span class="n">check_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">check</span><span class="o">.</span><span class="n">result</span> <span class="k">for</span> <span class="n">check</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_checks</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_checks_failures</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;One or more success criteria failed to initialize: &#39;</span>
+                        <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="p">[</span><span class="n">check</span><span class="o">.</span><span class="n">name</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">check</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">prepared_checks_failures</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="n">severity</span> <span class="o">=</span> <span class="n">_summarize_result_severity</span><span class="p">(</span><span class="n">GroupResultMode</span><span class="o">.</span><span class="n">all_</span><span class="p">,</span>
+                                              <span class="n">check_results</span> <span class="o">+</span> <span class="n">plan_results</span><span class="p">)</span>
+        <span class="n">reason</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">plan_results</span><span class="p">)</span><span class="si">}</span><span class="s1"> plans run, &#39;</span>
+                  <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">check_results</span><span class="p">)</span><span class="si">}</span><span class="s1"> checks passed&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Result</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="n">severity</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="n">reason</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedPlanStep.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPlanStep.html#atef.procedure.PreparedPlanStep.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">origin</span><span class="p">:</span> <span class="n">PlanStep</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedPlanStep</span><span class="p">:</span>
+
+        <span class="n">prep_step</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">origin</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">plan_step</span> <span class="ow">in</span> <span class="n">origin</span><span class="o">.</span><span class="n">plans</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">prep_plan</span> <span class="o">=</span> <span class="n">PreparedPlan</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span><span class="n">plan_step</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">prep_step</span><span class="p">)</span>
+                <span class="n">prep_step</span><span class="o">.</span><span class="n">prepared_plans</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">prep_plan</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">prep_step</span><span class="o">.</span><span class="n">prepared_plan_failures</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">plan_step</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">check</span> <span class="ow">in</span> <span class="n">origin</span><span class="o">.</span><span class="n">checks</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">create_prepared_comparison</span><span class="p">(</span><span class="n">check</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">prep_step</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
+                <span class="n">prep_step</span><span class="o">.</span><span class="n">prepared_checks_failures</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">prep_step</span><span class="o">.</span><span class="n">prepared_checks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">prep_step</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="create_prepared_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.create_prepared_comparison.html#atef.procedure.create_prepared_comparison">[docs]</a>
+<span class="k">def</span> <span class="nf">create_prepared_comparison</span><span class="p">(</span>
+    <span class="n">check</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">ComparisonToTarget</span><span class="p">,</span> <span class="n">ComparisonToPlanData</span><span class="p">],</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">AnyDataclass</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="n">PreparedComparisonException</span><span class="p">]:</span>
+
+    <span class="n">output</span> <span class="o">=</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Cannot prepare the provided comparison, type not &#39;</span>
+                        <span class="sa">f</span><span class="s1">&#39;supported: (</span><span class="si">{</span><span class="n">check</span><span class="si">}</span><span class="s1">)&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">check</span><span class="p">,</span> <span class="n">ComparisonToTarget</span><span class="p">):</span>
+        <span class="n">signal</span> <span class="o">=</span> <span class="n">check</span><span class="o">.</span><span class="n">to_signal</span><span class="p">()</span>
+        <span class="n">comp</span> <span class="o">=</span> <span class="n">check</span><span class="o">.</span><span class="n">comparison</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">PreparedSignalComparison</span><span class="o">.</span><span class="n">from_signal</span><span class="p">(</span>
+                <span class="n">signal</span><span class="o">=</span><span class="n">signal</span><span class="p">,</span> <span class="n">comparison</span><span class="o">=</span><span class="n">comp</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">PreparedComparisonException</span><span class="p">(</span>
+                <span class="n">exception</span><span class="o">=</span><span class="n">ex</span><span class="p">,</span>
+                <span class="n">identifier</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span><span class="n">signal</span><span class="p">,</span> <span class="s1">&#39;pvname&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+                <span class="n">message</span><span class="o">=</span><span class="s1">&#39;Failed to initialize comparison&#39;</span><span class="p">,</span>
+                <span class="n">comparison</span><span class="o">=</span><span class="n">comp</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">comp</span><span class="o">.</span><span class="n">name</span>
+            <span class="p">)</span>
+
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">check</span><span class="p">,</span> <span class="n">ComparisonToPlanData</span><span class="p">):</span>
+        <span class="n">comp</span> <span class="o">=</span> <span class="n">check</span><span class="o">.</span><span class="n">comparison</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">PreparedPlanComparison</span><span class="o">.</span><span class="n">from_comp_to_plan</span><span class="p">(</span>
+                <span class="n">check</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">PreparedComparisonException</span><span class="p">(</span>
+                <span class="n">exception</span><span class="o">=</span><span class="n">ex</span><span class="p">,</span>
+                <span class="n">identifier</span><span class="o">=</span><span class="nb">getattr</span><span class="p">(</span><span class="n">check</span><span class="p">,</span> <span class="s1">&#39;plan_id&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">),</span>
+                <span class="n">message</span><span class="o">=</span><span class="s1">&#39;Failed to initialize comparison&#39;</span><span class="p">,</span>
+                <span class="n">comparison</span><span class="o">=</span><span class="n">comp</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">comp</span><span class="o">.</span><span class="n">name</span>
+            <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output</span></div>
+
+
+
+<div class="viewcode-block" id="get_bs_state">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.get_bs_state.html#atef.procedure.get_bs_state">[docs]</a>
+<span class="k">def</span> <span class="nf">get_bs_state</span><span class="p">(</span><span class="n">dclass</span><span class="p">:</span> <span class="n">PreparedProcedureStep</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BlueskyState</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get the BlueskyState instance corresponding to ``dclass``.</span>
+<span class="sd">    Each ProcedureFile gets assigned a single BlueskyState.</span>
+<span class="sd">    Walk parents up to the top-level PreparedProcedureFile, find its origin</span>
+<span class="sd">    (ProcedureFile), then return its correspoinding BlueskyState</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dclass : PreparedProcedureStep</span>
+<span class="sd">        the current prepared-variant procedure step</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    BlueskyState</span>
+<span class="sd">        the BlueskyState holding run information and allowed devices/plans</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># dclass should be a Prepared dataclass</span>
+    <span class="k">if</span> <span class="n">dclass</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">top_dclass</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">top_dclass</span> <span class="o">=</span> <span class="n">dclass</span>
+        <span class="n">ctr</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># This isn&#39;t my finest work, but it does work</span>
+        <span class="k">while</span> <span class="p">((</span><span class="nb">getattr</span><span class="p">(</span><span class="n">top_dclass</span><span class="p">,</span> <span class="s1">&#39;parent&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">and</span>
+                <span class="p">(</span><span class="n">ctr</span> <span class="o">&lt;</span> <span class="n">MAX_PLAN_DEPTH</span><span class="p">)):</span>
+            <span class="n">top_dclass</span> <span class="o">=</span> <span class="n">top_dclass</span><span class="o">.</span><span class="n">parent</span>
+            <span class="n">ctr</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="n">ctr</span> <span class="o">&gt;=</span> <span class="n">MAX_PLAN_DEPTH</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">ctr</span><span class="si">}</span><span class="s1"> &quot;parents&quot; traversed, either the depth of &#39;</span>
+                           <span class="s1">&#39;this file is excessive or an infinite loop occurred&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">top_dclass</span><span class="p">,</span> <span class="n">PreparedProcedureFile</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;top-level dataclass was not a PreparedProcedureFile, &#39;</span>
+                         <span class="sa">f</span><span class="s1">&#39; </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">top_dclass</span><span class="p">)</span><span class="si">}</span><span class="s1">, using default BlueskyState&#39;</span><span class="p">)</span>
+            <span class="n">top_dclass</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">top_dclass</span> <span class="o">=</span> <span class="n">top_dclass</span><span class="o">.</span><span class="n">file</span>  <span class="c1"># grab un-prepared ProcedureFile</span>
+
+    <span class="n">top_dclass_id</span> <span class="o">=</span> <span class="nb">id</span><span class="p">(</span><span class="n">top_dclass</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">top_dclass_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">BS_STATE_MAP</span><span class="p">:</span>
+        <span class="n">BS_STATE_MAP</span><span class="p">[</span><span class="n">top_dclass_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">BlueskyState</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">BS_STATE_MAP</span><span class="p">[</span><span class="n">top_dclass_id</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="PreparedPlanComparison">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPlanComparison.html#atef.procedure.PreparedPlanComparison">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedPlanComparison</span><span class="p">(</span><span class="n">PreparedComparison</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Unified representation for comparisons to Bluesky Plan data</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#: Original plan data, holds relevant data coordinates</span>
+    <span class="n">plan_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ComparisonToPlanData</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: The hierarchical parent of this comparison</span>
+    <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedPlanStep</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="c1">#: The value from the plan, to which the comparison will take place</span>
+    <span class="n">data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="PreparedPlanComparison.get_data_async">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPlanComparison.html#atef.procedure.PreparedPlanComparison.get_data_async">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">get_data_async</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="n">bs_state</span> <span class="o">=</span> <span class="n">get_bs_state</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="p">)</span>
+        <span class="c1"># get BSState, look for entry?</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">get_RE_data</span><span class="p">(</span><span class="n">bs_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># &#39;None&#39; is likely incompatible with our comparisons and should</span>
+            <span class="c1"># be raised for separately</span>
+            <span class="k">return</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">comparison</span><span class="o">.</span><span class="n">if_disconnected</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;No data available for signal </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">identifier</span><span class="si">!r}</span><span class="s2"> in &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;comparison </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">comparison</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">plan_data</span><span class="o">.</span><span class="n">comparison</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">identifier</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">identifier</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedPlanComparison.from_comp_to_plan">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedPlanComparison.html#atef.procedure.PreparedPlanComparison.from_comp_to_plan">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_comp_to_plan</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">origin</span><span class="p">:</span> <span class="n">ComparisonToPlanData</span><span class="p">,</span>
+        <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedPlanStep</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedPlanComparison</span><span class="p">:</span>
+
+        <span class="n">identifier</span> <span class="o">=</span> <span class="n">origin</span><span class="o">.</span><span class="n">comparison</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="sa">f</span><span class="s1">&#39;[</span><span class="si">{</span><span class="n">origin</span><span class="o">.</span><span class="n">data_points</span><span class="si">}</span><span class="s1">]&#39;</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">origin</span><span class="o">.</span><span class="n">name</span>
+
+        <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cache</span> <span class="o">=</span> <span class="n">DataCache</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">plan_data</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+            <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">,</span>
+            <span class="n">identifier</span><span class="o">=</span><span class="n">identifier</span><span class="p">,</span>
+            <span class="n">comparison</span><span class="o">=</span><span class="n">origin</span><span class="o">.</span><span class="n">comparison</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="get_RE_data">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.get_RE_data.html#atef.procedure.get_RE_data">[docs]</a>
+<span class="k">def</span> <span class="nf">get_RE_data</span><span class="p">(</span><span class="n">bs_state</span><span class="p">:</span> <span class="n">BlueskyState</span><span class="p">,</span> <span class="n">plan_data</span><span class="p">:</span> <span class="n">PlanData</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get databroker data from the GlobalRunEngine from the plan specified by</span>
+<span class="sd">    ``plan_data``.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    bs_state : BlueskyState</span>
+<span class="sd">        the BlueskyState whose run_map holds the uuid for ``plan_data``</span>
+<span class="sd">    plan_data : PlanData</span>
+<span class="sd">        the plan data specification (data points, plan number, field names)</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Any</span>
+<span class="sd">        Array of data specified by ``plan_data``</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    RuntimeError</span>
+<span class="sd">        if the data cannot be found in ``bs_state``</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        if ``plan_data`` does not provide parsable datapoints</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">gre</span> <span class="o">=</span> <span class="n">GlobalRunEngine</span><span class="p">()</span>
+    <span class="n">run_uuids</span> <span class="o">=</span> <span class="n">bs_state</span><span class="o">.</span><span class="n">run_map</span><span class="p">[</span><span class="n">plan_data</span><span class="o">.</span><span class="n">plan_id</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">run_uuids</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Data unavailable, run cannot be found.  Has the &quot;</span>
+                           <span class="sa">f</span><span class="s2">&quot;referenced plan (id: </span><span class="si">{</span><span class="n">plan_data</span><span class="o">.</span><span class="n">plan_id</span><span class="si">}</span><span class="s2">) &quot;</span>
+                           <span class="s2">&quot;been run?&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Use index to grab right uuid, data row</span>
+    <span class="n">uuid</span> <span class="o">=</span> <span class="n">run_uuids</span><span class="p">[</span><span class="n">plan_data</span><span class="o">.</span><span class="n">plan_no</span><span class="p">]</span>
+    <span class="n">plan_table</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">=</span> <span class="n">gre</span><span class="o">.</span><span class="n">db</span><span class="p">[</span><span class="n">uuid</span><span class="p">]</span><span class="o">.</span><span class="n">table</span><span class="p">()</span>
+    <span class="n">field_series</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">=</span> <span class="n">plan_table</span><span class="p">[</span><span class="n">plan_data</span><span class="o">.</span><span class="n">field_names</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">plan_data</span><span class="o">.</span><span class="n">data_points</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+        <span class="n">data_slice</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="o">*</span><span class="n">plan_data</span><span class="o">.</span><span class="n">data_points</span><span class="p">)</span>
+        <span class="n">data_table</span> <span class="o">=</span> <span class="n">field_series</span><span class="p">[</span><span class="n">data_slice</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">plan_data</span><span class="o">.</span><span class="n">data_points</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="n">data_table</span> <span class="o">=</span> <span class="n">field_series</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">plan_data</span><span class="o">.</span><span class="n">data_points</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unable to parse data point format: </span><span class="si">{</span><span class="n">plan_data</span><span class="o">.</span><span class="n">data_points</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="n">reduced_data</span> <span class="o">=</span> <span class="n">plan_data</span><span class="o">.</span><span class="n">reduction_mode</span><span class="o">.</span><span class="n">reduce_values</span><span class="p">(</span><span class="n">data_table</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">reduced_data</span></div>
+
+
+
+<span class="n">AnyProcedure</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span>
+    <span class="n">ProcedureGroup</span><span class="p">,</span>
+    <span class="n">DescriptionStep</span><span class="p">,</span>
+    <span class="n">PassiveStep</span><span class="p">,</span>
+    <span class="n">SetValueStep</span><span class="p">,</span>
+    <span class="n">PlanStep</span>
+<span class="p">]</span>
+
+<span class="n">AnyPreparedProcedure</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span>
+    <span class="n">PreparedProcedureGroup</span><span class="p">,</span>
+    <span class="n">PreparedDescriptionStep</span><span class="p">,</span>
+    <span class="n">PreparedPassiveStep</span><span class="p">,</span>
+    <span class="n">PreparedSetValueStep</span><span class="p">,</span>
+    <span class="n">PreparedPlanStep</span>
+<span class="p">]</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, SLAC National Accelerator Laboratory.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

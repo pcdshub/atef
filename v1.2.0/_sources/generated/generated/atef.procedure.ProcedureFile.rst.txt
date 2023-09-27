@@ -1,0 +1,31 @@
+atef.procedure.ProcedureFile
+============================
+
+.. currentmodule:: atef.procedure
+
+.. autoclass:: ProcedureFile
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: from_filename
+    .. automethod:: from_json
+    .. automethod:: from_yaml
+    .. automethod:: to_json
+    .. automethod:: to_yaml
+    .. automethod:: walk_steps
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: version
+    .. autoattribute:: root
+    
+    
