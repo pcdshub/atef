@@ -865,6 +865,12 @@ class RangeWidget(DesignerDisplay, DataWidget):
         self.update_symbols(self.bridge.inclusive.get())
         # One additional visual update on inversion
         self.bridge.invert.changed_value.connect(self.update_visualization)
+
+        # update on value changes
+        self.bridge.low.changed_value.connect(self.update_visualization)
+        self.bridge.high.changed_value.connect(self.update_visualization)
+        self.bridge.warn_low.changed_value.connect(self.update_visualization)
+        self.bridge.warn_high.changed_value.connect(self.update_visualization)
         # Make sure this was called at least once
         self.update_visualization()
 
@@ -969,11 +975,16 @@ class RangeWidget(DesignerDisplay, DataWidget):
             self.vertical_line_3.show()
             self.warn_low_label.show()
             self.warn_high_label.show()
+            # update labels
+            self.warn_high_label.setText(str(warn_high_mark))
+            self.warn_low_label.setText(str(warn_low_mark))
         # The yellow and green lines should be sized relative to each other
         total_range = high_mark - low_mark
         left_range = warn_low_mark - low_mark
         mid_range = warn_high_mark - warn_low_mark
         right_range = high_mark - warn_high_mark
+        self.low_label.setText(str(low_mark))
+        self.high_label.setText(str(high_mark))
         self.left_yellow_line.setFixedWidth(int(
             real_space * left_range/total_range
         ))
