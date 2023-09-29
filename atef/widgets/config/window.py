@@ -58,6 +58,7 @@ class Window(DesignerDisplay, QMainWindow):
     user_filename_ext = 'json'
 
     tab_widget: QTabWidget
+    action_welcome_tab: QAction
     action_new_file: QAction
     action_open_file: QAction
     action_save: QAction
@@ -72,6 +73,7 @@ class Window(DesignerDisplay, QMainWindow):
     def __init__(self, *args, show_welcome: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
         self.setWindowTitle('atef config')
+        self.action_welcome_tab.triggered.connect(self.welcome_user)
         self.action_new_file.triggered.connect(self.new_file)
         self.action_open_file.triggered.connect(self.open_file)
         self.action_save.triggered.connect(self.save)
