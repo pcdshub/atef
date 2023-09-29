@@ -234,6 +234,13 @@ class Window(DesignerDisplay, QMainWindow):
             except ValidationError:
                 logger.error('failed to open file as either active '
                              'or passive checkout')
+                msg = QtWidgets.QMessageBox(parent=self)
+                msg.setIcon(QtWidgets.QMessageBox.Critical)
+                msg.setText('Failed to open file as either an active or passive '
+                            'checkout.  The file may be corrupted or malformed.')
+                msg.setWindowTitle('Could not open file')
+                msg.exec_()
+                return
         self._new_tab(data=data, filename=filename)
 
     def _new_tab(
