@@ -1672,7 +1672,7 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         if found_row is None:
             return
 
-        step_row = ComparisonRowWidget(data=new_step)
+        step_row = ConfigurationGroupRowWidget(data=new_step)
         self.setup_row_buttons(
             row_widget=step_row,
             item=comp_item,
@@ -1791,12 +1791,16 @@ class StepPage(DesignerDisplay, PageWidget):
             return
 
         step = cast_dataclass(data=self.data, new_type=new_type)
+        # Assumes self.parent_tree_item.widget: ProcedureGroupPage
+        # put another way, this assumes steps cannot be parent of other steps
         self.parent_tree_item.widget.replace_step(
             old_step=self.data,
             new_step=step,
             comp_item=self.tree_item,
         )
         self.tree_item.setText(1, new_type.__name__)
+        # remove old children, no longer needed.
+        self.tree_item.takeChildren()
         self.new_step(step=step)
         self.update_context()
 
