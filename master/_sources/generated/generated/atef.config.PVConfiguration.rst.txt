@@ -11,6 +11,9 @@ atef.config.PVConfiguration
 
     
     .. automethod:: __init__
+    .. automethod:: children
+    .. automethod:: move_comparison
+    .. automethod:: replace_comparison
     
     
 

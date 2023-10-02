@@ -12,6 +12,7 @@ atef.procedure.ConfigurationCheckStep
     
     .. automethod:: __init__
     .. automethod:: allow_verify
+    .. automethod:: children
     
     
 

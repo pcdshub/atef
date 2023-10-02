@@ -11,6 +11,7 @@ atef.config.PreparedFile
 
     
     .. automethod:: __init__
+    .. automethod:: children
     .. automethod:: compare
     .. automethod:: fill_cache
     .. automethod:: from_config

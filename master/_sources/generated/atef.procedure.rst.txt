@@ -13,7 +13,6 @@
       create_prepared_comparison
       get_RE_data
       get_bs_state
-      walk_steps
    
    
 

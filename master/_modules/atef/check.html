@@ -1,12 +1,14 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>atef.check &mdash; atef  documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+
+  
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
@@ -173,12 +175,14 @@
 <a class="viewcode-back" href="../../generated/generated/atef.check.Value.html#atef.check.Value.compare">[docs]</a>
     <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Compare the provided value with this one, using tolerance settings.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">atol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">rtol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">atol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bool</span><span class="p">))):</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span>
                 <span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
                 <span class="n">rtol</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rtol</span> <span class="ow">or</span> <span class="mf">0.0</span><span class="p">),</span>
                 <span class="n">atol</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atol</span> <span class="ow">or</span> <span class="mf">0.0</span><span class="p">)</span>
             <span class="p">)</span>
+
         <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span></div>
 </div>
 
@@ -850,6 +854,38 @@
         <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span><span class="p">:</span>
             <span class="k">await</span> <span class="n">comp</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">is_prepared</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="AnyComparison.children">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyComparison.html#atef.check.AnyComparison.children">[docs]</a>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span></div>
+
+
+<div class="viewcode-block" id="AnyComparison.replace_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyComparison.html#atef.check.AnyComparison.replace_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Replace ``old_comp`` with ``new_comp`` in this dataclass.</span>
+<span class="sd">        A common method for all dataclasses that hold comparisons.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        old_comp : Comparison</span>
+<span class="sd">            Comparsion to replace</span>
+<span class="sd">        new_comp : Comparison</span>
+<span class="sd">            Comparison to replace ``old_comp`` with</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">util</span><span class="o">.</span><span class="n">replace_in_list</span><span class="p">(</span>
+            <span class="n">old</span><span class="o">=</span><span class="n">old_comp</span><span class="p">,</span>
+            <span class="n">new</span><span class="o">=</span><span class="n">new_comp</span><span class="p">,</span>
+            <span class="n">item_list</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span><span class="p">,</span>
+        <span class="p">)</span></div>
 </div>
 
 
@@ -1052,6 +1088,10 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">is_prepared</span> <span class="o">=</span> <span class="kc">True</span></div>
 </div>
 
+
+
+<span class="n">ALL_COMPARISONS</span> <span class="o">=</span> <span class="p">[</span><span class="n">Equals</span><span class="p">,</span> <span class="n">NotEquals</span><span class="p">,</span> <span class="n">Greater</span><span class="p">,</span> <span class="n">GreaterOrEqual</span><span class="p">,</span> <span class="n">Less</span><span class="p">,</span> <span class="n">LessOrEqual</span><span class="p">,</span>
+                   <span class="n">Range</span><span class="p">,</span> <span class="n">ValueSet</span><span class="p">,</span> <span class="n">AnyValue</span><span class="p">,</span> <span class="n">AnyComparison</span><span class="p">]</span>
 </pre></div>
 
            </div>

@@ -1,0 +1,6 @@
+atef.walk.walk\_config\_file
+============================
+
+.. currentmodule:: atef.walk
+
+.. autofunction:: walk_config_file

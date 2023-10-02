@@ -12,6 +12,8 @@ atef.procedure.ProcedureGroup
     
     .. automethod:: __init__
     .. automethod:: allow_verify
+    .. automethod:: children
+    .. automethod:: replace_step
     .. automethod:: walk_steps
     
     

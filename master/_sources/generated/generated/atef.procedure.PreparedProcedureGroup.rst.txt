@@ -13,6 +13,7 @@ atef.procedure.PreparedProcedureGroup
     .. automethod:: __init__
     .. automethod:: from_origin
     .. automethod:: run
+    .. automethod:: walk_steps
     
     
 

@@ -11,6 +11,7 @@ atef.procedure.ProcedureFile
 
     
     .. automethod:: __init__
+    .. automethod:: children
     .. automethod:: from_filename
     .. automethod:: from_json
     .. automethod:: from_yaml

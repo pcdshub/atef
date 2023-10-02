@@ -11,6 +11,9 @@ atef.config.ConfigurationGroup
 
     
     .. automethod:: __init__
+    .. automethod:: children
+    .. automethod:: move_comparison
+    .. automethod:: replace_comparison
     .. automethod:: walk_configs
     
     

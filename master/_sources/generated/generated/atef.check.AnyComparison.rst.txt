@@ -11,11 +11,13 @@ atef.check.AnyComparison
 
     
     .. automethod:: __init__
+    .. automethod:: children
     .. automethod:: compare
     .. automethod:: describe
     .. automethod:: get_data_for_signal
     .. automethod:: get_data_for_signal_async
     .. automethod:: prepare
+    .. automethod:: replace_comparison
     
     
 

@@ -1,6 +1,0 @@
-atef.procedure.walk\_steps
-==========================
-
-.. currentmodule:: atef.procedure
-
-.. autofunction:: walk_steps

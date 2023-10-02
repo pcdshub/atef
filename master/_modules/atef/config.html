@@ -1,12 +1,14 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>atef.config &mdash; atef  documentation</title>
-      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../_static/graphviz.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+
+  
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
@@ -131,7 +133,88 @@
     <span class="c1">#: Description tied to this configuration.</span>
     <span class="n">description</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="c1">#: Tags tied to this configuration.</span>
-    <span class="n">tags</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span></div>
+    <span class="n">tags</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Configuration.children">
+<a class="viewcode-back" href="../../generated/generated/atef.config.Configuration.html#atef.config.Configuration.children">[docs]</a>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[]</span></div>
+
+
+<div class="viewcode-block" id="Configuration.replace_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.config.Configuration.html#atef.config.Configuration.replace_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">comp_attrs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.</span>
+<span class="sd">        Looks through ``shared``, then any of the attributes in ``comp_attrs``</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        old_comp : Comparison</span>
+<span class="sd">            Comparison to be replaced</span>
+<span class="sd">        new_comp : Comparison</span>
+<span class="sd">            Comparison to replace ``old_comp`` with</span>
+<span class="sd">        comp_attrs : Optional[List[str]], optional</span>
+<span class="sd">            Attribute names in the dataclass to check, by default None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">comp_attrs</span> <span class="o">=</span> <span class="n">comp_attrs</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span> <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">comp_attrs</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;shared&quot;</span><span class="p">]):</span>
+            <span class="k">return</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">util</span><span class="o">.</span><span class="n">replace_in_list</span><span class="p">(</span>
+                <span class="n">old</span><span class="o">=</span><span class="n">old_comp</span><span class="p">,</span>
+                <span class="n">new</span><span class="o">=</span><span class="n">new_comp</span><span class="p">,</span>
+                <span class="n">item_list</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">shared</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">comp_attrs</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">comp_list</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">util</span><span class="o">.</span><span class="n">replace_in_list</span><span class="p">(</span>
+                            <span class="n">old</span><span class="o">=</span><span class="n">old_comp</span><span class="p">,</span>
+                            <span class="n">new</span><span class="o">=</span><span class="n">new_comp</span><span class="p">,</span>
+                            <span class="n">item_list</span><span class="o">=</span><span class="n">comp_list</span><span class="p">,</span>
+                        <span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                        <span class="k">continue</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">break</span></div>
+
+
+<div class="viewcode-block" id="Configuration.move_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.config.Configuration.html#atef.config.Configuration.move_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">move_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">comp_attrs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">att</span><span class="p">)</span> <span class="k">for</span> <span class="n">att</span> <span class="ow">in</span> <span class="n">comp_attrs</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;shared&quot;</span><span class="p">]):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;cannot find a requested attr in dataclass&#39;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="c1"># remove from all attrs</span>
+        <span class="n">util</span><span class="o">.</span><span class="n">remove_by_id</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shared</span><span class="p">,</span> <span class="n">comp</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">comp_attrs</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">comp_list</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">util</span><span class="o">.</span><span class="n">remove_by_id</span><span class="p">(</span><span class="n">comp_list</span><span class="p">,</span> <span class="n">comp</span><span class="p">)</span>
+
+        <span class="c1"># place into new_attr</span>
+        <span class="k">if</span> <span class="n">new_attr</span> <span class="o">==</span> <span class="s2">&quot;shared&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">shared</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">comp</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">comp_attrs</span><span class="p">:</span>
+                <span class="n">attr_dict</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="p">{})</span>
+                <span class="k">if</span> <span class="n">new_attr</span> <span class="ow">in</span> <span class="n">attr_dict</span><span class="p">:</span>
+                    <span class="n">attr_dict</span><span class="p">[</span><span class="n">new_attr</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">comp</span><span class="p">)</span></div>
+</div>
 
 
 
@@ -160,6 +243,13 @@
             <span class="k">yield</span> <span class="n">config</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">ConfigurationGroup</span><span class="p">):</span>
                 <span class="k">yield from</span> <span class="n">config</span><span class="o">.</span><span class="n">walk_configs</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ConfigurationGroup.children">
+<a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationGroup.html#atef.config.ConfigurationGroup.children">[docs]</a>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Configuration</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">configs</span></div>
 </div>
 
 
@@ -183,7 +273,53 @@
     <span class="c1">#: Device attribute name to comparison list.</span>
     <span class="n">by_attr</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
     <span class="c1">#: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.</span>
-    <span class="n">shared</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+    <span class="n">shared</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DeviceConfiguration.children">
+<a class="viewcode-back" href="../../generated/generated/atef.config.DeviceConfiguration.html#atef.config.DeviceConfiguration.children">[docs]</a>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">([</span><span class="n">comp</span> <span class="k">for</span> <span class="n">comp_list</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">by_attr</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">comp_list</span><span class="p">]</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">shared</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DeviceConfiguration.replace_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.config.DeviceConfiguration.html#atef.config.DeviceConfiguration.replace_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">comp_attrs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.</span>
+<span class="sd">        Looks through ``shared``, then any of the attributes in ``comp_attrs``</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        old_comp : Comparison</span>
+<span class="sd">            Comparison to be replaced</span>
+<span class="sd">        new_comp : Comparison</span>
+<span class="sd">            Comparison to replace ``old_comp`` with</span>
+<span class="sd">        comp_attrs : Optional[List[str]], optional</span>
+<span class="sd">            Attribute names in the dataclass to check, by default [&#39;by_attr&#39;] if</span>
+<span class="sd">            no value is provided</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">comp_attrs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">comp_attrs</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;by_attr&#39;</span><span class="p">]</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">replace_comparison</span><span class="p">(</span><span class="n">old_comp</span><span class="p">,</span> <span class="n">new_comp</span><span class="p">,</span> <span class="n">comp_attrs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DeviceConfiguration.move_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.config.DeviceConfiguration.html#atef.config.DeviceConfiguration.move_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">move_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">comp_attrs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">move_comparison</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="n">new_attr</span><span class="p">,</span> <span class="n">comp_attrs</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;by_attr&#39;</span><span class="p">])</span></div>
+</div>
 
 
 
@@ -197,7 +333,53 @@
     <span class="c1">#: PV name to comparison list.</span>
     <span class="n">by_pv</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
     <span class="c1">#: Comparisons to be run on *all* PVs in the `by_pv` dictionary.</span>
-    <span class="n">shared</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+    <span class="n">shared</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PVConfiguration.children">
+<a class="viewcode-back" href="../../generated/generated/atef.config.PVConfiguration.html#atef.config.PVConfiguration.children">[docs]</a>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">([</span><span class="n">comp</span> <span class="k">for</span> <span class="n">comp_list</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">by_pv</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">comp_list</span><span class="p">]</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">shared</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PVConfiguration.replace_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.config.PVConfiguration.html#atef.config.PVConfiguration.replace_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">comp_attrs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.</span>
+<span class="sd">        Looks through ``shared``, then any of the attributes in ``comp_attrs``</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        old_comp : Comparison</span>
+<span class="sd">            Comparison to be replaced</span>
+<span class="sd">        new_comp : Comparison</span>
+<span class="sd">            Comparison to replace ``old_comp`` with</span>
+<span class="sd">        comp_attrs : Optional[List[str]], optional</span>
+<span class="sd">            Attribute names in the dataclass to check, by default [&#39;by_pv&#39;] if</span>
+<span class="sd">            no value is provided</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">comp_attrs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">comp_attrs</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;by_pv&#39;</span><span class="p">]</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">replace_comparison</span><span class="p">(</span><span class="n">old_comp</span><span class="p">,</span> <span class="n">new_comp</span><span class="p">,</span> <span class="n">comp_attrs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PVConfiguration.move_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.config.PVConfiguration.html#atef.config.PVConfiguration.move_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">move_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">comp_attrs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">move_comparison</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="n">new_attr</span><span class="p">,</span> <span class="n">comp_attrs</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;by_pv&#39;</span><span class="p">])</span></div>
+</div>
 
 
 
@@ -217,7 +399,53 @@
     <span class="c1">#: Result attribute name to comparison list.</span>
     <span class="n">by_attr</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
     <span class="c1">#: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.</span>
-    <span class="n">shared</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+    <span class="n">shared</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ToolConfiguration.children">
+<a class="viewcode-back" href="../../generated/generated/atef.config.ToolConfiguration.html#atef.config.ToolConfiguration.children">[docs]</a>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">([</span><span class="n">comp</span> <span class="k">for</span> <span class="n">comp_list</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">by_attr</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">comp_list</span><span class="p">]</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">shared</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ToolConfiguration.replace_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.config.ToolConfiguration.html#atef.config.ToolConfiguration.replace_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">comp_attrs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.</span>
+<span class="sd">        Looks through ``shared``, then any of the attributes in ``comp_attrs``</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        old_comp : Comparison</span>
+<span class="sd">            Comparison to be replaced</span>
+<span class="sd">        new_comp : Comparison</span>
+<span class="sd">            Comparison to replace ``old_comp`` with</span>
+<span class="sd">        comp_attrs : Optional[List[str]], optional</span>
+<span class="sd">            Attribute names in the dataclass to check, by default [&#39;by_attr&#39;] if</span>
+<span class="sd">            no value is provided</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">comp_attrs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">comp_attrs</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;by_attr&#39;</span><span class="p">]</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">replace_comparison</span><span class="p">(</span><span class="n">old_comp</span><span class="p">,</span> <span class="n">new_comp</span><span class="p">,</span> <span class="n">comp_attrs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ToolConfiguration.move_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.config.ToolConfiguration.html#atef.config.ToolConfiguration.move_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">move_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">comp_attrs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">move_comparison</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="n">new_attr</span><span class="p">,</span> <span class="n">comp_attrs</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;by_attr&#39;</span><span class="p">])</span></div>
+</div>
 
 
 
@@ -254,6 +482,13 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span>
         <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">walk_configs</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ConfigurationFile.children">
+<a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.children">[docs]</a>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">ConfigurationGroup</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="ConfigurationFile.get_by_device">
@@ -295,7 +530,7 @@
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.from_filename">[docs]</a>
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">from_filename</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConfigurationFile</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot; Load a configuration file from a file.  Dispatches based on file type &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a configuration file from a file.  Dispatches based on file type&quot;&quot;&quot;</span>
         <span class="n">path</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;.json&#39;</span><span class="p">:</span>
             <span class="n">config</span> <span class="o">=</span> <span class="n">ConfigurationFile</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
@@ -451,6 +686,13 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Walk through the prepared groups.&quot;&quot;&quot;</span>
         <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span>
         <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">walk_groups</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="PreparedFile.children">
+<a class="viewcode-back" href="../../generated/generated/atef.config.PreparedFile.html#atef.config.PreparedFile.children">[docs]</a>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="PreparedFile.compare">
@@ -627,7 +869,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot; Re-compute the combined result and return it &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Re-compute the combined result and return it&quot;&quot;&quot;</span>
         <span class="c1"># read results without running steps</span>
         <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span><span class="p">:</span>
@@ -813,7 +1055,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot; Re-compute the combined result and return it &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Re-compute the combined result and return it&quot;&quot;&quot;</span>
         <span class="c1"># read results without running steps</span>
         <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">configs</span><span class="p">:</span>
@@ -1748,7 +1990,7 @@
 <span class="k">async</span> <span class="k">def</span> <span class="nf">run_passive_step</span><span class="p">(</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="n">PreparedConfiguration</span><span class="p">,</span> <span class="n">PreparedFile</span><span class="p">]</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot; Runs a given check and returns the result. &quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Runs a given check and returns the result.&quot;&quot;&quot;</span>
     <span class="c1"># Warn if will run all subcomparisons?</span>
     <span class="n">cache_fill_tasks</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">try</span><span class="p">:</span>
