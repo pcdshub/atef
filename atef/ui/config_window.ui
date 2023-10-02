@@ -37,6 +37,8 @@
     <property name="title">
      <string>File</string>
     </property>
+    <addaction name="action_welcome_tab"/>
+    <addaction name="separator"/>
     <addaction name="action_new_file"/>
     <addaction name="separator"/>
     <addaction name="action_open_file"/>
@@ -118,6 +120,11 @@
   <action name="action_find_replace">
    <property name="text">
     <string>Find / Replace</string>
+   </property>
+  </action>
+  <action name="action_welcome_tab">
+   <property name="text">
+    <string>Welcome Tab</string>
    </property>
   </action>
  </widget>
