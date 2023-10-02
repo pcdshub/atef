@@ -9,6 +9,7 @@ import yaml
 from pytestqt.qtbot import QtBot
 from qtpy import QtCore
 
+from atef.cache import get_signal_cache
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydDeviceTableWidget
 
@@ -200,14 +201,13 @@ def test_config_window_basic(qtbot: QtBot):
     qtbot.addWidget(window)
 
 
-# @pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
+# @pytest.mark.skip()
 def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path,
                                  all_config_path: os.PathLike):
     """
     Pass if the config gui can open a file and save the same file back
     """
     window = Window(show_welcome=False)
-    qtbot.addWidget(window)
     config = pathlib.Path(all_config_path)
     filename = config.name
     source = str(config)
@@ -219,6 +219,10 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path,
     with open(dest, 'r') as fd:
         dest_lines = fd.readlines()
     assert source_lines == dest_lines
+    # Clear the signal cache to stop signal-based callbacks from triggering
+    cache = get_signal_cache()
+    cache.clear()
+    qtbot.addWidget(window)
 
 
 # # Test encountered frequent failures due to C++ objects being deleted before
