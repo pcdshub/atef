@@ -637,6 +637,17 @@ class GeneralComparisonWidget(DesignerDisplay, DataWidget):
         self.bridge.if_disconnected.put(Severity[value])
 
 
+def float_or_none(value):
+    """
+    Returns a float, or if value is None, return None.
+    a "from_str" function for optional values
+    """
+    if value in ('', None):
+        return None
+
+    return float(value)
+
+
 class EqualsMixin:
     """
     Utilities for atol/rtol style data widgets
@@ -679,13 +690,13 @@ class EqualsMixin:
         setup_line_edit_data(
             line_edit=self.atol_edit,
             value_obj=self.bridge.atol,
-            from_str=float,
+            from_str=float_or_none,
             to_str=str,
         )
         setup_line_edit_data(
             line_edit=self.rtol_edit,
             value_obj=self.bridge.rtol,
-            from_str=float,
+            from_str=float_or_none,
             to_str=str,
         )
         starting_value = self.bridge.value.get()
