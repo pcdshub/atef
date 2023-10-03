@@ -9,7 +9,6 @@ import yaml
 from pytestqt.qtbot import QtBot
 from qtpy import QtCore
 
-from atef.cache import get_signal_cache
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydDeviceTableWidget
 
@@ -219,9 +218,6 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path,
     with open(dest, 'r') as fd:
         dest_lines = fd.readlines()
     assert source_lines == dest_lines
-    # Clear the signal cache to stop signal-based callbacks from triggering
-    cache = get_signal_cache()
-    cache.clear()
     qtbot.addWidget(window)
 
 
@@ -276,3 +272,4 @@ def test_device_table(qtbot: QtBot, happi_client: happi.Client):
     otable.device = new_dev
     assert otable.windowTitle() == new_dev.name
     qtbot.addWidget(otable)
+    assert False
