@@ -272,4 +272,3 @@ def test_device_table(qtbot: QtBot, happi_client: happi.Client):
     otable.device = new_dev
     assert otable.windowTitle() == new_dev.name
     qtbot.addWidget(otable)
-    assert False
