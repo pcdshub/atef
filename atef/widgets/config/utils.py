@@ -6,7 +6,6 @@ import logging
 import time
 from dataclasses import fields
 from enum import IntEnum
-from functools import partial
 from itertools import zip_longest
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
@@ -46,6 +45,7 @@ from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
 from atef.widgets.utils import (BusyCursorThread, PV_validator,
+                                WeakPartialMethodSlot,
                                 match_line_edit_text_width)
 
 logger = logging.getLogger(__name__)
@@ -1609,20 +1609,34 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         menu = QMenu()
         if not self._is_number:
             use_bool = menu.addAction("&Bool")
-            use_bool.triggered.connect(partial(self.set_mode, EditMode.BOOL)),
+            bool_slot = WeakPartialMethodSlot(use_bool, use_bool.triggered,
+                                              self.set_mode, EditMode.BOOL)
+            use_bool.triggered.connect(bool_slot._call)
             use_enum = menu.addAction("&Enum")
-            use_enum.triggered.connect(partial(self.set_mode, EditMode.ENUM))
+            enum_slot = WeakPartialMethodSlot(use_enum, use_enum.triggered,
+                                              self.set_mode, EditMode.ENUM)
+            use_enum.triggered.connect(enum_slot._call)
         use_float = menu.addAction("&Float")
-        use_float.triggered.connect(partial(self.set_mode, EditMode.FLOAT))
+        float_slot = WeakPartialMethodSlot(use_float, use_float.triggered,
+                                           self.set_mode, EditMode.FLOAT)
+        use_float.triggered.connect(float_slot._call)
         use_int = menu.addAction("&Int")
-        use_int.triggered.connect(partial(self.set_mode, EditMode.INT))
+        int_slot = WeakPartialMethodSlot(use_int, use_int.triggered,
+                                         self.set_mode, EditMode.INT)
+        use_int.triggered.connect(int_slot._call)
         if not self._is_number:
             use_str = menu.addAction("&String")
-            use_str.triggered.connect(partial(self.set_mode, EditMode.STR))
+            str_slot = WeakPartialMethodSlot(use_str, use_str.triggered,
+                                             self.set_mode, EditMode.STR)
+            use_str.triggered.connect(str_slot._call)
         use_epics = menu.addAction("EPI&CS")
-        use_epics.triggered.connect(partial(self.set_mode, EditMode.EPICS))
+        epics_slot = WeakPartialMethodSlot(use_epics, use_epics.triggered,
+                                           self.set_mode, EditMode.EPICS)
+        use_epics.triggered.connect(epics_slot._call)
         use_happi = menu.addAction("&Happi")
-        use_happi.triggered.connect(partial(self.set_mode, EditMode.HAPPI))
+        happi_slot = WeakPartialMethodSlot(use_happi, use_happi.triggered,
+                                           self.set_mode, EditMode.HAPPI)
+        use_happi.triggered.connect(happi_slot._call)
         self.select_mode_button.setMenu(menu)
         self.select_mode_button.setPopupMode(
             self.select_mode_button.InstantPopup

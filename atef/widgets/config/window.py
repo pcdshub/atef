@@ -10,7 +10,6 @@ import os.path
 import traceback
 import webbrowser
 from copy import deepcopy
-from functools import partial
 from pathlib import Path
 from pprint import pprint
 from typing import ClassVar, Dict, Optional, Union
@@ -31,7 +30,8 @@ from atef.qt_helpers import walk_tree_widget_items
 from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.widgets.config.find_replace import (FillTemplatePage,
                                               FindReplaceWidget)
-from atef.widgets.utils import reset_cursor, set_wait_cursor
+from atef.widgets.utils import (WeakPartialMethodSlot, reset_cursor,
+                                set_wait_cursor)
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
@@ -114,22 +114,32 @@ class Window(DesignerDisplay, QMainWindow):
         curr_idx = self.tab_widget.count() - 1
         self.tab_widget.setCurrentIndex(curr_idx)
 
-        widget.new_passive_button.clicked.connect(
-            partial(self.new_file, checkout_type='passive')
+        new_passive_slot = WeakPartialMethodSlot(
+            widget.new_passive_button, widget.new_passive_button.clicked,
+            self.new_file, checkout_type="passive"
         )
-        widget.new_active_button.clicked.connect(
-            partial(self.new_file, checkout_type='active')
+        widget.new_passive_button.clicked.connect(new_passive_slot._call)
+        new_active_slot = WeakPartialMethodSlot(
+            widget.new_active_button, widget.new_active_button.clicked,
+            self.new_file, checkout_type="active"
         )
+        widget.new_active_button.clicked.connect(new_active_slot._call)
+
         widget.fill_template_button.clicked.connect(
             self.open_fill_template
         )
-        widget.sample_active_button.clicked.connect(partial(
-            self.open_file, filename=str(TEST_CONFIG_PATH / 'active_test.json')
-        ))
 
-        widget.sample_passive_button.clicked.connect(partial(
+        sample_active_slot = WeakPartialMethodSlot(
+            widget.sample_active_button, widget.sample_active_button.clicked,
+            self.open_file, filename=str(TEST_CONFIG_PATH / 'active_test.json')
+        )
+        widget.sample_active_button.clicked.connect(sample_active_slot._call)
+
+        sample_passive_slot = WeakPartialMethodSlot(
+            widget.sample_passive_button, widget.sample_passive_button.clicked,
             self.open_file, filename=str(TEST_CONFIG_PATH / 'all_fields.json')
-        ))
+        )
+        widget.sample_passive_button.clicked.connect(sample_passive_slot._call)
 
         widget.open_button.clicked.connect(self.open_file)
         widget.exit_button.clicked.connect(self.close_all)

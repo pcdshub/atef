@@ -26,7 +26,8 @@ from atef.type_hints import PrimitiveType
 from atef.util import get_happi_client
 from atef.widgets.config.utils import TableWidgetWithAddRow
 from atef.widgets.core import DesignerDisplay
-from atef.widgets.utils import BusyCursorThread, insert_widget
+from atef.widgets.utils import (BusyCursorThread, WeakPartialMethodSlot,
+                                insert_widget)
 
 if TYPE_CHECKING:
     from .window import Window
@@ -558,6 +559,13 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         match_fn = get_default_match_fn(self._search_regex)
         self._match_fn = match_fn
 
+    def _remove_item_from_change_list(self, list_item):
+        self.change_list.takeItem(self.change_list.row(list_item))
+
+    def accept_change(self, list_item):
+        # make sure this only runs if action was successful
+        self._remove_item_from_change_list(list_item)
+
     def preview_changes(self, *args, **kwargs) -> None:
         """
         Update the change list according to the provided find and replace settings
@@ -569,13 +577,6 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
         self.change_list.clear()
         self.match_paths = list(walk_find_match(self.orig_file, self._match_fn))
-
-        def remove_item(list_item):
-            self.change_list.takeItem(self.change_list.row(list_item))
-
-        def accept_change(list_item):
-            # make sure this only runs if action was successful
-            remove_item(list_item)
 
         # generator can be unstable if dataclass changes during walk
         # this is only ok because we consume generator entirely
@@ -590,8 +591,16 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
             self.change_list.addItem(l_item)
             self.change_list.setItemWidget(l_item, row_widget)
 
-            row_widget.button_box.accepted.connect(partial(accept_change, l_item))
-            row_widget.button_box.rejected.connect(partial(remove_item, l_item))
+            accept_slot = WeakPartialMethodSlot(
+                row_widget.button_box, row_widget.button_box.accepted,
+                self.accept_change, l_item
+            )
+            row_widget.button_box.accepted.connect(accept_slot._call)
+            reject_slot = WeakPartialMethodSlot(
+                row_widget.button_box, row_widget.button_box.rejected,
+                self._remove_item_from_change_list, l_item
+            )
+            row_widget.button_box.rejected.connect(reject_slot._call)
 
     def open_converted(self, *args, **kwargs) -> None:
         """ open new file in new tab """
@@ -978,7 +987,11 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.details_list.addItem(l_item)
             self.details_list.setItemWidget(l_item, row_widget)
 
-            row_widget.remove_item.connect(partial(self.remove_item_from_details, l_item))
+            remove_slot = WeakPartialMethodSlot(
+                row_widget.remove_item, row_widget.remove_item.connect,
+                self.remove_item_from_details, l_item
+            )
+            row_widget.remove_item.connect(remove_slot._call)
 
     def remove_item_from_details(self, item: QtWidgets.QListWidgetItem) -> None:
         """ remove an item from the details list """
@@ -1138,8 +1151,11 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         details_row_widgets = []
         for action in self.actions:
             row_widget = FindReplaceRow(data=action)
-
-            row_widget.remove_item.connect(partial(self.remove_from_action_list, action=action))
+            remove_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.remove_item,
+                self.remove_from_action_list, action=action
+            )
+            row_widget.remove_item.connect(remove_slot._call)
             details_row_widgets.append(row_widget)
 
         return details_row_widgets
