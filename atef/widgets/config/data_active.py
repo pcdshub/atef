@@ -932,6 +932,8 @@ class ActionRowWidget(TargetRowWidget):
         self.update_input_placeholder()
 
     def get_curr_value(self):
+        if self._sig is None:
+            return
         self._sig.wait_for_connection()
         self._curr_value = self.bridge.value.get() or self._sig.get()
         self._dtype = type(self._curr_value)
