@@ -989,7 +989,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.details_list.setItemWidget(l_item, row_widget)
 
             remove_slot = WeakPartialMethodSlot(
-                row_widget.remove_item, row_widget.remove_item.connect,
+                row_widget, row_widget.remove_item,
                 self.remove_item_from_details, l_item
             )
             self._partial_slots.append(remove_slot)
