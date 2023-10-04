@@ -1609,34 +1609,27 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         menu = QMenu()
         if not self._is_number:
             use_bool = menu.addAction("&Bool")
-            bool_slot = WeakPartialMethodSlot(use_bool, use_bool.triggered,
-                                              self.set_mode, EditMode.BOOL)
-            use_bool.triggered.connect(bool_slot._call)
+            WeakPartialMethodSlot(use_bool, use_bool.triggered,
+                                  self.set_mode, EditMode.BOOL)
             use_enum = menu.addAction("&Enum")
-            enum_slot = WeakPartialMethodSlot(use_enum, use_enum.triggered,
-                                              self.set_mode, EditMode.ENUM)
-            use_enum.triggered.connect(enum_slot._call)
+            WeakPartialMethodSlot(use_enum, use_enum.triggered,
+                                  self.set_mode, EditMode.ENUM)
         use_float = menu.addAction("&Float")
-        float_slot = WeakPartialMethodSlot(use_float, use_float.triggered,
-                                           self.set_mode, EditMode.FLOAT)
-        use_float.triggered.connect(float_slot._call)
+        WeakPartialMethodSlot(use_float, use_float.triggered,
+                              self.set_mode, EditMode.FLOAT)
         use_int = menu.addAction("&Int")
-        int_slot = WeakPartialMethodSlot(use_int, use_int.triggered,
-                                         self.set_mode, EditMode.INT)
-        use_int.triggered.connect(int_slot._call)
+        WeakPartialMethodSlot(use_int, use_int.triggered,
+                              self.set_mode, EditMode.INT)
         if not self._is_number:
             use_str = menu.addAction("&String")
-            str_slot = WeakPartialMethodSlot(use_str, use_str.triggered,
-                                             self.set_mode, EditMode.STR)
-            use_str.triggered.connect(str_slot._call)
+            WeakPartialMethodSlot(use_str, use_str.triggered,
+                                  self.set_mode, EditMode.STR)
         use_epics = menu.addAction("EPI&CS")
-        epics_slot = WeakPartialMethodSlot(use_epics, use_epics.triggered,
-                                           self.set_mode, EditMode.EPICS)
-        use_epics.triggered.connect(epics_slot._call)
+        WeakPartialMethodSlot(use_epics, use_epics.triggered,
+                              self.set_mode, EditMode.EPICS)
         use_happi = menu.addAction("&Happi")
-        happi_slot = WeakPartialMethodSlot(use_happi, use_happi.triggered,
-                                           self.set_mode, EditMode.HAPPI)
-        use_happi.triggered.connect(happi_slot._call)
+        WeakPartialMethodSlot(use_happi, use_happi.triggered,
+                              self.set_mode, EditMode.HAPPI)
         self.select_mode_button.setMenu(menu)
         self.select_mode_button.setPopupMode(
             self.select_mode_button.InstantPopup

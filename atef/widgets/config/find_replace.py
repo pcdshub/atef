@@ -591,16 +591,14 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
             self.change_list.addItem(l_item)
             self.change_list.setItemWidget(l_item, row_widget)
 
-            accept_slot = WeakPartialMethodSlot(
+            WeakPartialMethodSlot(
                 row_widget.button_box, row_widget.button_box.accepted,
                 self.accept_change, l_item
             )
-            row_widget.button_box.accepted.connect(accept_slot._call)
-            reject_slot = WeakPartialMethodSlot(
+            WeakPartialMethodSlot(
                 row_widget.button_box, row_widget.button_box.rejected,
                 self._remove_item_from_change_list, l_item
             )
-            row_widget.button_box.rejected.connect(reject_slot._call)
 
     def open_converted(self, *args, **kwargs) -> None:
         """ open new file in new tab """
@@ -987,11 +985,10 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.details_list.addItem(l_item)
             self.details_list.setItemWidget(l_item, row_widget)
 
-            remove_slot = WeakPartialMethodSlot(
+            WeakPartialMethodSlot(
                 row_widget.remove_item, row_widget.remove_item.connect,
                 self.remove_item_from_details, l_item
             )
-            row_widget.remove_item.connect(remove_slot._call)
 
     def remove_item_from_details(self, item: QtWidgets.QListWidgetItem) -> None:
         """ remove an item from the details list """
@@ -1151,11 +1148,10 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         details_row_widgets = []
         for action in self.actions:
             row_widget = FindReplaceRow(data=action)
-            remove_slot = WeakPartialMethodSlot(
+            WeakPartialMethodSlot(
                 row_widget, row_widget.remove_item,
                 self.remove_from_action_list, action=action
             )
-            row_widget.remove_item.connect(remove_slot._call)
             details_row_widgets.append(row_widget)
 
         return details_row_widgets

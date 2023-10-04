@@ -976,7 +976,6 @@ class ActionRowWidget(TargetRowWidget):
             return
 
         self.curr_val_thread = BusyCursorThread(parent=self, func=self.get_curr_value)
-        # fail_slot = WeakPartialMethodSlot(self.curr_val_thread, self.curr_val_thread.raised_exception, self.get_curr_value, sig)
         self.curr_val_thread.raised_exception.connect(self.fail_get_value)
         self.curr_val_thread.task_finished.connect(self.run_setup_input_widget)
         self.curr_val_thread.start()
