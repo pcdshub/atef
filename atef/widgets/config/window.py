@@ -114,32 +114,28 @@ class Window(DesignerDisplay, QMainWindow):
         curr_idx = self.tab_widget.count() - 1
         self.tab_widget.setCurrentIndex(curr_idx)
 
-        new_passive_slot = WeakPartialMethodSlot(
+        WeakPartialMethodSlot(
             widget.new_passive_button, widget.new_passive_button.clicked,
             self.new_file, checkout_type="passive"
         )
-        widget.new_passive_button.clicked.connect(new_passive_slot._call)
-        new_active_slot = WeakPartialMethodSlot(
+        WeakPartialMethodSlot(
             widget.new_active_button, widget.new_active_button.clicked,
             self.new_file, checkout_type="active"
         )
-        widget.new_active_button.clicked.connect(new_active_slot._call)
 
         widget.fill_template_button.clicked.connect(
             self.open_fill_template
         )
 
-        sample_active_slot = WeakPartialMethodSlot(
+        WeakPartialMethodSlot(
             widget.sample_active_button, widget.sample_active_button.clicked,
             self.open_file, filename=str(TEST_CONFIG_PATH / 'active_test.json')
         )
-        widget.sample_active_button.clicked.connect(sample_active_slot._call)
 
-        sample_passive_slot = WeakPartialMethodSlot(
+        WeakPartialMethodSlot(
             widget.sample_passive_button, widget.sample_passive_button.clicked,
             self.open_file, filename=str(TEST_CONFIG_PATH / 'all_fields.json')
         )
-        widget.sample_passive_button.clicked.connect(sample_passive_slot._call)
 
         widget.open_button.clicked.connect(self.open_file)
         widget.exit_button.clicked.connect(self.close_all)
