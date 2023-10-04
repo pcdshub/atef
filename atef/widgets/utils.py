@@ -376,7 +376,7 @@ class WeakPartialMethodSlot:
             ...
         self.signal = None
 
-    def _call(self, *new_args):
+    def _call(self, *new_args, **new_kwargs):
         """
         PyQt callback slot which handles the internal WeakMethod.
 
@@ -391,5 +391,5 @@ class WeakPartialMethodSlot:
         if method is None:
             self._method_destroyed()
             return
-
-        return method(*self.partial_args, **self.partial_kwargs)
+        return method(*self.partial_args, *new_args,
+                      **{**self.partial_kwargs, **new_kwargs})
