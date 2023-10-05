@@ -16,6 +16,7 @@ from typing import ClassVar, Dict, Optional, Union
 
 import qtawesome
 from apischema import ValidationError, deserialize, serialize
+from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtWidgets
 from qtpy.QtCore import Qt, QTimer
 from qtpy.QtCore import Signal as QSignal
@@ -30,8 +31,7 @@ from atef.qt_helpers import walk_tree_widget_items
 from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.widgets.config.find_replace import (FillTemplatePage,
                                               FindReplaceWidget)
-from atef.widgets.utils import (WeakPartialMethodSlot, reset_cursor,
-                                set_wait_cursor)
+from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
