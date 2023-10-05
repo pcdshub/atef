@@ -9,7 +9,6 @@ happi
 ipython
 numpy
 ophyd
-pcdsutils>0.13.0
 pydm
 PyQt5
 pyyaml

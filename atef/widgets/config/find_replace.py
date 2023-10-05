@@ -17,7 +17,6 @@ from typing import (TYPE_CHECKING, Any, Callable, ClassVar, Generator,
 import happi
 import qtawesome as qta
 from apischema import ValidationError, serialize
-from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
 
 from atef.cache import DataCache, get_signal_cache
@@ -27,7 +26,8 @@ from atef.type_hints import PrimitiveType
 from atef.util import get_happi_client
 from atef.widgets.config.utils import TableWidgetWithAddRow
 from atef.widgets.core import DesignerDisplay
-from atef.widgets.utils import BusyCursorThread, insert_widget
+from atef.widgets.utils import (BusyCursorThread, WeakPartialMethodSlot,
+                                insert_widget)
 
 if TYPE_CHECKING:
     from .window import Window
