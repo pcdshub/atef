@@ -560,10 +560,10 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         match_fn = get_default_match_fn(self._search_regex)
         self._match_fn = match_fn
 
-    def _remove_item_from_change_list(self, list_item):
+    def _remove_item_from_change_list(self, list_item, *args, **kwargs):
         self.change_list.takeItem(self.change_list.row(list_item))
 
-    def accept_change(self, list_item):
+    def accept_change(self, list_item, *args, **kwargs):
         # make sure this only runs if action was successful
         self._remove_item_from_change_list(list_item)
 

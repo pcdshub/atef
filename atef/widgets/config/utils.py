@@ -1954,7 +1954,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.thread_worker.task_finished.connect(fill_enums)
         self.thread_worker.start()
 
-    def set_mode(self, mode: EditMode) -> None:
+    def set_mode(self, mode: EditMode, *args, **kwargs) -> None:
         """
         Change the mode of the edit widget.
         This adjusts the dynamic data classes as needed and
