@@ -1208,7 +1208,10 @@ class PreparedSignalComparison(PreparedComparison):
         )
 
     async def compare(self) -> Result:
-        # if signal is an enum, also flip the string field and retry
+        """
+        Run the inherited compare routine, but if signal is an enum,
+        also flip the string field and retry
+        """
         result = await super().compare()
 
         if result.severity != Severity.success and self.signal.enum_strs:

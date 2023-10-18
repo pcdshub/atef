@@ -1,3 +1,6 @@
+from typing import Any
+
+import happi
 import pytest
 
 from atef.cache import DataCache
@@ -298,7 +301,7 @@ async def test_epics_value(
     ["0", Severity.error],
 ])
 async def test_enum_comparision(
-    happi_client, value, status
+    happi_client: happi.Client, value: Any, status: Severity
 ):
     dev = happi_client.search(name='enum1')[0].get()
     comp = Equals(value=value)
