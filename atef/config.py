@@ -1214,7 +1214,8 @@ class PreparedSignalComparison(PreparedComparison):
         """
         result = await super().compare()
 
-        if result.severity != Severity.success and self.signal.enum_strs:
+        if (result.severity != Severity.success
+                and getattr(self.signal, 'enum_strs', None)):
             self.comparison.string = not self.comparison.string
             await self.get_data_async()
             result = await super().compare()
