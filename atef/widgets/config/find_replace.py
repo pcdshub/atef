@@ -17,6 +17,7 @@ from typing import (TYPE_CHECKING, Any, Callable, ClassVar, Generator,
 import happi
 import qtawesome as qta
 from apischema import ValidationError, serialize
+from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
 
 from atef.cache import DataCache, get_signal_cache
@@ -434,6 +435,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         self._window = window
         self.match_paths: Iterable[List[Any]] = []
         self.orig_file = None
+        self._partial_slots: list[WeakPartialMethodSlot] = []
 
         if not filepath:
             self.open_converted_button.hide()
@@ -558,6 +560,13 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
         match_fn = get_default_match_fn(self._search_regex)
         self._match_fn = match_fn
 
+    def _remove_item_from_change_list(self, list_item, *args, **kwargs):
+        self.change_list.takeItem(self.change_list.row(list_item))
+
+    def accept_change(self, list_item, *args, **kwargs):
+        # make sure this only runs if action was successful
+        self._remove_item_from_change_list(list_item)
+
     def preview_changes(self, *args, **kwargs) -> None:
         """
         Update the change list according to the provided find and replace settings
@@ -569,13 +578,6 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
         self.change_list.clear()
         self.match_paths = list(walk_find_match(self.orig_file, self._match_fn))
-
-        def remove_item(list_item):
-            self.change_list.takeItem(self.change_list.row(list_item))
-
-        def accept_change(list_item):
-            # make sure this only runs if action was successful
-            remove_item(list_item)
 
         # generator can be unstable if dataclass changes during walk
         # this is only ok because we consume generator entirely
@@ -590,8 +592,16 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
             self.change_list.addItem(l_item)
             self.change_list.setItemWidget(l_item, row_widget)
 
-            row_widget.button_box.accepted.connect(partial(accept_change, l_item))
-            row_widget.button_box.rejected.connect(partial(remove_item, l_item))
+            accept_slot = WeakPartialMethodSlot(
+                row_widget.button_box, row_widget.button_box.accepted,
+                self.accept_change, l_item
+            )
+            self._partial_slots.append(accept_slot)
+            reject_slot = WeakPartialMethodSlot(
+                row_widget.button_box, row_widget.button_box.rejected,
+                self._remove_item_from_change_list, l_item
+            )
+            self._partial_slots.append(reject_slot)
 
     def open_converted(self, *args, **kwargs) -> None:
         """ open new file in new tab """
@@ -724,7 +734,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self._signals: List[str] = []
         self._devices: List[str] = []
         self.busy_thread = None
-
+        self._partial_slots: list[WeakPartialMethodSlot] = []
         if filepath:
             self.open_file(filename=filepath)
         self.setup_ui()
@@ -978,7 +988,11 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.details_list.addItem(l_item)
             self.details_list.setItemWidget(l_item, row_widget)
 
-            row_widget.remove_item.connect(partial(self.remove_item_from_details, l_item))
+            remove_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.remove_item,
+                self.remove_item_from_details, l_item
+            )
+            self._partial_slots.append(remove_slot)
 
     def remove_item_from_details(self, item: QtWidgets.QListWidgetItem) -> None:
         """ remove an item from the details list """
@@ -1018,6 +1032,7 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         self.actions: List[FindReplaceAction] = []
         self._match_fn: MatchFunction = lambda x: False
         self._replace_fn: ReplaceFunction = lambda x: x
+        self._partial_slots: list[WeakPartialMethodSlot] = []
         self.setup_ui()
 
     def setup_ui(self):
@@ -1139,7 +1154,11 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         for action in self.actions:
             row_widget = FindReplaceRow(data=action)
 
-            row_widget.remove_item.connect(partial(self.remove_from_action_list, action=action))
+            remove_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.remove_item,
+                self.remove_from_action_list, action=action
+            )
+            self._partial_slots.append(remove_slot)
             details_row_widgets.append(row_widget)
 
         return details_row_widgets

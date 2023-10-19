@@ -6,7 +6,6 @@ import logging
 import time
 from dataclasses import fields
 from enum import IntEnum
-from functools import partial
 from itertools import zip_longest
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
@@ -14,6 +13,7 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
 import numpy as np
 import qtawesome as qta
 from ophyd import EpicsSignal, EpicsSignalRO
+from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import (QPoint, QPointF, QRect, QRectF, QRegularExpression,
                          QSize, Qt, QTimer)
@@ -1560,6 +1560,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self._is_number = False
         self._show_tol = False
         self._prep_dynamic_thread = None
+        self._partial_slots: list[WeakPartialMethodSlot] = []
         self.setup_widgets()
         self.set_mode_from_data()
         self.setSizePolicy(
@@ -1609,20 +1610,34 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         menu = QMenu()
         if not self._is_number:
             use_bool = menu.addAction("&Bool")
-            use_bool.triggered.connect(partial(self.set_mode, EditMode.BOOL)),
+            bool_slot = WeakPartialMethodSlot(use_bool, use_bool.triggered,
+                                              self.set_mode, EditMode.BOOL)
+            self._partial_slots.append(bool_slot)
             use_enum = menu.addAction("&Enum")
-            use_enum.triggered.connect(partial(self.set_mode, EditMode.ENUM))
+            enum_slot = WeakPartialMethodSlot(use_enum, use_enum.triggered,
+                                              self.set_mode, EditMode.ENUM)
+            self._partial_slots.append(enum_slot)
         use_float = menu.addAction("&Float")
-        use_float.triggered.connect(partial(self.set_mode, EditMode.FLOAT))
+        float_slot = WeakPartialMethodSlot(use_float, use_float.triggered,
+                                           self.set_mode, EditMode.FLOAT)
+        self._partial_slots.append(float_slot)
         use_int = menu.addAction("&Int")
-        use_int.triggered.connect(partial(self.set_mode, EditMode.INT))
+        int_slot = WeakPartialMethodSlot(use_int, use_int.triggered,
+                                         self.set_mode, EditMode.INT)
+        self._partial_slots.append(int_slot)
         if not self._is_number:
             use_str = menu.addAction("&String")
-            use_str.triggered.connect(partial(self.set_mode, EditMode.STR))
+            str_slot = WeakPartialMethodSlot(use_str, use_str.triggered,
+                                             self.set_mode, EditMode.STR)
+            self._partial_slots.append(str_slot)
         use_epics = menu.addAction("EPI&CS")
-        use_epics.triggered.connect(partial(self.set_mode, EditMode.EPICS))
+        epics_slot = WeakPartialMethodSlot(use_epics, use_epics.triggered,
+                                           self.set_mode, EditMode.EPICS)
+        self._partial_slots.append(epics_slot)
         use_happi = menu.addAction("&Happi")
-        use_happi.triggered.connect(partial(self.set_mode, EditMode.HAPPI))
+        happi_slot = WeakPartialMethodSlot(use_happi, use_happi.triggered,
+                                           self.set_mode, EditMode.HAPPI)
+        self._partial_slots.append(happi_slot)
         self.select_mode_button.setMenu(menu)
         self.select_mode_button.setPopupMode(
             self.select_mode_button.InstantPopup
@@ -1939,7 +1954,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
         self.thread_worker.task_finished.connect(fill_enums)
         self.thread_worker.start()
 
-    def set_mode(self, mode: EditMode) -> None:
+    def set_mode(self, mode: EditMode, *args, **kwargs) -> None:
         """
         Change the mode of the edit widget.
         This adjusts the dynamic data classes as needed and

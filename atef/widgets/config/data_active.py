@@ -25,7 +25,7 @@ import qtawesome
 import typhos
 import typhos.cli
 import typhos.display
-from ophyd.signal import EpicsSignalBase
+from ophyd.signal import Signal
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QDialogButtonBox
@@ -901,6 +901,10 @@ class ActionRowWidget(TargetRowWidget):
         self.edit_widget = None
         if data is None:
             data = ValueToTarget()
+        self._sig: Optional[Signal] = None
+        self._curr_value = None
+        self._dtype = None
+        self._enum_strs = None
         super().__init__(data=data, **kwargs)
 
     def setup_ui(self) -> None:
@@ -927,13 +931,37 @@ class ActionRowWidget(TargetRowWidget):
 
         self.update_input_placeholder()
 
+    def get_curr_value(self):
+        if self._sig is None:
+            return
+        self._sig.wait_for_connection()
+        self._curr_value = self.bridge.value.get() or self._sig.get()
+        self._dtype = type(self._curr_value)
+        self._enum_strs = getattr(self._sig, 'enum_strs', None)
+
+    def fail_get_value(self, ex: Exception):
+        logger.debug(f'failed to get signal data for input widget: {ex}')
+        self._curr_value = 'no data'
+        # fall back to type in dataclass if available
+        stored_value = self.bridge.value.get()
+        if stored_value is not None:
+            self._dtype = type(stored_value)
+        else:
+            self._dtype = float
+
+        self.run_setup_input_widget()
+
+    def run_setup_input_widget(self):
+        self.setup_input_widget(self._curr_value, self._dtype,
+                                enum_strs=self._enum_strs)
+
     def update_input_placeholder(self) -> None:
         """
         Updates value input widget with a QLineEdit with the approriate validator
         given the target's datatype
         """
-        sig: EpicsSignalBase = self.data.to_signal()
-        if sig is None:
+        self._sig = self.data.to_signal()
+        if self._sig is None:
             self.edit_widget = QtWidgets.QLabel('(no target set)')
             insert_widget(self.edit_widget, self.value_input_placeholder)
             self.value_button_box.hide()
@@ -943,35 +971,13 @@ class ActionRowWidget(TargetRowWidget):
         self._dtype = None
         self._enum_strs = None
 
-        def get_curr_value():
-            sig.wait_for_connection()
-            self._curr_value = self.bridge.value.get() or sig.get()
-            self._dtype = type(self._curr_value)
-            self._enum_strs = getattr(sig, 'enum_strs', None)
-
-        def fail_get_value(ex: Exception):
-            logger.debug(f'failed to get signal data for input widget: {ex}')
-            self._curr_value = 'no data'
-            # fall back to type in dataclass if available
-            stored_value = self.bridge.value.get()
-            if stored_value is not None:
-                self._dtype = type(stored_value)
-            else:
-                self._dtype = float
-
-            run_setup_input_widget()
-
-        def run_setup_input_widget():
-            self.setup_input_widget(self._curr_value, self._dtype,
-                                    enum_strs=self._enum_strs)
-
         if self.curr_val_thread and self.curr_val_thread.isRunning():
             logger.debug('thread is still running.  Ignore..')
             return
 
-        self.curr_val_thread = BusyCursorThread(func=get_curr_value)
-        self.curr_val_thread.raised_exception.connect(fail_get_value)
-        self.curr_val_thread.task_finished.connect(run_setup_input_widget)
+        self.curr_val_thread = BusyCursorThread(parent=self, func=self.get_curr_value)
+        self.curr_val_thread.raised_exception.connect(self.fail_get_value)
+        self.curr_val_thread.task_finished.connect(self.run_setup_input_widget)
         self.curr_val_thread.start()
 
     def setup_input_widget(
