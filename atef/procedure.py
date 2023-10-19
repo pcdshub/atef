@@ -157,7 +157,7 @@ class Target:
     def to_signal(
         self,
         signal_cache: Optional[_SignalCache] = None
-    ) -> Optional[ophyd.EpicsSignal]:
+    ) -> Optional[ophyd.Signal]:
         """
         Return the signal described by this Target.  First attempts to use the
         device + attr information to look up the signal in happi, falling back
@@ -165,7 +165,7 @@ class Target:
 
         Returns
         -------
-        ophyd.EpicsSignal
+        ophyd.Signal
             the signal described by this Target
         """
         try:
