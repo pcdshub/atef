@@ -13,6 +13,7 @@ from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
 import numpy as np
 import qtawesome as qta
 from ophyd import EpicsSignal, EpicsSignalRO
+from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import (QPoint, QPointF, QRect, QRectF, QRegularExpression,
                          QSize, Qt, QTimer)
@@ -45,7 +46,6 @@ from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData, OphydAttributeDataSummary
 from atef.widgets.utils import (BusyCursorThread, PV_validator,
-                                WeakPartialMethodSlot,
                                 match_line_edit_text_width)
 
 logger = logging.getLogger(__name__)
