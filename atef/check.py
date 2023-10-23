@@ -88,7 +88,7 @@ class Value:
     def compare(self, value: PrimitiveType) -> bool:
         """Compare the provided value with this one, using tolerance settings."""
         if ((self.rtol is not None or self.atol is not None)
-                and isinstance(value, (int, float))):
+                and not isinstance(value, (str, bool))):
             return np.isclose(
                 value, self.value,
                 rtol=(self.rtol or 0.0),

@@ -23,10 +23,13 @@ class EnumValue:
     str_value: str
 
     def __eq__(self, __value: object) -> bool:
-        if isinstance(__value, int):
-            return self.int_value == __value
-        elif isinstance(__value, str):
-            return self.str_value == __value
+        if isinstance(__value, (int, str)):
+            try:
+                int_val = int(__value)
+            except ValueError:
+                int_val = __value
+
+            return self.int_value == int_val or self.str_value == str(__value)
         else:
             return False
 

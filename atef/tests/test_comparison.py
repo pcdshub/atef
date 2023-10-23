@@ -298,7 +298,7 @@ async def test_epics_value(
     [1, Severity.error],
     ["YAG", Severity.error],
     ["UNKNOWN", Severity.error],
-    ["0", Severity.error],
+    ["0", Severity.success],
 ])
 async def test_enum_comparision(
     happi_client: happi.Client, value: Any, status: Severity
