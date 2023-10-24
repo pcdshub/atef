@@ -13,6 +13,30 @@ from .type_hints import Number, PrimitiveType
 from .util import run_in_executor
 
 
+@dataclass
+class EnumValue:
+    """
+    Wrapper for enum value that can be compared to either the string or int
+    value of the enum.  Only accepts string enums.
+    """
+    int_value: int
+    str_value: str
+
+    def __eq__(self, __value: object) -> bool:
+        if isinstance(__value, (int, str)):
+            try:
+                int_val = int(__value)
+            except ValueError:
+                int_val = __value
+
+            return self.int_value == int_val or self.str_value == str(__value)
+        else:
+            return False
+
+    def __str__(self) -> str:
+        return f'Enum({self.int_value}|"{self.str_value}")'
+
+
 class _ReduceMethodType(Protocol):
     def __call__(self, data: Sequence[PrimitiveType], *args, **kwargs) -> PrimitiveType:
         ...
@@ -177,6 +201,12 @@ def get_data_for_signal(
             signal, reduce_period
         )
 
+    # if enum, return a special EnumValue
+    if getattr(signal, 'enum_strs', None):
+        int_value = signal.get(as_string=False)
+        str_value = signal.get(as_string=True)
+        return EnumValue(int_value, str_value)
+
     if string:
         return signal.get(as_string=True)
 
@@ -228,6 +258,12 @@ async def get_data_for_signal_async(
         )
 
     def inner_sync_get():
+        # if enum, return a special EnumValue
+        if getattr(signal, 'enum_strs', None):
+            int_value = signal.get(as_string=False)
+            str_value = signal.get(as_string=True)
+            return EnumValue(int_value, str_value)
+
         if string:
             return signal.get(as_string=True)
 

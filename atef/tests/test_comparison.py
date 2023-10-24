@@ -1,6 +1,10 @@
+from typing import Any
+
+import happi
 import pytest
 
 from atef.cache import DataCache
+from atef.config import PreparedSignalComparison
 
 from .. import check
 from ..check import Comparison, Equals, NotEquals, PrimitiveType, Severity
@@ -286,3 +290,24 @@ async def test_epics_value(
     await comparison.prepare(cache)
     assert comparison(value).severity == result
     print(comparison(value).reason)
+
+
+@pytest.mark.parametrize('value, status', [
+    [0, Severity.success],
+    ['OUT', Severity.success],
+    [1, Severity.error],
+    ["YAG", Severity.error],
+    ["UNKNOWN", Severity.error],
+    ["0", Severity.success],
+])
+async def test_enum_comparision(
+    happi_client: happi.Client, value: Any, status: Severity
+):
+    dev = happi_client.search(name='enum1')[0].get()
+    comp = Equals(value=value)
+    prep_comp = PreparedSignalComparison.from_device(
+        device=dev, attr='enum', comparison=comp
+    )
+
+    result = await prep_comp.compare()
+    assert result.severity == status
