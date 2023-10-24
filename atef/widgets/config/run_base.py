@@ -16,11 +16,12 @@ from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLineEdit, QMenu,
                             QVBoxLayout, QWidget, QWidgetAction)
 
 from atef.check import Comparison
-from atef.config import (AnyPreparedConfiguration, Configuration,
-                         ConfigurationFile, PreparedComparison,
+from atef.config import (AnyConfiguration, AnyPreparedConfiguration,
+                         Configuration, ConfigurationFile, PreparedComparison,
                          PreparedConfiguration, PreparedFile)
 from atef.enums import Severity
-from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
+from atef.procedure import (AnyPreparedProcedure, AnyProcedure,
+                            PreparedProcedureFile, PreparedProcedureGroup,
                             PreparedProcedureStep, ProcedureFile,
                             ProcedureStep, walk_steps)
 from atef.result import Result, combine_results
@@ -485,38 +486,95 @@ class VerifyEntryWidget(DesignerDisplay, QWidget):
         self.verify_button_box.button(QDialogButtonBox.Cancel).setText('Reject')
 
 
-def create_tree_items(
-    data: Any,
+def create_tree_from_file(
+    data: Union[ConfigurationFile, ProcedureFile],
+    prepared_file: Optional[Union[PreparedFile, PreparedProcedureFile]] = None
+):
+    # Is prepared_data really optional?...
+    root_item = TreeItem(data=data, prepared_data=prepared_file)
+    if isinstance(data, ConfigurationFile):
+        create_passive_tree_items(data.root, root_item, prepared_file)
+        return root_item
+    if isinstance(data, ProcedureFile):
+        create_active_tree_items(data.root, root_item, prepared_file)
+        return root_item
+
+    raise TypeError("Data was not a passive or active checkout file")
+
+
+def create_passive_tree_items(
+    data: AnyConfiguration,
     parent: TreeItem,
-    prepared_file: Optional[PreparedFile] = None
+    prepared_data: Optional[AnyPreparedConfiguration] = None  # Any prepared thing...
 ) -> None:
     """
     Recursively create the tree starting from the given data
     Optionally associate prepared dataclasses with the TreeItems
     """
+    # Handle root if necessary
+    if hasattr(data, 'root'):
+        # top level, add root item.
+        item = TreeItem(data, prepared_data=[prepared_data])
+        create_passive_tree_items(data.root, item, prepared_data=prepared_data)
+        parent.addChild(item)
+
     for cfg in getattr(data, 'configs', []):
-        if prepared_file:
+        if prepared_data:
             # Grab relevant comps/configs so tree item can hold results
-            prep_configs = get_relevant_configs_comps(prepared_file, cfg)
+            prep_configs = get_relevant_configs_comps(prepared_data, cfg)
         else:
             prep_configs = None
         item = TreeItem(cfg, prepared_data=prep_configs)
-        create_tree_items(cfg, item, prepared_file=prepared_file)
+        create_passive_tree_items(cfg, item, prepared_data=prepared_data)
         parent.addChild(item)
 
-    # look into configs, by_attr, shared
+    # look into configs, by_attr, by_pv, and shared
+    # no config has both "by_attr" and "by_pv", but shared shows up last in tree
     # merges List[List[Comparison]] --> List[Comparison] with itertools
     config_categories = [
-        getattr(data, 'shared', []),
         itertools.chain.from_iterable(getattr(data, 'by_attr', {}).values()),
-        itertools.chain.from_iterable(getattr(data, 'by_pv', {}).values())
+        itertools.chain.from_iterable(getattr(data, 'by_pv', {}).values()),
+        getattr(data, 'shared', []),
     ]
     for comp_list in config_categories:
         for comp in comp_list:
-            if prepared_file:
+            if prepared_data:
                 # Grab relevant comps/configs so tree item can hold results
-                prep_configs = get_relevant_configs_comps(prepared_file, comp)
+                prep_configs = get_relevant_configs_comps(prepared_data, comp)
             else:
                 prep_configs = None
             item = TreeItem(comp, prepared_data=prep_configs)
             parent.addChild(item)
+
+
+# TODO: Check to prepared_data may not ever get reduced, so could just be the
+# file the whole way through.
+def create_active_tree_items(
+    data: AnyProcedure,
+    parent: TreeItem,
+    prepared_data: Optional[AnyPreparedProcedure] = None
+) -> None:
+    # Handle root if necessary
+    if hasattr(data, 'root'):
+        # top level, add root item.
+        item = TreeItem(data, prepared_data=[prepared_data])
+        create_active_tree_items(data.root, item, prepared_file=prepared_data)
+        parent.addChild(item)
+
+    # ProcedureGroup
+    for step in getattr(data, 'steps', []):
+        if prepared_data:
+            prep_steps = get_prepared_step(prepared_data, step)
+        else:
+            prep_steps = None
+        item = TreeItem(step, prepared_data=prep_steps)
+        create_active_tree_items(step, item, prepared_data=prepared_data)
+        parent.addChild(item)
+
+    # SetValueStep Comparisons
+    for criterion in getattr(data, 'success_criteria', []):
+        comp = criterion.comparison
+        if prepared_data:
+            prepared_comp = get_prepared_step(prepared_data, comp)
+        item = TreeItem(comp, prepared_comp)
+        parent.addChild(item)

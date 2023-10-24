@@ -16,7 +16,7 @@ from atef.config import (ConfigurationFile, PreparedFile,
 from atef.procedure import (PreparedDescriptionStep, PreparedPassiveStep,
                             PreparedSetValueStep, PreparedValueToSignal)
 from atef.widgets.config.data_base import DataWidget
-from atef.widgets.config.run_base import ResultStatus, create_tree_items
+from atef.widgets.config.run_base import ResultStatus, create_tree_from_file
 from atef.widgets.config.utils import ConfigTreeModel, TreeItem
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import insert_widget
@@ -60,8 +60,8 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
         root_item = TreeItem(
             data=self.config_file, prepared_data=self.prepared_config
         )
-        create_tree_items(data=self.config_file.root, parent=root_item,
-                          prepared_file=self.prepared_config)
+        create_tree_from_file(data=self.config_file.root, parent=root_item,
+                              prepared_file=self.prepared_config)
 
         model = ConfigTreeModel(data=root_item)
         self.tree_view.setModel(model)

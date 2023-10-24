@@ -978,7 +978,8 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
     the ``setData`` method.
 
     Expects the item to be specifically a TreeItem, which each holds a
-    Configuration or Comparison
+    Configuration or Comparison.  This TreeItem must also have a root node whose
+    only child contains the desired data.  This root node will be invisible
     """
     def __init__(self, *args, data: TreeItem, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1160,6 +1161,8 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         return None
 
 
+# TODO: Rename this and related helpers to be more specific
+# (this refers to steps/configs and their statuses. )
 class TreeItem:
     """
     Node in a tree representation of a passive checkout.
@@ -1176,13 +1179,15 @@ class TreeItem:
         Severity.warning : ('?', QColor(255, 165, 0, 255)),
         # x mark
         Severity.internal_error: ('\u2718', QColor(255, 0, 0, 255)),
-        Severity.error: ('\u2718', QColor(255, 0, 0, 255))
+        Severity.error: ('\u2718', QColor(255, 0, 0, 255)),
+        'N/A': ('', QColor())
     }
 
     def __init__(
         self,
-        data: Union[Configuration, Comparison],
-        prepared_data: Optional[List[PreparedConfiguration, PreparedComparison]] = None
+        data: Optional[Union[Configuration, Comparison]] = None,
+        prepared_data: Optional[List[PreparedConfiguration, PreparedComparison]] = None,
+        widget: Optional[QtWidgets.QWidget] = None
     ) -> None:
         self._data = data
         self.prepared_data = prepared_data
@@ -1191,6 +1196,7 @@ class TreeItem:
         self._children: List[TreeItem] = []
         self._parent = None
         self._row = 0
+        self.widget = widget
 
     def data(self, column: int) -> Any:
         """
@@ -1208,11 +1214,18 @@ class TreeItem:
         -------
         Any
         """
+        if self._data is None:
+            # This should never be seen
+            return '<root>'
+
         if column == 0:
-            return self._data.name
+            return getattr(self._data, 'name', 'root')
         elif column == 1:
             if self.prepared_data:
-                prep_results = [d.result for d in self.prepared_data]
+                prep_results = [d.result for d in self.prepared_data
+                                if hasattr(d, 'result')]
+                if len(prep_results) == 0:
+                    return self.result_icon_map['N/A']
                 self.combined_result = combine_results(prep_results)
                 icon_data = self.result_icon_map[self.combined_result.severity]
                 return icon_data

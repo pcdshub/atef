@@ -58,7 +58,9 @@ BS_STATE_MAP: Dict[int, BlueskyState] = {}
 MAX_PLAN_DEPTH = 200
 
 
-def walk_steps(step: ProcedureStep) -> Generator[ProcedureStep, None, None]:
+def walk_steps(
+    step: Union[ProcedureStep, PreparedProcedureStep]
+) -> Generator[Union[ProcedureStep, PreparedProcedureStep], None, None]:
     """
     Yield ProedureSteps in ``step``, depth-first.
 

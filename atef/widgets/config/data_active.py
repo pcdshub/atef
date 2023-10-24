@@ -37,7 +37,7 @@ from atef.config import ConfigurationFile
 from atef.qt_helpers import QDataclassElem
 from atef.result import Result, incomplete_result
 from atef.widgets.config.data_base import DataWidget, SimpleRowWidget
-from atef.widgets.config.run_base import create_tree_items
+from atef.widgets.config.run_base import create_tree_from_file
 from atef.widgets.config.utils import (ConfigTreeModel, MultiInputDialog,
                                        TableWidgetWithAddRow, TreeItem)
 from atef.widgets.core import DesignerDisplay
@@ -518,7 +518,7 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
         """
         # tree data
         root_item = TreeItem(data=config_file)
-        create_tree_items(data=config_file.root, parent=root_item)
+        create_tree_from_file(data=config_file.root, parent=root_item)
 
         model = ConfigTreeModel(data=root_item)
 

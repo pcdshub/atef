@@ -436,7 +436,7 @@ def walk_tree_widget_items(
     tree_widget: QtWidgets.QTreeWidget
 ) -> Generator[Any, None, None]:
     """
-    Walk a ``QtWidgets.QTreeWidget``'s tree items.  Steps through items depht-first
+    Walk a ``QtWidgets.QTreeWidget``'s tree items.  Steps through items depth-first
 
     Parameters
     ----------
