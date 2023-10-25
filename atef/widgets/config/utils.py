@@ -34,13 +34,13 @@ from atef.config import (Configuration, DeviceConfiguration,
                          PreparedFile, PVConfiguration, ToolConfiguration)
 from atef.enums import Severity
 from atef.exceptions import DynamicValueError, MissingHappiDeviceError
-from atef.procedure import (ProcedureFile, ProcedureStep, SetValueStep,
-                            walk_steps)
+from atef.procedure import ProcedureFile, ProcedureStep, SetValueStep
 from atef.qt_helpers import (QDataclassBridge, QDataclassList, QDataclassValue,
                              ThreadWorker)
 from atef.result import combine_results, incomplete_result
 from atef.tools import Ping
 from atef.type_hints import Number
+from atef.walk import walk_steps
 from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget

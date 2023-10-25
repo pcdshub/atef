@@ -15,16 +15,15 @@ from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLineEdit, QMenu,
                             QPushButton, QSpacerItem, QStyle, QToolButton,
                             QVBoxLayout, QWidget, QWidgetAction)
 
-from atef.check import Comparison
 from atef.config import (AnyConfiguration, AnyPreparedConfiguration,
-                         Configuration, ConfigurationFile, PreparedComparison,
-                         PreparedConfiguration, PreparedFile)
+                         ConfigurationFile, PreparedComparison, PreparedFile)
 from atef.enums import Severity
 from atef.procedure import (AnyPreparedProcedure, AnyProcedure,
                             PreparedProcedureFile, PreparedProcedureGroup,
                             PreparedProcedureStep, ProcedureFile,
-                            ProcedureStep, walk_steps)
+                            ProcedureStep)
 from atef.result import Result, combine_results
+from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.utils import TreeItem, disable_widget
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import BusyCursorThread
@@ -108,84 +107,6 @@ def infer_step_type(config: Union[PreparedComparison, PreparedProcedureStep]) ->
     # TODO: Uncomment this when we've fixed up the comparison walking...
     # raise TypeError(f'incompatible type ({type(config)}), '
     #                 'cannot infer active or passive')
-
-
-def get_relevant_configs_comps(
-    prepared_file: PreparedFile,
-    original_c: Union[Configuration, Comparison]
-) -> List[Union[PreparedConfiguration, PreparedComparison]]:
-    """
-    Gather all the PreparedConfiguration or PreparedComparison dataclasses
-    that correspond to the original comparison or config.
-
-    Phrased another way: maps prepared comparisons onto the comparison
-    seen in the GUI
-
-    Currently for passive checkout files only
-
-    Parameters
-    ----------
-    prepared_file : PreparedFile
-        the file containing configs or comparisons to be gathered
-    original_c : Union[Configuration, Comparison]
-        the comparison to match PreparedComparison or PreparedConfigurations to
-
-    Returns
-    -------
-    List[Union[PreparedConfiguration, PreparedComparison]]:
-        the configuration or comparison dataclasses related to ``original_c``
-    """
-    matched_c = []
-
-    for config in prepared_file.walk_groups():
-        if config.config is original_c:
-            matched_c.append(config)
-
-    for comp in prepared_file.walk_comparisons():
-        if comp.comparison is original_c:
-            matched_c.append(comp)
-
-    return matched_c
-
-
-def get_prepared_step(
-    prepared_file: PreparedProcedureFile,
-    origin: Union[ProcedureStep, Comparison],
-) -> List[Union[PreparedProcedureStep, PreparedComparison]]:
-    """
-    Gather all PreparedProcedureStep dataclasses the correspond to the original
-    ProcedureStep.
-    If a PreparedProcedureStep also has comparisions, use the walk_comparisons
-    method to check if the "origin" matches any of thoes comparisons
-
-    Only relevant for active checkouts.
-
-    Parameters
-    ----------
-    prepared_file : PreparedProcedureFile
-        the PreparedProcedureFile to search through
-    origin : Union[ProcedureStep, Comparison]
-        the step / comparison to match
-
-    Returns
-    -------
-    List[Union[PreparedProcedureStep, PreparedComparison]]
-        the PreparedProcedureStep's or PreparedComparison's related to ``origin``
-    """
-    # As of the writing of this docstring, this helper is only expected to return
-    # lists of length 1.  However in order to match the passive checkout workflow,
-    # we still return a list of relevant steps or comparisons.
-    matched_steps = []
-    for pstep in walk_steps(prepared_file.root):
-        if getattr(pstep, 'origin', None) is origin:
-            matched_steps.append(pstep)
-        # check PreparedComparisons, which might be included in some steps
-        if hasattr(pstep, 'walk_comparisons'):
-            for comp in pstep.walk_comparisons():
-                if comp.comparison is origin:
-                    matched_steps.append(comp)
-
-    return matched_steps
 
 
 class ResultStatus(QLabel):
