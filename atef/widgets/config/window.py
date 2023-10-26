@@ -29,6 +29,7 @@ from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep)
 from atef.qt_helpers import walk_tree_widget_items
 from atef.report import ActiveAtefReport, PassiveAtefReport
+from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.find_replace import (FillTemplatePage,
                                               FindReplaceWidget)
 from atef.widgets.utils import insert_widget, reset_cursor, set_wait_cursor
@@ -37,8 +38,8 @@ from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
 from .page import (AtefItem, ConfigurationGroupPage, PageWidget,
                    ProcedureGroupPage, RunStepPage, link_page, walk_tree_items)
-from .run_base import (create_tree_from_file, get_prepared_step,
-                       get_relevant_configs_comps, make_run_page)
+from .result_summary import ResultsSummaryWidget
+from .run_base import create_tree_from_file, make_run_page
 from .utils import ConfigTreeModel, MultiInputDialog, Toggle, clear_results
 
 logger = logging.getLogger(__name__)
@@ -562,6 +563,7 @@ class RunTree(EditTree):
     filename = 'run_config_tree.ui'
 
     print_report_button: QtWidgets.QPushButton
+    results_button: QtWidgets.QPushButton
 
     def __init__(
         self,
@@ -581,6 +583,7 @@ class RunTree(EditTree):
 
         self._swap_to_run_widgets()
         self.print_report_button.clicked.connect(self.print_report)
+        self.results_button.clicked.connect(self.show_results_summary)
         # use new tree view summary
         self.tree_view = QtWidgets.QTreeView()
         self.root_item = create_tree_from_file(
@@ -735,6 +738,11 @@ class RunTree(EditTree):
         msg = MultiInputDialog(parent=self, init_values=info)
         msg.exec()
         return msg
+
+    def show_results_summary(self):
+        self._summary_widget = ResultsSummaryWidget(file=self.prepared_file)
+        self._summary_widget.setWindowTitle('Results Summary')
+        self._summary_widget.show()
 
 
 class DualTree(QWidget):

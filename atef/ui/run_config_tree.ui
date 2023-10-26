@@ -35,6 +35,13 @@
         </widget>
        </item>
        <item>
+        <widget class="QPushButton" name="results_button">
+         <property name="text">
+          <string>Results Summary</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QPushButton" name="print_report_button">
          <property name="text">
           <string>Print Report</string>
