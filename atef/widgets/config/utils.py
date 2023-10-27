@@ -1160,6 +1160,14 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
 
         return None
 
+    def data_updated(self) -> None:
+        """ method for calling dataChanged on the entire view """
+        top_left = self.index(0, 0, QtCore.QModelIndex())
+        bottom_right = self.index(self.rowCount(QtCore.QModelIndex()),
+                                  self.columnCount(QtCore.QModelIndex()),
+                                  QtCore.QModelIndex())
+        self.dataChanged.emit(top_left, bottom_right)
+
 
 # TODO: Rename this and related helpers to be more specific
 # (this refers to steps/configs and their statuses. )
@@ -1180,7 +1188,7 @@ class TreeItem:
         # x mark
         Severity.internal_error: ('\u2718', QColor(255, 0, 0, 255)),
         Severity.error: ('\u2718', QColor(255, 0, 0, 255)),
-        'N/A': ('', QColor())
+        'N/A': ('nothing', QColor())
     }
 
     def __init__(
@@ -1236,6 +1244,8 @@ class TreeItem:
 
     def tooltip(self) -> str:
         """ Construct the tooltip based on the stored result """
+        if not self.prepared_data:
+            return 'Failed to prepare'
         if self.combined_result:
             reason = self.combined_result.reason
             return reason.strip('[]').replace(', ', '\n')

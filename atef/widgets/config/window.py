@@ -598,13 +598,25 @@ class RunTree(EditTree):
         self.tree_view.header().swapSections(0, 1)
         self.tree_view.expandAll()
         # Connect to pages
-        for old_it, new_it in zip(walk_tree_widget_items(self.tree_widget),
-                                  walk_tree_items(self.root_item)):
-            # assign widget to item
-            new_it.widget = old_it.widget
+        # TODO: when we redo tree construction, this may need looking at
+        # ugly and dumb as is, but we need to make sure pages match tree items
+        for new_it in walk_tree_items(self.root_item):
+            for old_it in walk_tree_widget_items(self.tree_widget):
+                # match precisely the edit-mode dataclass
+                if old_it.widget.data is new_it._data:
+                    # assign widget to item
+                    new_it.widget = old_it.widget
+                    break
 
         # show widgets when interacting with new tree
         self.tree_view.selectionModel().selectionChanged.connect(self.show_selected_page)
+
+        # update tree statuses with every result update
+        for item in walk_tree_items(self.root_item):
+            if item.widget:
+                item.widget.run_check.results_updated.connect(
+                    self.model.data_updated
+                )
 
         insert_widget(self.tree_view, self.tree_widget)
 
