@@ -6,8 +6,8 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, List
 
-from PyQt5.QtCore import QModelIndex
 from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import Qt
 
 from atef.config import PreparedFile
 from atef.enums import Severity
@@ -42,6 +42,12 @@ class ResultModel(QtCore.QAbstractTableModel):
         super().__init__(*args, **kwargs)
         self.result_info = data
         self.headers = ['Status', 'Type', 'Name', 'Reason']
+        self.color_map = {
+            Severity.success: QtGui.QColor(0, 128, 0, 255),
+            Severity.warning: QtGui.QColor(255, 128, 0, 255),
+            Severity.internal_error: QtGui.QColor(255, 0, 0, 255),
+            Severity.error: QtGui.QColor(255, 0, 0, 255)
+        }
 
     @classmethod
     def from_file(cls, file) -> ResultModel:
@@ -55,8 +61,8 @@ class ResultModel(QtCore.QAbstractTableModel):
                     raise ValueError('could not find origin of passive component')
                 info = ResultInfo(
                     status=c.result.severity,
-                    reason=c.result.reason,
-                    name=origin.name,
+                    reason=c.result.reason or '',
+                    name=origin.name or '',
                     origin=origin
                 )
                 data.append(info)
@@ -66,8 +72,8 @@ class ResultModel(QtCore.QAbstractTableModel):
             for s in datac:
                 data.append(ResultInfo(
                     status=s.result.severity,
-                    reason=s.result.reason,
-                    name=s.origin.name,
+                    reason=s.result.reason or '',
+                    name=s.origin.name or '',
                     origin=s.origin
                 ))
 
@@ -83,7 +89,7 @@ class ResultModel(QtCore.QAbstractTableModel):
         if not index.isValid():
             return None
 
-        if role == QtCore.Qt.DisplayRole:
+        if role == Qt.DisplayRole:
             if index.column() == 0:
                 return self.result_info[index.row()].status.name
             elif index.column() == 1:
@@ -93,13 +99,19 @@ class ResultModel(QtCore.QAbstractTableModel):
             elif index.column() == 3:
                 return self.result_info[index.row()].reason
 
+        if role == Qt.ForegroundRole:
+            if index.column() == 0:
+                brush = QtGui.QBrush()
+                brush.setColor(self.color_map[self.result_info[index.row()].status])
+                return brush
+
     def headerData(
-        self, section: int, orientation: QtCore.Qt.Orientation, role: int
+        self, section: int, orientation: Qt.Orientation, role: int
     ) -> Any:
-        if role != QtCore.Qt.DisplayRole:
+        if role != Qt.DisplayRole:
             return
 
-        if orientation == QtCore.Qt.Horizontal:
+        if orientation == Qt.Horizontal:
             return self.headers[section]
 
     def dclass_types(self) -> List[str]:
@@ -125,7 +137,6 @@ class CheckableComboBox(QtWidgets.QComboBox):
         self.model().itemChanged.connect(self.update_text)
 
     def eventFilter(self, object, event):
-
         if object == self.lineEdit():
             if event.type() == QtCore.QEvent.MouseButtonRelease:
                 if self.close_on_edit_click:
@@ -153,19 +164,19 @@ class CheckableComboBox(QtWidgets.QComboBox):
     def addItem(self, item):
         super(CheckableComboBox, self).addItem(item)
         item = self.model().item(self.count() - 1, 0)
-        item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
-        item.setCheckState(QtCore.Qt.Checked)
+        item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+        item.setCheckState(Qt.Checked)
 
     def itemChecked(self, index):
         item = self.model().item(index, 0)
-        return item.checkState() == QtCore.Qt.Checked
+        return item.checkState() == Qt.Checked
 
     def update_text(self) -> None:
         """ if we have items, make text show all of them """
         items = []
         for i in range(self.model().rowCount()):
             item = self.model().item(i, 0)
-            if item.checkState() == QtCore.Qt.Checked:
+            if item.checkState() == Qt.Checked:
                 items.append(item.text())
 
         if len(items) > 3:
@@ -193,25 +204,29 @@ class ResultFilterProxyModel(QtCore.QSortFilterProxyModel):
         self.allowed_types = []
         self.allowed_statuses = []
 
-    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
+    def filterAcceptsRow(
+        self,
+        source_row: int,
+        source_parent: QtCore.QModelIndex
+    ) -> bool:
         name_ok, reason_ok, type_ok, status_ok = True, True, True, True
 
         name_index = self.sourceModel().index(source_row, 2, source_parent)
-        name = self.sourceModel().data(name_index, QtCore.Qt.DisplayRole)
+        name = self.sourceModel().data(name_index, Qt.DisplayRole)
         name_ok = self.name_regexp.match(name).hasMatch()
 
         reason_index = self.sourceModel().index(source_row, 3, source_parent)
-        reason = self.sourceModel().data(reason_index, QtCore.Qt.DisplayRole)
+        reason = self.sourceModel().data(reason_index, Qt.DisplayRole)
         reason_ok = self.reason_regexp.match(reason).hasMatch()
 
         if self.allowed_types:
             type_index = self.sourceModel().index(source_row, 1, source_parent)
-            type_data = self.sourceModel().data(type_index, QtCore.Qt.DisplayRole)
+            type_data = self.sourceModel().data(type_index, Qt.DisplayRole)
             type_ok = type_data in self.allowed_types
 
         if self.allowed_statuses:
             status_index = self.sourceModel().index(source_row, 0, source_parent)
-            status_data = self.sourceModel().data(status_index, QtCore.Qt.DisplayRole)
+            status_data = self.sourceModel().data(status_index, Qt.DisplayRole)
             status_ok = status_data in self.allowed_statuses
 
         return name_ok and reason_ok and type_ok and status_ok
@@ -289,7 +304,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         allowed_types = []
         for i in range(self.type_combo.model().rowCount()):
             item = self.type_combo.model().item(i)
-            if item.checkState() == QtCore.Qt.Checked:
+            if item.checkState() == Qt.Checked:
                 allowed_types.append(item.text())
 
         return allowed_types
@@ -300,7 +315,9 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
             row = []
             for j in range(self.proxy_model.columnCount()):
                 index = self.proxy_model.index(i, j)
-                row.append(self.proxy_model.data(index, QtCore.Qt.DisplayRole))
+                row.append(
+                    self.proxy_model.data(index, Qt.DisplayRole) or ''
+                )
 
             text += ', '.join(row)
             text += '\n'

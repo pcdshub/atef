@@ -287,7 +287,7 @@ class RunCheck(DesignerDisplay, QWidget):
     def update_all_icons_tooltips(self) -> None:
         """ Convenience method for updating all the icons and tooltips """
         if not self.data:
-            logger.warning('No config associated with this step')
+            logger.debug('No config associated with this step')
             return
 
         self.update_icon(self.result_label, self.results)
@@ -452,6 +452,8 @@ def create_passive_tree_items(
     # look into configs, by_attr, by_pv, and shared
     # no config has both "by_attr" and "by_pv", but shared shows up last in tree
     # merges List[List[Comparison]] --> List[Comparison] with itertools
+    # This skips nested comparisons (via AnyComparison), which is the correct
+    # behavior, as those nested comparisons will not have Prepared variants or results
     config_categories = [
         itertools.chain.from_iterable(getattr(data, 'by_attr', {}).values()),
         itertools.chain.from_iterable(getattr(data, 'by_pv', {}).values()),
