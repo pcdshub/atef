@@ -601,9 +601,13 @@ class RunTree(EditTree):
         # TODO: when we redo tree construction, this may need looking at
         # ugly and dumb as is, but we need to make sure pages match tree items
         for new_it in walk_tree_items(self.root_item):
+            if new_it._data is None:  # Skip the empty root
+                continue
+            logger.debug(f'attempting to match {type(new_it._data)}')
             for old_it in walk_tree_widget_items(self.tree_widget):
-                # match precisely the edit-mode dataclass
-                if old_it.widget.data is new_it._data:
+                # match precisely the edit-mode dataclass, wherever it is
+                if new_it._data in (old_it.widget.data,
+                                    getattr(old_it.widget.data, 'origin', None)):
                     # assign widget to item
                     new_it.widget = old_it.widget
                     break

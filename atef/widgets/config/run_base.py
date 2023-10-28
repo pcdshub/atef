@@ -412,12 +412,12 @@ def create_tree_from_file(
     prepared_file: Optional[Union[PreparedFile, PreparedProcedureFile]] = None
 ):
     # Is prepared_data really optional?...
-    root_item = TreeItem(data=data, prepared_data=prepared_file)
+    root_item = TreeItem()
     if isinstance(data, ConfigurationFile):
-        create_passive_tree_items(data.root, root_item, prepared_file)
+        create_passive_tree_items(data, root_item, prepared_file)
         return root_item
     if isinstance(data, ProcedureFile):
-        create_active_tree_items(data.root, root_item, prepared_file)
+        create_active_tree_items(data, root_item, prepared_file)
         return root_item
 
     raise TypeError("Data was not a passive or active checkout file")
@@ -435,7 +435,7 @@ def create_passive_tree_items(
     # Handle root if necessary
     if hasattr(data, 'root'):
         # top level, add root item.
-        item = TreeItem(data, prepared_data=[prepared_data])
+        item = TreeItem(data.root, prepared_data=[prepared_data.root])
         create_passive_tree_items(data.root, item, prepared_data=prepared_data)
         parent.addChild(item)
 
@@ -480,8 +480,8 @@ def create_active_tree_items(
     # Handle root if necessary
     if hasattr(data, 'root'):
         # top level, add root item.
-        item = TreeItem(data, prepared_data=[prepared_data])
-        create_active_tree_items(data.root, item, prepared_file=prepared_data)
+        item = TreeItem(data.root, prepared_data=[prepared_data.root])
+        create_active_tree_items(data.root, item, prepared_data=prepared_data)
         parent.addChild(item)
 
     # ProcedureGroup
