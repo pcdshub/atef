@@ -1946,7 +1946,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             start = time.monotonic()
             for sig in sigs:
                 try:
-                    sig.wait_for_connection(timeout=1)
+                    sig.wait_for_connection()
                 except TimeoutError:
                     pass
                 if time.monotonic() - start >= 1:
