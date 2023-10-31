@@ -4,7 +4,7 @@ Widgets for summarizing the results of a run.
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, List
+from typing import Any, List, Set
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
@@ -37,17 +37,20 @@ class ResultModel(QtCore.QAbstractTableModel):
     To be proxied for searching
     """
     result_info: List[ResultInfo]
+    result_icon_map = {
+        # check mark
+        Severity.success: ('\u2713', QtGui.QColor(0, 128, 0, 255)),
+        Severity.warning : ('?', QtGui.QColor(255, 165, 0, 255)),
+        # x mark
+        Severity.internal_error: ('\u2718', QtGui.QColor(255, 0, 0, 255)),
+        Severity.error: ('\u2718', QtGui.QColor(255, 0, 0, 255)),
+        'N/A': ('nothing', QtGui.QColor())
+    }
 
     def __init__(self, *args, data: List[ResultInfo] = [], **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.result_info = data
         self.headers = ['Status', 'Type', 'Name', 'Reason']
-        self.color_map = {
-            Severity.success: QtGui.QColor(0, 128, 0, 255),
-            Severity.warning: QtGui.QColor(255, 128, 0, 255),
-            Severity.internal_error: QtGui.QColor(255, 0, 0, 255),
-            Severity.error: QtGui.QColor(255, 0, 0, 255)
-        }
 
     @classmethod
     def from_file(cls, file) -> ResultModel:
@@ -70,11 +73,14 @@ class ResultModel(QtCore.QAbstractTableModel):
             datac = [st_tuple[0] for st_tuple in walk_procedure_file(file.root)]
             data = []
             for s in datac:
+                origin = getattr(s, 'origin', None) or getattr(s, 'comparison', None)
+                if origin is None:
+                    raise ValueError('could not find origin of active component')
                 data.append(ResultInfo(
                     status=s.result.severity,
                     reason=s.result.reason or '',
-                    name=s.origin.name or '',
-                    origin=s.origin
+                    name=origin.name or '',
+                    origin=origin
                 ))
 
         return cls(data=data)
@@ -91,7 +97,8 @@ class ResultModel(QtCore.QAbstractTableModel):
 
         if role == Qt.DisplayRole:
             if index.column() == 0:
-                return self.result_info[index.row()].status.name
+                sev = self.result_info[index.row()].status
+                return f'[{self.result_icon_map[sev][0]}] {sev.name}'
             elif index.column() == 1:
                 return self.result_info[index.row()].type
             elif index.column() == 2:
@@ -102,7 +109,9 @@ class ResultModel(QtCore.QAbstractTableModel):
         if role == Qt.ForegroundRole:
             if index.column() == 0:
                 brush = QtGui.QBrush()
-                brush.setColor(self.color_map[self.result_info[index.row()].status])
+                brush.setColor(
+                    self.result_icon_map[self.result_info[index.row()].status][1]
+                )
                 return brush
 
     def headerData(
@@ -114,7 +123,7 @@ class ResultModel(QtCore.QAbstractTableModel):
         if orientation == Qt.Horizontal:
             return self.headers[section]
 
-    def dclass_types(self) -> List[str]:
+    def dclass_types(self) -> Set[str]:
         return set(res.type for res in self.result_info)
 
 
@@ -179,7 +188,7 @@ class CheckableComboBox(QtWidgets.QComboBox):
             if item.checkState() == Qt.Checked:
                 items.append(item.text())
 
-        if len(items) > 3:
+        if len(items) > 3 or len(items) == 0:
             self.lineEdit().setText(f'[{len(items)}] types shown')
         else:
             self.lineEdit().setText(', '.join(items))
@@ -209,7 +218,7 @@ class ResultFilterProxyModel(QtCore.QSortFilterProxyModel):
         source_row: int,
         source_parent: QtCore.QModelIndex
     ) -> bool:
-        name_ok, reason_ok, type_ok, status_ok = True, True, True, True
+        name_ok, reason_ok, type_ok, status_ok = True, True, False, False
 
         name_index = self.sourceModel().index(source_row, 2, source_parent)
         name = self.sourceModel().data(name_index, Qt.DisplayRole)
@@ -227,7 +236,8 @@ class ResultFilterProxyModel(QtCore.QSortFilterProxyModel):
         if self.allowed_statuses:
             status_index = self.sourceModel().index(source_row, 0, source_parent)
             status_data = self.sourceModel().data(status_index, Qt.DisplayRole)
-            status_ok = status_data in self.allowed_statuses
+            status_ok = any([allowed_stat in status_data
+                             for allowed_stat in self.allowed_statuses])
 
         return name_ok and reason_ok and type_ok and status_ok
 
@@ -250,14 +260,17 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
     warning_check: QtWidgets.QCheckBox
     error_check: QtWidgets.QCheckBox
 
+    refresh_button: QtWidgets.QToolButton
+
     def __init__(self, *args, file: Any, **kwargs):
         super().__init__(*args, **kwargs)
         self.file = file
-        self.setup_ui()
         self.status_map = {'success': self.success_check,
                            'warning': self.warning_check,
                            'error': self.error_check,
                            'internal_error': self.error_check}
+        self.setup_ui()
+        self.filters_changed()
 
     def setup_ui(self) -> None:
         self.model = ResultModel.from_file(self.file)
@@ -285,6 +298,11 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.success_check.stateChanged.connect(self.filters_changed)
         self.warning_check.stateChanged.connect(self.filters_changed)
         self.error_check.stateChanged.connect(self.filters_changed)
+
+        # setup refresh button
+        refresh_icon = self.style().standardIcon(QtWidgets.QStyle.SP_BrowserReload)
+        self.refresh_button.setIcon(refresh_icon)
+        self.refresh_button.clicked.connect(self.refresh_results)
 
     def filters_changed(self, *args, **kwargs) -> None:
         """ Update all the filters on the proxy model """
@@ -323,3 +341,21 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
             text += '\n'
 
         self.results_text.setText(text)
+
+    def refresh_results(self) -> None:
+        self.model = ResultModel.from_file(self.file)
+        self.proxy_model = ResultFilterProxyModel()
+        self.proxy_model.setSourceModel(self.model)
+        self.results_table.setModel(self.proxy_model)
+
+        # reset all the settings/filters
+        self.name_edit.setText('')
+        self.reason_edit.setText('')
+        for box in self.status_map.values():
+            box.setChecked(True)
+
+        # re-setup type combo box
+        self.type_combo.clear()
+        # Fill combo box with types
+        for dclass_type in self.model.dclass_types():
+            self.type_combo.addItem(dclass_type)
