@@ -6,19 +6,20 @@ note that if a configuration fails to prepare, they will be skipped
 """
 from __future__ import annotations
 
-from typing import Any, Generator, List, Tuple, Union
+from typing import Generator, List, Tuple, Union
 
 from atef.check import Comparison
-from atef.config import (Configuration, PreparedComparison,
-                         PreparedConfiguration, PreparedFile)
-from atef.procedure import (PreparedProcedureFile, PreparedProcedureStep,
-                            ProcedureStep)
+from atef.config import (AnyPreparedConfiguration, Configuration,
+                         PreparedComparison, PreparedConfiguration,
+                         PreparedFile)
+from atef.procedure import (AnyPreparedProcedure, PreparedProcedureFile,
+                            PreparedProcedureStep, ProcedureStep)
 
 
 def walk_config_file(
     config: Union[PreparedFile, PreparedConfiguration, PreparedComparison],
     level: int = 0
-) -> Generator[Tuple[Any, int], None, None]:
+) -> Generator[Tuple[Union[AnyPreparedConfiguration, PreparedComparison], int], None, None]:
     """
     Yields each config and comparison and its depth
     Performs a recursive depth-first search
@@ -49,7 +50,7 @@ def walk_config_file(
 def walk_procedure_file(
     config: Union[PreparedProcedureFile, PreparedProcedureStep, PreparedComparison],
     level: int = 0
-) -> Generator[Tuple[Any, int], None, None]:
+) -> Generator[Tuple[Union[AnyPreparedProcedure, PreparedComparison], int], None, None]:
     """
     Yields each ProcedureStep / Comparison and its depth
     Performs a recursive depth-first search

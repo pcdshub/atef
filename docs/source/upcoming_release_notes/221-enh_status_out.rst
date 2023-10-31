@@ -7,7 +7,7 @@ API Breaks
 
 Features
 --------
-- Adds results summary page accessible from run-mode
+- Adds results summary page accessible from run-mode in the `atef config` GUI
 - Adds icons to run-mode tree view
 
 Bugfixes

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import csv
 import dataclasses
-from typing import Any, List, Set
+from typing import Any, List, Optional, Set, Union
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
@@ -23,15 +23,18 @@ from atef.widgets.utils import insert_widget
 class ResultInfo:
     """ Normalized, and slightly processed view of configs/steps with results """
     status: Severity
-    name: str
     reason: str
 
     # An un-prepared dataclass, to match the tree views (will not hold the result)
     origin: AnyDataclass
 
     @property
-    def type(self):
+    def type(self) -> str:
         return type(self.origin).__name__
+
+    @property
+    def name(self) -> str:
+        return getattr(self.origin, 'name', '')
 
 
 class ResultModel(QtCore.QAbstractTableModel):
@@ -50,13 +53,21 @@ class ResultModel(QtCore.QAbstractTableModel):
         'N/A': ('nothing', QtGui.QColor())
     }
 
-    def __init__(self, *args, data: List[ResultInfo] = [], **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        data: Optional[List[ResultInfo]] = None,
+        **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
-        self.result_info = data
+        self.result_info = data or []
         self.headers = ['Status', 'Type', 'Name', 'Reason']
 
     @classmethod
-    def from_file(cls, file) -> ResultModel:
+    def from_file(
+        cls,
+        file: Union[PreparedFile, PreparedProcedureFile]
+    ) -> ResultModel:
         """ Build this model from a PreparedFile which contains results"""
         if isinstance(file, PreparedFile):
             datac = [cfg_tuple[0] for cfg_tuple in walk_config_file(file.root)]
@@ -68,7 +79,6 @@ class ResultModel(QtCore.QAbstractTableModel):
                 info = ResultInfo(
                     status=c.result.severity,
                     reason=c.result.reason or '',
-                    name=origin.name or '',
                     origin=origin
                 )
                 data.append(info)
@@ -82,7 +92,6 @@ class ResultModel(QtCore.QAbstractTableModel):
                 data.append(ResultInfo(
                     status=s.result.severity,
                     reason=s.result.reason or '',
-                    name=origin.name or '',
                     origin=origin
                 ))
 
