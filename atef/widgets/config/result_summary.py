@@ -3,6 +3,7 @@ Widgets for summarizing the results of a run.
 """
 from __future__ import annotations
 
+import csv
 import dataclasses
 from typing import Any, List, Set
 
@@ -261,6 +262,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
     error_check: QtWidgets.QCheckBox
 
     refresh_button: QtWidgets.QToolButton
+    save_text_button: QtWidgets.QPushButton
 
     def __init__(self, *args, file: Any, **kwargs):
         super().__init__(*args, **kwargs)
@@ -304,6 +306,9 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.refresh_button.setIcon(refresh_icon)
         self.refresh_button.clicked.connect(self.refresh_results)
 
+        # setup save button
+        self.save_text_button.clicked.connect(self.save_text)
+
     def filters_changed(self, *args, **kwargs) -> None:
         """ Update all the filters on the proxy model """
         self.proxy_model.name_regexp.setPattern(self.name_edit.text())
@@ -327,19 +332,23 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
 
         return allowed_types
 
-    def update_plain_text(self) -> None:
-        text = 'status, type, name, reason\n'
+    def get_plain_text(self) -> str:
+        text = 'status, type, name, reason'
         for i in range(self.proxy_model.rowCount()):
+            text += '\n'
             row = []
             for j in range(self.proxy_model.columnCount()):
                 index = self.proxy_model.index(i, j)
                 row.append(
                     self.proxy_model.data(index, Qt.DisplayRole) or ''
                 )
-
+            if row[0].startswith('['):
+                row[0] = row[0][4:]  # strip out icon from plain text
             text += ', '.join(row)
-            text += '\n'
+        return text
 
+    def update_plain_text(self) -> None:
+        text = self.get_plain_text()
         self.results_text.setText(text)
 
     def refresh_results(self) -> None:
@@ -359,3 +368,21 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         # Fill combo box with types
         for dclass_type in self.model.dclass_types():
             self.type_combo.addItem(dclass_type)
+
+    def save_text(self) -> None:
+        text = self.get_plain_text().split('\n')
+        if not text:
+            return
+
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+            parent=self,
+            caption='Select a filename',
+            filter='CSV Files (*.csv)',
+        )
+        if not filename.endswith('.csv'):
+            filename += '.csv'
+
+        with open(filename, 'w') as fd:
+            writer = csv.writer(fd)
+            for row in text:
+                writer.writerow(row.split(','))
