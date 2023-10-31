@@ -583,6 +583,7 @@ class RunTree(EditTree):
 
         self._swap_to_run_widgets()
         self.print_report_button.clicked.connect(self.print_report)
+        self._summary_widget: Optional[ResultsSummaryWidget] = None
         self.results_button.clicked.connect(self.show_results_summary)
         # use new tree view summary
         self.tree_view = QtWidgets.QTreeView()
@@ -632,8 +633,17 @@ class RunTree(EditTree):
         """
         Show the proper widget on the right when a tree row is selected.
 
+        For use as a slot connecting to QTreeView.selectionModel().selectionChanged
+
         This works by hiding the previous widget and showing the new
         selection, creating the widget object if needed.
+
+        Parameters
+        ----------
+        selected : QtCore.QItemSelection
+            Selected region
+        deselected : QtCore.QItemSelection
+            Deselected region (unused)
         """
         selected_indexes = selected.indexes()
 
@@ -756,6 +766,7 @@ class RunTree(EditTree):
         return msg
 
     def show_results_summary(self):
+        """ show the results summary widget """
         self._summary_widget = ResultsSummaryWidget(file=self.prepared_file)
         self._summary_widget.setWindowTitle('Results Summary')
         self._summary_widget.show()

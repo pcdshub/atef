@@ -18,10 +18,9 @@ from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLineEdit, QMenu,
 from atef.config import (AnyConfiguration, AnyPreparedConfiguration,
                          ConfigurationFile, PreparedComparison, PreparedFile)
 from atef.enums import Severity
-from atef.procedure import (AnyPreparedProcedure, AnyProcedure,
-                            PreparedProcedureFile, PreparedProcedureGroup,
-                            PreparedProcedureStep, ProcedureFile,
-                            ProcedureStep)
+from atef.procedure import (AnyProcedure, PreparedProcedureFile,
+                            PreparedProcedureGroup, PreparedProcedureStep,
+                            ProcedureFile, ProcedureStep)
 from atef.result import Result, combine_results
 from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.utils import TreeItem, disable_widget
@@ -409,9 +408,8 @@ class VerifyEntryWidget(DesignerDisplay, QWidget):
 
 def create_tree_from_file(
     data: Union[ConfigurationFile, ProcedureFile],
-    prepared_file: Optional[Union[PreparedFile, PreparedProcedureFile]] = None
+    prepared_file: Union[PreparedFile, PreparedProcedureFile]
 ):
-    # Is prepared_data really optional?...
     root_item = TreeItem()
     if isinstance(data, ConfigurationFile):
         create_passive_tree_items(data, root_item, prepared_file)
@@ -426,7 +424,7 @@ def create_tree_from_file(
 def create_passive_tree_items(
     data: AnyConfiguration,
     parent: TreeItem,
-    prepared_data: Optional[AnyPreparedConfiguration] = None  # Any prepared thing...
+    prepared_data: PreparedFile
 ) -> None:
     """
     Recursively create the tree starting from the given data
@@ -470,12 +468,10 @@ def create_passive_tree_items(
             parent.addChild(item)
 
 
-# TODO: Check to prepared_data may not ever get reduced, so could just be the
-# file the whole way through.
 def create_active_tree_items(
     data: AnyProcedure,
     parent: TreeItem,
-    prepared_data: Optional[AnyPreparedProcedure] = None
+    prepared_data: PreparedFile
 ) -> None:
     # Handle root if necessary
     if hasattr(data, 'root'):

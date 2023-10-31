@@ -25,6 +25,8 @@ class ResultInfo:
     status: Severity
     name: str
     reason: str
+
+    # An un-prepared dataclass, to match the tree views (will not hold the result)
     origin: AnyDataclass
 
     @property
@@ -86,13 +88,68 @@ class ResultModel(QtCore.QAbstractTableModel):
 
         return cls(data=data)
 
-    def rowCount(self, parent: QtCore.QModelIndex) -> int:
+    def rowCount(
+        self,
+        parent: QtCore.QModelIndex = QtCore.QModelIndex()
+    ) -> int:
+        """
+        Returns the number of rows in the model
+
+        Parameters
+        ----------
+        parent : QtCore.QModelIndex
+            The index of the parent to find rows under.  Invalid for tables.
+
+        Returns
+        -------
+        int
+            the number of rows in the model under ``parent``
+        """
+        # qt docs told me to
+        if parent.isValid():
+            return 0
         return len(self.result_info)
 
-    def columnCount(self, parent: QtCore.QModelIndex) -> int:
+    def columnCount(
+        self,
+        parent: QtCore.QModelIndex = QtCore.QModelIndex()
+    ) -> int:
+        """
+        Returns the number of columns in the model.  Independent of parent.
+
+        Parameters
+        ----------
+        parent : QtCore.QModelIndex
+            The index of the parent to find columns for.  Invalid for tables.
+
+        Returns
+        -------
+        int
+            the number of rows in the model under ``parent``
+        """
+        if parent.isValid():
+            return 0
         return 4
 
-    def data(self, index: QtCore.QModelIndex, role: int) -> Any:
+    def data(
+        self,
+        index: QtCore.QModelIndex,
+        role: int = Qt.DisplayRole
+    ) -> Any:
+        """
+        Return data from the model, depending on the provided role
+
+        Parameters
+        ----------
+        index : QtCore.QModelIndex
+            The index for the desired data
+        role : int
+            The data role
+
+        Returns
+        -------
+        Any
+        """
         if not index.isValid():
             return None
 
@@ -116,8 +173,29 @@ class ResultModel(QtCore.QAbstractTableModel):
                 return brush
 
     def headerData(
-        self, section: int, orientation: Qt.Orientation, role: int
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.DisplayRole
     ) -> Any:
+        """
+        Returns the data for the given ``role`` and ``section`` in the header with
+        the specified ``orientation``.
+
+        Parameters
+        ----------
+        section : int
+            The column number for horizontal headers, or row number for vertical
+        orientation : Qt.Orientation
+            Qt.Horizontal | Qt.Vertical
+        role : int
+            the display role
+
+        Returns
+        -------
+        Any
+            the header data
+        """
         if role != Qt.DisplayRole:
             return
 
@@ -125,15 +203,20 @@ class ResultModel(QtCore.QAbstractTableModel):
             return self.headers[section]
 
     def dclass_types(self) -> Set[str]:
+        """ Returns a set of the dataclass types stored in the model """
         return set(res.type for res in self.result_info)
 
 
 class CheckableComboBox(QtWidgets.QComboBox):
+    """ A QComboBox that allows for multiple selection via checkable items """
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+
+        # make the text programmatically, but not manually editable
         self.setEditable(True)
         self.lineEdit().setReadOnly(True)
+        self.model().itemChanged.connect(self.update_text)
 
         # make the line edit look more like a button
         palette = QtWidgets.QApplication.palette()
@@ -142,14 +225,15 @@ class CheckableComboBox(QtWidgets.QComboBox):
 
         # manage click events on line edit
         self.lineEdit().installEventFilter(self)
-        self.close_on_edit_click = False
+        self.popup_is_open = False
 
-        self.model().itemChanged.connect(self.update_text)
+        # Click events on item
+        self.view().pressed.connect(self.item_pressed)
 
     def eventFilter(self, object, event):
         if object == self.lineEdit():
             if event.type() == QtCore.QEvent.MouseButtonRelease:
-                if self.close_on_edit_click:
+                if self.popup_is_open:
                     self.hidePopup()
                 else:
                     self.showPopup()
@@ -159,30 +243,43 @@ class CheckableComboBox(QtWidgets.QComboBox):
         return False
 
     def showPopup(self):
+        """ Show popup if it's not open, and remember """
         super().showPopup()
-        # When the popup is displayed, a click on the lineedit should close it
-        self.close_on_edit_click = True
+        self.popup_is_open = True
 
     def hidePopup(self):
+        """ Close popup and update the text """
         super().hidePopup()
         # Used to prevent immediate reopening when clicking on the lineEdit
         self.startTimer(100)
         # Refresh the display text when closing
         self.update_text()
-        self.close_on_edit_click = False
+        self.popup_is_open = False
 
-    def addItem(self, item):
-        super(CheckableComboBox, self).addItem(item)
-        item = self.model().item(self.count() - 1, 0)
+    def addItem(self, text: str, userData: Any = ...) -> None:
+        """ Adds an item with the given ``text`` and makes it checkable """
+        super(CheckableComboBox, self).addItem(text)
+        item: QtGui.QStandardItem = self.model().item(self.count() - 1, 0)
         item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
         item.setCheckState(Qt.Checked)
 
-    def itemChecked(self, index):
-        item = self.model().item(index, 0)
-        return item.checkState() == Qt.Checked
+    def item_pressed(self, index: QtCore.QModelIndex) -> None:
+        """
+        Handler for toggling check state when clicking on the item itself
+
+        Parameters
+        ----------
+        index : QtCore.QModelIndex
+            index of clicked item
+        """
+        item: QtGui.QStandardItem = self.model().item(index.row(), 0)
+        if item.checkState() == Qt.Unchecked:
+            item.setCheckState(Qt.Checked)
+        else:
+            item.setCheckState(Qt.Unchecked)
 
     def update_text(self) -> None:
-        """ if we have items, make text show all of them """
+        """ Show a summary of selected items in the QComboBox LineEdit """
         items = []
         for i in range(self.model().rowCount()):
             item = self.model().item(i, 0)
@@ -190,7 +287,7 @@ class CheckableComboBox(QtWidgets.QComboBox):
                 items.append(item.text())
 
         if len(items) > 3 or len(items) == 0:
-            self.lineEdit().setText(f'[{len(items)}] types shown')
+            self.lineEdit().setText(f'[{len(items)}] items shown')
         else:
             self.lineEdit().setText(', '.join(items))
 
@@ -198,7 +295,7 @@ class CheckableComboBox(QtWidgets.QComboBox):
 class ResultFilterProxyModel(QtCore.QSortFilterProxyModel):
     """
     Filter proxy model specifically for ResultModel.
-    Combines multiple filter conditions
+    Combines multiple filter conditions.
     """
 
     name_regexp: QtCore.QRegularExpression
@@ -245,7 +342,8 @@ class ResultFilterProxyModel(QtCore.QSortFilterProxyModel):
 
 class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
     """
-    Widget for showing results summary
+    Widget for showing results summary in table and text formats.
+    Has options for filtering results by type, name, status, and reason.
     """
     filename = 'results_summary.ui'
 
@@ -275,6 +373,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.filters_changed()
 
     def setup_ui(self) -> None:
+        """ Set up slots and do initial ui setup """
         self.model = ResultModel.from_file(self.file)
         self.proxy_model = ResultFilterProxyModel()
         self.proxy_model.setSourceModel(self.model)
@@ -315,15 +414,18 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.proxy_model.reason_regexp.setPattern(self.reason_edit.text())
         self.proxy_model.allowed_statuses = self.get_allowed_statuses()
         self.proxy_model.allowed_types = self.get_allowed_types()
+        # signal that the model has been updated
         self.proxy_model.invalidateFilter()
         self.update_plain_text()
 
     def get_allowed_statuses(self) -> List[str]:
+        """ Gather allowed status types from the status checkboxes """
         return [status_key for status_key, status_widget
                 in self.status_map.items()
                 if status_widget.isChecked()]
 
     def get_allowed_types(self) -> List[str]:
+        """ Gather the allowed types from the checkable combo box """
         allowed_types = []
         for i in range(self.type_combo.model().rowCount()):
             item = self.type_combo.model().item(i)
@@ -333,6 +435,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         return allowed_types
 
     def get_plain_text(self) -> str:
+        """ Generate plain text version of ResultsSummary Table """
         text = 'status, type, name, reason'
         for i in range(self.proxy_model.rowCount()):
             text += '\n'
@@ -348,10 +451,15 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         return text
 
     def update_plain_text(self) -> None:
+        """ Slot for updating plain text tab """
         text = self.get_plain_text()
         self.results_text.setText(text)
 
     def refresh_results(self) -> None:
+        """
+        Re-initialize the model with the file.  Also refreshes the type combo
+        box for good measure, despite this getting destroyed on RunTree refresh
+        """
         self.model = ResultModel.from_file(self.file)
         self.proxy_model = ResultFilterProxyModel()
         self.proxy_model.setSourceModel(self.model)
@@ -370,6 +478,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
             self.type_combo.addItem(dclass_type)
 
     def save_text(self) -> None:
+        """ Save the csv representation of the filtered results table """
         text = self.get_plain_text().split('\n')
         if not text:
             return
