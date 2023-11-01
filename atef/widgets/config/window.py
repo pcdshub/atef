@@ -768,8 +768,10 @@ class RunTree(EditTree):
 
     def show_results_summary(self):
         """ show the results summary widget """
-        self._summary_widget = ResultsSummaryWidget(file=self.prepared_file)
+        self._summary_widget = ResultsSummaryWidget(parent=self,
+                                                    file=self.prepared_file)
         self._summary_widget.setWindowTitle('Results Summary')
+        self._summary_widget.setWindowFlags(QtCore.Qt.Window)
         self._summary_widget.show()
 
 
