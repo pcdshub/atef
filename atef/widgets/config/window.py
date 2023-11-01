@@ -498,6 +498,7 @@ class EditTree(DesignerDisplay, QWidget):
             self.show_selected_display
         )
         self.tree_widget.setCurrentItem(self.root_item)
+        self.tree_widget.expandAll()
 
     def assemble_tree(self):
         """

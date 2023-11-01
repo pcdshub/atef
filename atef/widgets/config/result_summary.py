@@ -370,6 +370,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
 
     refresh_button: QtWidgets.QToolButton
     save_text_button: QtWidgets.QPushButton
+    clipboard_button: QtWidgets.QPushButton
 
     def __init__(self, *args, file: Any, **kwargs):
         super().__init__(*args, **kwargs)
@@ -390,16 +391,9 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.results_table.setSortingEnabled(True)
         self.results_table.horizontalHeader().setStretchLastSection(True)
 
-        self.success_check.setChecked(True)
-        self.warning_check.setChecked(True)
-        self.error_check.setChecked(True)
-
         # setup type combo box
         self.type_combo = CheckableComboBox()
         insert_widget(self.type_combo, self.type_combo_placeholder)
-        # Fill combo box with types
-        for dclass_type in self.model.dclass_types():
-            self.type_combo.addItem(dclass_type)
 
         # connect filter widgets
         self.name_edit.textChanged.connect(self.filters_changed)
@@ -414,8 +408,11 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.refresh_button.setIcon(refresh_icon)
         self.refresh_button.clicked.connect(self.refresh_results)
 
-        # setup save button
+        # setup save buttons
         self.save_text_button.clicked.connect(self.save_text)
+        self.clipboard_button.clicked.connect(self.copy_to_clipboard)
+
+        self.refresh_results()
 
     def filters_changed(self, *args, **kwargs) -> None:
         """ Update all the filters on the proxy model """
@@ -451,12 +448,13 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
             row = []
             for j in range(self.proxy_model.columnCount()):
                 index = self.proxy_model.index(i, j)
-                row.append(
-                    self.proxy_model.data(index, Qt.DisplayRole) or ''
-                )
+                data = self.proxy_model.data(index, Qt.DisplayRole) or ''
+                if ',' in data:
+                    data = f'"{data}"'
+                row.append(data)
             if row[0].startswith('['):
                 row[0] = row[0][4:]  # strip out icon from plain text
-            text += ', '.join(row)
+            text += ','.join(row)
         return text
 
     def update_plain_text(self) -> None:
@@ -477,8 +475,10 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         # reset all the settings/filters
         self.name_edit.setText('')
         self.reason_edit.setText('')
-        for box in self.status_map.values():
-            box.setChecked(True)
+
+        self.success_check.setChecked(False)
+        self.warning_check.setChecked(True)
+        self.error_check.setChecked(True)
 
         # re-setup type combo box
         self.type_combo.clear()
@@ -503,4 +503,19 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         with open(filename, 'w') as fd:
             writer = csv.writer(fd)
             for row in text:
-                writer.writerow(row.split(','))
+                writer.writerow(row.split(',', 3))
+
+    def copy_to_clipboard(self) -> None:
+        """ Copy the plain-text results table to the clipboard """
+        text = self.get_plain_text()
+        if not text:
+            return
+
+        QtGui.QGuiApplication.clipboard().setText(text)
+
+        self._msg = QtWidgets.QMessageBox(parent=self)
+        self._msg.setText(
+            'Plain-text results copied to clipboard.',
+        )
+        self._msg.setWindowTitle('Results Copied!')
+        self._msg.exec()
