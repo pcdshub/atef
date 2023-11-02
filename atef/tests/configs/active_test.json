@@ -42,15 +42,6 @@
               "value": 1.0,
               "timeout": 20.0,
               "settle_time": 5.0
-            },
-            {
-              "name": null,
-              "device": "im3k4",
-              "attr": "target.state",
-              "pv": "IM3K4:PPM:MMS:STATE:GET_RBV",
-              "value": 4,
-              "timeout": null,
-              "settle_time": null
             }
           ],
           "success_criteria": [

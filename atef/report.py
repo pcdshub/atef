@@ -9,7 +9,7 @@ from dataclasses import fields
 from datetime import datetime
 from operator import attrgetter
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 from reportlab import platypus
 from reportlab.lib import colors, enums, pagesizes, units
@@ -36,6 +36,7 @@ from atef.procedure import (PreparedPassiveStep, PreparedProcedureFile,
                             PreparedSetValueStep)
 from atef.result import Result
 from atef.type_hints import AnyDataclass
+from atef.walk import walk_config_file, walk_procedure_file
 
 logger = logging.getLogger(__name__)
 
@@ -59,68 +60,6 @@ symbol_map = {
     Equals: '=', NotEquals: '≠', Greater: '>', GreaterOrEqual: '≥', Less: '<',
     LessOrEqual: '≤', Range: '≤'
 }
-
-
-def walk_config_file(
-    config: Union[PreparedFile, PreparedConfiguration, PreparedComparison],
-    level: int = 0
-) -> Generator[Tuple[Any, int], None, None]:
-    """
-    Yields each config and comparison and its depth
-    Performs a recursive depth-first search
-
-    Parameters
-    ----------
-    config : Union[PreparedFile, PreparedConfiguration, PreparedComparison]
-        the configuration or comparison to walk
-    level : int, optional
-        the current recursion depth, by default 0
-
-    Yields
-    ------
-    Generator[Tuple[Any, int], None, None]
-    """
-    yield config, level
-    if isinstance(config, PreparedFile):
-        yield from walk_config_file(config.root, level=level+1)
-    elif isinstance(config, PreparedConfiguration):
-        if hasattr(config, 'configs'):
-            for conf in config.configs:
-                yield from walk_config_file(conf, level=level+1)
-        if hasattr(config, 'comparisons'):
-            for comp in config.comparisons:
-                yield from walk_config_file(comp, level=level+1)
-
-
-def walk_procedure_file(
-    config: Union[PreparedProcedureFile, PreparedProcedureStep, PreparedComparison],
-    level: int = 0
-) -> Generator[Tuple[Any, int], None, None]:
-    """
-    Yields each ProcedureStep / Comparison and its depth
-    Performs a recursive depth-first search
-
-    Parameters
-    ----------
-    config : Union[PreparedProcedureFile, PreparedProcedureStep,
-                    PreparedComparison]
-        the item to yield and walk through
-    level : int, optional
-        the current recursion depth, by default 0
-
-    Yields
-    ------
-    Generator[Tuple[Any, int], None, None]
-    """
-    yield config, level
-    if isinstance(config, PreparedProcedureFile):
-        yield from walk_procedure_file(config.root, level=level+1)
-    elif isinstance(config, PreparedProcedureStep):
-        for sub_step in getattr(config, 'steps', []):
-            yield from walk_procedure_file(sub_step, level=level+1)
-        if hasattr(config, 'walk_comparisons'):
-            for sub_comp in config.walk_comparisons():
-                yield from walk_procedure_file(sub_comp, level=level+1)
 
 
 def get_result_text(result: Result) -> Paragraph:

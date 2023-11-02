@@ -58,24 +58,6 @@ BS_STATE_MAP: Dict[int, BlueskyState] = {}
 MAX_PLAN_DEPTH = 200
 
 
-def walk_steps(step: ProcedureStep) -> Generator[ProcedureStep, None, None]:
-    """
-    Yield ProedureSteps in ``step``, depth-first.
-
-    Parameters
-    ----------
-    step : ProcedureStep
-        Step to yield ProcedureSteps from
-
-    Yields
-    ------
-    Generator[ProcedureStep, None, None]
-    """
-    yield step
-    for sub_step in getattr(step, 'steps', []):
-        yield from walk_steps(sub_step)
-
-
 @dataclasses.dataclass
 @serialization.as_tagged_union
 class ProcedureStep:
@@ -656,6 +638,13 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         self.step_result = result
 
         return super().result
+
+    def walk_steps(self) -> Generator[AnyPreparedProcedure]:
+        for step in self.steps:
+            step = cast(AnyPreparedProcedure, step)
+            yield step
+            if hasattr(step, 'walk_steps'):
+                yield from step.walk_steps()
 
 
 @dataclass

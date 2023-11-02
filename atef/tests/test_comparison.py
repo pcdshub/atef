@@ -292,6 +292,7 @@ async def test_epics_value(
     print(comparison(value).reason)
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize('value, status', [
     [0, Severity.success],
     ['OUT', Severity.success],

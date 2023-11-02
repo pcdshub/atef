@@ -15,15 +15,14 @@ from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLineEdit, QMenu,
                             QPushButton, QSpacerItem, QStyle, QToolButton,
                             QVBoxLayout, QWidget, QWidgetAction)
 
-from atef.check import Comparison
-from atef.config import (AnyPreparedConfiguration, Configuration,
-                         ConfigurationFile, PreparedComparison,
-                         PreparedConfiguration, PreparedFile)
+from atef.config import (AnyConfiguration, AnyPreparedConfiguration,
+                         ConfigurationFile, PreparedComparison, PreparedFile)
 from atef.enums import Severity
-from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
-                            PreparedProcedureStep, ProcedureFile,
-                            ProcedureStep, walk_steps)
+from atef.procedure import (AnyProcedure, PreparedProcedureFile,
+                            PreparedProcedureGroup, PreparedProcedureStep,
+                            ProcedureFile, ProcedureStep)
 from atef.result import Result, combine_results
+from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.utils import TreeItem, disable_widget
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import BusyCursorThread
@@ -107,84 +106,6 @@ def infer_step_type(config: Union[PreparedComparison, PreparedProcedureStep]) ->
     # TODO: Uncomment this when we've fixed up the comparison walking...
     # raise TypeError(f'incompatible type ({type(config)}), '
     #                 'cannot infer active or passive')
-
-
-def get_relevant_configs_comps(
-    prepared_file: PreparedFile,
-    original_c: Union[Configuration, Comparison]
-) -> List[Union[PreparedConfiguration, PreparedComparison]]:
-    """
-    Gather all the PreparedConfiguration or PreparedComparison dataclasses
-    that correspond to the original comparison or config.
-
-    Phrased another way: maps prepared comparisons onto the comparison
-    seen in the GUI
-
-    Currently for passive checkout files only
-
-    Parameters
-    ----------
-    prepared_file : PreparedFile
-        the file containing configs or comparisons to be gathered
-    original_c : Union[Configuration, Comparison]
-        the comparison to match PreparedComparison or PreparedConfigurations to
-
-    Returns
-    -------
-    List[Union[PreparedConfiguration, PreparedComparison]]:
-        the configuration or comparison dataclasses related to ``original_c``
-    """
-    matched_c = []
-
-    for config in prepared_file.walk_groups():
-        if config.config is original_c:
-            matched_c.append(config)
-
-    for comp in prepared_file.walk_comparisons():
-        if comp.comparison is original_c:
-            matched_c.append(comp)
-
-    return matched_c
-
-
-def get_prepared_step(
-    prepared_file: PreparedProcedureFile,
-    origin: Union[ProcedureStep, Comparison],
-) -> List[Union[PreparedProcedureStep, PreparedComparison]]:
-    """
-    Gather all PreparedProcedureStep dataclasses the correspond to the original
-    ProcedureStep.
-    If a PreparedProcedureStep also has comparisions, use the walk_comparisons
-    method to check if the "origin" matches any of thoes comparisons
-
-    Only relevant for active checkouts.
-
-    Parameters
-    ----------
-    prepared_file : PreparedProcedureFile
-        the PreparedProcedureFile to search through
-    origin : Union[ProcedureStep, Comparison]
-        the step / comparison to match
-
-    Returns
-    -------
-    List[Union[PreparedProcedureStep, PreparedComparison]]
-        the PreparedProcedureStep's or PreparedComparison's related to ``origin``
-    """
-    # As of the writing of this docstring, this helper is only expected to return
-    # lists of length 1.  However in order to match the passive checkout workflow,
-    # we still return a list of relevant steps or comparisons.
-    matched_steps = []
-    for pstep in walk_steps(prepared_file.root):
-        if getattr(pstep, 'origin', None) is origin:
-            matched_steps.append(pstep)
-        # check PreparedComparisons, which might be included in some steps
-        if hasattr(pstep, 'walk_comparisons'):
-            for comp in pstep.walk_comparisons():
-                if comp.comparison is origin:
-                    matched_steps.append(comp)
-
-    return matched_steps
 
 
 class ResultStatus(QLabel):
@@ -365,7 +286,7 @@ class RunCheck(DesignerDisplay, QWidget):
     def update_all_icons_tooltips(self) -> None:
         """ Convenience method for updating all the icons and tooltips """
         if not self.data:
-            logger.warning('No config associated with this step')
+            logger.debug('No config associated with this step')
             return
 
         self.update_icon(self.result_label, self.results)
@@ -485,38 +406,94 @@ class VerifyEntryWidget(DesignerDisplay, QWidget):
         self.verify_button_box.button(QDialogButtonBox.Cancel).setText('Reject')
 
 
-def create_tree_items(
-    data: Any,
+def create_tree_from_file(
+    data: Union[ConfigurationFile, ProcedureFile],
+    prepared_file: Union[PreparedFile, PreparedProcedureFile]
+):
+    root_item = TreeItem()
+    if isinstance(data, ConfigurationFile):
+        create_passive_tree_items(data, root_item, prepared_file)
+        return root_item
+    if isinstance(data, ProcedureFile):
+        create_active_tree_items(data, root_item, prepared_file)
+        return root_item
+
+    raise TypeError("Data was not a passive or active checkout file")
+
+
+def create_passive_tree_items(
+    data: AnyConfiguration,
     parent: TreeItem,
-    prepared_file: Optional[PreparedFile] = None
+    prepared_data: PreparedFile
 ) -> None:
     """
     Recursively create the tree starting from the given data
     Optionally associate prepared dataclasses with the TreeItems
     """
+    # Handle root if necessary
+    if hasattr(data, 'root'):
+        # top level, add root item.
+        item = TreeItem(data.root, prepared_data=[prepared_data.root])
+        create_passive_tree_items(data.root, item, prepared_data=prepared_data)
+        parent.addChild(item)
+
     for cfg in getattr(data, 'configs', []):
-        if prepared_file:
+        if prepared_data:
             # Grab relevant comps/configs so tree item can hold results
-            prep_configs = get_relevant_configs_comps(prepared_file, cfg)
+            prep_configs = get_relevant_configs_comps(prepared_data, cfg)
         else:
             prep_configs = None
         item = TreeItem(cfg, prepared_data=prep_configs)
-        create_tree_items(cfg, item, prepared_file=prepared_file)
+        create_passive_tree_items(cfg, item, prepared_data=prepared_data)
         parent.addChild(item)
 
-    # look into configs, by_attr, shared
+    # look into configs, by_attr, by_pv, and shared
+    # no config has both "by_attr" and "by_pv", but shared shows up last in tree
     # merges List[List[Comparison]] --> List[Comparison] with itertools
+    # This skips nested comparisons (via AnyComparison), which is the correct
+    # behavior, as those nested comparisons will not have Prepared variants or results
     config_categories = [
-        getattr(data, 'shared', []),
         itertools.chain.from_iterable(getattr(data, 'by_attr', {}).values()),
-        itertools.chain.from_iterable(getattr(data, 'by_pv', {}).values())
+        itertools.chain.from_iterable(getattr(data, 'by_pv', {}).values()),
+        getattr(data, 'shared', []),
     ]
     for comp_list in config_categories:
         for comp in comp_list:
-            if prepared_file:
+            if prepared_data:
                 # Grab relevant comps/configs so tree item can hold results
-                prep_configs = get_relevant_configs_comps(prepared_file, comp)
+                prep_configs = get_relevant_configs_comps(prepared_data, comp)
             else:
                 prep_configs = None
             item = TreeItem(comp, prepared_data=prep_configs)
             parent.addChild(item)
+
+
+def create_active_tree_items(
+    data: AnyProcedure,
+    parent: TreeItem,
+    prepared_data: PreparedFile
+) -> None:
+    # Handle root if necessary
+    if hasattr(data, 'root'):
+        # top level, add root item.
+        item = TreeItem(data.root, prepared_data=[prepared_data.root])
+        create_active_tree_items(data.root, item, prepared_data=prepared_data)
+        parent.addChild(item)
+
+    # ProcedureGroup
+    for step in getattr(data, 'steps', []):
+        if prepared_data:
+            prep_steps = get_prepared_step(prepared_data, step)
+        else:
+            prep_steps = None
+        item = TreeItem(step, prepared_data=prep_steps)
+        create_active_tree_items(step, item, prepared_data=prepared_data)
+        parent.addChild(item)
+
+    # SetValueStep Comparisons
+    for criterion in getattr(data, 'success_criteria', []):
+        comp = criterion.comparison
+        if prepared_data:
+            prepared_comp = get_prepared_step(prepared_data, comp)
+        item = TreeItem(comp, prepared_comp)
+        parent.addChild(item)
