@@ -409,7 +409,30 @@ class VerifyEntryWidget(DesignerDisplay, QWidget):
 def create_tree_from_file(
     data: Union[ConfigurationFile, ProcedureFile],
     prepared_file: Union[PreparedFile, PreparedProcedureFile]
-):
+) -> TreeItem:
+    """
+    Create a TreeItem Tree with items linked to original and prepared dataclasses
+    from ``data`` and ``prepared_file`` respectively.
+
+    For use in ConfigTreeModel, show showing a tree view with result status icons
+
+    Parameters
+    ----------
+    data : Union[ConfigurationFile, ProcedureFile]
+        The "original" file (edit-mode, un-prepared)
+    prepared_file : Union[PreparedFile, PreparedProcedureFile]
+        The "prepared" file (run-mode, prepared)
+
+    Returns
+    -------
+    TreeItem
+        The root node of the tree
+
+    Raises
+    ------
+    TypeError
+        If data is neither a ConfigurationFile nor ProcedureFile
+    """
     root_item = TreeItem()
     if isinstance(data, ConfigurationFile):
         create_passive_tree_items(data, root_item, prepared_file)

@@ -1141,7 +1141,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return None
 
-        item = index.internalPointer()
+        item = index.internalPointer()  # Gives original TreeItem
         # special handling for status info
         if index.column() == 1:
             if role == Qt.ForegroundRole:
@@ -1157,6 +1157,9 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
             return item.tooltip()
         if role == Qt.DisplayRole:
             return item.data(index.column())
+
+        if role == Qt.UserRole:
+            return item
 
         return None
 
@@ -1181,6 +1184,10 @@ class TreeItem:
     If ``prepared_data`` is provided, Result information can be provided to the
     model via the ``.data()`` method
     """
+    widget: Optional[QtWidgets.QWidget]  # Actually PageWidget, but circular imports
+    parent_tree_item: TreeItem
+    full_tree: QtWidgets.QTreeView
+
     result_icon_map = {
         # check mark
         Severity.success: ('\u2713', QColor(0, 128, 0, 255)),
@@ -1195,7 +1202,9 @@ class TreeItem:
         self,
         data: Optional[Union[Configuration, Comparison]] = None,
         prepared_data: Optional[List[PreparedConfiguration, PreparedComparison]] = None,
-        widget: Optional[QtWidgets.QWidget] = None
+        widget: Optional[QtWidgets.QWidget] = None,
+        tree_view: Optional[QtWidgets.QTreeView] = None,
+        tree_parent: Optional[TreeItem] = None
     ) -> None:
         self._data = data
         self.prepared_data = prepared_data
@@ -1205,6 +1214,8 @@ class TreeItem:
         self._parent = None
         self._row = 0
         self.widget = widget
+        self.tree_view = tree_view
+        self.tree_parent = tree_parent
 
     def data(self, column: int) -> Any:
         """
@@ -1285,6 +1296,14 @@ class TreeItem:
         child._row = len(self._children)
         self._children.append(child)
         self._columncount = max(child.columnCount(), self._columncount)
+
+    @property
+    def orig_data(self):
+        return self._data
+
+    @property
+    def prep_data(self):
+        return self.prepared_data
 
 
 class AddRowWidget(DesignerDisplay, QWidget):

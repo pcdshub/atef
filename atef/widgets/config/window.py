@@ -9,6 +9,7 @@ import os
 import os.path
 import traceback
 import webbrowser
+from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
 from pprint import pprint
@@ -29,6 +30,7 @@ from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep)
 from atef.qt_helpers import walk_tree_widget_items
 from atef.report import ActiveAtefReport, PassiveAtefReport
+from atef.type_hints import AnyDataclass
 from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.find_replace import (FillTemplatePage,
                                               FindReplaceWidget)
@@ -36,11 +38,12 @@ from atef.widgets.utils import insert_widget, reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
-from .page import (AtefItem, ConfigurationGroupPage, PageWidget,
+from .page import (PAGE_MAP, AtefItem, ConfigurationGroupPage, PageWidget,
                    ProcedureGroupPage, RunStepPage, link_page, walk_tree_items)
 from .result_summary import ResultsSummaryWidget
 from .run_base import create_tree_from_file, make_run_page
-from .utils import ConfigTreeModel, MultiInputDialog, Toggle, clear_results
+from .utils import (ConfigTreeModel, MultiInputDialog, Toggle, TreeItem,
+                    clear_results)
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +278,7 @@ class Window(DesignerDisplay, QMainWindow):
             applicable. This lets us keep track of which filename to
             save back to.
         """
-        widget = DualTree(config_file=data, full_path=filename)
+        widget = DualTree(orig_file=data, full_path=filename)
         self.tab_widget.addTab(widget, self.get_tab_name(filename))
         curr_idx = self.tab_widget.count() - 1
         self.tab_widget.setCurrentIndex(curr_idx)
@@ -550,7 +553,7 @@ class EditTree(DesignerDisplay, QWidget):
         self.last_selection = item
 
 
-_edit_to_run_page: Dict[type, PageWidget] = {
+EDIT_TO_RUN_PAGE: Dict[type, PageWidget] = {
     DescriptionStep: RunStepPage,
     PassiveStep: RunStepPage,
     SetValueStep: RunStepPage,
@@ -698,13 +701,13 @@ class RunTree(EditTree):
         for item in walk_tree_widget_items(self.tree_widget):
             data = item.widget.data  # Dataclass on widget
             prepared_data = get_prepare_fn(self.prepared_file, data)
-            if type(data) in _edit_to_run_page:
+            if type(data) in EDIT_TO_RUN_PAGE:
                 if len(prepared_data) != 1:
                     raise ValueError(
                         'number of prepared dataclasses is not 1, while the '
                         'target page expects one: '
                         f'{type(data)} -> {[type(d) for d in prepared_data]}')
-                run_widget_cls = _edit_to_run_page[type(data)]
+                run_widget_cls = EDIT_TO_RUN_PAGE[type(data)]
                 run_widget = run_widget_cls(data=prepared_data[0])
                 link_page(item, run_widget)
                 run_widget.link_children()
@@ -775,59 +778,203 @@ class RunTree(EditTree):
         self._summary_widget.show()
 
 
-class DualTree(QWidget):
+class DualTree(DesignerDisplay, QWidget):
     """
     A widget that exposes one of two tree widgets depending on the mode
     """
+    filename = 'dual_config_tree.ui'
+
+    tree_view: QtWidgets.QTreeView
+    splitter: QtWidgets.QSplitter
+    last_selection: Optional[TreeItem]
+
+    print_report_button: QtWidgets.QPushButton
+    results_button: QtWidgets.QPushButton
+
     mode_switch_finished: ClassVar[QSignal] = QSignal()
+
+    built_widgets: OrderedDict
 
     def __init__(
         self,
         *args,
-        config_file: ConfigurationFile | ProcedureFile,
+        orig_file: ConfigurationFile | ProcedureFile,
         full_path: Optional[str] = None,
+        widget_cache_size: int = 5,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
-        self.layout = QtWidgets.QHBoxLayout()
-        edit_tree = EditTree(parent=self, config_file=config_file,
-                             full_path=full_path)
-        self.layout.addWidget(edit_tree)
-        self.setLayout(self.layout)
-        self.trees = {'edit': edit_tree, 'run': None}
+        self.main_layout = QtWidgets.QHBoxLayout()
+        self.edit_widget_cache: OrderedDict[TreeItem, QWidget] = OrderedDict()
+        self.run_widget_cache: OrderedDict[TreeItem, QWidget] = OrderedDict()
+        self.caches: Dict[str, OrderedDict[TreeItem, QWidget]] = {
+            'edit': self.edit_widget_cache,
+            'run': self.run_widget_cache
+        }
+        self.max_cache_size = widget_cache_size
+        self.current_widget: QWidget = None
+        self.orig_file = orig_file
+        self.prepared_file = None
+        self.full_path = full_path
+        self.root_item = TreeItem()
         self.mode = 'edit'
-        serialized_edit_config = serialize(type(self.trees['edit'].config_file),
-                                           self.trees['edit'].config_file)
+
+        # basic tree setup, start in edit mode
+        self.assemble_tree()
+        self.refresh_model()
+
+        # Connect other buttons
+        self.print_report_button.clicked.connect(self.print_report)
+        self._summary_widget: Optional[ResultsSummaryWidget] = None
+        self.results_button.clicked.connect(self.show_results_summary)
+
+        # store serialized edit
+        serialized_edit_config = serialize(type(self.orig_file), self.orig_file)
         self.last_edit_config = deepcopy(serialized_edit_config)
         self._orig_config = deepcopy(self.last_edit_config)
 
         self.toggle = Toggle()
-        self.show_widgets()
 
-    def get_tree(self, mode: str = None) -> Union[EditTree, RunTree]:
+        # show the root item
+        self.tree_view.selectionModel().currentChanged.connect(
+            self.show_selected_display
+        )
+        # self.show_widgets()
+
+    def assemble_tree(self) -> None:
+        # self.tree_view = QtWidgets.QTreeView()
+        self.refresh_model()
+        self.tree_view.resizeColumnToContents(1)
+        self.tree_view.header().swapSections(0, 1)
+        self.tree_view.expandAll()
+        # starting in edit mode, hide statuses
+        self.tree_view.setColumnHidden(1, True)
+        # TODO: hide buttons
+
+    def refresh_prepared_file(self) -> None:
+        if isinstance(self.orig_file, ConfigurationFile):
+            self.prepared_file = PreparedFile.from_config(self.orig_file,
+                                                          cache=DataCache())
+        if isinstance(self.orig_file, ProcedureFile):
+            self.prepared_file = PreparedProcedureFile.from_origin(self.orig_file)
+
+    def refresh_model(self) -> None:
         """
-        Get the requested tree, either 'edit' or 'run'.
-        Defaults to the currently active tree
-
-        Parameters
-        ----------
-        mode : str, optional
-            either 'edit' or 'run', by default None
-
-        Returns
-        -------
-        Union[EditTree, RunTree]
-            the requested tree
+        Rebuild the model, refreshing the Prepared file primarily
         """
-        if mode is None:
-            return self.trees[self.mode]
+        self.refresh_prepared_file()
+        # clear cache, schedule everything inside for deletion?
+        self.root_item = create_tree_from_file(
+            data=self.orig_file,
+            prepared_file=self.prepared_file
+        )
+        self.model = ConfigTreeModel(data=self.root_item)
 
-        if mode == 'run':
-            # generate new run configuration
-            if (self.trees['run'] is None):
-                self.build_run_tree()
+        self.tree_view.setModel(self.model)
 
-        return self.trees[mode]
+    def show_selected_display(self, current: QtCore.QModelIndex, previous: QtCore.QModelIndex) -> None:
+        """ Show selected widget, construct it if necesary """
+        # TODO: show busy cursor?
+        item: TreeItem = self.tree_view.model().data(current, Qt.UserRole)
+        print(item, item.data(0))
+        self.show_page_for_data(item, mode='edit')
+        # decide on mode, dispatch to show_page methods
+        # grab widget if exists in cache
+        # create widget if not
+        # show widget
+
+    def show_page_for_data(self, item: TreeItem, mode: str = 'edit') -> None:
+        """ Show page widget corresponding to ``data`` in ``mode`` """
+        curr_cache = self.caches[mode]
+        if item in curr_cache:
+            new_widget = curr_cache[item]
+            return
+
+        else:
+            # not in cache, need to build the widget.
+            new_widget = self.create_widget(item.orig_data, mode)
+
+            if len(curr_cache) >= self.max_cache_size:
+                curr_cache.popitem()
+                curr_cache[item] = new_widget
+
+        # TODO: make sure current widget is never None later on
+        if self.current_widget:
+            self.current_widget.setVisible(False)
+            self.splitter.replaceWidget(1, new_widget)
+        else:
+            self.splitter.addWidget(new_widget)
+
+        self.current_widget = new_widget
+        self.current_widget.setVisible(True)
+
+    def create_widget(self, data: AnyDataclass, mode: str) -> QWidget:
+        # edit mode
+        widget: PageWidget = PAGE_MAP[type(data)](data=data)
+        # TODO: Logic could be better, might not have to make edit widget when
+        # separate run widget exists
+        if mode == 'edit':
+            return widget
+        else:  # run mode
+            if self.prepared_file is None:
+                self.refresh_prepared_file()
+
+            if isinstance(self.orig_file, ConfigurationFile):
+                get_prepare_fn = get_relevant_configs_comps
+            elif isinstance(self.orig_file, ProcedureFile):
+                get_prepare_fn = get_prepared_step
+
+            prepared_data = get_prepare_fn(self.prepared_file, data)
+            if type(data) in EDIT_TO_RUN_PAGE:
+                if len(prepared_data) != 1:
+                    raise ValueError(
+                        'number of prepared dataclasses is not 1, while the '
+                        'target page expects one: '
+                        f'{type(data)} -> {[type(d) for d in prepared_data]}')
+                run_widget_cls = EDIT_TO_RUN_PAGE[type(data)]
+                run_widget = run_widget_cls(data=prepared_data[0])
+                # link_page(item, run_widget)
+                # run_widget.link_children()
+            else:
+                run_widget = make_run_page(widget, prepared_data)
+
+                # if prev_widget:
+                #     prev_widget.run_check.setup_next_button(item)
+
+                # prev_widget = run_widget
+
+                # update all statuses every time a step is run
+            # run_widget.run_check.results_updated.connect(self.update_statuses)
+
+            # disable last 'next' button
+            # run_widget.run_check.next_button.hide()
+            return run_widget
+        # place into layout
+
+    # def get_tree(self, mode: str = None) -> Union[EditTree, RunTree]:
+    #     """
+    #     Get the requested tree, either 'edit' or 'run'.
+    #     Defaults to the currently active tree
+
+    #     Parameters
+    #     ----------
+    #     mode : str, optional
+    #         either 'edit' or 'run', by default None
+
+    #     Returns
+    #     -------
+    #     Union[EditTree, RunTree]
+    #         the requested tree
+    #     """
+    #     if mode is None:
+    #         return self.trees[self.mode]
+
+    #     if mode == 'run':
+    #         # generate new run configuration
+    #         if (self.trees['run'] is None):
+    #             self.build_run_tree()
+
+    #     return self.trees[mode]
 
     def switch_mode(self, value) -> None:
         """ Switch tree modes between 'edit' and 'run' """
@@ -863,46 +1010,72 @@ class DualTree(QWidget):
             self.mode_switch_finished.emit()
             self.mode_switch_finished.disconnect(reset_cursor)
 
-    def show_widgets(self) -> None:
-        """ Show active widget, hide others. (re)generate RunTree if needed """
-        # If run_tree requested check if there are changes
-        # Do nothing if run tree exists and config has not changed
-        update_run = False
-        if self.mode == 'run':
-            # store a copy of the edit tree to detect diffs
-            current_edit_config = deepcopy(
-                serialize(type(self.trees['edit'].config_file),
-                          self.trees['edit'].config_file)
-            )
+    # def show_widgets(self) -> None:
+    #     """ Show active widget, hide others. (re)generate RunTree if needed """
+    #     # If run_tree requested check if there are changes
+    #     # Do nothing if run tree exists and config has not changed
+    #     update_run = False
+    #     if self.mode == 'run':
+    #         # store a copy of the edit tree to detect diffs
+    #         current_edit_config = deepcopy(
+    #             serialize(type(self.trees['edit'].config_file),
+    #                       self.trees['edit'].config_file)
+    #         )
 
-            if self.trees['run'] is None:
-                update_run = True
-            elif not (current_edit_config == self.last_edit_config):
-                # run tree found, and edit configs are different
-                # remember last edit config
-                self.last_edit_config = deepcopy(current_edit_config)
-                update_run = True
+    #         if self.trees['run'] is None:
+    #             update_run = True
+    #         elif not (current_edit_config == self.last_edit_config):
+    #             # run tree found, and edit configs are different
+    #             # remember last edit config
+    #             self.last_edit_config = deepcopy(current_edit_config)
+    #             update_run = True
 
-            if update_run:
-                self.build_run_tree()
+    #         if update_run:
+    #             self.build_run_tree()
 
-        for widget in self.trees.values():
-            if hasattr(widget, 'hide'):
-                widget.hide()
-        self.trees[self.mode].show()
+    #     for widget in self.trees.values():
+    #         if hasattr(widget, 'hide'):
+    #             widget.hide()
+    #     self.trees[self.mode].show()
 
-    def build_run_tree(self) -> None:
-        """
-        Build the RunTree based on the current EditTree
-        Removes the existing RunTree if it exists
-        """
-        if self.trees['run']:
-            old_r_widget = self.trees['run']
-            old_r_widget.setParent(None)
-            old_r_widget.deleteLater()
-            self.trees['run'] = None
+    def print_report(self, *args, **kwargs):
+        """ setup button to print the report """
+        filename, _ = QFileDialog.getSaveFileName(
+            parent=self,
+            caption='Print report to:',
+            filter='PDF Files (*.pdf)',
+        )
 
-        r_widget = RunTree.from_edit_tree(self.trees['edit'])
-        r_widget.hide()
-        self.layout.addWidget(r_widget)
-        self.trees['run'] = r_widget
+        if not filename:
+            # Exit clause
+            return
+        if not filename.endswith('.pdf'):
+            filename += '.pdf'
+
+        # To differentiate between active and passive checkout reports
+        if isinstance(self.prepared_file, PreparedFile):
+            doc = PassiveAtefReport(filename, config=self.prepared_file)
+        elif isinstance(self.prepared_file, PreparedProcedureFile):
+            doc = ActiveAtefReport(filename, config=self.prepared_file)
+        else:
+            raise TypeError('Unsupported data-type for report generation')
+
+        # allow user to customize header fields
+        doc_info = doc.get_info()
+        msg = self.show_report_cust_prompt(doc_info)
+        if msg.result() == msg.Accepted:
+            new_info = msg.get_info()
+            doc.set_info(**new_info)
+            doc.create_report()
+
+    def show_report_cust_prompt(self, info):
+        """ generate a window allowing user to customize information """
+        msg = MultiInputDialog(parent=self, init_values=info)
+        msg.exec()
+        return msg
+
+    def show_results_summary(self):
+        """ show the results summary widget """
+        self._summary_widget = ResultsSummaryWidget(file=self.prepared_file)
+        self._summary_widget.setWindowTitle('Results Summary')
+        self._summary_widget.show()
