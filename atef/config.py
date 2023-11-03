@@ -52,6 +52,9 @@ class Configuration:
     #: Tags tied to this configuration.
     tags: Optional[List[str]] = None
 
+    def children(self) -> List[Any]:
+        return []
+
 
 @dataclass
 class ConfigurationGroup(Configuration):
@@ -75,6 +78,9 @@ class ConfigurationGroup(Configuration):
             if isinstance(config, ConfigurationGroup):
                 yield from config.walk_configs()
 
+    def children(self) -> List[Any]:
+        return self.configs
+
 
 @dataclass
 class DeviceConfiguration(Configuration):
@@ -95,6 +101,10 @@ class DeviceConfiguration(Configuration):
     #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
     shared: List[Comparison] = field(default_factory=list)
 
+    def children(self) -> List[Any]:
+        return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
+                + self.shared)
+
 
 @dataclass
 class PVConfiguration(Configuration):
@@ -105,6 +115,10 @@ class PVConfiguration(Configuration):
     by_pv: Dict[str, List[Comparison]] = field(default_factory=dict)
     #: Comparisons to be run on *all* PVs in the `by_pv` dictionary.
     shared: List[Comparison] = field(default_factory=list)
+
+    def children(self) -> List[Any]:
+        return ([comp for comp_list in self.by_pv.values() for comp in comp_list]
+                + self.shared)
 
 
 @dataclass
@@ -122,6 +136,10 @@ class ToolConfiguration(Configuration):
     by_attr: Dict[str, List[Comparison]] = field(default_factory=dict)
     #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
     shared: List[Comparison] = field(default_factory=list)
+
+    def children(self) -> List[Any] | None:
+        return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
+                + self.shared)
 
 
 AnyConfiguration = Union[
@@ -153,6 +171,9 @@ class ConfigurationFile:
         """
         yield self.root
         yield from self.root.walk_configs()
+
+    def children(self) -> list[ConfigurationGroup]:
+        return [self.root]
 
     def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
         """Get all configurations that match the device name."""
@@ -311,6 +332,9 @@ class PreparedFile:
         """Walk through the prepared groups."""
         yield self.root
         yield from self.root.walk_groups()
+
+    def children(self) -> List[Any]:
+        return [self.root]
 
     async def compare(self) -> Result:
         """Run all comparisons and return a combined result."""

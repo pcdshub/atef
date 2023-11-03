@@ -84,6 +84,9 @@ class ProcedureStep:
         """
         return self.result.severity == Severity.success
 
+    def children(self) -> List[Any]:
+        return []
+
 
 @dataclass
 class ProcedureGroup(ProcedureStep):
@@ -97,6 +100,9 @@ class ProcedureGroup(ProcedureStep):
             yield step
             if isinstance(step, ProcedureGroup):
                 yield from step.walk_steps()
+
+    def children(self) -> List[Any]:
+        return self.steps
 
 
 @dataclass
@@ -121,6 +127,9 @@ class SetValueStep(ProcedureStep):
     halt_on_fail: bool = True
     #: Only mark the step_result as successful if all actions have succeeded
     require_action_success: bool = True
+
+    def children(self) -> List[Any]:
+        return [crit.comparison for crit in self.success_criteria]
 
 
 @dataclass
@@ -260,6 +269,10 @@ class PlanStep(ProcedureStep):
     #: Only mark step_result successfull if all steps have succeeded
     require_plan_success: bool = True
 
+    def children(self) -> List[Any]:
+        # Subject to change as PlanStep is developed
+        return self.plans + [check.comparison for check in self.checks]
+
 
 @dataclass
 class DisplayOptions:
@@ -324,6 +337,9 @@ class ProcedureFile:
     def walk_steps(self) -> Generator[AnyProcedure, None, None]:
         yield self.root
         yield from self.root.walk_steps()
+
+    def children(self) -> List[Any]:
+        return [self.root]
 
     @classmethod
     def from_filename(cls, filename: AnyPath) -> ProcedureFile:
