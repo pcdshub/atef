@@ -821,7 +821,6 @@ class DualTree(DesignerDisplay, QWidget):
 
         # basic tree setup, start in edit mode
         self.assemble_tree()
-        self.refresh_model()
 
         # Connect other buttons
         self.print_report_button.clicked.connect(self.print_report)
@@ -835,10 +834,12 @@ class DualTree(DesignerDisplay, QWidget):
 
         self.toggle = Toggle()
 
-        # show the root item
-        self.tree_view.selectionModel().currentChanged.connect(
+        self.tree_view.selectionModel().selectionChanged.connect(
             self.show_selected_display
         )
+
+        # temp testing
+        self.select_by_item(self.root_item.child(0).child(0))
         # self.show_widgets()
 
     def assemble_tree(self) -> None:
@@ -846,9 +847,10 @@ class DualTree(DesignerDisplay, QWidget):
         self.refresh_model()
         self.tree_view.resizeColumnToContents(1)
         self.tree_view.header().swapSections(0, 1)
-        self.tree_view.expandAll()
         # starting in edit mode, hide statuses
         self.tree_view.setColumnHidden(1, True)
+        self.tree_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tree_view.expandAll()
         # TODO: hide buttons
 
     def refresh_prepared_file(self) -> None:
@@ -863,20 +865,52 @@ class DualTree(DesignerDisplay, QWidget):
         Rebuild the model, refreshing the Prepared file primarily
         """
         self.refresh_prepared_file()
-        # clear cache, schedule everything inside for deletion?
+        # TODO: clear cache, schedule everything inside for deletion?
+        # TODO: properly signal tree for update?
+
         self.root_item = create_tree_from_file(
             data=self.orig_file,
             prepared_file=self.prepared_file
         )
         self.model = ConfigTreeModel(data=self.root_item)
-
         self.tree_view.setModel(self.model)
+        self.model.beginResetModel()
+        self.model.endResetModel()
+        self.tree_view.expandAll()
 
-    def show_selected_display(self, current: QtCore.QModelIndex, previous: QtCore.QModelIndex) -> None:
+    def select_by_item(self, item: TreeItem) -> None:
+        """ Select desired treeitem (and show corresponding page) in TreeView """
+        new_index = self.model.index_from_item(item)
+        sel_model = self.tree_view.selectionModel()
+        sel_model.select(new_index, sel_model.ClearAndSelect | sel_model.Rows)
+
+    def select_by_data(self, data: AnyDataclass) -> None:
+        """ Select the item containing ``data`` """
+        for item in walk_tree_items(self.root_item):
+            if item.orig_data is data:
+                self.select_by_item(item)
+                return
+        return
+
+    def current_item(self) -> Optional[TreeItem]:
+        """ return the currently selected item """
+        sel_model = self.tree_view.selectionModel()
+        try:
+            curr_index = sel_model.selectedIndexes()[0]
+        except IndexError:
+            return None
+        return self.model.data(curr_index, Qt.UserRole)
+
+    def show_selected_display(
+        self,
+        selected: QtCore.QItemSelection,
+        previous: QtCore.QItemSelection
+    ) -> None:
         """ Show selected widget, construct it if necesary """
         # TODO: show busy cursor?
+        current = selected.indexes()[0]
         item: TreeItem = self.tree_view.model().data(current, Qt.UserRole)
-        print(item, item.data(0))
+        logger.debug(f'selected item: {item.data(0)}')
         self.show_page_for_data(item, mode='edit')
         # decide on mode, dispatch to show_page methods
         # grab widget if exists in cache
@@ -895,8 +929,12 @@ class DualTree(DesignerDisplay, QWidget):
             new_widget = self.create_widget(item.orig_data, mode)
 
             if len(curr_cache) >= self.max_cache_size:
-                curr_cache.popitem()
+                _, oldest_widget = curr_cache.popitem()
                 curr_cache[item] = new_widget
+                oldest_widget.setParent(None)
+                oldest_widget.deleteLater()
+
+            new_widget.assign_tree_item(item, self)
 
         # TODO: make sure current widget is never None later on
         if self.current_widget:
@@ -908,7 +946,7 @@ class DualTree(DesignerDisplay, QWidget):
         self.current_widget = new_widget
         self.current_widget.setVisible(True)
 
-    def create_widget(self, data: AnyDataclass, mode: str) -> QWidget:
+    def create_widget(self, data: AnyDataclass, mode: str) -> PageWidget:
         # edit mode
         widget: PageWidget = PAGE_MAP[type(data)](data=data)
         # TODO: Logic could be better, might not have to make edit widget when
@@ -950,6 +988,17 @@ class DualTree(DesignerDisplay, QWidget):
             # run_widget.run_check.next_button.hide()
             return run_widget
         # place into layout
+
+    def maybe_get_widget(self, item: TreeItem, mode: str = 'edit') -> Optional[PageWidget]:
+        """
+        Return the widget linked to ``data`` (or ``item``?) if it exists in the
+        widget cache.  If not, return None
+        """
+        cache = self.caches[mode]
+        if item in cache:
+            return cache[item]
+
+        return None
 
     # def get_tree(self, mode: str = None) -> Union[EditTree, RunTree]:
     #     """

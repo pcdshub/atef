@@ -39,7 +39,7 @@ from atef.qt_helpers import (QDataclassBridge, QDataclassList, QDataclassValue,
                              ThreadWorker)
 from atef.result import combine_results, incomplete_result
 from atef.tools import Ping
-from atef.type_hints import Number
+from atef.type_hints import AnyDataclass, Number
 from atef.walk import walk_steps
 from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
@@ -1095,6 +1095,9 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         # all else
         return QtCore.QModelIndex()
 
+    def index_from_item(self, item: TreeItem) -> QtCore.QModelIndex:
+        return self.createIndex(item.row(), 0, item)
+
     def parent(self, index: QtCore.QModelIndex) -> QtCore.QModelIndex:
         """
         Returns the parent of the given model item.
@@ -1220,9 +1223,8 @@ class TreeItem:
     If ``prepared_data`` is provided, Result information can be provided to the
     model via the ``.data()`` method
     """
+    # TODO: Determine if this is actually used by Tree item, or is selection from DualTree
     widget: Optional[QtWidgets.QWidget]  # Actually PageWidget, but circular imports
-    parent_tree_item: TreeItem
-    full_tree: QtWidgets.QTreeView
 
     result_icon_map = {
         # check mark
@@ -1238,7 +1240,6 @@ class TreeItem:
         self,
         data: Optional[Union[Configuration, Comparison]] = None,
         prepared_data: Optional[List[PreparedConfiguration, PreparedComparison]] = None,
-        widget: Optional[QtWidgets.QWidget] = None,
         tree_view: Optional[QtWidgets.QTreeView] = None,
         tree_parent: Optional[TreeItem] = None
     ) -> None:
@@ -1249,9 +1250,8 @@ class TreeItem:
         self._children: List[TreeItem] = []
         self._parent = None
         self._row = 0
-        self.widget = widget
         self.tree_view = tree_view
-        self.tree_parent = tree_parent
+        self._parent = tree_parent
 
     def data(self, column: int) -> Any:
         """
@@ -1333,6 +1333,14 @@ class TreeItem:
         self._children.append(child)
         self._columncount = max(child.columnCount(), self._columncount)
 
+    def takeChildren(self) -> None:
+        """
+        Remove and return this item's children
+        """
+        children = self._children
+        self._children = []
+        return children
+
     @property
     def orig_data(self):
         return self._data
@@ -1340,6 +1348,16 @@ class TreeItem:
     @property
     def prep_data(self):
         return self.prepared_data
+
+    def find_ancestor_by_data_type(self, types: Type[AnyDataclass]) -> Optional[TreeItem]:
+        """Find an ancestor widget of the given type."""
+        ancestor = self.parent()
+        while ancestor is not None:
+            if type(ancestor.orig_data) in types:
+                return ancestor
+            ancestor = ancestor.parent()
+
+        return None
 
 
 class AddRowWidget(DesignerDisplay, QWidget):
