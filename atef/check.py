@@ -843,3 +843,7 @@ class Range(Comparison):
             await self.warn_high_dynamic.prepare(cache)
             self.warn_high = self.warn_high_dynamic.get()
         self.is_prepared = True
+
+
+ALL_COMPARISONS = [Equals, NotEquals, Greater, GreaterOrEqual, Less, LessOrEqual,
+                   Range, ValueSet, AnyValue, AnyComparison]
