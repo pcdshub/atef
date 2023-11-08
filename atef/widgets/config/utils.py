@@ -677,7 +677,30 @@ def setup_line_edit_data(
     value_obj.changed_value.connect(update_widget)
 
 
-def describe_comparison_context(attr: str, config: Configuration) -> str:
+def get_comp_field_in_parent(
+    comp: Comparison,
+    parent: Union[Configuration, ProcedureStep]
+) -> str:
+    attr = ''
+    if comp in getattr(parent, 'shared', []):
+        attr = 'shared'
+    elif hasattr(parent, 'by_attr') or hasattr(parent, 'by_pv'):
+        attr_dict = getattr(parent, 'by_attr', {}) or getattr(parent, 'by_pv', {})
+        for attr_name, comparisons in attr_dict.items():
+            if comp in comparisons:
+                attr = attr_name
+                break
+    elif hasattr(parent, 'success_criteria'):
+        if comp in [crit.comparison for crit in parent.success_criteria]:
+            attr = 'success_criteria'
+
+    return attr
+
+
+def describe_comparison_context(
+    comp: Comparison,
+    parent: Union[Configuration, ProcedureStep]
+) -> str:
     """
     Describe in words what value or values we are comparing to.
 
@@ -691,31 +714,33 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
         ToolConfiguration that has the contextual information for
         understanding attr.
     """
+    attr = get_comp_field_in_parent(comp, parent)
+
     if not attr:
         return 'Error loading context information'
-    if isinstance(config, DeviceConfiguration):
-        num_devices = len(config.devices)
+    if isinstance(parent, DeviceConfiguration):
+        num_devices = len(parent.devices)
         if num_devices == 0:
             return 'Invalid comparison to zero devices'
         if attr == 'shared':
-            num_signals = len(config.by_attr)
+            num_signals = len(parent.by_attr)
             if num_signals == 0:
                 return 'Invalid comparison to zero signals'
             if num_devices == 1 and num_signals == 1:
                 # device_name.signal_name
                 return (
-                    f'Comparison to value of {config.devices[0]}.'
-                    f'{list(config.by_attr)[0]}'
+                    f'Comparison to value of {parent.devices[0]}.'
+                    f'{list(parent.by_attr)[0]}'
                 )
             if num_devices > 1 and num_signals == 1:
                 return (
-                    f'Comparison to value of {list(config.by_attr)[0]} '
+                    f'Comparison to value of {list(parent.by_attr)[0]} '
                     f'signal on each of {num_devices} devices'
                 )
             if num_devices == 1 and num_signals > 1:
                 return (
                     f'Comparison to value of {num_signals} '
-                    f'signals on {config.devices[0]}'
+                    f'signals on {parent.devices[0]}'
                 )
             return (
                 f'Comparison to value of {num_signals} signals '
@@ -724,30 +749,30 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
         # Must be one specific signal
         if num_devices == 1:
             # device_name.signal_name
-            return f'Comparison to value of {config.devices[0]}.{attr}'
+            return f'Comparison to value of {parent.devices[0]}.{attr}'
         return (
             f'Comparison to value of {attr} '
             f'on each of {num_devices} devices'
         )
-    if isinstance(config, PVConfiguration):
+    if isinstance(parent, PVConfiguration):
         if attr == 'shared':
-            num_pvs = len(config.by_pv)
+            num_pvs = len(parent.by_pv)
             if num_pvs == 0:
                 return 'Invalid comparison to zero PVs'
             if num_pvs == 1:
-                return f'Comparison to value of {list(config.by_pv)[0]}'
+                return f'Comparison to value of {list(parent.by_pv)[0]}'
             return f'Comparison to value of each of {num_pvs} pvs'
         return f'Comparison to value of {attr}'
-    if isinstance(config, ToolConfiguration):
-        if isinstance(config.tool, Ping):
-            num_hosts = len(config.tool.hosts)
+    if isinstance(parent, ToolConfiguration):
+        if isinstance(parent.tool, Ping):
+            num_hosts = len(parent.tool.hosts)
             if num_hosts == 0:
                 return 'Invalid comparison to zero ping hosts'
             if attr == 'shared':
                 if num_hosts == 1:
                     return (
                         'Comparison to all different results from pinging '
-                        f'{config.tool.hosts[0]}'
+                        f'{parent.tool.hosts[0]}'
                     )
                 return (
                     'Comparison to all different results from pinging '
@@ -756,12 +781,14 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
             if num_hosts == 1:
                 return (
                     f'Comparison to {attr} result '
-                    f'from pinging {config.tool.hosts[0]}'
+                    f'from pinging {parent.tool.hosts[0]}'
                 )
             return (
                 f'Comparison to {attr} result from pinging {num_hosts} hosts'
             )
         return 'Comparison to unknown tool results'
+    if isinstance(parent, SetValueStep):
+        return f'Comparison is success critiera of {parent.name or "SetValueStep"}'
     return 'Invalid comparison'
 
 
@@ -773,8 +800,8 @@ def describe_step_context(attr: str, step: ProcedureStep) -> str:
 
 
 def get_relevant_pvs(
-    attr: str,
-    config: Configuration
+    comp: Comparison,
+    parent: Union[Configuration, ProcedureStep]
 ) -> List[Tuple[str, str]]:
     """
     Get the pvs and corresponding attribute name for the provided comparison.
@@ -794,17 +821,19 @@ def get_relevant_pvs(
         A list of tuples (PV:NAME, device.attr.name) containing the
         relevant pv information
     """
-    if isinstance(config, PVConfiguration):
+    attr = get_comp_field_in_parent(comp, parent)
+
+    if isinstance(parent, PVConfiguration):
         # we have raw PV's here, with no attrs
-        return [(pv, None) for pv in config.by_pv.keys()]
-    if isinstance(config, DeviceConfiguration):
+        return [(pv, None) for pv in parent.by_pv.keys()]
+    if isinstance(parent, DeviceConfiguration):
         pv_list = []
         if attr == 'shared':
             # Use all pvs in the config
-            attrs = config.by_attr.keys()
+            attrs = parent.by_attr.keys()
         else:
             attrs = list([attr])
-        for device_name in config.devices:
+        for device_name in parent.devices:
             dev = util.get_happi_device_by_name(device_name)
             for curr_attr in attrs:
                 try:
@@ -814,6 +843,13 @@ def get_relevant_pvs(
                 if pv:
                     pv_list.append((pv, device_name + '.' + curr_attr))
 
+        return pv_list
+    if isinstance(parent, SetValueStep):
+        for crit in parent.success_criteria:
+            if comp is crit.comparison:
+                # TODO: get PV from device/component pairs
+                pv_list = [crit.pv]
+                break
         return pv_list
 
 
