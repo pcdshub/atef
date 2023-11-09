@@ -10,10 +10,11 @@ import os.path
 import traceback
 import webbrowser
 from collections import OrderedDict
+from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from pprint import pprint
-from typing import ClassVar, Dict, Optional, Union
+from typing import ClassVar, Dict, Generator, Optional, Union
 
 import qtawesome
 from apischema import ValidationError, deserialize, serialize
@@ -922,7 +923,6 @@ class DualTree(DesignerDisplay, QWidget):
         curr_cache = self.caches[mode]
         if item in curr_cache:
             new_widget = curr_cache[item]
-            return
 
         else:
             # not in cache, need to build the widget.
@@ -930,10 +930,12 @@ class DualTree(DesignerDisplay, QWidget):
 
             if len(curr_cache) >= self.max_cache_size:
                 _, oldest_widget = curr_cache.popitem()
-                curr_cache[item] = new_widget
+                logger.debug(f'{mode} cache full, popping last widget: '
+                             f'({oldest_widget})')
                 oldest_widget.setParent(None)
                 oldest_widget.deleteLater()
 
+            curr_cache[item] = new_widget
             new_widget.assign_tree_item(item, self)
 
         # TODO: make sure current widget is never None later on
@@ -999,6 +1001,15 @@ class DualTree(DesignerDisplay, QWidget):
             return cache[item]
 
         return None
+
+    @contextmanager
+    def modifies_tree(self) -> Generator[None, None, None]:
+        """ context manager in calls to modify the model layout """
+        self.model.layoutAboutToBeChanged.emit()
+        try:
+            yield
+        finally:
+            self.model.layoutChanged.emit()
 
     # def get_tree(self, mode: str = None) -> Union[EditTree, RunTree]:
     #     """
