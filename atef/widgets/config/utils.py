@@ -9,6 +9,7 @@ from enum import IntEnum
 from itertools import zip_longest
 from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
                     Union)
+from weakref import WeakValueDictionary
 
 import numpy as np
 import qtawesome as qta
@@ -1223,8 +1224,11 @@ class TreeItem:
     If ``prepared_data`` is provided, Result information can be provided to the
     model via the ``.data()`` method
     """
-    # TODO: Determine if this is actually used by Tree item, or is selection from DualTree
-    widget: Optional[QtWidgets.QWidget]  # Actually PageWidget, but circular imports
+    _bridge_cache: ClassVar[
+        WeakValueDictionary[int, QDataclassBridge]
+    ] = WeakValueDictionary()
+    bridge: QDataclassBridge
+    data: AnyDataclass
 
     result_icon_map = {
         # check mark
@@ -1251,7 +1255,17 @@ class TreeItem:
         self._parent = None
         self._row = 0
         self.tree_view = tree_view
-        self._parent = tree_parent
+        if tree_parent:
+            tree_parent.addChild(self)
+
+        # Assign bridge
+        if self._data:
+            try:
+                self.bridge = self._bridge_cache[id(data)]
+            except KeyError:
+                bridge = QDataclassBridge(data)
+                self._bridge_cache[id(data)] = bridge
+                self.bridge = bridge
 
     def data(self, column: int) -> Any:
         """
@@ -1331,6 +1345,10 @@ class TreeItem:
         child._parent = self
         child._row = len(self._children)
         self._children.append(child)
+        self._columncount = max(child.columnCount(), self._columncount)
+
+    def removeChild(self, child: TreeItem) -> None:
+        self._children.remove(child)
         self._columncount = max(child.columnCount(), self._columncount)
 
     def takeChildren(self) -> None:
