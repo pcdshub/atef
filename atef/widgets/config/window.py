@@ -477,7 +477,7 @@ class EditTree(DesignerDisplay, QWidget):
 
     tree_widget: QTreeWidget
     splitter: QtWidgets.QSplitter
-    last_selection: Optional[AtefItem]
+    last_selection: Optional[TreeItem]
 
     full_path: str
 
@@ -891,7 +891,6 @@ class DualTree(DesignerDisplay, QWidget):
             if item.orig_data is data:
                 self.select_by_item(item)
                 return
-        return
 
     def current_item(self) -> Optional[TreeItem]:
         """ return the currently selected item """
@@ -926,7 +925,7 @@ class DualTree(DesignerDisplay, QWidget):
 
         else:
             # not in cache, need to build the widget.
-            new_widget = self.create_widget(item.orig_data, mode)
+            new_widget = self.create_widget(item, mode)
 
             if len(curr_cache) >= self.max_cache_size:
                 _, oldest_widget = curr_cache.popitem()
@@ -936,7 +935,6 @@ class DualTree(DesignerDisplay, QWidget):
                 oldest_widget.deleteLater()
 
             curr_cache[item] = new_widget
-            new_widget.assign_tree_item(item, self)
 
         # TODO: make sure current widget is never None later on
         if self.current_widget:
@@ -948,9 +946,12 @@ class DualTree(DesignerDisplay, QWidget):
         self.current_widget = new_widget
         self.current_widget.setVisible(True)
 
-    def create_widget(self, data: AnyDataclass, mode: str) -> PageWidget:
+    def create_widget(self, item: TreeItem, mode: str) -> PageWidget:
+        data = item.orig_data
         # edit mode
-        widget: PageWidget = PAGE_MAP[type(data)](data=data)
+        widget: PageWidget = PAGE_MAP[type(item.orig_data)](
+            data=data, tree_item=item, full_tree=self
+        )
         # TODO: Logic could be better, might not have to make edit widget when
         # separate run widget exists
         if mode == 'edit':
@@ -1010,6 +1011,15 @@ class DualTree(DesignerDisplay, QWidget):
             yield
         finally:
             self.model.layoutChanged.emit()
+
+        # try to reset old selection
+        try:
+            self.select_by_item(self.current_item())
+        except Exception as ex:
+            # TODO: find real fail conditions
+            # root item is actually invisible, only its child is visible
+            logger.debug(f'failed to re-select previous item: {ex}')
+            self.select_by_item(self.root_item.child(0))
 
     # def get_tree(self, mode: str = None) -> Union[EditTree, RunTree]:
     #     """

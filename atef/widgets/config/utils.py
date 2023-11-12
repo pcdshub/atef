@@ -1244,7 +1244,6 @@ class TreeItem:
         self,
         data: Optional[Union[Configuration, Comparison]] = None,
         prepared_data: Optional[List[PreparedConfiguration, PreparedComparison]] = None,
-        tree_view: Optional[QtWidgets.QTreeView] = None,
         tree_parent: Optional[TreeItem] = None
     ) -> None:
         self._data = data
@@ -1254,7 +1253,6 @@ class TreeItem:
         self._children: List[TreeItem] = []
         self._parent = None
         self._row = 0
-        self.tree_view = tree_view
         if tree_parent:
             tree_parent.addChild(self)
 
@@ -1345,11 +1343,15 @@ class TreeItem:
         child._parent = self
         child._row = len(self._children)
         self._children.append(child)
-        self._columncount = max(child.columnCount(), self._columncount)
+        # self._columncount = max(child.columnCount(), self._columncount)
 
     def removeChild(self, child: TreeItem) -> None:
         self._children.remove(child)
-        self._columncount = max(child.columnCount(), self._columncount)
+        # re-assign rows to children
+        remaining_children = self.takeChildren()
+        for rchild in remaining_children:
+            self.addChild(rchild)
+        # self._columncount = max(child.columnCount(), self._columncount)
 
     def takeChildren(self) -> None:
         """
