@@ -368,10 +368,6 @@ class PageWidget(QWidget):
         tree : DualTree
             Dual tree with treeview and seletion helpers
         """
-        print('assign_tree_item called..')
-        self.tree_item = item
-        self.parent_tree_item = item.parent()
-        self.full_tree = tree
         # Make sure we update our parent button's tooltip on tree changes
         if not self.has_connected_tree:
             self.full_tree.model.dataChanged.connect(
@@ -1941,12 +1937,14 @@ class StepPage(DesignerDisplay, PageWidget):
         """
         For the AnyComparison, add a sub-comparison.
         """
-        page = ComparisonPage(data=comparison)
         item = TreeItem(
             data=comparison,
             tree_parent=self.tree_item,
         )
-        link_page(item=item, widget=page, tree=self.full_tree)
+        page = ComparisonPage(
+            data=comparison, tree_item=item, full_tree=self.full_tree
+        )
+        # link_page(item=item, widget=page, tree=self.full_tree)
         # set up value_widget now that link exists
         setup_multi_mode_for_widget(
             page=page, specific_widget=page.specific_comparison_widget
@@ -2182,6 +2180,8 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.mode_input_setup = False
         self.new_comparison(comparison=data)
         self.specific_combo.activated.connect(self.select_comparison_type)
+
+        self.assign_tree_item(item=self.tree_item, tree=self.full_tree)
 
     def assign_tree_item(self, item: AtefItem, tree: DualTree) -> None:
         """
