@@ -1116,8 +1116,10 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return QtCore.QModelIndex()
         child = index.internalPointer()
+        if child is self.root_item:
+            return QtCore.QModelIndex()
         parent = child.parent()
-        if parent == self.root_item:
+        if parent is self.root_item:
             return QtCore.QModelIndex()
 
         return self.createIndex(parent.row(), 0, parent)
