@@ -43,8 +43,7 @@ from .page import (PAGE_MAP, AtefItem, ConfigurationGroupPage, PageWidget,
                    ProcedureGroupPage, RunStepPage, link_page, walk_tree_items)
 from .result_summary import ResultsSummaryWidget
 from .run_base import create_tree_from_file, make_run_page
-from .utils import (ConfigTreeModel, MultiInputDialog, Toggle, TreeItem,
-                    clear_results)
+from .utils import ConfigTreeModel, MultiInputDialog, Toggle, TreeItem
 
 logger = logging.getLogger(__name__)
 
@@ -196,11 +195,11 @@ class Window(DesignerDisplay, QMainWindow):
             self.get_tab_name(filename),
         )
 
-    def get_current_tree(self) -> Union[EditTree, RunTree]:
+    def get_current_tree(self) -> DualTree:
         """
         Return the widget of the current open tab.
         """
-        return self.tab_widget.currentWidget().get_tree()
+        return self.tab_widget.currentWidget()
 
     def new_file(self, *args, checkout_type: Optional[str] = None, **kwargs):
         """
@@ -370,34 +369,30 @@ class Window(DesignerDisplay, QMainWindow):
     def print_report(self, *args, **kwargs):
         """ Open save dialog for report output """
         # get RunTree
-        run_tree: RunTree = self.tab_widget.currentWidget().get_tree(mode='run')
+        run_tree: DualTree = self.tab_widget.currentWidget()
 
         run_tree.print_report()
 
     def clear_results(self, *args, **kwargs):
         """ clear results for a given tree """
-        current_tree = self.tab_widget.currentWidget().get_tree()
+        current_tree: DualTree = self.tab_widget.currentWidget()
+        config_file = current_tree.orig_file
+        # ask for confirmation first
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to clear the results of the checkout: '
+                f'{config_file.root.name}?'
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
 
-        if isinstance(current_tree, RunTree):
-            config_file = current_tree.config_file
-            # ask for confirmation first
-            reply = QMessageBox.question(
-                self,
-                'Confirm deletion',
-                (
-                    'Are you sure you want to clear the results of the checkout: '
-                    f'{config_file.root.name}?'
-                ),
-            )
-            if reply != QMessageBox.Yes:
-                return
-
-            if current_tree.prepared_file:
-                clear_results(current_tree.prepared_file)
-            else:
-                clear_results(config_file)
-
-            current_tree.update_statuses()
+        orig_data = current_tree.current_item.orig_data
+        current_tree.refresh_model()
+        current_tree.select_by_data(orig_data)
+        current_tree.update_statuses()
 
     def find_replace(self, *args, **kwargs):
         """ find and replace in the current tree.  Open a find-replace widget """
@@ -835,15 +830,12 @@ class DualTree(DesignerDisplay, QWidget):
 
         self.toggle = Toggle()
 
-        self.tree_view.selectionModel().selectionChanged.connect(
-            self.show_selected_display
-        )
-
         # temp testing
         self.select_by_item(self.root_item.child(0).child(0))
         # self.show_widgets()
 
     def assemble_tree(self) -> None:
+        """ init-time tree setup.  Sets the tree into edit mode """
         # self.tree_view = QtWidgets.QTreeView()
         self.refresh_model()
         self.tree_view.resizeColumnToContents(1)
@@ -852,7 +844,9 @@ class DualTree(DesignerDisplay, QWidget):
         self.tree_view.setColumnHidden(1, True)
         self.tree_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.tree_view.expandAll()
-        # TODO: hide buttons
+
+        self.print_report_button.hide()
+        self.results_button.hide()
 
     def refresh_prepared_file(self) -> None:
         if isinstance(self.orig_file, ConfigurationFile):
@@ -879,8 +873,15 @@ class DualTree(DesignerDisplay, QWidget):
         self.model.endResetModel()
         self.tree_view.expandAll()
 
+        # selection model tied to data model, need to re-connect on refresh
+        self.tree_view.selectionModel().selectionChanged.connect(
+            self.show_selected_display
+        )
+
     def select_by_item(self, item: TreeItem) -> None:
         """ Select desired treeitem (and show corresponding page) in TreeView """
+        # check if item is in tree before selecting?
+        logger.debug(f'selecting page for item: {item.data(0)}')
         new_index = self.model.index_from_item(item)
         sel_model = self.tree_view.selectionModel()
         sel_model.select(new_index, sel_model.ClearAndSelect | sel_model.Rows)
@@ -892,6 +893,7 @@ class DualTree(DesignerDisplay, QWidget):
                 self.select_by_item(item)
                 return
 
+    @property
     def current_item(self) -> Optional[TreeItem]:
         """ return the currently selected item """
         sel_model = self.tree_view.selectionModel()
@@ -914,12 +916,8 @@ class DualTree(DesignerDisplay, QWidget):
             logger.debug('no selection made')
             return
         item: TreeItem = self.tree_view.model().data(current, Qt.UserRole)
-        logger.debug(f'selected item: {item.data(0)}')
-        self.show_page_for_data(item, mode='edit')
-        # decide on mode, dispatch to show_page methods
-        # grab widget if exists in cache
-        # create widget if not
-        # show widget
+        logger.debug(f'showing selected display: {item.data(0)}')
+        self.show_page_for_data(item, mode=self.mode)
 
     def show_page_for_data(self, item: TreeItem, mode: str = 'edit') -> None:
         """ Show page widget corresponding to ``data`` in ``mode`` """
@@ -973,6 +971,7 @@ class DualTree(DesignerDisplay, QWidget):
             elif isinstance(self.orig_file, ProcedureFile):
                 get_prepare_fn = get_prepared_step
 
+            # TODO: Is this just the stored data now?  Yea I think so
             prepared_data = get_prepare_fn(self.prepared_file, data)
             if type(data) in EDIT_TO_RUN_PAGE:
                 if len(prepared_data) != 1:
@@ -987,18 +986,30 @@ class DualTree(DesignerDisplay, QWidget):
             else:
                 run_widget = make_run_page(widget, prepared_data)
 
+                # TODO: Restore next button
                 # if prev_widget:
                 #     prev_widget.run_check.setup_next_button(item)
 
                 # prev_widget = run_widget
 
                 # update all statuses every time a step is run
-            # run_widget.run_check.results_updated.connect(self.update_statuses)
+            run_widget.run_check.results_updated.connect(self.update_statuses)
+            # update tree statuses with every result update
+            run_widget.run_check.results_updated.connect(
+                self.model.data_updated
+            )
 
             # disable last 'next' button
             # run_widget.run_check.next_button.hide()
             return run_widget
-        # place into layout
+
+    def update_statuses(self) -> None:
+        """ update every status icon based on stored config result """
+        for widget in self.run_widget_cache.values():
+            try:
+                widget.run_check.update_all_icons_tooltips()
+            except AttributeError as ex:
+                logger.debug(f'Run Check widget not properly setup: {ex}')
 
     def maybe_get_widget(self, item: TreeItem, mode: str = 'edit') -> Optional[PageWidget]:
         """
@@ -1024,37 +1035,12 @@ class DualTree(DesignerDisplay, QWidget):
             return
         # try to reset old selection
         try:
-            self.select_by_item(self.current_item())
+            self.select_by_item(self.current_item)
         except Exception as ex:
             # TODO: find real fail conditions
             logger.debug(f'failed to re-select previous item: {ex}')
             # root item is actually invisible, only its child is visible
             self.select_by_item(self.root_item.child(0))
-
-    # def get_tree(self, mode: str = None) -> Union[EditTree, RunTree]:
-    #     """
-    #     Get the requested tree, either 'edit' or 'run'.
-    #     Defaults to the currently active tree
-
-    #     Parameters
-    #     ----------
-    #     mode : str, optional
-    #         either 'edit' or 'run', by default None
-
-    #     Returns
-    #     -------
-    #     Union[EditTree, RunTree]
-    #         the requested tree
-    #     """
-    #     if mode is None:
-    #         return self.trees[self.mode]
-
-    #     if mode == 'run':
-    #         # generate new run configuration
-    #         if (self.trees['run'] is None):
-    #             self.build_run_tree()
-
-    #     return self.trees[mode]
 
     def switch_mode(self, value) -> None:
         """ Switch tree modes between 'edit' and 'run' """
@@ -1069,14 +1055,14 @@ class DualTree(DesignerDisplay, QWidget):
                 self.mode = 'run'
             else:
                 self.mode = 'edit'
-            self.show_widgets()
+            self.show_mode_widgets()
         except Exception as ex:
             logger.exception(ex)
             # reset toggle and mode
 
             def reset_to_edit():
                 self.toggle.setChecked(prev_toggle_state)
-                self.show_widgets()
+                self.show_mode_widgets()
 
             warning_msg = QMessageBox(QMessageBox.Critical, 'Warning',
                                       'Mode Switch Failed')
@@ -1090,33 +1076,46 @@ class DualTree(DesignerDisplay, QWidget):
             self.mode_switch_finished.emit()
             self.mode_switch_finished.disconnect(reset_cursor)
 
-    # def show_widgets(self) -> None:
-    #     """ Show active widget, hide others. (re)generate RunTree if needed """
-    #     # If run_tree requested check if there are changes
-    #     # Do nothing if run tree exists and config has not changed
-    #     update_run = False
-    #     if self.mode == 'run':
-    #         # store a copy of the edit tree to detect diffs
-    #         current_edit_config = deepcopy(
-    #             serialize(type(self.trees['edit'].config_file),
-    #                       self.trees['edit'].config_file)
-    #         )
+    def show_mode_widgets(self) -> None:
+        """ Show active widget, hide others. (re)generate RunTree if needed """
+        # If run_tree requested check if there are changes
+        # Do nothing if run tree exists and config has not changed
+        update_run = False
+        if self.mode == 'run':
+            # store a copy of the edit tree to detect diffs
+            current_edit_config = deepcopy(
+                serialize(type(self.orig_file), self.orig_file)
+            )
 
-    #         if self.trees['run'] is None:
-    #             update_run = True
-    #         elif not (current_edit_config == self.last_edit_config):
-    #             # run tree found, and edit configs are different
-    #             # remember last edit config
-    #             self.last_edit_config = deepcopy(current_edit_config)
-    #             update_run = True
+            if self.prepared_file is None:
+                update_run = True
+            elif not (current_edit_config == self.last_edit_config):
+                # run tree found, and edit configs are different
+                # remember last edit config
+                self.last_edit_config = deepcopy(current_edit_config)
+                update_run = True
 
-    #         if update_run:
-    #             self.build_run_tree()
+            if update_run:
+                self.run_widget_cache.clear()
+                # generate new tree with prep file
+                self.refresh_model()
 
-    #     for widget in self.trees.values():
-    #         if hasattr(widget, 'hide'):
-    #             widget.hide()
-    #     self.trees[self.mode].show()
+            self.print_report_button.show()
+            self.results_button.show()
+            self.tree_view.setColumnHidden(1, False)
+        else:
+            self.print_report_button.hide()
+            self.results_button.hide()
+            self.tree_view.setColumnHidden(1, True)
+
+        # navigate away and back to trigger selectionChanged
+        if update_run:
+            self.select_by_item(self.root_item)
+            self.select_by_item(self.root_item.child(0))
+        else:
+            curr_item = self.current_item
+            self.select_by_item(self.root_item)
+            self.select_by_item(curr_item)
 
     def print_report(self, *args, **kwargs):
         """ setup button to print the report """

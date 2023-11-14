@@ -7,8 +7,8 @@ import time
 from dataclasses import fields
 from enum import IntEnum
 from itertools import zip_longest
-from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
-                    Union)
+from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
+                    Tuple, Type, Union)
 from weakref import WeakValueDictionary
 
 import numpy as np
@@ -1212,6 +1212,19 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
                                   self.columnCount(QtCore.QModelIndex()),
                                   QtCore.QModelIndex())
         self.dataChanged.emit(top_left, bottom_right)
+
+    def walk_items(self, item: TreeItem = None) -> Generator[TreeItem, None, None]:
+        """ Walk the tree items, depth first. """
+        if item is None:
+            item = self.root_item
+
+        # skip first root node
+        if item.orig_data is not None:
+            yield item
+
+        if item.childCount() > 0:
+            for i in range(item.childCount()):
+                yield from self.walk_items(item.child(i))
 
 
 # TODO: Rename this and related helpers to be more specific
