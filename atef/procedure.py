@@ -19,6 +19,7 @@ import datetime
 import json
 import logging
 import pathlib
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
                     Tuple, Union, cast)
@@ -131,6 +132,30 @@ class SetValueStep(ProcedureStep):
     def children(self) -> List[Any]:
         return [crit.comparison for crit in self.success_criteria]
 
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison
+    ) -> ComparisonToTarget:
+        """ replace ``old_comp`` with ``new_comp``, in success_criteria """
+        comp_list = [crit.comparison for crit in self.success_criteria]
+        try:
+            idx = comp_list.index(old_comp)
+        except ValueError:
+            logger.warning('attempted to replace a comparison that does not exist'
+                           f': {old_comp} -> {new_comp}')
+
+        new_crit = deepcopy(self.success_criteria[idx])
+        new_crit.comparison = new_comp
+
+        util.replace_in_list(
+            old=self.success_criteria[idx],
+            new=new_crit,
+            item_list=self.success_criteria
+        )
+
+        return new_crit
+
 
 @dataclass
 class Target:
@@ -144,6 +169,7 @@ class Target:
     attr: Optional[str] = None
     #: EPICS PV
     pv: Optional[str] = None
+    # TODO: a method for getting the PV from device/attr pairs
 
     def to_signal(
         self,

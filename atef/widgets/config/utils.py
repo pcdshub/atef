@@ -1119,7 +1119,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         if child is self.root_item:
             return QtCore.QModelIndex()
         parent = child.parent()
-        if parent is self.root_item:
+        if parent in (self.root_item, None):
             return QtCore.QModelIndex()
 
         return self.createIndex(parent.row(), 0, parent)
@@ -1254,7 +1254,7 @@ class TreeItem:
         self._columncount = 3
         self._children: List[TreeItem] = []
         self._parent = None
-        self._row = 0
+        self._row = 0  # (self._row)th child of this item's parent
         if tree_parent:
             tree_parent.addChild(self)
 
@@ -1354,6 +1354,20 @@ class TreeItem:
         for rchild in remaining_children:
             self.addChild(rchild)
         # self._columncount = max(child.columnCount(), self._columncount)
+
+    def replaceChild(self, old_child: TreeItem, new_child: TreeItem) -> None:
+        """ Replace ``old_child`` with ``new_child``, maintaining order """
+        for idx in range(self.childCount()):
+            if self.child(idx) is old_child:
+                self._children[idx] = new_child
+                new_child._parent = self
+                new_child._row = idx
+
+                # dereference old_child
+                old_child._parent = None
+                return
+
+        raise IndexError('old child not found, could not replace')
 
     def takeChildren(self) -> None:
         """

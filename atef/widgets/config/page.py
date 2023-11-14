@@ -41,6 +41,7 @@ from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             ProcedureGroup, ProcedureStep, SetValueStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.type_hints import AnyDataclass
+from atef.util import replace_in_list
 from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
@@ -109,11 +110,6 @@ def link_page(item: AtefItem, widget: PageWidget, tree: DualTree) -> None:
     """
     print('link page')
     widget.assign_tree_item(item, tree)
-
-
-def replace_in_list(old: Any, new: Any, item_list: List[Any]):
-    index = item_list.index(old)
-    item_list[index] = new
 
 
 class AtefItem(QTreeWidgetItem):
@@ -2032,23 +2028,22 @@ class StepPage(DesignerDisplay, PageWidget):
     def replace_comparison(
         self,
         old_comparison: Comparison,
-        new_comparison: Comparison,
+        new_comparison: Union[Comparison, ComparisonToTarget],
         comp_item: TreeItem,
     ) -> None:
         """
-        Find old_comparison and replace it with new_comparison.
-
-        Also finds the row widget and replaces it with a new row widget.
+        replaces the relevant row widget.
         """
-        # Get info and location of comparison
         if isinstance(self.specific_procedure_widget, SetValueEditWidget):
             table: TableWidgetWithAddRow = self.specific_procedure_widget.checks_table
             row_widget_cls = CheckRowWidget
-            row_data_cls = ComparisonToTarget
-            data_list = self.data.success_criteria
-            comp_list = [comptotarget.comparison for comptotarget in data_list]
-            index = comp_list.index(old_comparison)
+            # row_data_cls = ComparisonToTarget
+            # data_list = self.data.success_criteria
+            # comp_list = [comptotarget.comparison for comptotarget in data_list]
+            # index = comp_list.index(old_comparison)
+            new_data = new_comparison
 
+        # Get info and location of comparison in table
         found_row = None
         for row_index in range(table.rowCount()):
             widget = table.cellWidget(row_index, 0)
@@ -2058,9 +2053,9 @@ class StepPage(DesignerDisplay, PageWidget):
         if found_row is None:
             return
 
-        # replace comparison in dataclass
-        new_data = row_data_cls(comparison=new_comparison)
-        data_list[index] = new_data
+        # # replace comparison in dataclass
+        # new_data = row_data_cls(comparison=new_comparison)
+        # data_list[index] = new_data
 
         # create new row
         comp_row = row_widget_cls(data=new_data)
@@ -2216,6 +2211,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         This is accomplished by discarding the old widgets in favor
         of new widgets.
         """
+        print(f'new_comparison: {comparison}')
         general_widget = GeneralComparisonWidget(data=comparison)
         self.insert_widget(
             general_widget,
@@ -2292,16 +2288,33 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         comparison = cast_dataclass(data=self.data, new_type=new_type)
         parent_widget = self.full_tree.maybe_get_widget(self.parent_tree_item)
 
-        with self.full_tree.modifies_tree():
+        with self.full_tree.modifies_tree(select_prev=False):
             # TODO: Still need to replace in dataclass.
+            # Replace comparison in dataclass, get new comparison
+            # (could be holder of comp, typically just comparison)
+            new_comp_row_data = self.parent_tree_item.orig_data.replace_comparison(
+                old_comp=self.data,
+                new_comp=comparison
+            )
+
+            # replace tree item
+            new_item = TreeItem(
+                data=comparison,
+            )
+            self.parent_tree_item.replaceChild(self.tree_item, new_item)
+            self.tree_item = new_item
+
+            # if parent widget exists, replace the comparison row there
             if parent_widget is not None:
                 parent_widget.replace_comparison(
                     old_comparison=self.data,
-                    new_comparison=comparison,
+                    new_comparison=new_comp_row_data,
                     comp_item=self.tree_item,
                 )
             self.new_comparison(comparison=comparison)
             self.update_context()
+        # old item will be missing, select this one
+        self.full_tree.select_by_item(new_item)
 
     def showEvent(self, *args, **kwargs) -> None:
         """

@@ -3,7 +3,7 @@ import concurrent.futures
 import functools
 import logging
 import pathlib
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, List, Optional, Sequence
 
 import happi
 import ophyd
@@ -150,3 +150,8 @@ async def run_in_executor(
 
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(executor, wrapped)
+
+
+def replace_in_list(old: Any, new: Any, item_list: List[Any]):
+    index = item_list.index(old)
+    item_list[index] = new
