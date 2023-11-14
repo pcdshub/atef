@@ -908,7 +908,11 @@ class DualTree(DesignerDisplay, QWidget):
     ) -> None:
         """ Show selected widget, construct it if necesary """
         # TODO: show busy cursor?
-        current = selected.indexes()[0]
+        try:
+            current = selected.indexes()[0]
+        except IndexError:
+            logger.debug('no selection made')
+            return
         item: TreeItem = self.tree_view.model().data(current, Qt.UserRole)
         logger.debug(f'selected item: {item.data(0)}')
         self.show_page_for_data(item, mode='edit')
@@ -920,6 +924,7 @@ class DualTree(DesignerDisplay, QWidget):
     def show_page_for_data(self, item: TreeItem, mode: str = 'edit') -> None:
         """ Show page widget corresponding to ``data`` in ``mode`` """
         curr_cache = self.caches[mode]
+        oldest_widget = None
         if item in curr_cache:
             new_widget = curr_cache[item]
 
@@ -931,8 +936,6 @@ class DualTree(DesignerDisplay, QWidget):
                 _, oldest_widget = curr_cache.popitem()
                 logger.debug(f'{mode} cache full, popping last widget: '
                              f'({oldest_widget})')
-                oldest_widget.setParent(None)
-                oldest_widget.deleteLater()
 
             curr_cache[item] = new_widget
 
@@ -945,6 +948,11 @@ class DualTree(DesignerDisplay, QWidget):
 
         self.current_widget = new_widget
         self.current_widget.setVisible(True)
+
+        # remove oldest
+        if oldest_widget is not None:
+            oldest_widget.setParent(None)
+            oldest_widget.deleteLater()
 
     def create_widget(self, item: TreeItem, mode: str) -> PageWidget:
         data = item.orig_data
@@ -1004,7 +1012,7 @@ class DualTree(DesignerDisplay, QWidget):
         return None
 
     @contextmanager
-    def modifies_tree(self) -> Generator[None, None, None]:
+    def modifies_tree(self, select_prev: bool = True) -> Generator[None, None, None]:
         """ context manager in calls to modify the model layout """
         self.model.layoutAboutToBeChanged.emit()
         try:
@@ -1012,13 +1020,15 @@ class DualTree(DesignerDisplay, QWidget):
         finally:
             self.model.layoutChanged.emit()
 
+        if not select_prev:
+            return
         # try to reset old selection
         try:
             self.select_by_item(self.current_item())
         except Exception as ex:
             # TODO: find real fail conditions
-            # root item is actually invisible, only its child is visible
             logger.debug(f'failed to re-select previous item: {ex}')
+            # root item is actually invisible, only its child is visible
             self.select_by_item(self.root_item.child(0))
 
     # def get_tree(self, mode: str = None) -> Union[EditTree, RunTree]:
