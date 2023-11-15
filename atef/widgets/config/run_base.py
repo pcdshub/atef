@@ -216,10 +216,10 @@ class RunCheck(DesignerDisplay, QWidget):
         self.result_label.setPixmap(icon.pixmap(25, 25))
         self.data = data
 
-        if data:
-            self.setup_buttons(configs=data)
-            # initialize tooltip
-            self.update_all_icons_tooltips()
+        # if data:
+        self.setup_buttons(configs=data)
+        # initialize tooltip
+        self.update_all_icons_tooltips()
 
     def setup_buttons(self, configs, next_widget: AtefItem = None) -> None:
         """
@@ -234,6 +234,20 @@ class RunCheck(DesignerDisplay, QWidget):
         remove button and spacer.
         Link Status to result of Run procedure
         """
+        if not configs:
+            # default to error
+            self.run_button.hide()
+            self.run_success_label.hide()
+            self.verify_button.hide()
+            self.verify_label.hide()
+
+            fail_prep_result = Result(
+                severity=Severity.internal_error,
+                reason='No valid prepared steps or configs available')
+            self.update_icon(self.result_label, [fail_prep_result])
+            self.update_label_tooltip(self.result_label, [fail_prep_result])
+            return
+
         self._make_run_slot(configs)
         if next_widget:
             self.setup_next_button(next_widget)

@@ -25,9 +25,10 @@ from weakref import WeakSet, WeakValueDictionary
 
 from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy.QtGui import QDropEvent
-from qtpy.QtWidgets import (QComboBox, QFrame, QMessageBox, QPushButton,
-                            QSizePolicy, QStyle, QTableWidget, QToolButton,
-                            QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QComboBox, QFrame, QLabel, QMessageBox,
+                            QPushButton, QSizePolicy, QStyle, QTableWidget,
+                            QToolButton, QTreeWidget, QTreeWidgetItem,
+                            QVBoxLayout, QWidget)
 
 from atef.check import (ALL_COMPARISONS, AnyComparison, AnyValue, Comparison,
                         Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
@@ -41,7 +42,6 @@ from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             ProcedureGroup, ProcedureStep, SetValueStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.type_hints import AnyDataclass
-from atef.util import replace_in_list
 from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
@@ -382,14 +382,15 @@ class PageWidget(QWidget):
         Should be invoked at the end of the assign_tree_item, since we want to
         prepare the cleanup only when we have finished the setup
         """
-        def disconnect_name_widget():
-            bridge = self.name_desc_tags_widget.bridge
-            try:
-                bridge.name.changed_value.disconnect(self.set_new_node_name)
-            except TypeError as ex:
-                logger.debug(ex)
+        # def disconnect_name_widget():
+        #     bridge = self.name_desc_tags_widget.bridge
+        #     try:
+        #         bridge.name.changed_value.disconnect(self.set_new_node_name)
+        #     except TypeError as ex:
+        #         logger.debug(ex)
 
-        self.destroyed.connect(disconnect_name_widget)
+        # self.destroyed.connect(disconnect_name_widget)
+        return
 
     def _update_parent_tooltip_from_tree(
         self,
@@ -497,17 +498,17 @@ class PageWidget(QWidget):
                 old_widget.deleteLater()
         placeholder.layout().addWidget(widget)
 
-    def connect_tree_node_name(self, widget: DataWidget) -> None:
-        """
-        Helper function for causing the tree name to update when name updates.
-        """
-        widget.bridge.name.changed_value.connect(self.set_new_node_name)
+    # def connect_tree_node_name(self, widget: DataWidget) -> None:
+    #     """
+    #     Helper function for causing the tree name to update when name updates.
+    #     """
+    #     widget.bridge.name.changed_value.connect(self.set_new_node_name)
 
-    def set_new_node_name(self, name: str) -> None:
-        """
-        Change the name of our node in the tree widget.
-        """
-        self.tree_item.setText(0, name)
+    # def set_new_node_name(self, name: str) -> None:
+    #     """
+    #     Change the name of our node in the tree widget.
+    #     """
+    #     self.tree_item.setText(0, name)
 
     def setup_delete_row_button(
         self,
@@ -632,7 +633,7 @@ class PageWidget(QWidget):
         to initialize the header if the page has a name/desc/tags widget.
         """
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
-        self.connect_tree_node_name(self.name_desc_tags_widget)
+        # self.connect_tree_node_name(self.name_desc_tags_widget)
 
     def setup_comparison_table_link(
         self,
@@ -734,6 +735,22 @@ class PageWidget(QWidget):
         raise NotImplementedError()
 
 
+class FailPage(DesignerDisplay, DataWidget):
+    """ Page for any step / configuration that fails preparation (run conversion) """
+    filename = 'failed_prep_page.ui'
+
+    fail_title: QLabel
+    fail_desc: QLabel
+
+    def __init__(self, *args, data=None, reason: Exception, **kwargs):
+        super().__init__(*args, data=data, **kwargs)
+        self._ex = reason
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        self.fail_desc.setText(str(self._ex))
+
+
 class ConfigurationGroupPage(DesignerDisplay, PageWidget):
     """
     Page that handles all components of a ConfigurationGroup.
@@ -772,11 +789,18 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             self.add_row_type_combo.addItem(option)
         self.config_table.dropEvent = self.table_drop_event
 
+        self.assign_tree_item(item=self.tree_item, tree=self.full_tree)
+
     def assign_tree_item(self, item: AtefItem, tree: DualTree) -> None:
         """
         Link-time setup of existing sub-nodes and navigation.
         """
         super().assign_tree_item(item, tree)
+        if not self.setup_done:
+            # Fill in the rows from the initial data
+            for config in self.data.configs:
+                self.add_config_row(config=config)
+            self.setup_done = True
         self.setup_name_desc_tags_link()
         self.setup_cleanup()
 
@@ -808,13 +832,20 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             ]()
             self.data.configs.append(config)
         config_row = ConfigurationGroupRowWidget(data=config)
-        config_item = TreeItem(
-            data=config, tree_parent=self.tree_item
-        )
-        config_page = PAGE_MAP[type(config)](
-            data=config, item=config_item, tree=self.full_tree
-        )
-        link_page(item=config_item, widget=config_page, tree=self.full_tree)
+        # TODO Still broken, no child setup row, no init setup
+        config_item = None
+        for child_item in self.tree_item.get_children():
+            if child_item.orig_data is config:
+                config_item = child_item
+                break
+        if config_item is None:
+            # make a new config, modifies tree
+            with self.full_tree.modifies_tree():
+                config_item = TreeItem(
+                    data=config,
+                    tree_parent=self.tree_item,
+                )
+
         self.setup_row_buttons(
             row_widget=config_row,
             item=config_item,
@@ -898,8 +929,9 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             self.device_config_widget,
             self.device_widget_placeholder,
         )
+        self.assign_tree_item(item=self.tree_item, tree=self.full_tree)
 
-    def assign_tree_item(self, item: AtefItem, tree: DualTree) -> None:
+    def assign_tree_item(self, item: TreeItem, tree: DualTree) -> None:
         """
         Link-time setup of existing sub-nodes and navigation.
         """
@@ -927,17 +959,18 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             comparison = Equals(name='untitled')
             self.data.shared.append(comparison)
         comp_row = ComparisonRowWidget(data=comparison)
-        comp_page = ComparisonPage(data=comparison)
-        comp_item = AtefItem(
-            tree_parent=self.tree_item,
-            name=comparison.name or 'untitled',
-            func_name=type(comparison).__name__,
-        )
-        link_page(item=comp_item, widget=comp_page, tree=self.full_tree)
-        # set up value_widget now that link exists
-        setup_multi_mode_for_widget(
-            page=comp_page, specific_widget=comp_page.specific_comparison_widget
-        )
+
+        comp_item = None
+        for child_item in self.tree_item.get_children():
+            if child_item.orig_data is comparison:
+                comp_item = child_item
+                break
+        if comp_item is None:
+            with self.full_tree.modifies_tree():
+                comp_item = TreeItem(
+                    data=comparison,
+                    tree_parent=self.tree_item,
+                )
 
         self.setup_row_buttons(
             row_widget=comp_row,
@@ -1021,32 +1054,13 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         self,
         old_comparison: Comparison,
         new_comparison: Comparison,
-        comp_item: AtefItem,
+        comp_item: TreeItem,
     ) -> None:
         """
         Find old_comparison and replace it with new_comparison.
 
         Also finds the row widget and replaces it with a new row widget.
         """
-        try:
-            replace_in_list(
-                old=old_comparison,
-                new=new_comparison,
-                item_list=self.data.shared,
-            )
-        except ValueError:
-            for comp_list in self.data.by_attr.values():
-                try:
-                    replace_in_list(
-                        old=old_comparison,
-                        new=new_comparison,
-                        item_list=comp_list,
-                    )
-                except ValueError:
-                    continue
-                else:
-                    break
-
         found_row = None
         prev_attr_index = 0
         for row_index in range(self.comparisons_table.rowCount()):
@@ -1094,6 +1108,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             self.pv_configuration_widget,
             self.pv_widget_placeholder,
         )
+        self.assign_tree_item(item=self.tree_item, tree=self.full_tree)
 
     def assign_tree_item(self, item: AtefItem, tree: DualTree) -> None:
         """
@@ -1123,16 +1138,19 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             comparison = Equals(name='untitled')
             self.data.shared.append(comparison)
         comp_row = ComparisonRowWidget(data=comparison)
-        comp_page = ComparisonPage(data=comparison)
-        comp_item = TreeItem(
-            data=comparison,
-            tree_parent=self.tree_item,
-        )
-        link_page(item=comp_item, widget=comp_page, tree=self.full_tree)
-        # set up value_widget now that link exists
-        setup_multi_mode_for_widget(
-            page=comp_page, specific_widget=comp_page.specific_comparison_widget
-        )
+
+        comp_item = None
+        for child_item in self.tree_item.get_children():
+            if child_item.orig_data is comparison:
+                comp_item = child_item
+                break
+        if comp_item is None:
+            # make a new comparison, modifies tree
+            with self.full_tree.modifies_tree():
+                comp_item = TreeItem(
+                    data=comparison,
+                    tree_parent=self.tree_item,
+                )
 
         self.setup_row_buttons(
             row_widget=comp_row,
@@ -1216,32 +1234,11 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         self,
         old_comparison: Comparison,
         new_comparison: Comparison,
-        comp_item: AtefItem,
+        comp_item: TreeItem,
     ) -> None:
         """
-        Find old_comparison and replace it with new_comparison.
-
-        Also finds the row widget and replaces it with a new row widget.
+        Finds the row widget and replaces it with a new row widget.
         """
-        try:
-            replace_in_list(
-                old=old_comparison,
-                new=new_comparison,
-                item_list=self.data.shared,
-            )
-        except ValueError:
-            for comp_list in self.data.by_pv.values():
-                try:
-                    replace_in_list(
-                        old=old_comparison,
-                        new=new_comparison,
-                        item_list=comp_list,
-                    )
-                except ValueError:
-                    continue
-                else:
-                    break
-
         found_row = None
         prev_attr_index = 0
         for row_index in range(self.comparisons_table.rowCount()):
@@ -1294,8 +1291,9 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         # Create the static sub-widgets and place them
         self.attr_selector_cache = WeakSet()
         self.setup_name_desc_tags_init()
+        self.assign_tree_item(item=self.tree_item, tree=self.full_tree)
 
-    def assign_tree_item(self, item: AtefItem, tree: DualTree) -> None:
+    def assign_tree_item(self, item: TreeItem, tree: DualTree) -> None:
         """
         Link-time setup of existing sub-nodes and navigation.
         """
@@ -1330,16 +1328,23 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             comparison = Equals(name='untitled')
             self.data.shared.append(comparison)
         comp_row = ComparisonRowWidget(data=comparison)
-        comp_page = ComparisonPage(data=comparison)
-        comp_item = TreeItem(
-            data=comparison,
-            tree_parent=self.tree_item,
-        )
-        link_page(item=comp_item, widget=comp_page, tree=self.full_tree)
+        # comp_page = ComparisonPage(data=comparison)
+        comp_item = None
+        for child_item in self.tree_item.get_children():
+            if child_item.orig_data is comparison:
+                comp_item = child_item
+                break
+        if comp_item is None:
+            with self.full_tree.modifies_tree():
+                comp_item = TreeItem(
+                    data=comparison,
+                    tree_parent=self.tree_item,
+                )
+        # link_page(item=comp_item, widget=comp_page, tree=self.full_tree)
         # set up value_widget now that link exists
-        setup_multi_mode_for_widget(
-            page=comp_page, specific_widget=comp_page.specific_comparison_widget
-        )
+        # setup_multi_mode_for_widget(
+        #     page=comp_page, specific_widget=comp_page.specific_comparison_widget
+        # )
 
         self.setup_row_buttons(
             row_widget=comp_row,
@@ -1431,29 +1436,8 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         comp_item: AtefItem,
     ) -> None:
         """
-        Find old_comparison and replace it with new_comparison.
-
-        Also finds the row widget and replaces it with a new row widget.
+        Replaces row widget in this page
         """
-        try:
-            replace_in_list(
-                old=old_comparison,
-                new=new_comparison,
-                item_list=self.data.shared,
-            )
-        except ValueError:
-            for comp_list in self.data.by_attr.values():
-                try:
-                    replace_in_list(
-                        old=old_comparison,
-                        new=new_comparison,
-                        item_list=comp_list,
-                    )
-                except ValueError:
-                    continue
-                else:
-                    break
-
         found_row = None
         prev_attr_index = 0
         for row_index in range(self.comparisons_table.rowCount()):
@@ -1598,10 +1582,9 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         config_row = ConfigurationGroupRowWidget(data=config)
 
         config_item = None
-        for ind in range(self.tree_item.childCount()):
-            curr_item = self.tree_item.child(ind)
-            if curr_item.orig_data is config:
-                config_item = curr_item
+        for child_item in self.tree_item.get_children():
+            if child_item.orig_data is config:
+                config_item = child_item
                 break
         if config_item is None:
             # make a new config, modifies tree
@@ -1688,9 +1671,6 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         comp_item : AtefItem
             AtefItem holding the old comparison and widget
         """
-        print('proggroup replace step')
-        replace_in_list(old_step, new_step, self.data.steps)
-
         # go through rows
         found_row = None
         for row_index in range(self.procedure_table.rowCount()):
@@ -1755,6 +1735,7 @@ class StepPage(DesignerDisplay, PageWidget):
         """
         Link-time setup of existing sub-nodes and navigation.
         """
+        print('svs.assign_tree_item')
         super().assign_tree_item(item, tree)
         self.setup_name_desc_tags_link()
 
@@ -1819,21 +1800,34 @@ class StepPage(DesignerDisplay, PageWidget):
             return
 
         step = cast_dataclass(data=self.data, new_type=new_type)
-        with self.full_tree.modifies_tree():
+        with self.full_tree.modifies_tree(select_prev=False):
             # Assumes self.parent_tree_item.widget: ProcedureGroupPage
             # put another way, this assumes steps cannot be parent of other steps
+            _ = self.parent_tree_item.orig_data.replace_step(
+                old_step=self.data,
+                new_step=step
+            )
+
+            # replace tree item
+            new_item = TreeItem(
+                data=step,
+            )
+            self.parent_tree_item.replaceChild(self.tree_item, new_item)
+            self.tree_item = new_item
+
             parent_widget = self.full_tree.maybe_get_widget(self.parent_tree_item)
+            print(parent_widget)
             if parent_widget is not None:
-                # TODO: make tree replacement even if parent widget does not exist
                 parent_widget.replace_step(
                     old_step=self.data,
                     new_step=step,
                     comp_item=self.tree_item,
                 )
             # remove old children, no longer needed.
-            self.tree_item.takeChildren()
             self.new_step(step=step)
             self.update_context()
+
+        self.full_tree.select_by_item(new_item)
 
     def showEvent(self, *args, **kwargs) -> None:
         """
@@ -1893,7 +1887,7 @@ class StepPage(DesignerDisplay, PageWidget):
         The node order should match the sequence in the table
         """
         # Cache the previous selection
-        pre_selected = self.full_tree.current_item().orig_data
+        pre_selected = self.full_tree.current_item.orig_data
         display_order = OrderedDict()
         table = self.specific_procedure_widget.checks_table
         for row_index in range(table.rowCount()):
@@ -1933,18 +1927,19 @@ class StepPage(DesignerDisplay, PageWidget):
         """
         For the AnyComparison, add a sub-comparison.
         """
-        item = TreeItem(
-            data=comparison,
-            tree_parent=self.tree_item,
-        )
-        page = ComparisonPage(
-            data=comparison, tree_item=item, full_tree=self.full_tree
-        )
+        with self.full_tree.modifies_tree():
+            item = TreeItem(
+                data=comparison,
+                tree_parent=self.tree_item,
+            )
+        # page = ComparisonPage(
+        #     data=comparison, tree_item=item, full_tree=self.full_tree
+        # )
         # link_page(item=item, widget=page, tree=self.full_tree)
         # set up value_widget now that link exists
-        setup_multi_mode_for_widget(
-            page=page, specific_widget=page.specific_comparison_widget
-        )
+        # setup_multi_mode_for_widget(
+        #     page=page, specific_widget=page.specific_comparison_widget
+        # )
 
         self.setup_set_value_check_row_buttons(
             comparison=comparison,
@@ -2386,7 +2381,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         in control of it.
         """
         # Cache the previous selection
-        pre_selected = self.full_tree.current_item().orig_data
+        pre_selected = self.full_tree.current_item.orig_data
         display_order = OrderedDict()
         table = self.specific_comparison_widget.comparisons_table
         for row_index in range(table.rowCount()):
@@ -2422,16 +2417,17 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         """
         For the AnyComparison, add a sub-comparison.
         """
-        page = ComparisonPage(data=comparison)
-        item = TreeItem(
-            data=comparison,
-            tree_parent=self.tree_item,
-        )
-        link_page(item=item, widget=page, tree=self.full_tree)
-        # set up value_widget now that link exists
-        setup_multi_mode_for_widget(
-            page=page, specific_widget=page.specific_comparison_widget
-        )
+        with self.full_tree.modifies_tree():
+            item = TreeItem(
+                data=comparison,
+                tree_parent=self.tree_item,
+            )
+        # page = ComparisonPage(data=comparison, item=item, tree=self.full_tree)
+        # link_page(item=item, widget=page, tree=self.full_tree)
+        # # set up value_widget now that link exists
+        # setup_multi_mode_for_widget(
+        #     page=page, specific_widget=page.specific_comparison_widget
+        # )
         self.setup_any_comparison_row_buttons(
             comparison=comparison,
             item=item,
@@ -2442,7 +2438,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self,
         old_comparison: Comparison,
         new_comparison: Comparison,
-        comp_item: AtefItem,
+        comp_item: TreeItem,
     ) -> None:
         """
         Find old_comparison and replace it with new_comparison.
@@ -2452,11 +2448,8 @@ class ComparisonPage(DesignerDisplay, PageWidget):
 
         This is only valid when our data type is AnyComparison
         """
-        replace_in_list(
-            old=old_comparison,
-            new=new_comparison,
-            item_list=self.data.comparisons,
-        )
+        if not isinstance(self, AnyComparison):
+            logger.warning('Expected an AnyComparison, not replacing comparison')
         self.specific_comparison_widget.replace_row_widget(
             old_comparison=old_comparison,
             new_comparison=new_comparison,

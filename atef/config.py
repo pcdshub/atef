@@ -55,6 +55,34 @@ class Configuration:
     def children(self) -> List[Any]:
         return []
 
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+        comp_attrs: Optional[str] = None
+    ) -> Comparison:
+        try:
+            util.replace_in_list(
+                old=old_comp,
+                new=new_comp,
+                item_list=self.shared,
+            )
+        except ValueError:
+            for attr in comp_attrs:
+                for comp_list in getattr(self, attr, {}).values():
+                    try:
+                        util.replace_in_list(
+                            old=old_comp,
+                            new=new_comp,
+                            item_list=comp_list,
+                        )
+                    except ValueError:
+                        continue
+                    else:
+                        break
+
+        return new_comp
+
 
 @dataclass
 class ConfigurationGroup(Configuration):
@@ -105,6 +133,16 @@ class DeviceConfiguration(Configuration):
         return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
                 + self.shared)
 
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+        comp_attrs: Optional[List[str]] = None
+    ) -> Comparison:
+        if comp_attrs is None:
+            comp_attrs = ['by_attr']
+        return super().replace_comparison(old_comp, new_comp, comp_attrs)
+
 
 @dataclass
 class PVConfiguration(Configuration):
@@ -119,6 +157,16 @@ class PVConfiguration(Configuration):
     def children(self) -> List[Any]:
         return ([comp for comp_list in self.by_pv.values() for comp in comp_list]
                 + self.shared)
+
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+        comp_attrs: Optional[List[str]] = None
+    ) -> Comparison:
+        if comp_attrs is None:
+            comp_attrs = ['by_pv']
+        return super().replace_comparison(old_comp, new_comp, comp_attrs)
 
 
 @dataclass
@@ -140,6 +188,16 @@ class ToolConfiguration(Configuration):
     def children(self) -> List[Any] | None:
         return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
                 + self.shared)
+
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+        comp_attrs: Optional[List[str]] = None
+    ) -> Comparison:
+        if comp_attrs is None:
+            comp_attrs = ['by_attr']
+        return super().replace_comparison(old_comp, new_comp, comp_attrs)
 
 
 AnyConfiguration = Union[

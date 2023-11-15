@@ -677,6 +677,18 @@ class AnyComparison(Comparison):
             await comp.prepare(cache)
         self.is_prepared = True
 
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+        comp_attrs: Optional[List[str]] = None
+    ) -> Comparison:
+        util.replace_in_list(
+            old=old_comp,
+            new=new_comp,
+            item_list=self.comparisons,
+        )
+
 
 @dataclass
 class Greater(BasicDynamic):

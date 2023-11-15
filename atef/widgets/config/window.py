@@ -39,8 +39,9 @@ from atef.widgets.utils import insert_widget, reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
-from .page import (PAGE_MAP, AtefItem, ConfigurationGroupPage, PageWidget,
-                   ProcedureGroupPage, RunStepPage, link_page, walk_tree_items)
+from .page import (PAGE_MAP, AtefItem, ConfigurationGroupPage, FailPage,
+                   PageWidget, ProcedureGroupPage, RunStepPage, link_page,
+                   walk_tree_items)
 from .result_summary import ResultsSummaryWidget
 from .run_base import create_tree_from_file, make_run_page
 from .utils import ConfigTreeModel, MultiInputDialog, Toggle, TreeItem
@@ -931,7 +932,7 @@ class DualTree(DesignerDisplay, QWidget):
             new_widget = self.create_widget(item, mode)
 
             if len(curr_cache) >= self.max_cache_size:
-                _, oldest_widget = curr_cache.popitem()
+                _, oldest_widget = curr_cache.popitem(last=False)
                 logger.debug(f'{mode} cache full, popping last widget: '
                              f'({oldest_widget})')
 
@@ -975,15 +976,21 @@ class DualTree(DesignerDisplay, QWidget):
             prepared_data = get_prepare_fn(self.prepared_file, data)
             if type(data) in EDIT_TO_RUN_PAGE:
                 if len(prepared_data) != 1:
-                    raise ValueError(
-                        'number of prepared dataclasses is not 1, while the '
-                        'target page expects one: '
-                        f'{type(data)} -> {[type(d) for d in prepared_data]}')
-                run_widget_cls = EDIT_TO_RUN_PAGE[type(data)]
-                run_widget = run_widget_cls(data=prepared_data[0])
+                    run_widget = FailPage(
+                        reason=f'Found ({len(prepared_data)}) matching dataclasses'
+                               ', failed to set up run step.  Check to make sure'
+                               ' configuration is correct.'
+                    )
+                    return run_widget
+                else:
+                    run_widget_cls = EDIT_TO_RUN_PAGE[type(data)]
+                    # expects a single (top-level) step currently
+                    run_widget = run_widget_cls(data=prepared_data[0])
                 # link_page(item, run_widget)
                 # run_widget.link_children()
             else:
+                # can currently handle multiple prepared_data
+                # (e.g. multiple comparisons shown in one page)
                 run_widget = make_run_page(widget, prepared_data)
 
                 # TODO: Restore next button

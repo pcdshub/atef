@@ -1338,6 +1338,10 @@ class TreeItem:
         if row >= 0 and row < self.childCount():
             return self._children[row]
 
+    def get_children(self) -> Generator[TreeItem, None, None]:
+        """ Yield this item's children """
+        yield from self._children
+
     def parent(self) -> TreeItem:
         """ Return the item's parent """
         return self._parent

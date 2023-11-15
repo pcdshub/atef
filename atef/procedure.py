@@ -105,6 +105,14 @@ class ProcedureGroup(ProcedureStep):
     def children(self) -> List[Any]:
         return self.steps
 
+    def replace_step(
+        self,
+        old_step: Union[ProcedureStep, ProcedureGroup],
+        new_step: Union[ProcedureStep, ProcedureGroup]
+    ) -> ProcedureStep:
+        util.replace_in_list(old_step, new_step, self.steps)
+        return new_step
+
 
 @dataclass
 class DescriptionStep(ProcedureStep):
