@@ -809,13 +809,12 @@ def get_relevant_pvs(
 
     Parameters
     ----------
-    attr : str
-        The attribute, pvname or other string identifier to compare to.
-        This can also be 'shared'
-    config : Configuration
+    comp : Comparison
+        The comparison to gather PVs for
+    parent : Union[Configuration, ProcedureStep]
         Typically a DeviceConfiguration, PVConfiguration, or
-        ToolConfiguration that has the contextual information for
-        understanding attr.
+        ToolConfiguration that contains ``comp``
+
     Returns
     -------
     List[Tuple[str, str]]
@@ -1386,7 +1385,23 @@ class TreeItem:
 
         raise IndexError('old child not found, could not replace')
 
-    def takeChildren(self) -> None:
+    def takeChild(self, idx: int) -> TreeItem:
+        child = self._children.pop(idx)
+        # re-assign rows to children
+        remaining_children = self.takeChildren()
+        for rchild in remaining_children:
+            self.addChild(rchild)
+
+        return child
+
+    def insertChild(self, idx: int, child: TreeItem) -> None:
+        self._children.insert(idx, child)
+        # re-assign rows to children
+        remaining_children = self.takeChildren()
+        for rchild in remaining_children:
+            self.addChild(rchild)
+
+    def takeChildren(self) -> list[TreeItem]:
         """
         Remove and return this item's children
         """

@@ -334,14 +334,14 @@ class Window(DesignerDisplay, QMainWindow):
             self.set_current_tab_name(filename)
             current_tree.full_path = filename
 
-    def serialize_tree(self, tree: EditTree) -> dict:
+    def serialize_tree(self, tree: DualTree) -> dict:
         """
         Return the serialized data from a Tree widget.
         """
         try:
             return serialize(
-                type(tree.config_file),
-                tree.config_file,
+                type(tree.orig_file),
+                tree.orig_file,
             )
         except Exception:
             logger.exception('Error serializing file')
@@ -352,7 +352,7 @@ class Window(DesignerDisplay, QMainWindow):
 
         The parameters are open as to accept inputs from any signal.
         """
-        pprint(self.get_current_tree().config_file)
+        pprint(self.get_current_tree().orig_file)
 
     def print_serialized(self, *args, **kwargs):
         """
