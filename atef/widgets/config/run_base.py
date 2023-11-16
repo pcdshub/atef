@@ -6,21 +6,21 @@ Widgets here should map onto edit widgets, often from atef.widgets.config.data
 from __future__ import annotations
 
 import asyncio
-import itertools
 import logging
 from typing import TYPE_CHECKING, Any, ClassVar, List, Optional, Union
 
+from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore
 from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLineEdit, QMenu,
                             QPushButton, QSpacerItem, QStyle, QToolButton,
                             QVBoxLayout, QWidget, QWidgetAction)
 
-from atef.config import (AnyConfiguration, AnyPreparedConfiguration,
-                         ConfigurationFile, PreparedComparison, PreparedFile)
+from atef.config import (AnyPreparedConfiguration, ConfigurationFile,
+                         PreparedComparison, PreparedFile)
 from atef.enums import Severity
-from atef.procedure import (AnyProcedure, PreparedProcedureFile,
-                            PreparedProcedureGroup, PreparedProcedureStep,
-                            ProcedureFile, ProcedureStep)
+from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
+                            PreparedProcedureStep, ProcedureFile,
+                            ProcedureStep)
 from atef.result import Result, combine_results
 from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.utils import TreeItem, disable_widget
@@ -29,7 +29,7 @@ from atef.widgets.utils import BusyCursorThread
 
 # avoid circular imports
 if TYPE_CHECKING:
-    from atef.widgets.config.page import AtefItem
+    from atef.widgets.config.page import PageWidget
 
 logger = logging.getLogger(__name__)
 
@@ -216,12 +216,10 @@ class RunCheck(DesignerDisplay, QWidget):
         self.result_label.setPixmap(icon.pixmap(25, 25))
         self.data = data
 
-        # if data:
         self.setup_buttons(configs=data)
-        # initialize tooltip
         self.update_all_icons_tooltips()
 
-    def setup_buttons(self, configs, next_widget: AtefItem = None) -> None:
+    def setup_buttons(self, configs, next_widget: TreeItem = None) -> None:
         """
         Wire up buttons to the provided config dataclass.
         Run results and verification information will be saved to the
@@ -340,16 +338,26 @@ class RunCheck(DesignerDisplay, QWidget):
         except AttributeError:
             return None
 
-    def setup_next_button(self, next_item=None) -> None:
+    def setup_next_button(self, next_item: Optional[TreeItem] = None) -> None:
         """ Link RunCheck's next button to the next widget in the tree """
+        if not next_item:
+            return
         # rise out of placeholder into containing PageWidget
-        page = self.parent().parent()
+        page: PageWidget = self.parent().parent()
 
-        def inner_navigate(*args, **kwargs):
-            page.navigate_to(next_item)
+        next_slot = WeakPartialMethodSlot(
+            self.next_button, self.next_button.clicked,
+            self.navigate_to_item, next_item)
+        page._partial_slots.append(next_slot)
 
-        if next_item:
-            self.next_button.clicked.connect(inner_navigate)
+    def navigate_to_item(self, item: TreeItem, checked: bool) -> None:
+        """
+        helper to subscribe to QPushButton.clicked, consumes `checked` arg
+        from QPushButton.clicked
+        """
+        # rise out of placeholder into containing PageWidget
+        page: PageWidget = self.parent().parent()
+        page.full_tree.select_by_item(item)
 
     def setup_verify_button(self) -> None:
         """
@@ -449,88 +457,22 @@ def create_tree_from_file(
     """
     root_item = TreeItem()
     if isinstance(data, ConfigurationFile):
-        create_passive_tree_items(data, root_item, prepared_file)
-        return root_item
-    if isinstance(data, ProcedureFile):
-        create_active_tree_items(data, root_item, prepared_file)
-        return root_item
+        gather_fn = get_relevant_configs_comps
+    elif isinstance(data, ProcedureFile):
+        gather_fn = get_prepared_step
+    else:
+        raise TypeError("Data was not a passive or active checkout file")
 
-    raise TypeError("Data was not a passive or active checkout file")
-
-
-def create_passive_tree_items(
-    data: AnyConfiguration,
-    parent: TreeItem,
-    prepared_data: PreparedFile
-) -> None:
-    """
-    Recursively create the tree starting from the given data
-    Optionally associate prepared dataclasses with the TreeItems
-    """
-    # Handle root if necessary
-    if hasattr(data, 'root'):
-        # top level, add root item.
-        item = TreeItem(data.root, prepared_data=[prepared_data.root])
-        create_passive_tree_items(data.root, item, prepared_data=prepared_data)
-        parent.addChild(item)
-
-    for cfg in getattr(data, 'configs', []):
-        if prepared_data:
-            # Grab relevant comps/configs so tree item can hold results
-            prep_configs = get_relevant_configs_comps(prepared_data, cfg)
-        else:
-            prep_configs = None
-        item = TreeItem(cfg, prepared_data=prep_configs)
-        create_passive_tree_items(cfg, item, prepared_data=prepared_data)
-        parent.addChild(item)
-
-    # look into configs, by_attr, by_pv, and shared
-    # no config has both "by_attr" and "by_pv", but shared shows up last in tree
-    # merges List[List[Comparison]] --> List[Comparison] with itertools
-    # This skips nested comparisons (via AnyComparison), which is the correct
-    # behavior, as those nested comparisons will not have Prepared variants or results
-    config_categories = [
-        itertools.chain.from_iterable(getattr(data, 'by_attr', {}).values()),
-        itertools.chain.from_iterable(getattr(data, 'by_pv', {}).values()),
-        getattr(data, 'shared', []),
-    ]
-    for comp_list in config_categories:
-        for comp in comp_list:
+    def create_tree(data, parent: TreeItem, prepared_data):
+        if not hasattr(data, 'children'):
+            return
+        for child_data in data.children():
             if prepared_data:
-                # Grab relevant comps/configs so tree item can hold results
-                prep_configs = get_relevant_configs_comps(prepared_data, comp)
-            else:
-                prep_configs = None
-            item = TreeItem(comp, prepared_data=prep_configs)
+                prepared_subset = gather_fn(prepared_data, child_data)
+            item = TreeItem(child_data, prepared_data=prepared_subset)
+            create_tree(child_data, item, prepared_data)
             parent.addChild(item)
 
+    create_tree(data, root_item, prepared_file)
 
-def create_active_tree_items(
-    data: AnyProcedure,
-    parent: TreeItem,
-    prepared_data: PreparedFile
-) -> None:
-    # Handle root if necessary
-    if hasattr(data, 'root'):
-        # top level, add root item.
-        item = TreeItem(data.root, prepared_data=[prepared_data.root])
-        create_active_tree_items(data.root, item, prepared_data=prepared_data)
-        parent.addChild(item)
-
-    # ProcedureGroup
-    for step in getattr(data, 'steps', []):
-        if prepared_data:
-            prep_steps = get_prepared_step(prepared_data, step)
-        else:
-            prep_steps = None
-        item = TreeItem(step, prepared_data=prep_steps)
-        create_active_tree_items(step, item, prepared_data=prepared_data)
-        parent.addChild(item)
-
-    # SetValueStep Comparisons
-    for criterion in getattr(data, 'success_criteria', []):
-        comp = criterion.comparison
-        if prepared_data:
-            prepared_comp = get_prepared_step(prepared_data, comp)
-        item = TreeItem(comp, prepared_comp)
-        parent.addChild(item)
+    return root_item
