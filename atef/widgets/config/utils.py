@@ -2047,8 +2047,8 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             # self.ids: List[str]
             signal_cache = get_signal_cache()
             sigs: List[EpicsSignalRO] = []
-            for id in self.ids:
-                sigs.append(signal_cache[id])
+            for single_id in self.ids:
+                sigs.append(signal_cache[single_id])
 
         else:
             # Collect signals from ids as device attrs

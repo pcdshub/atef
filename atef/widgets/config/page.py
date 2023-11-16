@@ -2017,6 +2017,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             setup_multi_mode_for_widget(
                 page=self, specific_widget=self.specific_comparison_widget
             )
+            self.mode_input_setup = True
 
         self.setup_parent_callbacks()
 
@@ -2050,10 +2051,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.setup_name_desc_tags_init()
         # Reinitialize this for the new name/desc/tags widget
         self.post_tree_setup()
-        setup_multi_mode_for_widget(
-            page=self, specific_widget=self.specific_comparison_widget
-        )
-        self.mode_input_setup = True
 
         # Fix the layout spacing, some comparisons want spacing and some don't
         if isinstance(comparison, (ValueSet, AnyValue, AnyComparison)):
@@ -2107,7 +2104,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         with self.full_tree.modifies_tree(select_prev=False):
             # TODO: Still need to replace in dataclass.
             # Replace comparison in dataclass, get new comparison
-            # (could be holder of comp, typically just comparison)
             self.parent_tree_item.orig_data.replace_comparison(
                 old_comp=self.data,
                 new_comp=comparison
@@ -2136,8 +2132,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                     new_comparison=new_comp_row_data,
                     comp_item=self.tree_item,
                 )
-            self.new_comparison(comparison=comparison)
-            self.update_context()
         # old item will be missing, select this one
         self.full_tree.select_by_item(new_item)
 

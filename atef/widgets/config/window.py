@@ -511,9 +511,8 @@ class DualTree(DesignerDisplay, QWidget):
 
         self.toggle = Toggle()
 
-        # temp testing
-        self.select_by_item(self.root_item.child(0).child(0))
-        # self.show_widgets()
+        # select top level root
+        self.select_by_item(self.root_item.child(0))
 
     def assemble_tree(self) -> None:
         """ init-time tree setup.  Sets the tree into edit mode """
@@ -642,6 +641,7 @@ class DualTree(DesignerDisplay, QWidget):
 
         self.current_widget = new_widget
         self.current_widget.setVisible(True)
+        logger.debug(f'setting widget ({self.current_widget}) visible')
 
         # remove oldest
         if oldest_widget is not None:
