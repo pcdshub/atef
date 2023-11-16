@@ -86,6 +86,7 @@ class ProcedureStep:
         return self.result.severity == Severity.success
 
     def children(self) -> List[Any]:
+        """ Return children of this group, as a tree view might expect """
         return []
 
 
@@ -102,7 +103,8 @@ class ProcedureGroup(ProcedureStep):
             if isinstance(step, ProcedureGroup):
                 yield from step.walk_steps()
 
-    def children(self) -> List[Any]:
+    def children(self) -> List[Union[ProcedureStep, ProcedureGroup]]:
+        """ Return children of this group, as a tree view might expect """
         return self.steps
 
     def replace_step(
@@ -137,14 +139,15 @@ class SetValueStep(ProcedureStep):
     #: Only mark the step_result as successful if all actions have succeeded
     require_action_success: bool = True
 
-    def children(self) -> List[Any]:
+    def children(self) -> List[ComparisonToTarget]:
+        """ Return children of this group, as a tree view might expect """
         return [crit.comparison for crit in self.success_criteria]
 
     def replace_comparison(
         self,
         old_comp: Comparison,
         new_comp: Comparison
-    ) -> ComparisonToTarget:
+    ) -> None:
         """ replace ``old_comp`` with ``new_comp``, in success_criteria """
         comp_list = [crit.comparison for crit in self.success_criteria]
         try:
@@ -161,8 +164,6 @@ class SetValueStep(ProcedureStep):
             new=new_crit,
             item_list=self.success_criteria
         )
-
-        return new_crit
 
 
 @dataclass
@@ -303,7 +304,9 @@ class PlanStep(ProcedureStep):
     #: Only mark step_result successfull if all steps have succeeded
     require_plan_success: bool = True
 
-    def children(self) -> List[Any]:
+    def children(self) -> List[Union[PlanOptions, ComparisonToTarget,
+                                     ComparisonToPlanData]]:
+        """ Return children of this group, as a tree view might expect """
         # Subject to change as PlanStep is developed
         return self.plans + [check.comparison for check in self.checks]
 
@@ -372,7 +375,8 @@ class ProcedureFile:
         yield self.root
         yield from self.root.walk_steps()
 
-    def children(self) -> List[Any]:
+    def children(self) -> List[ProcedureGroup]:
+        """ Return children of this group, as a tree view might expect """
         return [self.root]
 
     @classmethod

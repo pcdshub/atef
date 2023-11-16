@@ -27,8 +27,7 @@ from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy.QtGui import QDropEvent
 from qtpy.QtWidgets import (QComboBox, QFrame, QLabel, QMessageBox,
                             QPushButton, QSizePolicy, QStyle, QTableWidget,
-                            QToolButton, QTreeWidget, QTreeWidgetItem,
-                            QVBoxLayout, QWidget)
+                            QToolButton, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from atef.check import (ALL_COMPARISONS, AnyComparison, AnyValue, Comparison,
                         Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
@@ -73,115 +72,24 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def walk_tree_items(item: AtefItem) -> Generator[TreeItem, None, None]:
+def walk_tree_items(item: TreeItem) -> Generator[TreeItem, None, None]:
     """
     Walk the tree depth first, starting at `item`.
 
     Parameters
     ----------
-    item : AtefItem
+    item : TreeItem
         the root node of the tree to walk
 
     Yields
     ------
-    Generator[AtefItem, None, None]
-        Yields AtefItems from the the tree.
+    Generator[TreeItem, None, None]
+        Yields TreeItem from the the tree.
     """
     yield item
 
     for child_idx in range(item.childCount()):
         yield from walk_tree_items(item.child(child_idx))
-
-
-def link_page(item: AtefItem, widget: PageWidget, tree: DualTree) -> None:
-    """
-    Link a page widget to an atef tree item.
-
-    All linkage calls should go through here to remove ambiguity
-    about ordering, etc. and so each object only has to worry about
-    how to update itself.
-
-    Parameters
-    ----------
-    item : AtefItem
-        The tree item to link.
-    widget : PageWidget
-        The widget to link.
-    """
-    print('link page')
-    widget.assign_tree_item(item, tree)
-
-
-class AtefItem(QTreeWidgetItem):
-    """
-    A QTreeWidget item with some convenience methods.
-
-    Must be assigned a page using ``link_page``.
-
-    Parameters
-    ----------
-    tree_parent : AtefItem or QTreeWidget
-        The node on the tree above this node.
-        Passing a QTreeWidget means that this is a top-level node.
-    name : str
-        The text on the left column of the tree view.
-    func_name : str
-        The text on the right column of the tree view.
-    """
-    widget: Optional[PageWidget]
-    parent_tree_item: QTreeWidgetItem
-    full_tree: QTreeWidget
-
-    def __init__(
-        self,
-        tree_parent: Union[AtefItem, QTreeWidget],
-        name: str,
-        func_name: Optional[str] = None,
-    ):
-        super().__init__()
-        self.widget = None
-        self.setText(0, name)
-        if func_name is not None:
-            self.setText(1, func_name)
-        if isinstance(tree_parent, QTreeWidget):
-            self.parent_tree_item = tree_parent.invisibleRootItem()
-            self.full_tree = tree_parent
-        else:
-            self.parent_tree_item = tree_parent
-            self.full_tree = tree_parent.full_tree
-        self.parent_tree_item.addChild(self)
-
-    def assign_widget(self, widget: PageWidget) -> None:
-        """
-        Updates this tree item with a reference to the corresponding page.
-
-        Parameters
-        ----------
-        widget : PageWidget
-            The page to show when this tree item is selected.
-        """
-        self.widget = widget
-
-    def find_ancestor_by_widget(self, cls: Type[QWidget]) -> Optional[AtefItem]:
-        """Find an ancestor widget of the given type."""
-        ancestor = self.parent_tree_item
-        while hasattr(ancestor, "parent_tree_item"):
-            widget = getattr(ancestor, "widget", None)
-            if isinstance(widget, cls):
-                return ancestor
-            ancestor = ancestor.parent_tree_item
-
-        return None
-
-    def find_ancestor_by_item(self, cls: Type[AtefItem]) -> Optional[AtefItem]:
-        """Find an ancestor widget of the given type."""
-        ancestor = self.parent_tree_item
-        while hasattr(ancestor, "parent_tree_item"):
-            if isinstance(ancestor, cls):
-                return ancestor
-            ancestor = ancestor.parent_tree_item
-
-        return None
 
 
 def setup_multi_mode_edit_widget(
@@ -349,7 +257,7 @@ class PageWidget(QWidget):
         self.child_button_map = WeakValueDictionary()
         self.has_connected_tree = False
         self.comp_table_setup_done = False
-        self._parital_slots = []
+        self._partial_slots = []
 
     def assign_tree_item(self, item: TreeItem, tree: DualTree) -> None:
         """
@@ -358,7 +266,7 @@ class PageWidget(QWidget):
 
         Parameters
         ----------
-        item : AtefItem
+        item : TreeItem
             The item that should be showing this page.
 
         tree : DualTree
@@ -440,7 +348,7 @@ class PageWidget(QWidget):
         """
         navigate_slot = WeakPartialMethodSlot(button, button.clicked,
                                               self.navigate_to, item)
-        self._parital_slots.append(navigate_slot)
+        self._partial_slots.append(navigate_slot)
 
         # Add the appropriate symbol
         icon = self.style().standardIcon(QStyle.SP_ArrowRight)
@@ -526,7 +434,7 @@ class PageWidget(QWidget):
             row.delete_button, row.delete_button.clicked,
             self.delete_table_row, table=table, row=row, item=item
         )
-        self._parital_slots.append(delete_slot)
+        self._partial_slots.append(delete_slot)
 
     def delete_table_row(
         self,
@@ -578,7 +486,7 @@ class PageWidget(QWidget):
     def setup_row_buttons(
         self,
         row_widget: DataWidget,
-        item: AtefItem,
+        item: TreeItem,
         table: QTableWidget,
     ) -> None:
         """
@@ -594,7 +502,7 @@ class PageWidget(QWidget):
         row_widget : DataWidget
             The widget that we need to modify. Should have a "child_button"
             and a "delete_button" attribute.
-        item : AtefItem
+        item : TreeItem
             The item corresponding to the page associated with the row widget.
         table : QTableWidget
             The table that the widget exists in.
@@ -791,7 +699,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
 
         self.assign_tree_item(item=self.tree_item, tree=self.full_tree)
 
-    def assign_tree_item(self, item: AtefItem, tree: DualTree) -> None:
+    def assign_tree_item(self, item: TreeItem, tree: DualTree) -> None:
         """
         Link-time setup of existing sub-nodes and navigation.
         """
@@ -1110,7 +1018,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         )
         self.assign_tree_item(item=self.tree_item, tree=self.full_tree)
 
-    def assign_tree_item(self, item: AtefItem, tree: DualTree) -> None:
+    def assign_tree_item(self, item: TreeItem, tree: DualTree) -> None:
         """
         Link-time setup of existing sub-nodes and navigation.
         """
@@ -1433,7 +1341,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         self,
         old_comparison: Comparison,
         new_comparison: Comparison,
-        comp_item: AtefItem,
+        comp_item: TreeItem,
     ) -> None:
         """
         Replaces row widget in this page
@@ -1668,8 +1576,8 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
             old ProcedureStep, to be replaced
         new_step : ProcedureStep
             new ProcedureStep to replace old_step with
-        comp_item : AtefItem
-            AtefItem holding the old comparison and widget
+        comp_item : TreeItem
+            TreeItem holding the old comparison and widget
         """
         # go through rows
         found_row = None
@@ -1735,7 +1643,6 @@ class StepPage(DesignerDisplay, PageWidget):
         """
         Link-time setup of existing sub-nodes and navigation.
         """
-        print('svs.assign_tree_item')
         super().assign_tree_item(item, tree)
         self.setup_name_desc_tags_link()
 
@@ -1816,7 +1723,6 @@ class StepPage(DesignerDisplay, PageWidget):
             self.tree_item = new_item
 
             parent_widget = self.full_tree.maybe_get_widget(self.parent_tree_item)
-            print(parent_widget)
             if parent_widget is not None:
                 parent_widget.replace_step(
                     old_step=self.data,
@@ -2173,7 +2079,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
 
         self.assign_tree_item(item=self.tree_item, tree=self.full_tree)
 
-    def assign_tree_item(self, item: AtefItem, tree: DualTree) -> None:
+    def assign_tree_item(self, item: TreeItem, tree: DualTree) -> None:
         """
         Link-time setup of existing sub-nodes and navigation.
         """
@@ -2206,7 +2112,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         This is accomplished by discarding the old widgets in favor
         of new widgets.
         """
-        print(f'new_comparison: {comparison}')
         general_widget = GeneralComparisonWidget(data=comparison)
         self.insert_widget(
             general_widget,
@@ -2287,7 +2192,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             # TODO: Still need to replace in dataclass.
             # Replace comparison in dataclass, get new comparison
             # (could be holder of comp, typically just comparison)
-            new_comp_row_data = self.parent_tree_item.orig_data.replace_comparison(
+            self.parent_tree_item.orig_data.replace_comparison(
                 old_comp=self.data,
                 new_comp=comparison
             )
@@ -2301,6 +2206,15 @@ class ComparisonPage(DesignerDisplay, PageWidget):
 
             # if parent widget exists, replace the comparison row there
             if parent_widget is not None:
+                # row here actually holds a ComparisonToTarget, get that data
+                if isinstance(self.parent_tree_item.orig_data, SetValueStep):
+                    parent_data = self.parent_tree_item.orig_data
+                    comp_list = [crit.comparison for crit in parent_data.success_criteria]
+                    idx = comp_list.index(comparison)
+                    new_comp_row_data = parent_data.success_criteria[idx]
+                else:
+                    new_comp_row_data = comparison
+
                 parent_widget.replace_comparison(
                     old_comparison=self.data,
                     new_comparison=new_comp_row_data,
@@ -2413,7 +2327,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             return
         self.full_tree.select_by_data(comp)
 
-    def add_sub_comparison_node(self, comparison: Comparison) -> AtefItem:
+    def add_sub_comparison_node(self, comparison: Comparison) -> TreeItem:
         """
         For the AnyComparison, add a sub-comparison.
         """
@@ -2462,7 +2376,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
     def setup_any_comparison_row_buttons(
         self,
         comparison: Comparison,
-        item: AtefItem,
+        item: TreeItem,
     ) -> None:
         """
         Find the row widget and set up the buttons.

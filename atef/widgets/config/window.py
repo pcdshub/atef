@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from pprint import pprint
-from typing import ClassVar, Dict, Generator, Optional, Union
+from typing import ClassVar, Dict, Generator, Optional
 
 import qtawesome
 from apischema import ValidationError, deserialize, serialize
@@ -23,25 +23,22 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt, QTimer
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
-                            QTabWidget, QTreeWidget, QWidget)
+                            QTabWidget, QWidget)
 
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, PreparedFile
 from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep)
-from atef.qt_helpers import walk_tree_widget_items
 from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.type_hints import AnyDataclass
 from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.find_replace import (FillTemplatePage,
                                               FindReplaceWidget)
-from atef.widgets.utils import insert_widget, reset_cursor, set_wait_cursor
+from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
-from .page import (PAGE_MAP, AtefItem, ConfigurationGroupPage, FailPage,
-                   PageWidget, ProcedureGroupPage, RunStepPage, link_page,
-                   walk_tree_items)
+from .page import PAGE_MAP, FailPage, PageWidget, RunStepPage, walk_tree_items
 from .result_summary import ResultsSummaryWidget
 from .run_base import create_tree_from_file, make_run_page
 from .utils import ConfigTreeModel, MultiInputDialog, Toggle, TreeItem
@@ -198,7 +195,7 @@ class Window(DesignerDisplay, QMainWindow):
 
     def get_current_tree(self) -> DualTree:
         """
-        Return the widget of the current open tab.
+        Return the DualTree widget for the current open tab.
         """
         return self.tab_widget.currentWidget()
 
@@ -336,13 +333,10 @@ class Window(DesignerDisplay, QMainWindow):
 
     def serialize_tree(self, tree: DualTree) -> dict:
         """
-        Return the serialized data from a Tree widget.
+        Return the serialized data from a DualTree widget.
         """
         try:
-            return serialize(
-                type(tree.orig_file),
-                tree.orig_file,
-            )
+            return serialize(type(tree.orig_file), tree.orig_file)
         except Exception:
             logger.exception('Error serializing file')
 
@@ -369,14 +363,12 @@ class Window(DesignerDisplay, QMainWindow):
 
     def print_report(self, *args, **kwargs):
         """ Open save dialog for report output """
-        # get RunTree
         run_tree: DualTree = self.tab_widget.currentWidget()
-
         run_tree.print_report()
 
     def clear_results(self, *args, **kwargs):
-        """ clear results for a given tree """
-        current_tree: DualTree = self.tab_widget.currentWidget()
+        """ clear results for the active file """
+        current_tree: DualTree = self.get_current_tree()
         config_file = current_tree.orig_file
         # ask for confirmation first
         reply = QMessageBox.question(
@@ -455,324 +447,11 @@ class LandingPage(DesignerDisplay, QWidget):
         )
 
 
-class EditTree(DesignerDisplay, QWidget):
-    """
-    The main per-file widget as a "native" view into the file.
-
-    Consists of a tree visualization on the left that can be selected through
-    to choose which part of the tree to edit in the widget space on the right.
-
-    Parameters
-    ----------
-    config_file : ConfigurationFile
-        The config file object to use to build the tree.
-    full_path : str, optional
-        The full path to the last file used to save or load the tree.
-    """
-    filename = 'config_tree.ui'
-
-    tree_widget: QTreeWidget
-    splitter: QtWidgets.QSplitter
-    last_selection: Optional[TreeItem]
-
-    full_path: str
-
-    def __init__(
-        self,
-        *args,
-        config_file: Union[ConfigurationFile, ProcedureFile],
-        full_path: Optional[str] = None,
-        **kwargs
-    ):
-        super().__init__(*args, **kwargs)
-        self.config_file = config_file
-        if isinstance(self.config_file, ConfigurationFile):
-            self.page_class = ConfigurationGroupPage
-        elif isinstance(self.config_file, ProcedureFile):
-            self.page_class = ProcedureGroupPage
-        self.full_path = full_path
-        self.last_selection = None
-        self.built_widgets = set()
-        self.assemble_tree()
-        self.tree_widget.itemSelectionChanged.connect(
-            self.show_selected_display
-        )
-        self.tree_widget.setCurrentItem(self.root_item)
-        self.tree_widget.expandAll()
-
-    def assemble_tree(self):
-        """
-        On startup, create the full tree.
-        """
-        self.tree_widget.setColumnCount(2)
-        self.tree_widget.setHeaderLabels(['Node', 'Type'])
-        root_configuration_group = self.config_file.root
-        if not root_configuration_group.name:
-            root_configuration_group.name = 'root'
-        self.root_item = AtefItem(
-            tree_parent=self.tree_widget,
-            name=root_configuration_group.name,
-            func_name='root',
-        )
-        root_page = self.page_class(
-            data=root_configuration_group,
-        )
-        # Linking pages will set up and assign child pages
-        link_page(item=self.root_item, widget=root_page)
-        root_page.parent_button.hide()
-
-    def show_selected_display(self, *args, **kwargs):
-        """
-        Show the proper widget on the right when a tree row is selected.
-
-        This works by hiding the previous widget and showing the new
-        selection, creating the widget object if needed.
-        """
-        item = self.tree_widget.currentItem()
-        if item is None:
-            logger.error('Tree has no currentItem.  Cannot show selected')
-            return
-        if item is self.last_selection:
-            return
-
-        replace = bool(self.last_selection is not None)
-        if self.last_selection is not None:
-            self.last_selection.widget.setVisible(False)
-        widget = item.widget
-        if widget not in self.built_widgets:
-            self.built_widgets.add(widget)
-
-        if replace:
-            self.splitter.replaceWidget(1, widget)
-        else:
-            self.splitter.addWidget(widget)
-        widget.setVisible(True)
-        self.last_selection = item
-
-
 EDIT_TO_RUN_PAGE: Dict[type, PageWidget] = {
     DescriptionStep: RunStepPage,
     PassiveStep: RunStepPage,
     SetValueStep: RunStepPage,
 }
-
-
-class RunTree(EditTree):
-    """
-    A tree that holds a checkout process.  Based on current EditTree.
-    """
-    filename = 'run_config_tree.ui'
-
-    print_report_button: QtWidgets.QPushButton
-    results_button: QtWidgets.QPushButton
-
-    def __init__(
-        self,
-        *args,
-        config_file: ConfigurationFile | ProcedureFile,
-        full_path: Optional[str] = None,
-        **kwargs
-    ):
-        super().__init__(config_file=config_file, full_path=full_path)
-        self.prepared_file: Optional[Union[PreparedFile, PreparedProcedureFile]] = None
-        if isinstance(config_file, ConfigurationFile):
-            self.prepared_file = PreparedFile.from_config(config_file,
-                                                          cache=DataCache())
-        if isinstance(config_file, ProcedureFile):
-            # clear all results when making a new run tree
-            self.prepared_file = PreparedProcedureFile.from_origin(config_file)
-
-        self._swap_to_run_widgets()
-        self.print_report_button.clicked.connect(self.print_report)
-        self._summary_widget: Optional[ResultsSummaryWidget] = None
-        self.results_button.clicked.connect(self.show_results_summary)
-        # use new tree view summary
-        self.tree_view = QtWidgets.QTreeView()
-        self.root_item = create_tree_from_file(
-            data=self.config_file,
-            prepared_file=self.prepared_file
-        )
-        self.model = ConfigTreeModel(data=self.root_item)
-
-        self.tree_view.setModel(self.model)
-
-        self.tree_view.resizeColumnToContents(1)
-        self.tree_view.header().swapSections(0, 1)
-        self.tree_view.expandAll()
-        # Connect to pages
-        # TODO: when we redo tree construction, this may need looking at
-        # ugly and dumb as is, but we need to make sure pages match tree items
-        for new_it in walk_tree_items(self.root_item):
-            if new_it._data is None:  # Skip the empty root
-                continue
-            logger.debug(f'attempting to match {type(new_it._data)}')
-            for old_it in walk_tree_widget_items(self.tree_widget):
-                # match precisely the edit-mode dataclass, wherever it is
-                if new_it._data in (old_it.widget.data,
-                                    getattr(old_it.widget.data, 'origin', None)):
-                    # assign widget to item
-                    new_it.widget = old_it.widget
-                    break
-
-        # show widgets when interacting with new tree
-        self.tree_view.selectionModel().selectionChanged.connect(self.show_selected_page)
-
-        # update tree statuses with every result update
-        for item in walk_tree_items(self.root_item):
-            if item.widget:
-                item.widget.run_check.results_updated.connect(
-                    self.model.data_updated
-                )
-
-        insert_widget(self.tree_view, self.tree_widget)
-
-    def show_selected_page(
-        self,
-        selected: QtCore.QItemSelection,
-        deselected: QtCore.QItemSelection
-    ) -> None:
-        """
-        Show the proper widget on the right when a tree row is selected.
-
-        For use as a slot connecting to QTreeView.selectionModel().selectionChanged
-
-        This works by hiding the previous widget and showing the new
-        selection, creating the widget object if needed.
-
-        Parameters
-        ----------
-        selected : QtCore.QItemSelection
-            Selected region
-        deselected : QtCore.QItemSelection
-            Deselected region (unused)
-        """
-        selected_indexes = selected.indexes()
-
-        item = selected_indexes[0].internalPointer()
-
-        if item is None:
-            logger.error('Tree has no currentItem.  Cannot show selected')
-            return
-        if item is self.last_selection:
-            return
-
-        replace = bool(self.last_selection is not None)
-        if self.last_selection is not None:
-            self.last_selection.widget.setVisible(False)
-        widget = item.widget
-        if widget not in self.built_widgets:
-            self.built_widgets.add(widget)
-
-        if replace:
-            self.splitter.replaceWidget(1, widget)
-        else:
-            self.splitter.addWidget(widget)
-        widget.setVisible(True)
-        self.last_selection = item
-
-    # TODO: set up to use Procedure widgets instead of config ones
-    @classmethod
-    def from_edit_tree(cls, edit_tree: EditTree):
-        """Create a RunTree from an EditTree"""
-        # make a new widget with tree/widget connections
-
-        return cls(
-            config_file=edit_tree.config_file,
-            full_path=edit_tree.full_path
-        )
-
-    def _swap_to_run_widgets(self) -> None:
-        """
-        Swap out widgets for run widgets
-
-        If a run-specific version of the widget exists, return that.
-        Otherwise makes a read-only copy of the widget with run controls
-        """
-        # replace widgets with run versions
-        # start at the root of the config file
-        prev_widget = None
-        if isinstance(self.config_file, ConfigurationFile):
-            get_prepare_fn = get_relevant_configs_comps
-        elif isinstance(self.config_file, ProcedureFile):
-            get_prepare_fn = get_prepared_step
-        for item in walk_tree_widget_items(self.tree_widget):
-            data = item.widget.data  # Dataclass on widget
-            prepared_data = get_prepare_fn(self.prepared_file, data)
-            if type(data) in EDIT_TO_RUN_PAGE:
-                if len(prepared_data) != 1:
-                    raise ValueError(
-                        'number of prepared dataclasses is not 1, while the '
-                        'target page expects one: '
-                        f'{type(data)} -> {[type(d) for d in prepared_data]}')
-                run_widget_cls = EDIT_TO_RUN_PAGE[type(data)]
-                run_widget = run_widget_cls(data=prepared_data[0])
-                link_page(item, run_widget)
-                run_widget.link_children()
-            else:
-                run_widget = make_run_page(item.widget, prepared_data)
-
-            if prev_widget:
-                prev_widget.run_check.setup_next_button(item)
-
-            prev_widget = run_widget
-
-            # update all statuses every time a step is run
-            run_widget.run_check.results_updated.connect(self.update_statuses)
-
-        # disable last 'next' button
-        run_widget.run_check.next_button.hide()
-
-    def update_statuses(self) -> None:
-        """ update every status icon based on stored config result """
-        for item in walk_tree_widget_items(self.tree_widget):
-            try:
-                item.widget.run_check.update_all_icons_tooltips()
-            except AttributeError as ex:
-                logger.debug(f'Run Check widget not properly setup: {ex}')
-
-    def print_report(self, *args, **kwargs):
-        """ setup button to print the report """
-        filename, _ = QFileDialog.getSaveFileName(
-            parent=self,
-            caption='Print report to:',
-            filter='PDF Files (*.pdf)',
-        )
-
-        if not filename:
-            # Exit clause
-            return
-        if not filename.endswith('.pdf'):
-            filename += '.pdf'
-
-        # To differentiate between active and passive checkout reports
-        if isinstance(self.prepared_file, PreparedFile):
-            doc = PassiveAtefReport(filename, config=self.prepared_file)
-        elif isinstance(self.prepared_file, PreparedProcedureFile):
-            doc = ActiveAtefReport(filename, config=self.prepared_file)
-        else:
-            raise TypeError('Unsupported data-type for report generation')
-
-        # allow user to customize header fields
-        doc_info = doc.get_info()
-        msg = self.show_report_cust_prompt(doc_info)
-        if msg.result() == msg.Accepted:
-            new_info = msg.get_info()
-            doc.set_info(**new_info)
-            doc.create_report()
-
-    def show_report_cust_prompt(self, info):
-        """ generate a window allowing user to customize information """
-        msg = MultiInputDialog(parent=self, init_values=info)
-        msg.exec()
-        return msg
-
-    def show_results_summary(self):
-        """ show the results summary widget """
-        self._summary_widget = ResultsSummaryWidget(parent=self,
-                                                    file=self.prepared_file)
-        self._summary_widget.setWindowTitle('Results Summary')
-        self._summary_widget.setWindowFlags(QtCore.Qt.Window)
-        self._summary_widget.show()
 
 
 class DualTree(DesignerDisplay, QWidget):
@@ -814,6 +493,7 @@ class DualTree(DesignerDisplay, QWidget):
         self.prepared_file = None
         self.full_path = full_path
         self.root_item = TreeItem()
+        self._item_list: list[TreeItem] = []
         self.mode = 'edit'
 
         # basic tree setup, start in edit mode
@@ -850,6 +530,10 @@ class DualTree(DesignerDisplay, QWidget):
         self.results_button.hide()
 
     def refresh_prepared_file(self) -> None:
+        """
+        Refreshes the stored Prepared file (passive or active).
+        Alone, this does not update the TreeView or ConfigTreeModel.
+        """
         if isinstance(self.orig_file, ConfigurationFile):
             self.prepared_file = PreparedFile.from_config(self.orig_file,
                                                           cache=DataCache())
@@ -860,14 +544,20 @@ class DualTree(DesignerDisplay, QWidget):
         """
         Rebuild the model, refreshing the Prepared file primarily
         """
+        # TODO: Make sure prepared file is attached at every tree item modification
         self.refresh_prepared_file()
-        # TODO: clear cache, schedule everything inside for deletion?
-        # TODO: properly signal tree for update?
+
+        # Clear widget caches
+        for cache in (self.edit_widget_cache, self.run_widget_cache):
+            for widget in cache.values():
+                widget.setParent(None)
+                widget.deleteLater()
 
         self.root_item = create_tree_from_file(
             data=self.orig_file,
             prepared_file=self.prepared_file
         )
+        self._item_list = list(walk_tree_items(self.root_item))
         self.model = ConfigTreeModel(data=self.root_item)
         self.tree_view.setModel(self.model)
         self.model.beginResetModel()
@@ -880,7 +570,7 @@ class DualTree(DesignerDisplay, QWidget):
         )
 
     def select_by_item(self, item: TreeItem) -> None:
-        """ Select desired treeitem (and show corresponding page) in TreeView """
+        """ Select desired TreeItem(and show corresponding page) in TreeView """
         # check if item is in tree before selecting?
         logger.debug(f'selecting page for item: {item.data(0)}')
         new_index = self.model.index_from_item(item)
@@ -888,7 +578,7 @@ class DualTree(DesignerDisplay, QWidget):
         sel_model.select(new_index, sel_model.ClearAndSelect | sel_model.Rows)
 
     def select_by_data(self, data: AnyDataclass) -> None:
-        """ Select the item containing ``data`` """
+        """ Select the TreeItem containing ``data`` """
         for item in walk_tree_items(self.root_item):
             if item.orig_data is data:
                 self.select_by_item(item)
@@ -921,7 +611,12 @@ class DualTree(DesignerDisplay, QWidget):
         self.show_page_for_data(item, mode=self.mode)
 
     def show_page_for_data(self, item: TreeItem, mode: str = 'edit') -> None:
-        """ Show page widget corresponding to ``data`` in ``mode`` """
+        """
+        Show PageWidget corresponding to ``data`` in ``mode``.
+        If the item's widget is cached, retrieve and show it.  Otherwise the
+        widget must be created.  Schedules oldest widget in cache for deletion
+        if the cache is full.
+        """
         curr_cache = self.caches[mode]
         oldest_widget = None
         if item in curr_cache:
@@ -954,6 +649,7 @@ class DualTree(DesignerDisplay, QWidget):
             oldest_widget.deleteLater()
 
     def create_widget(self, item: TreeItem, mode: str) -> PageWidget:
+        """ Create the widget for ``item`` in ``mode``. """
         data = item.orig_data
         # edit mode
         widget: PageWidget = PAGE_MAP[type(item.orig_data)](
@@ -986,18 +682,17 @@ class DualTree(DesignerDisplay, QWidget):
                     run_widget_cls = EDIT_TO_RUN_PAGE[type(data)]
                     # expects a single (top-level) step currently
                     run_widget = run_widget_cls(data=prepared_data[0])
-                # link_page(item, run_widget)
-                # run_widget.link_children()
             else:
                 # can currently handle multiple prepared_data
                 # (e.g. multiple comparisons shown in one page)
                 run_widget = make_run_page(widget, prepared_data)
 
-                # TODO: Restore next button
-                # if prev_widget:
-                #     prev_widget.run_check.setup_next_button(item)
-
-                # prev_widget = run_widget
+                try:
+                    next_item = self._item_list[self._item_list.index(item) + 1]
+                except IndexError:
+                    run_widget.run_check.next_button.hide()
+                else:
+                    run_widget.run_check.setup_next_button(next_item)
 
                 # update all statuses every time a step is run
             run_widget.run_check.results_updated.connect(self.update_statuses)
@@ -1007,7 +702,7 @@ class DualTree(DesignerDisplay, QWidget):
             )
 
             # disable last 'next' button
-            # run_widget.run_check.next_button.hide()
+
             return run_widget
 
     def update_statuses(self) -> None:
@@ -1040,6 +735,9 @@ class DualTree(DesignerDisplay, QWidget):
 
         if not select_prev:
             return
+
+        # update flattened tree list
+        self._item_list = list(walk_tree_items(self.root_item))
         # try to reset old selection
         try:
             self.select_by_item(self.current_item)

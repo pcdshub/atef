@@ -53,14 +53,31 @@ class Configuration:
     tags: Optional[List[str]] = None
 
     def children(self) -> List[Any]:
+        """ Return children of this group, as a tree view might expect """
         return []
 
     def replace_comparison(
         self,
         old_comp: Comparison,
         new_comp: Comparison,
-        comp_attrs: Optional[str] = None
-    ) -> Comparison:
+        comp_attrs: Optional[List[str]] = None
+    ) -> None:
+        """
+        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
+        Looks through ``shared``, then any of the attribues in ``comp_attrs``
+
+        Parameters
+        ----------
+        old_comp : Comparison
+            Comparison to be replaced
+        new_comp : Comparison
+            Comparison to replace ``old_comp`` with
+        comp_attrs : Optional[List[str]], optional
+            Attribute names in the dataclass to check, by default None
+        """
+        if not any(hasattr(self, attr) for attr in comp_attrs + ["shared"]):
+            return
+
         try:
             util.replace_in_list(
                 old=old_comp,
@@ -80,8 +97,6 @@ class Configuration:
                         continue
                     else:
                         break
-
-        return new_comp
 
 
 @dataclass
@@ -106,7 +121,8 @@ class ConfigurationGroup(Configuration):
             if isinstance(config, ConfigurationGroup):
                 yield from config.walk_configs()
 
-    def children(self) -> List[Any]:
+    def children(self) -> List[Configuration]:
+        """ Return children of this group, as a tree view might expect """
         return self.configs
 
 
@@ -129,7 +145,8 @@ class DeviceConfiguration(Configuration):
     #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
     shared: List[Comparison] = field(default_factory=list)
 
-    def children(self) -> List[Any]:
+    def children(self) -> List[Comparison]:
+        """ Return children of this group, as a tree view might expect """
         return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
                 + self.shared)
 
@@ -138,10 +155,24 @@ class DeviceConfiguration(Configuration):
         old_comp: Comparison,
         new_comp: Comparison,
         comp_attrs: Optional[List[str]] = None
-    ) -> Comparison:
+    ) -> None:
+        """
+        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
+        Looks through ``shared``, then any of the attribues in ``comp_attrs``
+
+        Parameters
+        ----------
+        old_comp : Comparison
+            Comparison to be replaced
+        new_comp : Comparison
+            Comparison to replace ``old_comp`` with
+        comp_attrs : Optional[List[str]], optional
+            Attribute names in the dataclass to check, by default ['by_attr'] if
+            no value is provided
+        """
         if comp_attrs is None:
             comp_attrs = ['by_attr']
-        return super().replace_comparison(old_comp, new_comp, comp_attrs)
+        super().replace_comparison(old_comp, new_comp, comp_attrs)
 
 
 @dataclass
@@ -154,7 +185,8 @@ class PVConfiguration(Configuration):
     #: Comparisons to be run on *all* PVs in the `by_pv` dictionary.
     shared: List[Comparison] = field(default_factory=list)
 
-    def children(self) -> List[Any]:
+    def children(self) -> List[Comparison]:
+        """ Return children of this group, as a tree view might expect """
         return ([comp for comp_list in self.by_pv.values() for comp in comp_list]
                 + self.shared)
 
@@ -163,10 +195,24 @@ class PVConfiguration(Configuration):
         old_comp: Comparison,
         new_comp: Comparison,
         comp_attrs: Optional[List[str]] = None
-    ) -> Comparison:
+    ) -> None:
+        """
+        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
+        Looks through ``shared``, then any of the attribues in ``comp_attrs``
+
+        Parameters
+        ----------
+        old_comp : Comparison
+            Comparison to be replaced
+        new_comp : Comparison
+            Comparison to replace ``old_comp`` with
+        comp_attrs : Optional[List[str]], optional
+            Attribute names in the dataclass to check, by default ['by_pv'] if
+            no value is provided
+        """
         if comp_attrs is None:
             comp_attrs = ['by_pv']
-        return super().replace_comparison(old_comp, new_comp, comp_attrs)
+        super().replace_comparison(old_comp, new_comp, comp_attrs)
 
 
 @dataclass
@@ -185,7 +231,8 @@ class ToolConfiguration(Configuration):
     #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
     shared: List[Comparison] = field(default_factory=list)
 
-    def children(self) -> List[Any] | None:
+    def children(self) -> List[Comparison]:
+        """ Return children of this group, as a tree view might expect """
         return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
                 + self.shared)
 
@@ -194,10 +241,24 @@ class ToolConfiguration(Configuration):
         old_comp: Comparison,
         new_comp: Comparison,
         comp_attrs: Optional[List[str]] = None
-    ) -> Comparison:
+    ) -> None:
+        """
+        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
+        Looks through ``shared``, then any of the attribues in ``comp_attrs``
+
+        Parameters
+        ----------
+        old_comp : Comparison
+            Comparison to be replaced
+        new_comp : Comparison
+            Comparison to replace ``old_comp`` with
+        comp_attrs : Optional[List[str]], optional
+            Attribute names in the dataclass to check, by default ['by_attr'] if
+            no value is provided
+        """
         if comp_attrs is None:
             comp_attrs = ['by_attr']
-        return super().replace_comparison(old_comp, new_comp, comp_attrs)
+        super().replace_comparison(old_comp, new_comp, comp_attrs)
 
 
 AnyConfiguration = Union[
@@ -230,7 +291,8 @@ class ConfigurationFile:
         yield self.root
         yield from self.root.walk_configs()
 
-    def children(self) -> list[ConfigurationGroup]:
+    def children(self) -> List[ConfigurationGroup]:
+        """ Return children of this group, as a tree view might expect """
         return [self.root]
 
     def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
@@ -391,7 +453,8 @@ class PreparedFile:
         yield self.root
         yield from self.root.walk_groups()
 
-    def children(self) -> List[Any]:
+    def children(self) -> List[PreparedGroup]:
+        """ Return children of this group, as a tree view might expect """
         return [self.root]
 
     async def compare(self) -> Result:

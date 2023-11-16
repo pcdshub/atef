@@ -32,16 +32,15 @@ from atef.cache import DataCache, get_signal_cache
 from atef.check import Comparison, EpicsValue, Equals, HappiValue, Range
 from atef.config import (Configuration, DeviceConfiguration,
                          PreparedComparison, PreparedConfiguration,
-                         PreparedFile, PVConfiguration, ToolConfiguration)
+                         PVConfiguration, ToolConfiguration)
 from atef.enums import Severity
 from atef.exceptions import DynamicValueError, MissingHappiDeviceError
-from atef.procedure import ProcedureFile, ProcedureStep, SetValueStep
+from atef.procedure import ProcedureStep, SetValueStep
 from atef.qt_helpers import (QDataclassBridge, QDataclassList, QDataclassValue,
                              ThreadWorker)
-from atef.result import combine_results, incomplete_result
+from atef.result import combine_results
 from atef.tools import Ping
 from atef.type_hints import AnyDataclass, Number
-from atef.walk import walk_steps
 from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
@@ -992,21 +991,6 @@ class MultiInputDialog(QtWidgets.QDialog):
         return info
 
 
-def clear_results(config_file: PreparedFile | ProcedureFile) -> None:
-    if isinstance(config_file, ProcedureFile):
-        # clear all results when making a new run tree
-        for step in walk_steps(config_file.root):
-            step.step_result = incomplete_result()
-            step.verify_result = incomplete_result()
-            step.combined_result = incomplete_result()
-
-    elif isinstance(config_file, PreparedFile):
-        for comp in config_file.walk_comparisons():
-            comp.result = incomplete_result()
-        for group in config_file.walk_groups():
-            group.result = incomplete_result()
-
-
 class ConfigTreeModel(QtCore.QAbstractItemModel):
     """
     Item model for tree data.  Goes through all this effort due to the need for
@@ -1361,15 +1345,15 @@ class TreeItem:
         child._parent = self
         child._row = len(self._children)
         self._children.append(child)
-        # self._columncount = max(child.columnCount(), self._columncount)
 
     def removeChild(self, child: TreeItem) -> None:
+        """ Remove ``child`` from this TreeItem """
         self._children.remove(child)
+        child._parent = None
         # re-assign rows to children
         remaining_children = self.takeChildren()
         for rchild in remaining_children:
             self.addChild(rchild)
-        # self._columncount = max(child.columnCount(), self._columncount)
 
     def replaceChild(self, old_child: TreeItem, new_child: TreeItem) -> None:
         """ Replace ``old_child`` with ``new_child``, maintaining order """
@@ -1386,7 +1370,9 @@ class TreeItem:
         raise IndexError('old child not found, could not replace')
 
     def takeChild(self, idx: int) -> TreeItem:
+        """ Remove and return the ``idx``-th child of this item """
         child = self._children.pop(idx)
+        child._parent = None
         # re-assign rows to children
         remaining_children = self.takeChildren()
         for rchild in remaining_children:
@@ -1395,6 +1381,7 @@ class TreeItem:
         return child
 
     def insertChild(self, idx: int, child: TreeItem) -> None:
+        """ Add ``child`` to this TreeItem at index ``idx`` """
         self._children.insert(idx, child)
         # re-assign rows to children
         remaining_children = self.takeChildren()
@@ -1407,6 +1394,9 @@ class TreeItem:
         """
         children = self._children
         self._children = []
+        for child in children:
+            child._parent = None
+
         return children
 
     @property

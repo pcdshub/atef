@@ -3,7 +3,7 @@ import concurrent.futures
 import functools
 import logging
 import pathlib
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Callable, List, Optional, Sequence, TypeVar
 
 import happi
 import ophyd
@@ -15,6 +15,7 @@ from .exceptions import (HappiLoadError, HappiUnavailableError,
 logger = logging.getLogger(__name__)
 
 ATEF_SOURCE_PATH = pathlib.Path(__file__).parent
+T = TypeVar("T")
 
 
 def ophyd_cleanup():
@@ -152,6 +153,6 @@ async def run_in_executor(
     return await loop.run_in_executor(executor, wrapped)
 
 
-def replace_in_list(old: Any, new: Any, item_list: List[Any]):
+def replace_in_list(old: T, new: T, item_list: List[T]):
     index = item_list.index(old)
     item_list[index] = new

@@ -330,8 +330,6 @@ def configuration_group():
 @pytest.fixture
 def make_page():
     def make_page_fn(cfg: AnyDataclass) -> PageWidget:
-        # page_cls = PAGE_MAP[type(cfg)]
-        # cfg_item = TreeItem(data=cfg)
         if isinstance(cfg, get_args(AnyConfiguration)):
             file = ConfigurationFile()
             file.root.configs.append(cfg)
@@ -342,8 +340,7 @@ def make_page():
         tree = DualTree(orig_file=file)
         tree.select_by_data(cfg)
         cfg_page = tree.current_widget
-        # cfg_page = page_cls(cfg, tree_item=cfg_item, full_tree=tree)
-        # link_page(item=cfg_item, widget=cfg_page)
+
         return cfg_page
 
     return make_page_fn
