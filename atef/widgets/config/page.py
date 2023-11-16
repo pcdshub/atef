@@ -748,8 +748,9 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
         config_data = self.data.configs.pop(source)
         self.data.configs.insert(dest, config_data)
         # Rearrange the tree
-        config_item = self.tree_item.takeChild(source)
-        self.tree_item.insertChild(dest, config_item)
+        with self.full_tree.modifies_tree():
+            config_item = self.tree_item.takeChild(source)
+            self.tree_item.insertChild(dest, config_item)
         # Rearrange the table: need a whole new widget or else segfault
         self.config_table.removeRow(source)
         self.config_table.insertRow(dest)
@@ -1487,8 +1488,9 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         config_data = self.data.steps.pop(source)
         self.data.steps.insert(dest, config_data)
         # Rearrange the tree
-        config_item = self.tree_item.takeChild(source)
-        self.tree_item.insertChild(dest, config_item)
+        with self.full_tree.modifies_tree():
+            config_item = self.tree_item.takeChild(source)
+            self.tree_item.insertChild(dest, config_item)
         # Rearrange the table: need a whole new widget or else segfault
         self.procedure_table.removeRow(source)
         self.procedure_table.insertRow(dest)
