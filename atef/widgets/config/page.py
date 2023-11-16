@@ -1770,13 +1770,13 @@ class StepPage(DesignerDisplay, PageWidget):
 
     def add_sub_comparison_node(self, comparison: Comparison) -> TreeItem:
         """
-        For the AnyComparison, add a sub-comparison.
+        Add a sub-comparison.  Expected to be called inside a DualTree.modifies_tree
+        context manager.
         """
-        with self.full_tree.modifies_tree():
-            item = TreeItem(
-                data=comparison,
-                tree_parent=self.tree_item,
-            )
+        item = TreeItem(
+            data=comparison,
+            tree_parent=self.tree_item,
+        )
 
         self.setup_set_value_check_row_buttons(
             comparison=comparison,
@@ -2009,7 +2009,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         super().post_tree_setup()
         self.setup_name_desc_tags_link()
         # Extra setup and/or teardown from AnyComparison
-        self.clean_up_any_comparison()
         if isinstance(self.data, AnyComparison):
             self.setup_any_comparison()
 
@@ -2212,8 +2211,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
             widget = table.cellWidget(row_index, 0)
             comp = widget.data
             display_order[id(comp)] = comp
-
-        with self.full_tree.modifies_tree():
+        with self.full_tree.modifies_tree(select_prev=False):
             # Pull off all of the existing items
             old_items = self.tree_item.takeChildren()
             old_item_map = {
@@ -2230,6 +2228,10 @@ class ComparisonPage(DesignerDisplay, PageWidget):
                 else:
                     # An old item existed, add it again
                     self.tree_item.addChild(item)
+                    self.setup_any_comparison_row_buttons(
+                        comparison=comp,
+                        item=item,
+                    )
 
         # Fix selection if it changed
         if not new_item:
@@ -2240,12 +2242,12 @@ class ComparisonPage(DesignerDisplay, PageWidget):
     def add_sub_comparison_node(self, comparison: Comparison) -> TreeItem:
         """
         For the AnyComparison, add a sub-comparison.
+        Expected to be called inside a DualTree.modfies_tree context manager
         """
-        with self.full_tree.modifies_tree():
-            item = TreeItem(
-                data=comparison,
-                tree_parent=self.tree_item,
-            )
+        item = TreeItem(
+            data=comparison,
+            tree_parent=self.tree_item,
+        )
 
         self.setup_any_comparison_row_buttons(
             comparison=comparison,

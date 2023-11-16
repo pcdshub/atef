@@ -633,11 +633,11 @@ class DualTree(DesignerDisplay, QWidget):
             curr_cache[item] = new_widget
 
         # TODO: make sure current widget is never None later on
-        if self.current_widget:
+        if (self.current_widget is None) or (self.splitter.widget(1) is None):
+            self.splitter.addWidget(new_widget)
+        else:
             self.current_widget.setVisible(False)
             self.splitter.replaceWidget(1, new_widget)
-        else:
-            self.splitter.addWidget(new_widget)
 
         self.current_widget = new_widget
         self.current_widget.setVisible(True)
@@ -733,11 +733,11 @@ class DualTree(DesignerDisplay, QWidget):
         finally:
             self.model.layoutChanged.emit()
 
-        if not select_prev:
-            return
-
         # update flattened tree list
         self._item_list = list(walk_tree_items(self.root_item))
+
+        if not select_prev:
+            return
         # try to reset old selection
         try:
             self.select_by_item(self.current_item)
