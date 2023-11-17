@@ -415,7 +415,7 @@ class RunCheck(DesignerDisplay, QWidget):
 
 
 class VerifyEntryWidget(DesignerDisplay, QWidget):
-    """ Simple text entry widget to prompt for a verification result and reason """
+    """Simple text entry widget to prompt for a verification result and reason"""
     filename = 'verify_entry_widget.ui'
 
     reason_line_edit: QLineEdit

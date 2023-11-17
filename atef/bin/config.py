@@ -59,7 +59,7 @@ def build_arg_parser(argparser=None):
     https://doc.qt.io/qt-5/qguiapplication.html#supported-command-line-options
     """
     argparser.add_argument(
-        "--cache_size",
+        "--cache-size",
         metavar="cache_size",
         type=int,
         default=5,

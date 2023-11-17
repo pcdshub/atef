@@ -42,7 +42,7 @@ def test_procedure_step_results(
     step_result: Result,
     expected: Result
 ):
-    """ Verify logic used to combine step_result and verify_result """
+    """Verify logic used to combine step_result and verify_result"""
     pstep = DescriptionStep()
     prep_pstep = PreparedProcedureStep.from_origin(pstep)
     pstep.verify_required = verify_required
@@ -59,7 +59,7 @@ def test_procedure_step_results(
 
 @pytest.mark.asyncio
 async def test_description_step_results():
-    """ Pass if DescriptionStep step_result always passes """
+    """Pass if DescriptionStep step_result always passes"""
     desc_step = DescriptionStep()
     prep_desc_step = PreparedProcedureStep.from_origin(desc_step)
     await prep_desc_step.run()
@@ -77,7 +77,7 @@ async def test_prepared_procedure(active_config_path):
 
 @pytest.mark.asyncio
 async def test_plan_step():
-    """ Pass if a PlanStep can be prepared and run in isolation """
+    """Pass if a PlanStep can be prepared and run in isolation"""
     # Note: this is not the standard way of using these plan steps.
     #       Normally PlanSteps will have a top-level ProcedureFile that owns
     #       its own BlueskyState.  Here we use the default None-BlueskyState

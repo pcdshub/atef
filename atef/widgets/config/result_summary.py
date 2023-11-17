@@ -21,7 +21,7 @@ from atef.widgets.utils import insert_widget
 
 @dataclasses.dataclass
 class ResultInfo:
-    """ Normalized, and slightly processed view of configs/steps with results """
+    """Normalized, and slightly processed view of configs/steps with results"""
     status: Severity
     reason: str
 
@@ -217,7 +217,7 @@ class ResultModel(QtCore.QAbstractTableModel):
 
 
 class CheckableComboBox(QtWidgets.QComboBox):
-    """ A QComboBox that allows for multiple selection via checkable items """
+    """A QComboBox that allows for multiple selection via checkable items"""
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

@@ -64,7 +64,7 @@ class Configuration:
     ) -> None:
         """
         Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
-        Looks through ``shared``, then any of the attribues in ``comp_attrs``
+        Looks through ``shared``, then any of the attributes in ``comp_attrs``
 
         Parameters
         ----------
@@ -75,6 +75,7 @@ class Configuration:
         comp_attrs : Optional[List[str]], optional
             Attribute names in the dataclass to check, by default None
         """
+        comp_attrs = comp_attrs or []
         if not any(hasattr(self, attr) for attr in comp_attrs + ["shared"]):
             return
 
@@ -158,7 +159,7 @@ class DeviceConfiguration(Configuration):
     ) -> None:
         """
         Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
-        Looks through ``shared``, then any of the attribues in ``comp_attrs``
+        Looks through ``shared``, then any of the attributes in ``comp_attrs``
 
         Parameters
         ----------
@@ -198,7 +199,7 @@ class PVConfiguration(Configuration):
     ) -> None:
         """
         Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
-        Looks through ``shared``, then any of the attribues in ``comp_attrs``
+        Looks through ``shared``, then any of the attributes in ``comp_attrs``
 
         Parameters
         ----------
@@ -244,7 +245,7 @@ class ToolConfiguration(Configuration):
     ) -> None:
         """
         Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
-        Looks through ``shared``, then any of the attribues in ``comp_attrs``
+        Looks through ``shared``, then any of the attributes in ``comp_attrs``
 
         Parameters
         ----------
@@ -1650,7 +1651,7 @@ def get_result_from_comparison(
 async def run_passive_step(
     config: Union[PreparedComparison, PreparedConfiguration, PreparedFile]
 ):
-    """ Runs a given check and returns the result. """
+    """Runs a given check and returns the result."""
     # Warn if will run all subcomparisons?
     cache_fill_tasks = []
     try:

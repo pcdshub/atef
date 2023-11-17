@@ -20,7 +20,7 @@ def test_yaml_equal_json(
     tmp_path: pathlib.Path,
     all_loaded_config: AnyDataclass
 ):
-    """ Read json, dump to yaml, compare dataclasses """
+    """Read json, dump to yaml, compare dataclasses"""
     all_loaded_config
 
     yaml_path = tmp_path / 'cfg.yaml'

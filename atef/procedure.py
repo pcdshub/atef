@@ -111,9 +111,8 @@ class ProcedureGroup(ProcedureStep):
         self,
         old_step: Union[ProcedureStep, ProcedureGroup],
         new_step: Union[ProcedureStep, ProcedureGroup]
-    ) -> ProcedureStep:
+    ) -> None:
         util.replace_in_list(old_step, new_step, self.steps)
-        return new_step
 
 
 @dataclass
@@ -130,7 +129,7 @@ class PassiveStep(ProcedureStep):
 
 @dataclass
 class SetValueStep(ProcedureStep):
-    """ A step that sets one or more values and checks one or more values after """
+    """A step that sets one or more values and checks one or more values after"""
     actions: List[ValueToTarget] = field(default_factory=list)
     success_criteria: List[ComparisonToTarget] = field(default_factory=list)
 
@@ -153,8 +152,8 @@ class SetValueStep(ProcedureStep):
         try:
             idx = comp_list.index(old_comp)
         except ValueError:
-            logger.warning('attempted to replace a comparison that does not exist'
-                           f': {old_comp} -> {new_comp}')
+            raise ValueError('attempted to replace a comparison that does not '
+                             f'exist: {old_comp} -> {new_comp}')
 
         new_crit = deepcopy(self.success_criteria[idx])
         new_crit.comparison = new_comp
@@ -462,7 +461,7 @@ class PreparedProcedureFile:
 
 @dataclass
 class FailedStep:
-    """ A step that failed to be prepared for running. """
+    """A step that failed to be prepared for running."""
     #: The data cache to use for the preparation step.
     parent: Optional[PreparedProcedureGroup]
     #: Configuration instance.

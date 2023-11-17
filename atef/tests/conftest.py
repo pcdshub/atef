@@ -336,6 +336,8 @@ def make_page():
         elif isinstance(cfg, get_args(AnyProcedure)):
             file = ProcedureFile()
             file.root.steps.append(cfg)
+        else:
+            raise NotImplementedError()
 
         tree = DualTree(orig_file=file)
         tree.select_by_data(cfg)

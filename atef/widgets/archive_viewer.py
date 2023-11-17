@@ -99,7 +99,7 @@ def _success_decorator(method):
 
 
 class ArchiverError(Exception):
-    """ Archiver related exceptions """
+    """Archiver related exceptions"""
     ...
 
 

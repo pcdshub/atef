@@ -9,7 +9,7 @@ from atef.widgets.config.page import ComparisonPage, ConfigurationGroupPage
 
 
 def gather_comparisons(cfg: AnyDataclass):
-    """ Returns a list of comparisons in any of the possible fields """
+    """Returns a list of comparisons in any of the possible fields"""
     comps = []
     if hasattr(cfg, 'shared'):
         for comp in cfg.shared:

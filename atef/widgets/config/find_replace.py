@@ -610,7 +610,7 @@ class FindReplaceWidget(DesignerDisplay, QtWidgets.QWidget):
 
 
 class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
-    """ A widget for displaying a single find/replace action """
+    """A widget for displaying a single find/replace action"""
     button_box: QtWidgets.QDialogButtonBox
     dclass_label: QtWidgets.QLabel
     pre_label: QtWidgets.QLabel

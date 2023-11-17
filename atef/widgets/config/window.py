@@ -422,7 +422,7 @@ class Window(DesignerDisplay, QMainWindow):
 
 
 class LandingPage(DesignerDisplay, QWidget):
-    """ Landing Page for selecting a subsequent action """
+    """Landing Page for selecting a subsequent action"""
     filename = 'landing_page.ui'
 
     new_passive_button: QtWidgets.QPushButton

@@ -657,7 +657,7 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
 
 
 class TargetRowWidget(DesignerDisplay, SimpleRowWidget):
-    """ Base widget with target selection """
+    """Base widget with target selection"""
     filename = 'action_row_widget.ui'
 
     target_button: QtWidgets.QToolButton

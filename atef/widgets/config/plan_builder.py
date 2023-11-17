@@ -21,7 +21,7 @@ logger = logging.getLogger(__file__)
 
 
 class PlanEntryWidget(DesignerDisplay, QtWidgets.QWidget):
-    """ holds many ArgumentEntryWidget's and supplies a plan item """
+    """holds many ArgumentEntryWidget's and supplies a plan item"""
 
     filename = 'plan_entry_widget.ui'
 
@@ -78,7 +78,7 @@ class PlanEntryWidget(DesignerDisplay, QtWidgets.QWidget):
 
 
 class ArgumentEntryWidget(QtWidgets.QWidget):
-    """ Base class for various input widgets? needed? """
+    """Base class for various input widgets? needed?"""
     # `info` is expected to be dictionary containing parameter info keys:
     # - "kind": positional or keyword, etc
     # - "description": a text description
@@ -193,7 +193,7 @@ class BasicArgEdit(ArgumentEntryWidget):
 
 
 class DeviceChoiceWidget(ArgumentEntryWidget):
-    """ For arguments that require devices """
+    """For arguments that require devices"""
     _search_widget: Optional[HappiDeviceComponentWidget] = None
     combo_box: Optional[QtWidgets.QComboBox] = None
     signal_button: Optional[QtWidgets.QPushButton] = None
@@ -292,7 +292,7 @@ class CloseEmitWidget(QtWidgets.QWidget):
 
 
 class ListArgWidget(ArgumentEntryWidget):
-    """ A table view widget that holds other ArgumentEntryWidget's """
+    """A table view widget that holds other ArgumentEntryWidget's"""
 
     def __init__(
         self,

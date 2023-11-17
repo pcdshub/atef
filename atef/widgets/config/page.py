@@ -611,7 +611,7 @@ class PageWidget(QWidget):
 
 
 class FailPage(DesignerDisplay, DataWidget):
-    """ Page for any step / configuration that fails preparation (run conversion) """
+    """Page for any step / configuration that fails preparation (run conversion)"""
     filename = 'failed_prep_page.ui'
 
     fail_title: QLabel
@@ -706,7 +706,6 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             ]()
             self.data.configs.append(config)
         config_row = ConfigurationGroupRowWidget(data=config)
-        # TODO Still broken, no child setup row, no init setup
         config_item = None
         for child_item in self.tree_item.get_children():
             if child_item.orig_data is config:
@@ -1663,7 +1662,7 @@ class StepPage(DesignerDisplay, PageWidget):
         with self.full_tree.modifies_tree(select_prev=False):
             # Assumes self.parent_tree_item.widget: ProcedureGroupPage
             # put another way, this assumes steps cannot be parent of other steps
-            _ = self.parent_tree_item.orig_data.replace_step(
+            self.parent_tree_item.orig_data.replace_step(
                 old_step=self.data,
                 new_step=step
             )
@@ -2103,7 +2102,6 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         parent_widget = self.full_tree.maybe_get_widget(self.parent_tree_item)
 
         with self.full_tree.modifies_tree(select_prev=False):
-            # TODO: Still need to replace in dataclass.
             # Replace comparison in dataclass, get new comparison
             self.parent_tree_item.orig_data.replace_comparison(
                 old_comp=self.data,

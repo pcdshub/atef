@@ -681,6 +681,23 @@ def get_comp_field_in_parent(
     comp: Comparison,
     parent: Union[Configuration, ProcedureStep]
 ) -> str:
+    """
+    Returns the field where ``comp`` resides in ``parent``.
+    Will have to be extended as more step types holding Comparison's are created
+
+    Parameters
+    ----------
+    comp : Comparison
+        The comparison, held by ``parent``
+    parent : Union[Configuration, ProcedureStep]
+        The dataclass that holds ``comp``
+
+    Returns
+    -------
+    str
+        The attribute name ``comp`` can be found in.  One of: {'shared',
+        'by_attr', 'by_pv', 'success_criteria'}
+    """
     attr = ''
     if comp in getattr(parent, 'shared', []):
         attr = 'shared'
@@ -2175,7 +2192,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
 
 
 def disable_widget(widget: QWidget) -> QWidget:
-    """ Disable widget, recurse through layouts """
+    """Disable widget, recurse through layouts"""
     # TODO: revisit, is there a better way to do this?
     for idx in range(widget.layout().count()):
         layout_item = widget.layout().itemAt(idx)

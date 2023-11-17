@@ -10,7 +10,7 @@ from atef.walk import walk_config_file, walk_procedure_file
 
 
 def passive_walk_params():
-    """ Zip the checkout paths with their appropriate information """
+    """Zip the checkout paths with their appropriate information"""
     # name, num_configs, num_comparisons
     file_info = {
         'lfe.json': (3, 42),  # 2 configs fail with happi access, 42 remaining comps
@@ -40,7 +40,7 @@ def test_passive_walks(filepath, num_configs, num_comps):
 
 
 def active_walk_params():
-    """ Zip the checkout paths with their appropriate information """
+    """Zip the checkout paths with their appropriate information"""
     # name, num_items (tree), num_steps
     file_info = {
         'active_test.json': (5, 4),  # 1 of each step type + 1 comparison
