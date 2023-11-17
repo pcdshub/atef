@@ -72,7 +72,13 @@ class Window(DesignerDisplay, QMainWindow):
     action_clear_results: QAction
     action_find_replace: QAction
 
-    def __init__(self, *args, cache_size: int, show_welcome: bool = True, **kwargs):
+    def __init__(
+        self,
+        *args,
+        cache_size: int = 5,
+        show_welcome: bool = True,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self._partial_slots: list[WeakPartialMethodSlot] = []
         self.cache_size = cache_size
