@@ -72,9 +72,10 @@ class Window(DesignerDisplay, QMainWindow):
     action_clear_results: QAction
     action_find_replace: QAction
 
-    def __init__(self, *args, show_welcome: bool = True, **kwargs):
+    def __init__(self, *args, cache_size: int, show_welcome: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
         self._partial_slots: list[WeakPartialMethodSlot] = []
+        self.cache_size = cache_size
         self.setWindowTitle('atef config')
         self.action_welcome_tab.triggered.connect(self.welcome_user)
         self.action_new_file.triggered.connect(self.new_file)
@@ -276,7 +277,8 @@ class Window(DesignerDisplay, QMainWindow):
             applicable. This lets us keep track of which filename to
             save back to.
         """
-        widget = DualTree(orig_file=data, full_path=filename)
+        widget = DualTree(orig_file=data, full_path=filename,
+                          widget_cache_size=self.cache_size)
         self.tab_widget.addTab(widget, self.get_tab_name(filename))
         curr_idx = self.tab_widget.count() - 1
         self.tab_widget.setCurrentIndex(curr_idx)

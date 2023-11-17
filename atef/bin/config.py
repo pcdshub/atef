@@ -58,6 +58,13 @@ def build_arg_parser(argparser=None):
     https://doc.qt.io/qt-5/qapplication.html#QApplication
     https://doc.qt.io/qt-5/qguiapplication.html#supported-command-line-options
     """
+    argparser.add_argument(
+        "--cache_size",
+        metavar="cache_size",
+        type=int,
+        default=5,
+        help="Page widget cache size",
+    )
 
     argparser.add_argument(
         "filenames",
@@ -70,9 +77,9 @@ def build_arg_parser(argparser=None):
     return argparser
 
 
-def main(filenames: Optional[List[AnyPath]] = None, **kwargs):
+def main(cache_size: int, filenames: Optional[List[AnyPath]] = None, **kwargs):
     app = QApplication(sys.argv)
-    main_window = Window(show_welcome=not filenames)
+    main_window = Window(cache_size=cache_size, show_welcome=not filenames)
     main_window.show()
     exception.install()
 
