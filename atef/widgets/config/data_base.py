@@ -47,9 +47,7 @@ class DataWidget(QWidget):
         Even parent is unlikely to see use because parent is set automatically
         when a widget is inserted into a layout.
     """
-    # TODO: Remove this from DataWidget.  Bride should live in TreeItem to
-    # to guarantee its existance.  Leaving this for now to not pre-maturely nuke
-    # the code base
+    # QDataclassBridge for this widget, other bridges may live in TreeItem
     _bridge_cache: ClassVar[
         WeakValueDictionary[int, QDataclassBridge]
     ] = WeakValueDictionary()
