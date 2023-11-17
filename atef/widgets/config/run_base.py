@@ -139,25 +139,25 @@ class ResultStatus(QLabel):
         self.data = data
 
     def update(self) -> None:
-        """ Slot for updating this label """
+        """Slot for updating this label"""
         self.update_icon()
         self.update_tooltip()
 
     def update_icon(self) -> None:
-        """ read the result and update the icon accordingly """
+        """read the result and update the icon accordingly"""
         chosen_icon = self.style_icons[self.data.result.severity]
         icon = self.style().standardIcon(chosen_icon)
         self.setPixmap(icon.pixmap(25, 25))
 
     def update_tooltip(self) -> None:
-        """ Helper method to update tooltip based on ``results`` """
+        """Helper method to update tooltip based on ``results``"""
         result = self.data.result
         uni_icon = self.unicode_icons[result.severity]
         tt = f'<p>{uni_icon}: {result.reason or "-"}</p>'
         self.setToolTip(tt)
 
     def event(self, event: QtCore.QEvent) -> bool:
-        """ Overload event method to update tooltips on tooltip-request """
+        """Overload event method to update tooltips on tooltip-request"""
         # Catch relevant events to update status tooltip
         if event.type() in (QtCore.QEvent.ToolTip, QtCore.QEvent.Paint):
             self.update()
@@ -255,7 +255,7 @@ class RunCheck(DesignerDisplay, QWidget):
     def _make_run_slot(self, configs) -> None:
 
         def run_slot(*args, **kwargs):
-            """ Slot that runs each step in the config list """
+            """Slot that runs each step in the config list"""
             for cfg in configs:
                 config_type = infer_step_type(cfg)
                 if config_type == 'active':
@@ -278,7 +278,7 @@ class RunCheck(DesignerDisplay, QWidget):
         self.run_button.clicked.connect(run_thread)
 
     def update_icon(self, label: QLabel, results: List[Result]) -> None:
-        """ Helper method to update icon on ``label`` based on ``results`` """
+        """Helper method to update icon on ``label`` based on ``results``"""
         combined_step_result = combine_results(results)
 
         chosen_icon = self.style_icons[combined_step_result.severity]
@@ -287,7 +287,7 @@ class RunCheck(DesignerDisplay, QWidget):
         label.setPixmap(icon.pixmap(25, 25))
 
     def update_label_tooltip(self, label: QLabel, results: List[Result]) -> None:
-        """ Helper method to update tooltip for ``label`` based on ``results`` """
+        """Helper method to update tooltip for ``label`` based on ``results``"""
         tt = ''
         for r in results:
             uni_icon = self.unicode_icons[r.severity]
@@ -296,7 +296,7 @@ class RunCheck(DesignerDisplay, QWidget):
         label.setToolTip('<p>' + tt.rstrip('<br>') + '</p>')
 
     def update_all_icons_tooltips(self) -> None:
-        """ Convenience method for updating all the icons and tooltips """
+        """Convenience method for updating all the icons and tooltips"""
         if not self.data:
             logger.debug('No config associated with this step')
             return
@@ -314,7 +314,7 @@ class RunCheck(DesignerDisplay, QWidget):
             self.update_label_tooltip(self.verify_label, self.verify_results)
 
     def event(self, event: QtCore.QEvent) -> bool:
-        """ Overload event method to update tooltips on tooltip-request """
+        """Overload event method to update tooltips on tooltip-request"""
         # Catch tooltip events to update status tooltip
         if event.type() == QtCore.QEvent.ToolTip:
             self.update_all_icons_tooltips()
@@ -339,7 +339,7 @@ class RunCheck(DesignerDisplay, QWidget):
             return None
 
     def setup_next_button(self, next_item: Optional[TreeItem] = None) -> None:
-        """ Link RunCheck's next button to the next widget in the tree """
+        """Link RunCheck's next button to the next widget in the tree"""
         if not next_item:
             return
         # rise out of placeholder into containing PageWidget

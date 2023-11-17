@@ -1206,7 +1206,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         return None
 
     def data_updated(self) -> None:
-        """ method for calling dataChanged on the entire view """
+        """method for calling dataChanged on the entire view"""
         top_left = self.index(0, 0, QtCore.QModelIndex())
         bottom_right = self.index(self.rowCount(QtCore.QModelIndex()),
                                   self.columnCount(QtCore.QModelIndex()),
@@ -1214,7 +1214,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         self.dataChanged.emit(top_left, bottom_right)
 
     def walk_items(self, item: TreeItem = None) -> Generator[TreeItem, None, None]:
-        """ Walk the tree items, depth first. """
+        """Walk the tree items, depth first."""
         if item is None:
             item = self.root_item
 
@@ -1317,7 +1317,7 @@ class TreeItem:
             return type(self._data).__name__
 
     def tooltip(self) -> str:
-        """ Construct the tooltip based on the stored result """
+        """Construct the tooltip based on the stored result"""
         if not self.prepared_data:
             return 'Failed to prepare'
         if self.combined_result:
@@ -1326,28 +1326,28 @@ class TreeItem:
         return ''
 
     def columnCount(self) -> int:
-        """ Return the item's column count """
+        """Return the item's column count"""
         return self._columncount
 
     def childCount(self) -> int:
-        """ Return the item's child count """
+        """Return the item's child count"""
         return len(self._children)
 
     def child(self, row: int) -> TreeItem:
-        """ Return the item's child """
+        """Return the item's child"""
         if row >= 0 and row < self.childCount():
             return self._children[row]
 
     def get_children(self) -> Generator[TreeItem, None, None]:
-        """ Yield this item's children """
+        """Yield this item's children"""
         yield from self._children
 
     def parent(self) -> TreeItem:
-        """ Return the item's parent """
+        """Return the item's parent"""
         return self._parent
 
     def row(self) -> int:
-        """ Return the item's row under its parent """
+        """Return the item's row under its parent"""
         return self._row
 
     def addChild(self, child: TreeItem) -> None:
@@ -1364,7 +1364,7 @@ class TreeItem:
         self._children.append(child)
 
     def removeChild(self, child: TreeItem) -> None:
-        """ Remove ``child`` from this TreeItem """
+        """Remove ``child`` from this TreeItem"""
         self._children.remove(child)
         child._parent = None
         # re-assign rows to children
@@ -1373,7 +1373,7 @@ class TreeItem:
             self.addChild(rchild)
 
     def replaceChild(self, old_child: TreeItem, new_child: TreeItem) -> None:
-        """ Replace ``old_child`` with ``new_child``, maintaining order """
+        """Replace ``old_child`` with ``new_child``, maintaining order"""
         for idx in range(self.childCount()):
             if self.child(idx) is old_child:
                 self._children[idx] = new_child
@@ -1387,7 +1387,7 @@ class TreeItem:
         raise IndexError('old child not found, could not replace')
 
     def takeChild(self, idx: int) -> TreeItem:
-        """ Remove and return the ``idx``-th child of this item """
+        """Remove and return the ``idx``-th child of this item"""
         child = self._children.pop(idx)
         child._parent = None
         # re-assign rows to children
@@ -1398,7 +1398,7 @@ class TreeItem:
         return child
 
     def insertChild(self, idx: int, child: TreeItem) -> None:
-        """ Add ``child`` to this TreeItem at index ``idx`` """
+        """Add ``child`` to this TreeItem at index ``idx``"""
         self._children.insert(idx, child)
         # re-assign rows to children
         remaining_children = self.takeChildren()
@@ -1547,7 +1547,7 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         row.delete_button.clicked.connect(inner_delete)
 
     def delete_table_row(self, row: QtWidgets.QWidget) -> None:
-        """ slot for a row's delete button.  Removes it from this table. """
+        """slot for a row's delete button.  Removes it from this table."""
         # get the data
         for row_index in range(self.rowCount()):
             widget = self.cellWidget(row_index, 0)
@@ -1558,7 +1558,7 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         self.table_updated.emit()
 
     def stash_row_numbers(self, *args, **kwargs):
-        """ Stash row numbers in row widgets """
+        """Stash row numbers in row widgets"""
         for row_num in range(self.rowCount()):
             row_widget = self.cellWidget(row_num, 0)
             row_widget.row_num = row_num

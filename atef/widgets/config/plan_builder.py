@@ -106,7 +106,7 @@ class ArgumentEntryWidget(QtWidgets.QWidget):
         # TODO: set description as tooltip?
 
     def value(self) -> Any:
-        """ Return the entered value as string. """
+        """Return the entered value as string."""
         raise NotImplementedError
 
     @classmethod

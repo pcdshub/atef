@@ -678,7 +678,7 @@ class AnyComparison(Comparison):
         self.is_prepared = True
 
     def children(self) -> List[Comparison]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return self.comparisons
 
     def replace_comparison(

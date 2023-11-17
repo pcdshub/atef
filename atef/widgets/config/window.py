@@ -365,17 +365,17 @@ class Window(DesignerDisplay, QMainWindow):
         pprint(self.serialize_tree(self.get_current_tree()))
 
     def open_archive_viewer(self, *args, **kwargs):
-        """ Open the archive viewer """
+        """Open the archive viewer"""
         widget = get_archive_viewer()
         widget.show()
 
     def print_report(self, *args, **kwargs):
-        """ Open save dialog for report output """
+        """Open save dialog for report output"""
         run_tree: DualTree = self.tab_widget.currentWidget()
         run_tree.print_report()
 
     def clear_results(self, *args, **kwargs):
-        """ clear results for the active file """
+        """clear results for the active file"""
         current_tree: DualTree = self.get_current_tree()
         config_file = current_tree.orig_file
         # ask for confirmation first
@@ -396,7 +396,7 @@ class Window(DesignerDisplay, QMainWindow):
         current_tree.update_statuses()
 
     def find_replace(self, *args, **kwargs):
-        """ find and replace in the current tree.  Open a find-replace widget """
+        """find and replace in the current tree.  Open a find-replace widget"""
         try:
             curr_tree = self.get_current_tree()
             logger.debug(f'starting find-replace: {self.get_current_tree().full_path}')
@@ -523,7 +523,7 @@ class DualTree(DesignerDisplay, QWidget):
         self.select_by_item(self.root_item.child(0))
 
     def assemble_tree(self) -> None:
-        """ init-time tree setup.  Sets the tree into edit mode """
+        """init-time tree setup.  Sets the tree into edit mode"""
         # self.tree_view = QtWidgets.QTreeView()
         self.refresh_model()
         self.tree_view.resizeColumnToContents(1)
@@ -577,7 +577,7 @@ class DualTree(DesignerDisplay, QWidget):
         )
 
     def select_by_item(self, item: TreeItem) -> None:
-        """ Select desired TreeItem(and show corresponding page) in TreeView """
+        """Select desired TreeItem(and show corresponding page) in TreeView"""
         # check if item is in tree before selecting?
         logger.debug(f'selecting page for item: {item.data(0)}')
         new_index = self.model.index_from_item(item)
@@ -585,7 +585,7 @@ class DualTree(DesignerDisplay, QWidget):
         sel_model.select(new_index, sel_model.ClearAndSelect | sel_model.Rows)
 
     def select_by_data(self, data: AnyDataclass) -> None:
-        """ Select the TreeItem containing ``data`` """
+        """Select the TreeItem containing ``data``"""
         for item in walk_tree_items(self.root_item):
             if item.orig_data is data:
                 self.select_by_item(item)
@@ -593,7 +593,7 @@ class DualTree(DesignerDisplay, QWidget):
 
     @property
     def current_item(self) -> Optional[TreeItem]:
-        """ return the currently selected item """
+        """return the currently selected item"""
         sel_model = self.tree_view.selectionModel()
         try:
             curr_index = sel_model.selectedIndexes()[0]
@@ -606,7 +606,7 @@ class DualTree(DesignerDisplay, QWidget):
         selected: QtCore.QItemSelection,
         previous: QtCore.QItemSelection
     ) -> None:
-        """ Show selected widget, construct it if necesary """
+        """Show selected widget, construct it if necesary"""
         # TODO: show busy cursor?
         try:
             current = selected.indexes()[0]
@@ -657,7 +657,7 @@ class DualTree(DesignerDisplay, QWidget):
             oldest_widget.deleteLater()
 
     def create_widget(self, item: TreeItem, mode: str) -> PageWidget:
-        """ Create the widget for ``item`` in ``mode``. """
+        """Create the widget for ``item`` in ``mode``."""
         data = item.orig_data
         # edit mode
         widget: PageWidget = PAGE_MAP[type(item.orig_data)](
@@ -714,7 +714,7 @@ class DualTree(DesignerDisplay, QWidget):
             return run_widget
 
     def update_statuses(self) -> None:
-        """ update every status icon based on stored config result """
+        """update every status icon based on stored config result"""
         for widget in self.run_widget_cache.values():
             try:
                 widget.run_check.update_all_icons_tooltips()
@@ -734,7 +734,7 @@ class DualTree(DesignerDisplay, QWidget):
 
     @contextmanager
     def modifies_tree(self, select_prev: bool = True) -> Generator[None, None, None]:
-        """ context manager in calls to modify the model layout """
+        """context manager in calls to modify the model layout"""
         self.model.layoutAboutToBeChanged.emit()
         try:
             yield
@@ -756,7 +756,7 @@ class DualTree(DesignerDisplay, QWidget):
             self.select_by_item(self.root_item.child(0))
 
     def switch_mode(self, value) -> None:
-        """ Switch tree modes between 'edit' and 'run' """
+        """Switch tree modes between 'edit' and 'run'"""
         if (not value and self.mode == 'edit') or (value and self.mode == 'run'):
             return
 
@@ -790,7 +790,7 @@ class DualTree(DesignerDisplay, QWidget):
             self.mode_switch_finished.disconnect(reset_cursor)
 
     def show_mode_widgets(self) -> None:
-        """ Show active widget, hide others. (re)generate RunTree if needed """
+        """Show active widget, hide others. (re)generate RunTree if needed"""
         # If run_tree requested check if there are changes
         # Do nothing if run tree exists and config has not changed
         update_run = False
@@ -831,7 +831,7 @@ class DualTree(DesignerDisplay, QWidget):
             self.select_by_item(curr_item)
 
     def print_report(self, *args, **kwargs):
-        """ setup button to print the report """
+        """setup button to print the report"""
         filename, _ = QFileDialog.getSaveFileName(
             parent=self,
             caption='Print report to:',
@@ -861,13 +861,13 @@ class DualTree(DesignerDisplay, QWidget):
             doc.create_report()
 
     def show_report_cust_prompt(self, info):
-        """ generate a window allowing user to customize information """
+        """generate a window allowing user to customize information"""
         msg = MultiInputDialog(parent=self, init_values=info)
         msg.exec()
         return msg
 
     def show_results_summary(self):
-        """ show the results summary widget """
+        """show the results summary widget"""
         self._summary_widget = ResultsSummaryWidget(file=self.prepared_file)
         self._summary_widget.setWindowTitle('Results Summary')
         self._summary_widget.show()

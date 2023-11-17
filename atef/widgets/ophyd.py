@@ -828,7 +828,7 @@ class OphydDeviceTableWidget(DesignerDisplay, QtWidgets.QFrame):
             self.attributes_selected.emit(attrs)
 
     def _open_archive_viewer(self):
-        """ Handler for opening Archive Viewer Widget """
+        """Handler for opening Archive Viewer Widget"""
         data = self.device_table_view.selected_attribute_data
 
         arch_widget = get_archive_viewer()

@@ -53,7 +53,7 @@ class Configuration:
     tags: Optional[List[str]] = None
 
     def children(self) -> List[Any]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return []
 
     def replace_comparison(
@@ -123,7 +123,7 @@ class ConfigurationGroup(Configuration):
                 yield from config.walk_configs()
 
     def children(self) -> List[Configuration]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return self.configs
 
 
@@ -147,7 +147,7 @@ class DeviceConfiguration(Configuration):
     shared: List[Comparison] = field(default_factory=list)
 
     def children(self) -> List[Comparison]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
                 + self.shared)
 
@@ -187,7 +187,7 @@ class PVConfiguration(Configuration):
     shared: List[Comparison] = field(default_factory=list)
 
     def children(self) -> List[Comparison]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return ([comp for comp_list in self.by_pv.values() for comp in comp_list]
                 + self.shared)
 
@@ -233,7 +233,7 @@ class ToolConfiguration(Configuration):
     shared: List[Comparison] = field(default_factory=list)
 
     def children(self) -> List[Comparison]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
                 + self.shared)
 
@@ -293,7 +293,7 @@ class ConfigurationFile:
         yield from self.root.walk_configs()
 
     def children(self) -> List[ConfigurationGroup]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return [self.root]
 
     def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
@@ -324,7 +324,7 @@ class ConfigurationFile:
 
     @classmethod
     def from_filename(cls, filename: AnyPath) -> ConfigurationFile:
-        """ Load a configuration file from a file.  Dispatches based on file type """
+        """Load a configuration file from a file.  Dispatches based on file type"""
         path = pathlib.Path(filename)
         if path.suffix.lower() == '.json':
             config = ConfigurationFile.from_json(path)
@@ -455,7 +455,7 @@ class PreparedFile:
         yield from self.root.walk_groups()
 
     def children(self) -> List[PreparedGroup]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return [self.root]
 
     async def compare(self) -> Result:
@@ -614,7 +614,7 @@ class PreparedConfiguration:
 
     @property
     def result(self) -> Result:
-        """ Re-compute the combined result and return it """
+        """Re-compute the combined result and return it"""
         # read results without running steps
         results = []
         for config in self.comparisons:
@@ -782,7 +782,7 @@ class PreparedGroup(PreparedConfiguration):
 
     @property
     def result(self) -> Result:
-        """ Re-compute the combined result and return it """
+        """Re-compute the combined result and return it"""
         # read results without running steps
         results = []
         for config in self.configs:

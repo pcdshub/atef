@@ -154,7 +154,7 @@ class IgnoreInteractionFilter(QObject):
     )
 
     def eventFilter(self, a0: QObject, a1: QEvent) -> bool:
-        """ ignore all interaction events while this filter is installed """
+        """ignore all interaction events while this filter is installed"""
         if a1.type() in self.interaction_events:
             return True
         else:

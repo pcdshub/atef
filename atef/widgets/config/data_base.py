@@ -235,7 +235,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         comp: Comparison,
         config: Union[Configuration, ProcedureStep]
     ) -> None:
-        """ Set up the archive viewer button """
+        """Set up the archive viewer button"""
         if self._viewer_initialized:
             # make sure this only happens once per instance
             return

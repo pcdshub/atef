@@ -2169,7 +2169,7 @@ class ComparisonPage(DesignerDisplay, PageWidget):
         self.name_desc_tags_widget.init_viewer(self.data, config)
 
     def setup_parent_callbacks(self) -> None:
-        """ Call parent's setup_comp_callbacks method """
+        """Call parent's setup_comp_callbacks method"""
         parent_widget = self.full_tree.maybe_get_widget(self.tree_item.parent())
         if parent_widget is None:
             return

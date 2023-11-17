@@ -1118,6 +1118,6 @@ class CheckRowWidget(TargetRowWidget):
         self.update_summary()
 
     def update_summary(self) -> None:
-        """ Update the summary label with the contianed Comparison's description """
+        """Update the summary label with the contianed Comparison's description"""
         comp = self.bridge.comparison.get()
         self.check_summary_label.setText(comp.describe())

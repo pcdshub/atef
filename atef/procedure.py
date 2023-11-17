@@ -86,7 +86,7 @@ class ProcedureStep:
         return self.result.severity == Severity.success
 
     def children(self) -> List[Any]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return []
 
 
@@ -104,7 +104,7 @@ class ProcedureGroup(ProcedureStep):
                 yield from step.walk_steps()
 
     def children(self) -> List[Union[ProcedureStep, ProcedureGroup]]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return self.steps
 
     def replace_step(
@@ -139,7 +139,7 @@ class SetValueStep(ProcedureStep):
     require_action_success: bool = True
 
     def children(self) -> List[ComparisonToTarget]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return [crit.comparison for crit in self.success_criteria]
 
     def replace_comparison(
@@ -147,7 +147,7 @@ class SetValueStep(ProcedureStep):
         old_comp: Comparison,
         new_comp: Comparison
     ) -> None:
-        """ replace ``old_comp`` with ``new_comp``, in success_criteria """
+        """replace ``old_comp`` with ``new_comp``, in success_criteria"""
         comp_list = [crit.comparison for crit in self.success_criteria]
         try:
             idx = comp_list.index(old_comp)
@@ -279,7 +279,7 @@ class PlanOptions:
     fixed_arguments: Optional[Sequence[str]] = None
 
     def to_plan_item(self: PlanOptions) -> Dict[str, Any]:
-        """ Makes a plan item (dictionary of parameters) for a given PlanStep """
+        """Makes a plan item (dictionary of parameters) for a given PlanStep"""
         it = {
             "name": self.plan,
             "args": self.args,
@@ -305,7 +305,7 @@ class PlanStep(ProcedureStep):
 
     def children(self) -> List[Union[PlanOptions, ComparisonToTarget,
                                      ComparisonToPlanData]]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         # Subject to change as PlanStep is developed
         return self.plans + [check.comparison for check in self.checks]
 
@@ -375,7 +375,7 @@ class ProcedureFile:
         yield from self.root.walk_steps()
 
     def children(self) -> List[ProcedureGroup]:
-        """ Return children of this group, as a tree view might expect """
+        """Return children of this group, as a tree view might expect"""
         return [self.root]
 
     @classmethod
@@ -540,7 +540,7 @@ class PreparedProcedureStep:
         raise NotImplementedError()
 
     async def run(self) -> Result:
-        """ Run the step and return the result """
+        """Run the step and return the result"""
         try:
             result = await self._run()
         except Exception as ex:
@@ -655,7 +655,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         return prepared
 
     async def run(self) -> Result:
-        """ Run all steps and return a combined result """
+        """Run all steps and return a combined result"""
         results = []
         for step in self.steps:
             results.append(await step.run())
@@ -674,7 +674,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
 
     @property
     def result(self) -> Result:
-        """ Re-compute the combined result and return it """
+        """Re-compute the combined result and return it"""
         results = []
         for step in self.steps:
             results.append(step.result)
@@ -734,7 +734,7 @@ class PreparedPassiveStep(PreparedProcedureStep):
     prepared_passive_file: Optional[PreparedFile] = None
 
     async def _run(self) -> Result:
-        """ Load, prepare, and run the passive step """
+        """Load, prepare, and run the passive step"""
         if not self.prepared_passive_file:
             return Result(severity=Severity.error, reason='No passive checkout to run')
         return await run_passive_step(self.prepared_passive_file)
@@ -787,7 +787,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
     )
 
     def walk_comparisons(self) -> Generator[PreparedComparison, None, None]:
-        """ Yields PreparedComparisons in this ProcedureStep """
+        """Yields PreparedComparisons in this ProcedureStep"""
         yield from self.prepared_criteria
 
     async def _run(self) -> Result:
@@ -1016,7 +1016,7 @@ class PreparedPlanStep(PreparedProcedureStep):
     )
 
     async def _run(self) -> Result:
-        """ Gather plan options and run the bluesky plan """
+        """Gather plan options and run the bluesky plan"""
         # Construct plan (get devices, organize args/kwargs, run)
         # verify
         # - gather namespace (plans, devices)

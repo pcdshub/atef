@@ -56,7 +56,7 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
         self.refresh_button.clicked.connect(self.run_config)
 
     def setup_tree(self):
-        """ Sets up ConfigTreeModel with the data from the ConfigurationFile """
+        """Sets up ConfigTreeModel with the data from the ConfigurationFile"""
         root_item = TreeItem(
             data=self.config_file, prepared_data=self.prepared_config
         )
@@ -73,7 +73,7 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
         self.tree_view.expandAll()
 
     def run_config(self, *args, **kwargs) -> None:
-        """ slot to be connected to RunCheck Button """
+        """slot to be connected to RunCheck Button"""
         try:
             self.tree_view.model().layoutAboutToBeChanged.emit()
         except AttributeError:
@@ -130,7 +130,7 @@ class SetValueRunWidget(DesignerDisplay, DataWidget):
                 table.setCellWidget(ins_ind, 0, action_row)
 
     def update_statuses(self):
-        """ slot to be connected to RunCheck button """
+        """slot to be connected to RunCheck button"""
         for table in (self.actions_table, self.checks_table):
             for i in range(table.rowCount()):
                 row_widget = table.cellWidget(i, 0)
