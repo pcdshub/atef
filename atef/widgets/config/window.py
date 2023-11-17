@@ -633,11 +633,6 @@ class DualTree(DesignerDisplay, QWidget):
             # not in cache, need to build the widget.
             new_widget = self.create_widget(item, mode)
 
-            if len(curr_cache) >= self.max_cache_size:
-                _, oldest_widget = curr_cache.popitem(last=False)
-                logger.debug(f'{mode} cache full, popping last widget: '
-                             f'({oldest_widget})')
-
             curr_cache[item] = new_widget
 
         # TODO: make sure current widget is never None later on
@@ -651,10 +646,19 @@ class DualTree(DesignerDisplay, QWidget):
         self.current_widget.setVisible(True)
         logger.debug(f'setting widget ({self.current_widget}) visible')
 
-        # remove oldest
-        if oldest_widget is not None:
-            oldest_widget.setParent(None)
-            oldest_widget.deleteLater()
+        # remove oldest if cache full.  Must destroy after new widget is shown
+        if len(curr_cache) >= self.max_cache_size:
+            _, oldest_widget = curr_cache.popitem(last=False)
+            logger.debug(f'{mode} cache full, popping last widget: '
+                         f'({oldest_widget})')
+
+            # typically this is fast enough, but if garbage collection is quick
+            # the widget may be deleted before we can delete it ourselves
+            try:
+                oldest_widget.setParent(None)
+                oldest_widget.deleteLater()
+            except RuntimeError:
+                pass
 
     def create_widget(self, item: TreeItem, mode: str) -> PageWidget:
         """Create the widget for ``item`` in ``mode``."""
