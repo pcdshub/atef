@@ -659,14 +659,14 @@ class DualTree(DesignerDisplay, QWidget):
     def create_widget(self, item: TreeItem, mode: str) -> PageWidget:
         """Create the widget for ``item`` in ``mode``."""
         data = item.orig_data
-        # edit mode
-        widget: PageWidget = PAGE_MAP[type(item.orig_data)](
-            data=data, tree_item=item, full_tree=self
-        )
+
         # TODO: Logic could be better, might not have to make edit widget when
         # separate run widget exists
         if mode == 'edit':
-            return widget
+            # edit mode
+            return PAGE_MAP[type(item.orig_data)](
+                data=data, tree_item=item, full_tree=self
+            )
         else:  # run mode
             if self.prepared_file is None:
                 self.refresh_prepared_file()
@@ -689,20 +689,24 @@ class DualTree(DesignerDisplay, QWidget):
                 else:
                     run_widget_cls = EDIT_TO_RUN_PAGE[type(data)]
                     # expects a single (top-level) step currently
-                    run_widget = run_widget_cls(data=prepared_data[0])
+                    run_widget = run_widget_cls(
+                        data=prepared_data[0], tree_item=item, full_tree=self)
             else:
+                edit_widget = PAGE_MAP[type(item.orig_data)](
+                    data=data, tree_item=item, full_tree=self
+                )
                 # can currently handle multiple prepared_data
                 # (e.g. multiple comparisons shown in one page)
-                run_widget = make_run_page(widget, prepared_data)
+                run_widget = make_run_page(edit_widget, prepared_data)
 
-                try:
-                    next_item = self._item_list[self._item_list.index(item) + 1]
-                except IndexError:
-                    run_widget.run_check.next_button.hide()
-                else:
-                    run_widget.run_check.setup_next_button(next_item)
+            try:
+                next_item = self._item_list[self._item_list.index(item) + 1]
+            except IndexError:
+                run_widget.run_check.next_button.hide()
+            else:
+                run_widget.run_check.setup_next_button(next_item)
 
-                # update all statuses every time a step is run
+            # update all statuses every time a step is run
             run_widget.run_check.results_updated.connect(self.update_statuses)
             # update tree statuses with every result update
             run_widget.run_check.results_updated.connect(
@@ -710,7 +714,6 @@ class DualTree(DesignerDisplay, QWidget):
             )
 
             # disable last 'next' button
-
             return run_widget
 
     def update_statuses(self) -> None:

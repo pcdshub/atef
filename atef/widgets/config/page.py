@@ -246,7 +246,6 @@ class PageWidget(QWidget):
         self.data = data
         if tree_item is not None:
             # assign tree item and check
-            assert tree_item.orig_data is data
             self.tree_item = tree_item
         else:
             self.tree_item = TreeItem(data=data)
@@ -1937,6 +1936,8 @@ class RunStepPage(DesignerDisplay, PageWidget):
             self.run_check.busy_thread.task_finished.connect(
                 self.run_widget.update_statuses
             )
+
+        self.post_tree_setup()
 
     def link_children(self) -> None:
         """
