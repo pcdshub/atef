@@ -677,6 +677,32 @@ class AnyComparison(Comparison):
             await comp.prepare(cache)
         self.is_prepared = True
 
+    def children(self) -> List[Comparison]:
+        """Return children of this group, as a tree view might expect"""
+        return self.comparisons
+
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+    ) -> None:
+        """
+        Replace ``old_comp`` with ``new_comp`` in this dataclass.
+        A common method for all dataclasses that hold comparisons.
+
+        Parameters
+        ----------
+        old_comp : Comparison
+            Comparsion to replace
+        new_comp : Comparison
+            Comparison to replace ``old_comp`` with
+        """
+        util.replace_in_list(
+            old=old_comp,
+            new=new_comp,
+            item_list=self.comparisons,
+        )
+
 
 @dataclass
 class Greater(BasicDynamic):
@@ -843,3 +869,7 @@ class Range(Comparison):
             await self.warn_high_dynamic.prepare(cache)
             self.warn_high = self.warn_high_dynamic.get()
         self.is_prepared = True
+
+
+ALL_COMPARISONS = [Equals, NotEquals, Greater, GreaterOrEqual, Less, LessOrEqual,
+                   Range, ValueSet, AnyValue, AnyComparison]

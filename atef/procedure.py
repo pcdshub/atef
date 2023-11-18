@@ -19,6 +19,7 @@ import datetime
 import json
 import logging
 import pathlib
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
                     Tuple, Union, cast)
@@ -84,6 +85,10 @@ class ProcedureStep:
         """
         return self.result.severity == Severity.success
 
+    def children(self) -> List[Any]:
+        """Return children of this group, as a tree view might expect"""
+        return []
+
 
 @dataclass
 class ProcedureGroup(ProcedureStep):
@@ -97,6 +102,17 @@ class ProcedureGroup(ProcedureStep):
             yield step
             if isinstance(step, ProcedureGroup):
                 yield from step.walk_steps()
+
+    def children(self) -> List[Union[ProcedureStep, ProcedureGroup]]:
+        """Return children of this group, as a tree view might expect"""
+        return self.steps
+
+    def replace_step(
+        self,
+        old_step: Union[ProcedureStep, ProcedureGroup],
+        new_step: Union[ProcedureStep, ProcedureGroup]
+    ) -> None:
+        util.replace_in_list(old_step, new_step, self.steps)
 
 
 @dataclass
@@ -113,7 +129,7 @@ class PassiveStep(ProcedureStep):
 
 @dataclass
 class SetValueStep(ProcedureStep):
-    """ A step that sets one or more values and checks one or more values after """
+    """A step that sets one or more values and checks one or more values after"""
     actions: List[ValueToTarget] = field(default_factory=list)
     success_criteria: List[ComparisonToTarget] = field(default_factory=list)
 
@@ -121,6 +137,32 @@ class SetValueStep(ProcedureStep):
     halt_on_fail: bool = True
     #: Only mark the step_result as successful if all actions have succeeded
     require_action_success: bool = True
+
+    def children(self) -> List[ComparisonToTarget]:
+        """Return children of this group, as a tree view might expect"""
+        return [crit.comparison for crit in self.success_criteria]
+
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison
+    ) -> None:
+        """replace ``old_comp`` with ``new_comp``, in success_criteria"""
+        comp_list = [crit.comparison for crit in self.success_criteria]
+        try:
+            idx = comp_list.index(old_comp)
+        except ValueError:
+            raise ValueError('attempted to replace a comparison that does not '
+                             f'exist: {old_comp} -> {new_comp}')
+
+        new_crit = deepcopy(self.success_criteria[idx])
+        new_crit.comparison = new_comp
+
+        util.replace_in_list(
+            old=self.success_criteria[idx],
+            new=new_crit,
+            item_list=self.success_criteria
+        )
 
 
 @dataclass
@@ -135,6 +177,7 @@ class Target:
     attr: Optional[str] = None
     #: EPICS PV
     pv: Optional[str] = None
+    # TODO: a method for getting the PV from device/attr pairs
 
     def to_signal(
         self,
@@ -236,7 +279,7 @@ class PlanOptions:
     fixed_arguments: Optional[Sequence[str]] = None
 
     def to_plan_item(self: PlanOptions) -> Dict[str, Any]:
-        """ Makes a plan item (dictionary of parameters) for a given PlanStep """
+        """Makes a plan item (dictionary of parameters) for a given PlanStep"""
         it = {
             "name": self.plan,
             "args": self.args,
@@ -259,6 +302,12 @@ class PlanStep(ProcedureStep):
     halt_on_fail: bool = True
     #: Only mark step_result successfull if all steps have succeeded
     require_plan_success: bool = True
+
+    def children(self) -> List[Union[PlanOptions, ComparisonToTarget,
+                                     ComparisonToPlanData]]:
+        """Return children of this group, as a tree view might expect"""
+        # Subject to change as PlanStep is developed
+        return self.plans + [check.comparison for check in self.checks]
 
 
 @dataclass
@@ -324,6 +373,10 @@ class ProcedureFile:
     def walk_steps(self) -> Generator[AnyProcedure, None, None]:
         yield self.root
         yield from self.root.walk_steps()
+
+    def children(self) -> List[ProcedureGroup]:
+        """Return children of this group, as a tree view might expect"""
+        return [self.root]
 
     @classmethod
     def from_filename(cls, filename: AnyPath) -> ProcedureFile:
@@ -408,7 +461,7 @@ class PreparedProcedureFile:
 
 @dataclass
 class FailedStep:
-    """ A step that failed to be prepared for running. """
+    """A step that failed to be prepared for running."""
     #: The data cache to use for the preparation step.
     parent: Optional[PreparedProcedureGroup]
     #: Configuration instance.
@@ -487,7 +540,7 @@ class PreparedProcedureStep:
         raise NotImplementedError()
 
     async def run(self) -> Result:
-        """ Run the step and return the result """
+        """Run the step and return the result"""
         try:
             result = await self._run()
         except Exception as ex:
@@ -602,7 +655,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         return prepared
 
     async def run(self) -> Result:
-        """ Run all steps and return a combined result """
+        """Run all steps and return a combined result"""
         results = []
         for step in self.steps:
             results.append(await step.run())
@@ -621,7 +674,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
 
     @property
     def result(self) -> Result:
-        """ Re-compute the combined result and return it """
+        """Re-compute the combined result and return it"""
         results = []
         for step in self.steps:
             results.append(step.result)
@@ -681,7 +734,7 @@ class PreparedPassiveStep(PreparedProcedureStep):
     prepared_passive_file: Optional[PreparedFile] = None
 
     async def _run(self) -> Result:
-        """ Load, prepare, and run the passive step """
+        """Load, prepare, and run the passive step"""
         if not self.prepared_passive_file:
             return Result(severity=Severity.error, reason='No passive checkout to run')
         return await run_passive_step(self.prepared_passive_file)
@@ -734,7 +787,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
     )
 
     def walk_comparisons(self) -> Generator[PreparedComparison, None, None]:
-        """ Yields PreparedComparisons in this ProcedureStep """
+        """Yields PreparedComparisons in this ProcedureStep"""
         yield from self.prepared_criteria
 
     async def _run(self) -> Result:
@@ -963,7 +1016,7 @@ class PreparedPlanStep(PreparedProcedureStep):
     )
 
     async def _run(self) -> Result:
-        """ Gather plan options and run the bluesky plan """
+        """Gather plan options and run the bluesky plan"""
         # Construct plan (get devices, organize args/kwargs, run)
         # verify
         # - gather namespace (plans, devices)

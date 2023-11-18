@@ -9,7 +9,7 @@ from atef.widgets.config.page import ComparisonPage, ConfigurationGroupPage
 
 
 def gather_comparisons(cfg: AnyDataclass):
-    """ Returns a list of comparisons in any of the possible fields """
+    """Returns a list of comparisons in any of the possible fields"""
     comps = []
     if hasattr(cfg, 'shared'):
         for comp in cfg.shared:
@@ -60,8 +60,9 @@ def test_add_delete_config(
     monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
                         lambda *args, **kwargs: QtWidgets.QMessageBox.Yes)
     qtbot.mouseClick(widget.delete_button, QtCore.Qt.LeftButton)
-
-    assert first_config not in configuration_group_page.data.configs
+    qtbot.wait_until(
+        lambda: first_config not in configuration_group_page.data.configs
+    )
 
 
 @pytest.mark.parametrize(
@@ -142,10 +143,11 @@ def test_change_comparison(
     # get comparison page
     row_widget = group_page.comparisons_table.cellWidget(0, 0)
     row_widget.child_button.clicked.emit()
-    comp_page = group_page.full_tree.currentItem().widget
+    qtbot.wait_until(lambda: isinstance(group_page.full_tree.current_widget,
+                                        ComparisonPage))
+    comp_page = group_page.full_tree.current_widget
     old_comp = comp_page.data
 
-    assert isinstance(comp_page, ComparisonPage)
     new_idxs = get_different_combo_options(comp_page.specific_combo)
 
     monkeypatch.setattr(QtWidgets.QMessageBox, 'question',

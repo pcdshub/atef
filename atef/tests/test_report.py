@@ -11,7 +11,7 @@ def test_demo_report(
     all_loaded_config: AnyDataclass,
     tmp_path: Path,
 ):
-    """ smoke test to check that reports can be generated """
+    """smoke test to check that reports can be generated"""
     save_path = tmp_path / 'tmp.pdf'
     save_path.touch()
     if isinstance(all_loaded_config, ConfigurationFile):

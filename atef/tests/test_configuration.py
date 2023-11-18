@@ -20,7 +20,7 @@ def test_yaml_equal_json(
     tmp_path: pathlib.Path,
     all_loaded_config: AnyDataclass
 ):
-    """ Read json, dump to yaml, compare dataclasses """
+    """Read json, dump to yaml, compare dataclasses"""
     all_loaded_config
 
     yaml_path = tmp_path / 'cfg.yaml'
@@ -38,10 +38,15 @@ def test_gather_pvs(
     device_configuration: DeviceConfiguration
 ):
     # only one pv in pv_configuration, will just grab all PV's
-    assert len(get_relevant_pvs('MY:PREFIX:hello', pv_configuration)) == 1
-    assert len(get_relevant_pvs('shared', pv_configuration)) == 1
+    pv_comps = list(pv_configuration.by_pv['MY:PREFIX:hello'])
+    for comp in pv_comps:
+        assert len(get_relevant_pvs(comp, pv_configuration)) == 1
+
+    shared_comp = pv_configuration.shared[0]
+    assert len(get_relevant_pvs(shared_comp, pv_configuration)) == 1
 
     # 2 devices, 2 attrs
-    assert len(get_relevant_pvs('fjdslka', device_configuration)) == 0
-    assert len(get_relevant_pvs('shared', device_configuration)) == 4
-    assert len(get_relevant_pvs('setpoint', device_configuration)) == 2
+    setpoint_comp = device_configuration.by_attr['setpoint'][0]
+    readback_comp = device_configuration.by_attr['readback'][0]
+    assert len(get_relevant_pvs(setpoint_comp, device_configuration)) == 2
+    assert len(get_relevant_pvs(readback_comp, device_configuration)) == 2

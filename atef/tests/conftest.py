@@ -4,7 +4,7 @@ import json
 import pathlib
 import tempfile
 from functools import partial
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, get_args
 
 import happi
 import ophyd
@@ -18,15 +18,15 @@ from qtpy import QtWidgets
 import atef
 from atef.cache import get_signal_cache
 from atef.check import Equals, Greater, GreaterOrEqual, LessOrEqual, NotEquals
-from atef.config import (ConfigurationFile, ConfigurationGroup,
-                         DeviceConfiguration, PVConfiguration,
-                         ToolConfiguration)
-from atef.procedure import ProcedureFile
+from atef.config import (AnyConfiguration, ConfigurationFile,
+                         ConfigurationGroup, DeviceConfiguration,
+                         PVConfiguration, ToolConfiguration)
+from atef.procedure import AnyProcedure, ProcedureFile
 from atef.tools import Ping
 from atef.type_hints import AnyDataclass
 from atef.util import ophyd_cleanup
-from atef.widgets.config.page import (PAGE_MAP, AtefItem, ComparisonPage,
-                                      PageWidget, link_page)
+from atef.widgets.config.page import ComparisonPage, PageWidget
+from atef.widgets.config.window import DualTree
 
 from ..archive_device import ArchivedValue, ArchiverHelper
 
@@ -330,11 +330,19 @@ def configuration_group():
 @pytest.fixture
 def make_page():
     def make_page_fn(cfg: AnyDataclass) -> PageWidget:
-        page_cls = PAGE_MAP[type(cfg)]
-        cfg_page = page_cls(cfg)
-        cfg_item = AtefItem(QtWidgets.QTreeWidget(), name='root',
-                            func_name=page_cls.__name__)
-        link_page(item=cfg_item, widget=cfg_page)
+        if isinstance(cfg, get_args(AnyConfiguration)):
+            file = ConfigurationFile()
+            file.root.configs.append(cfg)
+        elif isinstance(cfg, get_args(AnyProcedure)):
+            file = ProcedureFile()
+            file.root.steps.append(cfg)
+        else:
+            raise NotImplementedError()
+
+        tree = DualTree(orig_file=file)
+        tree.select_by_data(cfg)
+        cfg_page = tree.current_widget
+
         return cfg_page
 
     return make_page_fn

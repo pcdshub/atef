@@ -52,6 +52,53 @@ class Configuration:
     #: Tags tied to this configuration.
     tags: Optional[List[str]] = None
 
+    def children(self) -> List[Any]:
+        """Return children of this group, as a tree view might expect"""
+        return []
+
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+        comp_attrs: Optional[List[str]] = None
+    ) -> None:
+        """
+        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
+        Looks through ``shared``, then any of the attributes in ``comp_attrs``
+
+        Parameters
+        ----------
+        old_comp : Comparison
+            Comparison to be replaced
+        new_comp : Comparison
+            Comparison to replace ``old_comp`` with
+        comp_attrs : Optional[List[str]], optional
+            Attribute names in the dataclass to check, by default None
+        """
+        comp_attrs = comp_attrs or []
+        if not any(hasattr(self, attr) for attr in comp_attrs + ["shared"]):
+            return
+
+        try:
+            util.replace_in_list(
+                old=old_comp,
+                new=new_comp,
+                item_list=self.shared,
+            )
+        except ValueError:
+            for attr in comp_attrs:
+                for comp_list in getattr(self, attr, {}).values():
+                    try:
+                        util.replace_in_list(
+                            old=old_comp,
+                            new=new_comp,
+                            item_list=comp_list,
+                        )
+                    except ValueError:
+                        continue
+                    else:
+                        break
+
 
 @dataclass
 class ConfigurationGroup(Configuration):
@@ -75,6 +122,10 @@ class ConfigurationGroup(Configuration):
             if isinstance(config, ConfigurationGroup):
                 yield from config.walk_configs()
 
+    def children(self) -> List[Configuration]:
+        """Return children of this group, as a tree view might expect"""
+        return self.configs
+
 
 @dataclass
 class DeviceConfiguration(Configuration):
@@ -95,6 +146,35 @@ class DeviceConfiguration(Configuration):
     #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
     shared: List[Comparison] = field(default_factory=list)
 
+    def children(self) -> List[Comparison]:
+        """Return children of this group, as a tree view might expect"""
+        return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
+                + self.shared)
+
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+        comp_attrs: Optional[List[str]] = None
+    ) -> None:
+        """
+        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
+        Looks through ``shared``, then any of the attributes in ``comp_attrs``
+
+        Parameters
+        ----------
+        old_comp : Comparison
+            Comparison to be replaced
+        new_comp : Comparison
+            Comparison to replace ``old_comp`` with
+        comp_attrs : Optional[List[str]], optional
+            Attribute names in the dataclass to check, by default ['by_attr'] if
+            no value is provided
+        """
+        if comp_attrs is None:
+            comp_attrs = ['by_attr']
+        super().replace_comparison(old_comp, new_comp, comp_attrs)
+
 
 @dataclass
 class PVConfiguration(Configuration):
@@ -105,6 +185,35 @@ class PVConfiguration(Configuration):
     by_pv: Dict[str, List[Comparison]] = field(default_factory=dict)
     #: Comparisons to be run on *all* PVs in the `by_pv` dictionary.
     shared: List[Comparison] = field(default_factory=list)
+
+    def children(self) -> List[Comparison]:
+        """Return children of this group, as a tree view might expect"""
+        return ([comp for comp_list in self.by_pv.values() for comp in comp_list]
+                + self.shared)
+
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+        comp_attrs: Optional[List[str]] = None
+    ) -> None:
+        """
+        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
+        Looks through ``shared``, then any of the attributes in ``comp_attrs``
+
+        Parameters
+        ----------
+        old_comp : Comparison
+            Comparison to be replaced
+        new_comp : Comparison
+            Comparison to replace ``old_comp`` with
+        comp_attrs : Optional[List[str]], optional
+            Attribute names in the dataclass to check, by default ['by_pv'] if
+            no value is provided
+        """
+        if comp_attrs is None:
+            comp_attrs = ['by_pv']
+        super().replace_comparison(old_comp, new_comp, comp_attrs)
 
 
 @dataclass
@@ -122,6 +231,35 @@ class ToolConfiguration(Configuration):
     by_attr: Dict[str, List[Comparison]] = field(default_factory=dict)
     #: Comparisons to be run on *all* identifiers in the `by_attr` dictionary.
     shared: List[Comparison] = field(default_factory=list)
+
+    def children(self) -> List[Comparison]:
+        """Return children of this group, as a tree view might expect"""
+        return ([comp for comp_list in self.by_attr.values() for comp in comp_list]
+                + self.shared)
+
+    def replace_comparison(
+        self,
+        old_comp: Comparison,
+        new_comp: Comparison,
+        comp_attrs: Optional[List[str]] = None
+    ) -> None:
+        """
+        Replace ``old_comp`` with ``new_comp`` in this dataclass, wherever it is.
+        Looks through ``shared``, then any of the attributes in ``comp_attrs``
+
+        Parameters
+        ----------
+        old_comp : Comparison
+            Comparison to be replaced
+        new_comp : Comparison
+            Comparison to replace ``old_comp`` with
+        comp_attrs : Optional[List[str]], optional
+            Attribute names in the dataclass to check, by default ['by_attr'] if
+            no value is provided
+        """
+        if comp_attrs is None:
+            comp_attrs = ['by_attr']
+        super().replace_comparison(old_comp, new_comp, comp_attrs)
 
 
 AnyConfiguration = Union[
@@ -154,6 +292,10 @@ class ConfigurationFile:
         yield self.root
         yield from self.root.walk_configs()
 
+    def children(self) -> List[ConfigurationGroup]:
+        """Return children of this group, as a tree view might expect"""
+        return [self.root]
+
     def get_by_device(self, name: str) -> Generator[DeviceConfiguration, None, None]:
         """Get all configurations that match the device name."""
         for config in self.walk_configs():
@@ -182,7 +324,7 @@ class ConfigurationFile:
 
     @classmethod
     def from_filename(cls, filename: AnyPath) -> ConfigurationFile:
-        """ Load a configuration file from a file.  Dispatches based on file type """
+        """Load a configuration file from a file.  Dispatches based on file type"""
         path = pathlib.Path(filename)
         if path.suffix.lower() == '.json':
             config = ConfigurationFile.from_json(path)
@@ -311,6 +453,10 @@ class PreparedFile:
         """Walk through the prepared groups."""
         yield self.root
         yield from self.root.walk_groups()
+
+    def children(self) -> List[PreparedGroup]:
+        """Return children of this group, as a tree view might expect"""
+        return [self.root]
 
     async def compare(self) -> Result:
         """Run all comparisons and return a combined result."""
@@ -468,7 +614,7 @@ class PreparedConfiguration:
 
     @property
     def result(self) -> Result:
-        """ Re-compute the combined result and return it """
+        """Re-compute the combined result and return it"""
         # read results without running steps
         results = []
         for config in self.comparisons:
@@ -636,7 +782,7 @@ class PreparedGroup(PreparedConfiguration):
 
     @property
     def result(self) -> Result:
-        """ Re-compute the combined result and return it """
+        """Re-compute the combined result and return it"""
         # read results without running steps
         results = []
         for config in self.configs:
@@ -1505,7 +1651,7 @@ def get_result_from_comparison(
 async def run_passive_step(
     config: Union[PreparedComparison, PreparedConfiguration, PreparedFile]
 ):
-    """ Runs a given check and returns the result. """
+    """Runs a given check and returns the result."""
     # Warn if will run all subcomparisons?
     cache_fill_tasks = []
     try:

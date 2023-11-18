@@ -99,7 +99,7 @@ def _success_decorator(method):
 
 
 class ArchiverError(Exception):
-    """ Archiver related exceptions """
+    """Archiver related exceptions"""
     ...
 
 
@@ -239,7 +239,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.input_field.setValidator(PV_validator)
 
         def _add_item():
-            """ slot for input_field submission """
+            """slot for input_field submission"""
             # grab and clear text
             pv = self.input_field.text()
 
@@ -249,7 +249,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.input_field.returnPressed.connect(_add_item)
 
     def update_curves(self):
-        """ Clears the timeplot and adds any PV's present in the PVModel """
+        """Clears the timeplot and adds any PV's present in the PVModel"""
         # grab all the list items
         pv_data = self.curve_list.model().pvs
 
@@ -280,7 +280,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
         self.time_plot.setShowLegend(True)
 
     def clear_curves(self):
-        """ Clears the curves in the model and updates the plot """
+        """Clears the curves in the model and updates the plot"""
         while len(self.model.pvs) > 0:
             self.model.removeRow(0)
 

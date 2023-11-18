@@ -9,7 +9,7 @@ from atef.widgets.ophyd import (OphydAttributeData, OphydAttributeDataSummary,
 
 
 def test_ophyd_attribute_data(happi_client: happi.Client):
-    """ Pass if OphydAttributeData/Summary creation is successful """
+    """Pass if OphydAttributeData/Summary creation is successful"""
     dev = happi_client.search()[0].get()
     OphydAttributeData.from_device_attribute(dev, 'setpoint')
     odata = OphydAttributeData.from_device_attribute(dev, 'acceleration')

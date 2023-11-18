@@ -21,7 +21,7 @@ from atef.widgets.utils import insert_widget
 
 @dataclasses.dataclass
 class ResultInfo:
-    """ Normalized, and slightly processed view of configs/steps with results """
+    """Normalized, and slightly processed view of configs/steps with results"""
     status: Severity
     reason: str
 
@@ -212,12 +212,12 @@ class ResultModel(QtCore.QAbstractTableModel):
             return self.headers[section]
 
     def dclass_types(self) -> Set[str]:
-        """ Returns a set of the dataclass types stored in the model """
+        """Returns a set of the dataclass types stored in the model"""
         return set(res.type for res in self.result_info)
 
 
 class CheckableComboBox(QtWidgets.QComboBox):
-    """ A QComboBox that allows for multiple selection via checkable items """
+    """A QComboBox that allows for multiple selection via checkable items"""
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -252,12 +252,12 @@ class CheckableComboBox(QtWidgets.QComboBox):
         return False
 
     def showPopup(self):
-        """ Show popup if it's not open, and remember """
+        """Show popup if it's not open, and remember"""
         super().showPopup()
         self.popup_is_open = True
 
     def hidePopup(self):
-        """ Close popup and update the text """
+        """Close popup and update the text"""
         super().hidePopup()
         # Used to prevent immediate reopening when clicking on the lineEdit
         self.startTimer(100)
@@ -266,7 +266,7 @@ class CheckableComboBox(QtWidgets.QComboBox):
         self.popup_is_open = False
 
     def addItem(self, text: str, userData: Any = ...) -> None:
-        """ Adds an item with the given ``text`` and makes it checkable """
+        """Adds an item with the given ``text`` and makes it checkable"""
         super(CheckableComboBox, self).addItem(text)
         item: QtGui.QStandardItem = self.model().item(self.count() - 1, 0)
         item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
@@ -288,7 +288,7 @@ class CheckableComboBox(QtWidgets.QComboBox):
             item.setCheckState(Qt.Unchecked)
 
     def update_text(self) -> None:
-        """ Show a summary of selected items in the QComboBox LineEdit """
+        """Show a summary of selected items in the QComboBox LineEdit"""
         items = []
         for i in range(self.model().rowCount()):
             item = self.model().item(i, 0)
@@ -383,7 +383,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.filters_changed()
 
     def setup_ui(self) -> None:
-        """ Set up slots and do initial ui setup """
+        """Set up slots and do initial ui setup"""
         self.model = ResultModel.from_file(self.file)
         self.proxy_model = ResultFilterProxyModel()
         self.proxy_model.setSourceModel(self.model)
@@ -415,7 +415,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.refresh_results()
 
     def filters_changed(self, *args, **kwargs) -> None:
-        """ Update all the filters on the proxy model """
+        """Update all the filters on the proxy model"""
         self.proxy_model.name_regexp.setPattern(self.name_edit.text())
         self.proxy_model.reason_regexp.setPattern(self.reason_edit.text())
         self.proxy_model.allowed_statuses = self.get_allowed_statuses()
@@ -425,13 +425,13 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         self.update_plain_text()
 
     def get_allowed_statuses(self) -> List[str]:
-        """ Gather allowed status types from the status checkboxes """
+        """Gather allowed status types from the status checkboxes"""
         return [status_key for status_key, status_widget
                 in self.status_map.items()
                 if status_widget.isChecked()]
 
     def get_allowed_types(self) -> List[str]:
-        """ Gather the allowed types from the checkable combo box """
+        """Gather the allowed types from the checkable combo box"""
         allowed_types = []
         for i in range(self.type_combo.model().rowCount()):
             item = self.type_combo.model().item(i)
@@ -441,7 +441,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         return allowed_types
 
     def get_plain_text(self) -> str:
-        """ Generate plain text version of ResultsSummary Table """
+        """Generate plain text version of ResultsSummary Table"""
         text = 'status, type, name, reason'
         for i in range(self.proxy_model.rowCount()):
             text += '\n'
@@ -458,7 +458,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
         return text
 
     def update_plain_text(self) -> None:
-        """ Slot for updating plain text tab """
+        """Slot for updating plain text tab"""
         text = self.get_plain_text()
         self.results_text.setText(text)
 
@@ -487,7 +487,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
             self.type_combo.addItem(dclass_type)
 
     def save_text(self) -> None:
-        """ Save the csv representation of the filtered results table """
+        """Save the csv representation of the filtered results table"""
         text = self.get_plain_text().split('\n')
         if not text:
             return
@@ -506,7 +506,7 @@ class ResultsSummaryWidget(DesignerDisplay, QtWidgets.QWidget):
                 writer.writerow(row.split(',', 3))
 
     def copy_to_clipboard(self) -> None:
-        """ Copy the plain-text results table to the clipboard """
+        """Copy the plain-text results table to the clipboard"""
         text = self.get_plain_text()
         if not text:
             return

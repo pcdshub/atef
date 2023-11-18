@@ -539,7 +539,7 @@ class AtefReport(BaseDocTemplate):
         self.build_footer(canvas)
 
     def build_header(self, canvas: Canvas) -> None:
-        """ Populate and build header table """
+        """Populate and build header table"""
         canvas.saveState()
 
         header_table_data = [
@@ -573,7 +573,7 @@ class AtefReport(BaseDocTemplate):
         canvas.restoreState()
 
     def build_footer(self, canvas: Canvas) -> None:
-        """ Populate and build footer table """
+        """Populate and build footer table"""
         canvas.saveState()
         footer_caption = self.footer_center_text
         page_num = f'Page: {canvas.getPageNumber()}'
@@ -605,7 +605,7 @@ class AtefReport(BaseDocTemplate):
         footer_text: Optional[str] = None,
         approval_slots: Optional[int] = None
     ) -> None:
-        """ Ovderride or set default information used in the report """
+        """Ovderride or set default information used in the report"""
         if author:
             self.author = author
         if version:
@@ -675,7 +675,7 @@ class AtefReport(BaseDocTemplate):
         story.append(platypus.PageBreak())
 
     def build_linked_header(self, text: str, style: PS) -> Paragraph:
-        """ Create a unique bookmark name and add it to the header """
+        """Create a unique bookmark name and add it to the header"""
         mark_name = (text+style.name).encode('utf-8')
         bookmark_name = hashlib.sha1(mark_name).hexdigest()
         header = Paragraph(text + f'<a name="{bookmark_name}"/>', style)
@@ -745,7 +745,7 @@ class AtefReport(BaseDocTemplate):
         story.append(self.build_linked_header(header_text, style=style))
 
     def create_report(self) -> None:
-        """ Build the final report. """
+        """Build the final report."""
         raise NotImplementedError()
 
 

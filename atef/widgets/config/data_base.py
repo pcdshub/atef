@@ -4,14 +4,16 @@ Widgets used for manipulating the configuration data.
 from __future__ import annotations
 
 import logging
-from typing import ClassVar, List, Tuple
+from typing import ClassVar, List, Tuple, Union
 from weakref import WeakValueDictionary
 
 from qtpy.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QMessageBox, QPlainTextEdit, QStyle, QToolButton,
                             QVBoxLayout, QWidget)
 
+from atef.check import Comparison
 from atef.config import Configuration, ToolConfiguration
+from atef.procedure import ProcedureStep
 from atef.qt_helpers import QDataclassBridge, QDataclassList
 from atef.type_hints import AnyDataclass
 from atef.widgets.archive_viewer import get_archive_viewer
@@ -45,6 +47,7 @@ class DataWidget(QWidget):
         Even parent is unlikely to see use because parent is set automatically
         when a widget is inserted into a layout.
     """
+    # QDataclassBridge for this widget, other bridges may live in TreeItem
     _bridge_cache: ClassVar[
         WeakValueDictionary[int, QDataclassBridge]
     ] = WeakValueDictionary()
@@ -225,8 +228,12 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
 
         self.add_tag_button.clicked.connect(add_tag)
 
-    def init_viewer(self, attr: str, config: Configuration) -> None:
-        """ Set up the archive viewer button """
+    def init_viewer(
+        self,
+        comp: Comparison,
+        config: Union[Configuration, ProcedureStep]
+    ) -> None:
+        """Set up the archive viewer button"""
         if self._viewer_initialized:
             # make sure this only happens once per instance
             return
@@ -242,7 +249,7 @@ class NameDescTagsWidget(DesignerDisplay, NameMixin, DataWidget):
         def open_arch_viewer(*args, **kwargs):
             # only query PV info once requested.  grabbing devices and
             # their relevant PVs can be time consuming
-            pv_list = get_relevant_pvs(attr, config)
+            pv_list = get_relevant_pvs(comp, config)
             if len(pv_list) == 0:
                 QMessageBox.information(
                     self,

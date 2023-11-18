@@ -7,8 +7,9 @@ import time
 from dataclasses import fields
 from enum import IntEnum
 from itertools import zip_longest
-from typing import (Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type,
-                    Union)
+from typing import (Any, Callable, ClassVar, Dict, Generator, List, Optional,
+                    Tuple, Type, Union)
+from weakref import WeakValueDictionary
 
 import numpy as np
 import qtawesome as qta
@@ -31,16 +32,15 @@ from atef.cache import DataCache, get_signal_cache
 from atef.check import Comparison, EpicsValue, Equals, HappiValue, Range
 from atef.config import (Configuration, DeviceConfiguration,
                          PreparedComparison, PreparedConfiguration,
-                         PreparedFile, PVConfiguration, ToolConfiguration)
+                         PVConfiguration, ToolConfiguration)
 from atef.enums import Severity
 from atef.exceptions import DynamicValueError, MissingHappiDeviceError
-from atef.procedure import ProcedureFile, ProcedureStep, SetValueStep
+from atef.procedure import ProcedureStep, SetValueStep
 from atef.qt_helpers import (QDataclassBridge, QDataclassList, QDataclassValue,
                              ThreadWorker)
-from atef.result import combine_results, incomplete_result
+from atef.result import combine_results
 from atef.tools import Ping
-from atef.type_hints import Number
-from atef.walk import walk_steps
+from atef.type_hints import AnyDataclass, Number
 from atef.widgets.archive_viewer import get_archive_viewer
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
@@ -677,7 +677,47 @@ def setup_line_edit_data(
     value_obj.changed_value.connect(update_widget)
 
 
-def describe_comparison_context(attr: str, config: Configuration) -> str:
+def get_comp_field_in_parent(
+    comp: Comparison,
+    parent: Union[Configuration, ProcedureStep]
+) -> str:
+    """
+    Returns the field where ``comp`` resides in ``parent``.
+    Will have to be extended as more step types holding Comparison's are created
+
+    Parameters
+    ----------
+    comp : Comparison
+        The comparison, held by ``parent``
+    parent : Union[Configuration, ProcedureStep]
+        The dataclass that holds ``comp``
+
+    Returns
+    -------
+    str
+        The attribute name ``comp`` can be found in.  One of: {'shared',
+        'by_attr', 'by_pv', 'success_criteria'}
+    """
+    attr = ''
+    if comp in getattr(parent, 'shared', []):
+        attr = 'shared'
+    elif hasattr(parent, 'by_attr') or hasattr(parent, 'by_pv'):
+        attr_dict = getattr(parent, 'by_attr', {}) or getattr(parent, 'by_pv', {})
+        for attr_name, comparisons in attr_dict.items():
+            if comp in comparisons:
+                attr = attr_name
+                break
+    elif hasattr(parent, 'success_criteria'):
+        if comp in [crit.comparison for crit in parent.success_criteria]:
+            attr = 'success_criteria'
+
+    return attr
+
+
+def describe_comparison_context(
+    comp: Comparison,
+    parent: Union[Configuration, ProcedureStep]
+) -> str:
     """
     Describe in words what value or values we are comparing to.
 
@@ -691,31 +731,33 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
         ToolConfiguration that has the contextual information for
         understanding attr.
     """
+    attr = get_comp_field_in_parent(comp, parent)
+
     if not attr:
         return 'Error loading context information'
-    if isinstance(config, DeviceConfiguration):
-        num_devices = len(config.devices)
+    if isinstance(parent, DeviceConfiguration):
+        num_devices = len(parent.devices)
         if num_devices == 0:
             return 'Invalid comparison to zero devices'
         if attr == 'shared':
-            num_signals = len(config.by_attr)
+            num_signals = len(parent.by_attr)
             if num_signals == 0:
                 return 'Invalid comparison to zero signals'
             if num_devices == 1 and num_signals == 1:
                 # device_name.signal_name
                 return (
-                    f'Comparison to value of {config.devices[0]}.'
-                    f'{list(config.by_attr)[0]}'
+                    f'Comparison to value of {parent.devices[0]}.'
+                    f'{list(parent.by_attr)[0]}'
                 )
             if num_devices > 1 and num_signals == 1:
                 return (
-                    f'Comparison to value of {list(config.by_attr)[0]} '
+                    f'Comparison to value of {list(parent.by_attr)[0]} '
                     f'signal on each of {num_devices} devices'
                 )
             if num_devices == 1 and num_signals > 1:
                 return (
                     f'Comparison to value of {num_signals} '
-                    f'signals on {config.devices[0]}'
+                    f'signals on {parent.devices[0]}'
                 )
             return (
                 f'Comparison to value of {num_signals} signals '
@@ -724,30 +766,30 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
         # Must be one specific signal
         if num_devices == 1:
             # device_name.signal_name
-            return f'Comparison to value of {config.devices[0]}.{attr}'
+            return f'Comparison to value of {parent.devices[0]}.{attr}'
         return (
             f'Comparison to value of {attr} '
             f'on each of {num_devices} devices'
         )
-    if isinstance(config, PVConfiguration):
+    if isinstance(parent, PVConfiguration):
         if attr == 'shared':
-            num_pvs = len(config.by_pv)
+            num_pvs = len(parent.by_pv)
             if num_pvs == 0:
                 return 'Invalid comparison to zero PVs'
             if num_pvs == 1:
-                return f'Comparison to value of {list(config.by_pv)[0]}'
+                return f'Comparison to value of {list(parent.by_pv)[0]}'
             return f'Comparison to value of each of {num_pvs} pvs'
         return f'Comparison to value of {attr}'
-    if isinstance(config, ToolConfiguration):
-        if isinstance(config.tool, Ping):
-            num_hosts = len(config.tool.hosts)
+    if isinstance(parent, ToolConfiguration):
+        if isinstance(parent.tool, Ping):
+            num_hosts = len(parent.tool.hosts)
             if num_hosts == 0:
                 return 'Invalid comparison to zero ping hosts'
             if attr == 'shared':
                 if num_hosts == 1:
                     return (
                         'Comparison to all different results from pinging '
-                        f'{config.tool.hosts[0]}'
+                        f'{parent.tool.hosts[0]}'
                     )
                 return (
                     'Comparison to all different results from pinging '
@@ -756,12 +798,14 @@ def describe_comparison_context(attr: str, config: Configuration) -> str:
             if num_hosts == 1:
                 return (
                     f'Comparison to {attr} result '
-                    f'from pinging {config.tool.hosts[0]}'
+                    f'from pinging {parent.tool.hosts[0]}'
                 )
             return (
                 f'Comparison to {attr} result from pinging {num_hosts} hosts'
             )
         return 'Comparison to unknown tool results'
+    if isinstance(parent, SetValueStep):
+        return f'Comparison is success critiera of {parent.name or "SetValueStep"}'
     return 'Invalid comparison'
 
 
@@ -773,38 +817,39 @@ def describe_step_context(attr: str, step: ProcedureStep) -> str:
 
 
 def get_relevant_pvs(
-    attr: str,
-    config: Configuration
+    comp: Comparison,
+    parent: Union[Configuration, ProcedureStep]
 ) -> List[Tuple[str, str]]:
     """
     Get the pvs and corresponding attribute name for the provided comparison.
 
     Parameters
     ----------
-    attr : str
-        The attribute, pvname or other string identifier to compare to.
-        This can also be 'shared'
-    config : Configuration
+    comp : Comparison
+        The comparison to gather PVs for
+    parent : Union[Configuration, ProcedureStep]
         Typically a DeviceConfiguration, PVConfiguration, or
-        ToolConfiguration that has the contextual information for
-        understanding attr.
+        ToolConfiguration that contains ``comp``
+
     Returns
     -------
     List[Tuple[str, str]]
         A list of tuples (PV:NAME, device.attr.name) containing the
         relevant pv information
     """
-    if isinstance(config, PVConfiguration):
+    attr = get_comp_field_in_parent(comp, parent)
+
+    if isinstance(parent, PVConfiguration):
         # we have raw PV's here, with no attrs
-        return [(pv, None) for pv in config.by_pv.keys()]
-    if isinstance(config, DeviceConfiguration):
+        return [(pv, None) for pv in parent.by_pv.keys()]
+    if isinstance(parent, DeviceConfiguration):
         pv_list = []
         if attr == 'shared':
             # Use all pvs in the config
-            attrs = config.by_attr.keys()
+            attrs = parent.by_attr.keys()
         else:
             attrs = list([attr])
-        for device_name in config.devices:
+        for device_name in parent.devices:
             dev = util.get_happi_device_by_name(device_name)
             for curr_attr in attrs:
                 try:
@@ -814,6 +859,13 @@ def get_relevant_pvs(
                 if pv:
                     pv_list.append((pv, device_name + '.' + curr_attr))
 
+        return pv_list
+    if isinstance(parent, SetValueStep):
+        for crit in parent.success_criteria:
+            if comp is crit.comparison:
+                # TODO: get PV from device/component pairs
+                pv_list = [crit.pv]
+                break
         return pv_list
 
 
@@ -956,21 +1008,6 @@ class MultiInputDialog(QtWidgets.QDialog):
         return info
 
 
-def clear_results(config_file: PreparedFile | ProcedureFile) -> None:
-    if isinstance(config_file, ProcedureFile):
-        # clear all results when making a new run tree
-        for step in walk_steps(config_file.root):
-            step.step_result = incomplete_result()
-            step.verify_result = incomplete_result()
-            step.combined_result = incomplete_result()
-
-    elif isinstance(config_file, PreparedFile):
-        for comp in config_file.walk_comparisons():
-            comp.result = incomplete_result()
-        for group in config_file.walk_groups():
-            group.result = incomplete_result()
-
-
 class ConfigTreeModel(QtCore.QAbstractItemModel):
     """
     Item model for tree data.  Goes through all this effort due to the need for
@@ -1059,6 +1096,9 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         # all else
         return QtCore.QModelIndex()
 
+    def index_from_item(self, item: TreeItem) -> QtCore.QModelIndex:
+        return self.createIndex(item.row(), 0, item)
+
     def parent(self, index: QtCore.QModelIndex) -> QtCore.QModelIndex:
         """
         Returns the parent of the given model item.
@@ -1076,8 +1116,10 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return QtCore.QModelIndex()
         child = index.internalPointer()
+        if child is self.root_item:
+            return QtCore.QModelIndex()
         parent = child.parent()
-        if parent == self.root_item:
+        if parent in (self.root_item, None):
             return QtCore.QModelIndex()
 
         return self.createIndex(parent.row(), 0, parent)
@@ -1141,7 +1183,7 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return None
 
-        item = index.internalPointer()
+        item = index.internalPointer()  # Gives original TreeItem
         # special handling for status info
         if index.column() == 1:
             if role == Qt.ForegroundRole:
@@ -1158,15 +1200,31 @@ class ConfigTreeModel(QtCore.QAbstractItemModel):
         if role == Qt.DisplayRole:
             return item.data(index.column())
 
+        if role == Qt.UserRole:
+            return item
+
         return None
 
     def data_updated(self) -> None:
-        """ method for calling dataChanged on the entire view """
+        """method for calling dataChanged on the entire view"""
         top_left = self.index(0, 0, QtCore.QModelIndex())
         bottom_right = self.index(self.rowCount(QtCore.QModelIndex()),
                                   self.columnCount(QtCore.QModelIndex()),
                                   QtCore.QModelIndex())
         self.dataChanged.emit(top_left, bottom_right)
+
+    def walk_items(self, item: TreeItem = None) -> Generator[TreeItem, None, None]:
+        """Walk the tree items, depth first."""
+        if item is None:
+            item = self.root_item
+
+        # skip first root node
+        if item.orig_data is not None:
+            yield item
+
+        if item.childCount() > 0:
+            for i in range(item.childCount()):
+                yield from self.walk_items(item.child(i))
 
 
 # TODO: Rename this and related helpers to be more specific
@@ -1181,6 +1239,12 @@ class TreeItem:
     If ``prepared_data`` is provided, Result information can be provided to the
     model via the ``.data()`` method
     """
+    _bridge_cache: ClassVar[
+        WeakValueDictionary[int, QDataclassBridge]
+    ] = WeakValueDictionary()
+    bridge: QDataclassBridge
+    data: AnyDataclass
+
     result_icon_map = {
         # check mark
         Severity.success: ('\u2713', QColor(0, 128, 0, 255)),
@@ -1195,7 +1259,7 @@ class TreeItem:
         self,
         data: Optional[Union[Configuration, Comparison]] = None,
         prepared_data: Optional[List[PreparedConfiguration, PreparedComparison]] = None,
-        widget: Optional[QtWidgets.QWidget] = None
+        tree_parent: Optional[TreeItem] = None
     ) -> None:
         self._data = data
         self.prepared_data = prepared_data
@@ -1203,8 +1267,18 @@ class TreeItem:
         self._columncount = 3
         self._children: List[TreeItem] = []
         self._parent = None
-        self._row = 0
-        self.widget = widget
+        self._row = 0  # (self._row)th child of this item's parent
+        if tree_parent:
+            tree_parent.addChild(self)
+
+        # Assign bridge
+        if self._data:
+            try:
+                self.bridge = self._bridge_cache[id(data)]
+            except KeyError:
+                bridge = QDataclassBridge(data)
+                self._bridge_cache[id(data)] = bridge
+                self.bridge = bridge
 
     def data(self, column: int) -> Any:
         """
@@ -1243,7 +1317,7 @@ class TreeItem:
             return type(self._data).__name__
 
     def tooltip(self) -> str:
-        """ Construct the tooltip based on the stored result """
+        """Construct the tooltip based on the stored result"""
         if not self.prepared_data:
             return 'Failed to prepare'
         if self.combined_result:
@@ -1252,24 +1326,28 @@ class TreeItem:
         return ''
 
     def columnCount(self) -> int:
-        """ Return the item's column count """
+        """Return the item's column count"""
         return self._columncount
 
     def childCount(self) -> int:
-        """ Return the item's child count """
+        """Return the item's child count"""
         return len(self._children)
 
     def child(self, row: int) -> TreeItem:
-        """ Return the item's child """
+        """Return the item's child"""
         if row >= 0 and row < self.childCount():
             return self._children[row]
 
+    def get_children(self) -> Generator[TreeItem, None, None]:
+        """Yield this item's children"""
+        yield from self._children
+
     def parent(self) -> TreeItem:
-        """ Return the item's parent """
+        """Return the item's parent"""
         return self._parent
 
     def row(self) -> int:
-        """ Return the item's row under its parent """
+        """Return the item's row under its parent"""
         return self._row
 
     def addChild(self, child: TreeItem) -> None:
@@ -1284,7 +1362,77 @@ class TreeItem:
         child._parent = self
         child._row = len(self._children)
         self._children.append(child)
-        self._columncount = max(child.columnCount(), self._columncount)
+
+    def removeChild(self, child: TreeItem) -> None:
+        """Remove ``child`` from this TreeItem"""
+        self._children.remove(child)
+        child._parent = None
+        # re-assign rows to children
+        remaining_children = self.takeChildren()
+        for rchild in remaining_children:
+            self.addChild(rchild)
+
+    def replaceChild(self, old_child: TreeItem, new_child: TreeItem) -> None:
+        """Replace ``old_child`` with ``new_child``, maintaining order"""
+        for idx in range(self.childCount()):
+            if self.child(idx) is old_child:
+                self._children[idx] = new_child
+                new_child._parent = self
+                new_child._row = idx
+
+                # dereference old_child
+                old_child._parent = None
+                return
+
+        raise IndexError('old child not found, could not replace')
+
+    def takeChild(self, idx: int) -> TreeItem:
+        """Remove and return the ``idx``-th child of this item"""
+        child = self._children.pop(idx)
+        child._parent = None
+        # re-assign rows to children
+        remaining_children = self.takeChildren()
+        for rchild in remaining_children:
+            self.addChild(rchild)
+
+        return child
+
+    def insertChild(self, idx: int, child: TreeItem) -> None:
+        """Add ``child`` to this TreeItem at index ``idx``"""
+        self._children.insert(idx, child)
+        # re-assign rows to children
+        remaining_children = self.takeChildren()
+        for rchild in remaining_children:
+            self.addChild(rchild)
+
+    def takeChildren(self) -> list[TreeItem]:
+        """
+        Remove and return this item's children
+        """
+        children = self._children
+        self._children = []
+        for child in children:
+            child._parent = None
+
+        return children
+
+    @property
+    def orig_data(self):
+        return self._data
+
+    @property
+    def prep_data(self):
+        return self.prepared_data
+
+    def find_ancestor_by_data_type(self, types: Type[AnyDataclass]) -> Optional[TreeItem]:
+        """Find an ancestor widget of the given type."""
+        ancestor = self.parent()
+        while ancestor is not None:
+            if type(ancestor.orig_data) in types:
+                return ancestor
+            ancestor = ancestor.parent()
+
+        return None
 
 
 class AddRowWidget(DesignerDisplay, QWidget):
@@ -1399,7 +1547,7 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         row.delete_button.clicked.connect(inner_delete)
 
     def delete_table_row(self, row: QtWidgets.QWidget) -> None:
-        """ slot for a row's delete button.  Removes it from this table. """
+        """slot for a row's delete button.  Removes it from this table."""
         # get the data
         for row_index in range(self.rowCount()):
             widget = self.cellWidget(row_index, 0)
@@ -1410,7 +1558,7 @@ class TableWidgetWithAddRow(QtWidgets.QTableWidget):
         self.table_updated.emit()
 
     def stash_row_numbers(self, *args, **kwargs):
-        """ Stash row numbers in row widgets """
+        """Stash row numbers in row widgets"""
         for row_num in range(self.rowCount()):
             row_widget = self.cellWidget(row_num, 0)
             row_widget.row_num = row_num
@@ -1916,8 +2064,8 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
             # self.ids: List[str]
             signal_cache = get_signal_cache()
             sigs: List[EpicsSignalRO] = []
-            for id in self.ids:
-                sigs.append(signal_cache[id])
+            for single_id in self.ids:
+                sigs.append(signal_cache[single_id])
 
         else:
             # Collect signals from ids as device attrs
@@ -2044,7 +2192,7 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
 
 
 def disable_widget(widget: QWidget) -> QWidget:
-    """ Disable widget, recurse through layouts """
+    """Disable widget, recurse through layouts"""
     # TODO: revisit, is there a better way to do this?
     for idx in range(widget.layout().count()):
         layout_item = widget.layout().itemAt(idx)
