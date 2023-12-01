@@ -45,6 +45,7 @@ from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
+from atef.widgets.config.paged_table import PagedTableWidget
 from atef.widgets.config.run_active import (DescriptionRunWidget,
                                             PassiveRunWidget,
                                             SetValueRunWidget)
@@ -63,7 +64,8 @@ from .data_passive import (AnyComparisonWidget, AnyValueWidget,
                            ValueSetWidget)
 from .utils import (MultiModeValueEdit, TableWidgetWithAddRow, TreeItem,
                     cast_dataclass, describe_comparison_context,
-                    describe_step_context, gather_relevant_identifiers)
+                    describe_step_context, gather_relevant_identifiers,
+                    get_comp_field_in_parent)
 
 if TYPE_CHECKING:
     from .window import DualTree
@@ -405,7 +407,7 @@ class PageWidget(QWidget):
     def delete_table_row(
         self,
         *args,
-        table: QTableWidget,
+        table: PagedTableWidget,
         item: TreeItem,
         row: DataWidget,
         **kwargs
@@ -435,11 +437,12 @@ class PageWidget(QWidget):
                 pass
 
         # Remove row from the table
-        for row_index in range(table.rowCount()):
-            widget = table.cellWidget(row_index, 0)
-            if widget is row:
-                table.removeRow(row_index)
-                break
+        table.remove_data(row.data)
+        # for row_index in range(table.rowCount()):
+        #     widget = table.cellWidget(row_index, 0)
+        #     if widget is row:
+        #         table.removeRow(row_index)
+        #         break
         # Remove configuration from the data structure
         self.remove_table_data(data)
 
@@ -787,7 +790,8 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     device_widget_placeholder: QWidget
     device_config_widget: DeviceConfigurationWidget
 
-    comparisons_table: QTableWidget
+    comparisons_table_placeholder: QWidget
+    comparisons_table: PagedTableWidget
     add_comparison_button: QPushButton
 
     attr_selector_cache: WeakSet[QComboBox]
@@ -801,6 +805,12 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         self.insert_widget(
             self.device_config_widget,
             self.device_widget_placeholder,
+        )
+
+        self.comparisons_table = PagedTableWidget(item_list=data.shared)
+        self.insert_widget(
+            self.comparisons_table,
+            self.comparisons_table_placeholder
         )
         self.post_tree_setup()
 
@@ -830,7 +840,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             # New comparison
             comparison = Equals(name='untitled')
             self.data.shared.append(comparison)
-        comp_row = ComparisonRowWidget(data=comparison)
 
         comp_item = None
         for child_item in self.tree_item.get_children():
@@ -844,19 +853,28 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                     tree_parent=self.tree_item,
                 )
 
-        self.setup_row_buttons(
-            row_widget=comp_row,
-            item=comp_item,
-            table=self.comparisons_table,
-        )
-        self.attr_selector_cache.add(comp_row.attr_combo)
-        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
-        self.update_combo_attrs()
-        comp_row.attr_combo.setCurrentText(attr)
         row_count = self.comparisons_table.rowCount()
-        self.comparisons_table.insertRow(row_count)
-        self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
-        self.comparisons_table.setCellWidget(row_count, 0, comp_row)
+
+        def configure_row_widget(widget):
+            self.setup_row_buttons(
+                row_widget=widget,
+                item=comp_item,
+                table=self.comparisons_table,
+            )
+            attr = get_comp_field_in_parent(comparison, self.data)
+            self.attr_selector_cache.add(widget.attr_combo)
+
+            self.update_combo_attrs(widget)
+            widget.attr_combo.setCurrentText(attr)
+
+            update_slot = WeakPartialMethodSlot(
+                widget.attr_combo, widget.attr_combo.currentTextChanged,
+                self.update_comparison_dicts, comparison=comparison,
+            )
+
+            self._partial_slots.append(update_slot)
+
+        self.comparisons_table.insert_setup_row(row_count, comparison, configure_row_widget)
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -874,28 +892,34 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                 else:
                     break
 
-    def update_combo_attrs(self) -> None:
+    def update_combo_attrs(self, row_widget: ComparisonRowWidget) -> None:
         """
         For every row combobox, set the allowed values.
         """
-        for combo in self.attr_selector_cache:
-            orig_value = combo.currentText()
-            combo.clear()
-            found_attr = False
-            for index, attr in enumerate(self.data.by_attr):
-                combo.addItem(attr)
-                if orig_value == attr:
-                    combo.setCurrentIndex(index)
-                    found_attr = True
-            combo.addItem('shared')
-            if not found_attr:
-                # Should be shared
-                combo.setCurrentIndex(combo.count() - 1)
+        print('update_combo_attrs')
+        # for combo in self.attr_selector_cache:
+        combo = row_widget.attr_combo
+        orig_value = combo.currentText()
+        combo.clear()
+        found_attr = False
+        for index, attr in enumerate(self.data.by_attr):
+            combo.addItem(attr)
+            if orig_value == attr:
+                combo.setCurrentIndex(index)
+                found_attr = True
+        combo.addItem('shared')
+        if not found_attr:
+            # Should be shared
+            combo.setCurrentIndex(combo.count() - 1)
 
-    def update_comparison_dicts(self, *args, **kwargs) -> None:
+    def update_comparison_dicts(self, text: str, *args, comparison: Comparison, **kwargs) -> None:
         """
-        Rebuild by_attr and shared when user changes anything
+        Update comparison location in parent config
         """
+        print('called for update')
+        print(f'{text} -> {comparison}')
+        self.data.move_comparison(comparison, text)
+        return
         unsorted: List[Tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.rowCount()):

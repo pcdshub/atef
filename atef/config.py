@@ -99,6 +99,32 @@ class Configuration:
                     else:
                         break
 
+    def move_comparison(
+        self,
+        comp: Comparison,
+        new_attr: str,
+        comp_attrs: List[str],
+    ) -> None:
+        print(f'super.move_comparison: ({comp}) -> {new_attr}')
+        if not any(hasattr(self, att) for att in comp_attrs + ["shared"]):
+            print('an attr is missing')
+            return
+
+        # remove from all attrs
+        util.remove_by_id(self.shared, comp)
+        for attr in comp_attrs:
+            for comp_list in getattr(self, attr, {}).values():
+                util.remove_by_id(comp_list, comp)
+
+        # place into new_attr
+        if new_attr == "shared":
+            self.shared.append(comp)
+        else:
+            for attr in comp_attrs:
+                attr_dict = getattr(self, attr, {})
+                if new_attr in attr_dict:
+                    attr_dict[new_attr].append(comp)
+
 
 @dataclass
 class ConfigurationGroup(Configuration):
@@ -175,6 +201,14 @@ class DeviceConfiguration(Configuration):
             comp_attrs = ['by_attr']
         super().replace_comparison(old_comp, new_comp, comp_attrs)
 
+    def move_comparison(
+        self,
+        comp: Comparison,
+        new_attr: str,
+        comp_attrs: Optional[List[str]] = None
+    ) -> None:
+        super().move_comparison(comp, new_attr, comp_attrs=['by_attr'])
+
 
 @dataclass
 class PVConfiguration(Configuration):
@@ -214,6 +248,14 @@ class PVConfiguration(Configuration):
         if comp_attrs is None:
             comp_attrs = ['by_pv']
         super().replace_comparison(old_comp, new_comp, comp_attrs)
+
+    def move_comparison(
+        self,
+        comp: Comparison,
+        new_attr: str,
+        comp_attrs: Optional[List[str]] = None
+    ) -> None:
+        super().move_comparison(comp, new_attr, comp_attrs=['by_pv'])
 
 
 @dataclass
@@ -260,6 +302,14 @@ class ToolConfiguration(Configuration):
         if comp_attrs is None:
             comp_attrs = ['by_attr']
         super().replace_comparison(old_comp, new_comp, comp_attrs)
+
+    def move_comparison(
+        self,
+        comp: Comparison,
+        new_attr: str,
+        comp_attrs: Optional[List[str]] = None
+    ) -> None:
+        super().move_comparison(comp, new_attr, comp_attrs=['by_attr'])
 
 
 AnyConfiguration = Union[
