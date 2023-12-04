@@ -21,7 +21,10 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
 
     filename = 'paged_table.ui'
 
-    # TODO mimic QTableWidget methods used
+    # TODO mimic QTableWidget methods used?
+    # TODO: Dynamic page size
+    # TODO: Show specific comparison
+    # TODO: title header
 
     def __init__(
         self,
@@ -37,7 +40,7 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.page_size = page_size
         self.row_cls = widget_cls
 
-        self.source_model = QtGui.QStandardItemModel(1, 1, parent=self)
+        self.source_model = QtGui.QStandardItemModel(0, 1, parent=self)
         self.proxy_model = PagedProxyModel(self)
         self.proxy_model.setSourceModel(self.source_model)
         self.table_view.setModel(self.proxy_model)
@@ -52,9 +55,8 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
             for item in item_list:
                 self.insertRow(item, self.rowCount())
 
-        self.show_page(1)
-
         self.setup_ui()
+        self.show_page(1)
 
     def setup_ui(self) -> None:
         # link spinbox to show_page
@@ -87,6 +89,8 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         # reset total pages
         self.page_count_label.setText(f'/ {self.proxy_model.total_pages}')
         self.page_spinbox.setMaximum(self.proxy_model.total_pages)
+        if self.proxy_model.total_pages > 0:
+            self.page_spinbox.setMinimum(1)
 
     def show_page(self, page_no: int):
         # set page 0 to clear history effects
@@ -100,6 +104,9 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         # set proper page for filter model
         self.proxy_model.curr_page = page_no
         self.update_table()
+
+    def refresh(self) -> None:
+        self.show_page(self.proxy_model.curr_page)
 
     def insertRow(self, data: Any, index: int) -> None:
         # add item to model
@@ -118,38 +125,52 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.update_table()
         # TODO: Figure out how to ensure
 
-    def remove_data(self, data: Any) -> None:
-        """Removes ``data`` from source model"""
+    def find_data(self, data: Any, role: int = USER_DATA_ROLE) -> QModelIndex:
+        """Return index for ``data`` at ``role`` in source model"""
         for row_num in range(self.source_model.rowCount()):
             row_index = self.source_model.index(row_num, 0)
-            if row_index.data(USER_DATA_ROLE) is data:
-                self.source_model.removeRow(row_num)
-                return
+            if row_index.data(role) is data:
+                return row_index
 
-    def get_widget_for_data(self, data: Any) -> Optional[Any]:
-        """Return widget for with supplied data"""
-        # Delegate creates and destroys widgets, no bueno
-        raise NotImplementedError
+    def remove_data(self, data: Any) -> None:
+        """Removes ``data`` from source model"""
+        index = self.find_data(data)
+        self.source_model.removeRow(index.row())
 
-    def cellWidget(self, row: int, column: int) -> None:
-        # not necessary probably
-        pass
+    def replace_data(
+        self,
+        old_data: Any,
+        new_data: Any,
+        search_role: int = USER_DATA_ROLE,
+        repl_role: int = USER_DATA_ROLE
+    ) -> None:
+        index = self.find_data(old_data, search_role)
+        item = self.source_model.itemFromIndex(index)
+        item.setData(new_data, repl_role)
 
     def rowCount(self) -> int:
         # return total number of rows
         return self.source_model.rowCount()
 
-    def selectedIndexes(self) -> QtCore.QModelIndex:
-        pass
-
-    def indexAt(self) -> QtCore.QModelIndex:
-        pass
+    def resizeEvent(self, a0: QtGui.QResizeEvent) -> None:
+        super().resizeEvent(a0)
+        table_height = self.table_view.size().height()
+        index = self.proxy_model.index(0, 0)
+        row_widget = self.table_view.indexWidget(index)
+        if not row_widget:
+            return
+        row_height = row_widget.sizeHint().height()
+        num_rows = table_height // row_height
+        self.proxy_model.page_size = num_rows
+        self.refresh()
+        return
 
 
 class PagedProxyModel(QtCore.QSortFilterProxyModel):
-    def __init__(self, *args, page_size=3, **kwargs):
+    def __init__(self, *args, page_size=3, max_page_size=50, **kwargs):
         super().__init__(*args, **kwargs)
         self.page_size = page_size
+        self.max_page_size = max_page_size
         self.curr_page = 1
         self.search_regexp = QtCore.QRegularExpression()
 
@@ -161,6 +182,7 @@ class PagedProxyModel(QtCore.QSortFilterProxyModel):
         self.max_count = self.min_count + self.page_size
 
     def invalidateFilter(self) -> None:
+        self.page_size = min(self.page_size, self.max_page_size)
         self.total_pages = 0
 
         self.total_displayed = 0
@@ -185,7 +207,6 @@ class PagedProxyModel(QtCore.QSortFilterProxyModel):
         allowed: row passes filter, will be considered in page count
         reason: reason for decision
         """
-        print(f'pr: ({accepted, allowed, reason})')
         if accepted and not allowed:
             self.total_displayed += 1
 
@@ -197,7 +218,6 @@ class PagedProxyModel(QtCore.QSortFilterProxyModel):
         return accepted
 
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
-        print(f'far: {source_row}')
         source = self.sourceModel()
         index = source.index(source_row, self.filterKeyColumn(), source_parent)
         # TODO: Include basic search text (for name field?)
