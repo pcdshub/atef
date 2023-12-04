@@ -22,7 +22,7 @@ from collections import OrderedDict
 from functools import partial
 from typing import (TYPE_CHECKING, Any, ClassVar, Dict, Generator, List,
                     Optional, Tuple, Type, Union)
-from weakref import WeakSet, WeakValueDictionary
+from weakref import WeakValueDictionary
 
 from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy.QtGui import QDropEvent
@@ -832,12 +832,8 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     comparisons_table: PagedTableWidget
     add_comparison_button: QPushButton
 
-    # attr_selector_cache: WeakSet[QComboBox]
-
     def __init__(self, data: DeviceConfiguration, **kwargs):
         super().__init__(data=data, **kwargs)
-        # Create the static sub-widgets and place them
-        # self.attr_selector_cache = WeakSet()
         self.setup_name_desc_tags_init()
         self.device_config_widget = DeviceConfigurationWidget(data=data)
         self.insert_widget(
@@ -922,7 +918,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         """
         For every row combobox, set the allowed values.
         """
-        # for combo in self.attr_selector_cache:
         combo = row_widget.attr_combo
         orig_value = combo.currentText()
         combo.clear()
@@ -1007,20 +1002,23 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
     pv_widget_placeholder: QWidget
     pv_configuration_widget: PVConfigurationWidget
 
-    comparisons_table: QTableWidget
+    comparisons_table_placeholder: QWidget
+    comparisons_table: PagedTableWidget
     add_comparison_button: QPushButton
-
-    attr_selector_cache: WeakSet[QComboBox]
 
     def __init__(self, data: PVConfiguration, **kwargs):
         super().__init__(data=data, **kwargs)
-        # Create the static sub-widgets and place them
-        self.attr_selector_cache = WeakSet()
         self.setup_name_desc_tags_init()
         self.pv_configuration_widget = PVConfigurationWidget(data=data)
         self.insert_widget(
             self.pv_configuration_widget,
             self.pv_widget_placeholder,
+        )
+
+        self.comparisons_table = PagedTableWidget(title="Comparisons")
+        self.insert_widget(
+            self.comparisons_table,
+            self.comparisons_table_placeholder
         )
         self.post_tree_setup()
 
@@ -1050,7 +1048,6 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             # New comparison
             comparison = Equals(name='untitled')
             self.data.shared.append(comparison)
-        comp_row = ComparisonRowWidget(data=comparison)
 
         comp_item = None
         for child_item in self.tree_item.get_children():
@@ -1065,19 +1062,14 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                     tree_parent=self.tree_item,
                 )
 
-        self.setup_row_buttons(
-            row_widget=comp_row,
-            item=comp_item,
-            table=self.comparisons_table,
-        )
-        self.attr_selector_cache.add(comp_row.attr_combo)
-        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
-        self.update_combo_attrs()
-        comp_row.attr_combo.setCurrentText(attr)
         row_count = self.comparisons_table.rowCount()
-        self.comparisons_table.insertRow(row_count)
-        self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
-        self.comparisons_table.setCellWidget(row_count, 0, comp_row)
+        self.comparisons_table.insert_setup_row(
+            row_count,
+            comparison,
+            partial(self.configure_row_widget,
+                    comparison=comparison,
+                    comp_item=comp_item)
+        )
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -1095,34 +1087,39 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                 else:
                     break
 
-    def update_combo_attrs(self) -> None:
+    def update_combo_attrs(self, row_widget: ComparisonRowWidget) -> None:
         """
-        For every row combobox, set the allowed values.
+        For set the allowed values for ``row_widget``
         """
-        for combo in self.attr_selector_cache:
-            orig_value = combo.currentText()
-            combo.clear()
-            found_attr = False
-            for index, attr in enumerate(self.data.by_pv):
-                combo.addItem(attr)
-                if orig_value == attr:
-                    combo.setCurrentIndex(index)
-                    found_attr = True
-            combo.addItem('shared')
-            if not found_attr:
-                # Should be shared
-                combo.setCurrentIndex(combo.count() - 1)
+        combo = row_widget.attr_combo
+        orig_value = combo.currentText()
+        combo.clear()
+        found_attr = False
+        for index, attr in enumerate(self.data.by_pv):
+            combo.addItem(attr)
+            if orig_value == attr:
+                combo.setCurrentIndex(index)
+                found_attr = True
+        combo.addItem('shared')
+        if not found_attr:
+            # Should be shared
+            combo.setCurrentIndex(combo.count() - 1)
+
+    def update_comparison_attr(self, text: str, *args, comparison: Comparison, **kwargs) -> None:
+        self.data.move_comparison(comparison, text)
 
     def update_comparison_dicts(self, *args, **kwargs) -> None:
         """
-        Rebuild by_attr and shared when user changes anything
+        Rebuild by_attr and shared when user changes anything (e.g. a PV is deleted)
         """
         unsorted: List[Tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.rowCount()):
-            row_widget = self.comparisons_table.cellWidget(row_index, 0)
+            # TODO: make thisd page table method
+            comp = self.comparisons_table.source_model.index(row_index, 0).data(USER_DATA_ROLE)
+            curr_attr = get_comp_field_in_parent(comp, self.data)
             unsorted.append(
-                (row_widget.attr_combo.currentText(), row_widget.data)
+                (curr_attr, comp)
             )
 
         def get_sort_key(elem: Tuple[str, Comparison]):
@@ -1143,6 +1140,8 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         self.data.by_pv = by_pv
         self.data.shared = shared
 
+        self.comparisons_table.refresh()
+
     def replace_comparison(
         self,
         old_comparison: Comparison,
@@ -1152,27 +1151,15 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         """
         Finds the row widget and replaces it with a new row widget.
         """
-        found_row = None
-        prev_attr_index = 0
-        for row_index in range(self.comparisons_table.rowCount()):
-            widget = self.comparisons_table.cellWidget(row_index, 0)
-            if widget.data is old_comparison:
-                found_row = row_index
-                prev_attr_index = widget.attr_combo.currentIndex()
-                break
-        if found_row is None:
-            return
-        comp_row = ComparisonRowWidget(data=new_comparison)
-        self.setup_row_buttons(
-            row_widget=comp_row,
-            item=comp_item,
-            table=self.comparisons_table,
+        self.comparisons_table.replace_data(old_comparison, new_comparison)
+
+        self.comparisons_table.replace_data(
+            new_comparison,
+            partial(self.configure_row_widget,
+                    comparison=new_comparison,
+                    comp_item=comp_item),
+            repl_role=SETUP_SLOT_ROLE
         )
-        self.attr_selector_cache.add(comp_row.attr_combo)
-        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
-        self.comparisons_table.setCellWidget(found_row, 0, comp_row)
-        self.update_combo_attrs()
-        comp_row.attr_combo.setCurrentIndex(prev_attr_index)
 
 
 class ToolConfigurationPage(DesignerDisplay, PageWidget):
@@ -1187,11 +1174,10 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
     tool_placeholder: QWidget
     tool_widget: DataWidget
 
-    comparisons_table: QTableWidget
+    comparisons_table_placeholder: QWidget
+    comparisons_table: PagedTableWidget
     add_comparison_button: QPushButton
     tool_select_combo: QComboBox
-
-    attr_selector_cache: WeakSet[QComboBox]
 
     # Defines the valid tools, their result structs, and edit widgets
     tool_map: ClassVar[Dict[Type[Tool], Tuple[Type[ToolResult], Type[DataWidget]]]] = {
@@ -1202,8 +1188,13 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
     def __init__(self, data: ToolConfiguration, **kwargs):
         super().__init__(data=data, **kwargs)
         # Create the static sub-widgets and place them
-        self.attr_selector_cache = WeakSet()
         self.setup_name_desc_tags_init()
+
+        self.comparisons_table = PagedTableWidget(title="Comparisons")
+        self.insert_widget(
+            self.comparisons_table,
+            self.comparisons_table_placeholder
+        )
         self.post_tree_setup()
 
     def post_tree_setup(self) -> None:
@@ -1239,8 +1230,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             # New comparison
             comparison = Equals(name='untitled')
             self.data.shared.append(comparison)
-        comp_row = ComparisonRowWidget(data=comparison)
-        # comp_page = ComparisonPage(data=comparison)
+
         comp_item = None
         for child_item in self.tree_item.get_children():
             if child_item.orig_data is comparison:
@@ -1253,19 +1243,15 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                     tree_parent=self.tree_item,
                 )
 
-        self.setup_row_buttons(
-            row_widget=comp_row,
-            item=comp_item,
-            table=self.comparisons_table,
-        )
-        self.attr_selector_cache.add(comp_row.attr_combo)
-        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
-        self.update_combo_attrs()
-        comp_row.attr_combo.setCurrentText(attr)
         row_count = self.comparisons_table.rowCount()
-        self.comparisons_table.insertRow(row_count)
-        self.comparisons_table.setRowHeight(row_count, comp_row.sizeHint().height())
-        self.comparisons_table.setCellWidget(row_count, 0, comp_row)
+
+        self.comparisons_table.insert_setup_row(
+            row_count,
+            comparison,
+            partial(self.configure_row_widget,
+                    comparison=comparison,
+                    comp_item=comp_item)
+        )
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -1283,23 +1269,30 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 else:
                     break
 
-    def update_combo_attrs(self) -> None:
+    def update_combo_attrs(self, row_widget: ComparisonRowWidget) -> None:
         """
         For every row combobox, set the allowed values.
         """
-        for combo in self.attr_selector_cache:
-            orig_value = combo.currentText()
-            combo.clear()
-            found_attr = False
-            for index, attr in enumerate(self.data.by_attr):
-                combo.addItem(attr)
-                if orig_value == attr:
-                    combo.setCurrentIndex(index)
-                    found_attr = True
-            combo.addItem('shared')
-            if not found_attr:
-                # Should be shared
-                combo.setCurrentIndex(combo.count() - 1)
+        combo = row_widget.attr_combo
+        orig_value = combo.currentText()
+        combo.clear()
+        found_attr = False
+        for index, attr in enumerate(self.data.by_attr):
+            combo.addItem(attr)
+            if orig_value == attr:
+                combo.setCurrentIndex(index)
+                found_attr = True
+        combo.addItem('shared')
+        if not found_attr:
+            # Should be shared
+            combo.setCurrentIndex(combo.count() - 1)
+
+    def update_comparison_attr(self, text: str, *args, comparison: Comparison, **kwargs) -> None:
+        """
+        Update comparison location in parent config
+        """
+        self.data.move_comparison(comparison, text)
+        return
 
     def update_comparison_dicts(self, *args, **kwargs) -> None:
         """
@@ -1308,9 +1301,10 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         unsorted: List[Tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.rowCount()):
-            row_widget = self.comparisons_table.cellWidget(row_index, 0)
+            comp = self.comparisons_table.source_model.index(row_index, 0).data(USER_DATA_ROLE)
+            curr_attr = get_comp_field_in_parent(comp, self.data)
             unsorted.append(
-                (row_widget.attr_combo.currentText(), row_widget.data)
+                (curr_attr, comp)
             )
 
         def get_sort_key(elem: Tuple[str, Comparison]):
@@ -1345,27 +1339,15 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         """
         Replaces row widget in this page
         """
-        found_row = None
-        prev_attr_index = 0
-        for row_index in range(self.comparisons_table.rowCount()):
-            widget = self.comparisons_table.cellWidget(row_index, 0)
-            if widget.data is old_comparison:
-                found_row = row_index
-                prev_attr_index = widget.attr_combo.currentIndex()
-                break
-        if found_row is None:
-            return
-        comp_row = ComparisonRowWidget(data=new_comparison)
-        self.setup_row_buttons(
-            row_widget=comp_row,
-            item=comp_item,
-            table=self.comparisons_table,
+        self.comparisons_table.replace_data(old_comparison, new_comparison)
+
+        self.comparisons_table.replace_data(
+            new_comparison,
+            partial(self.configure_row_widget,
+                    comparison=new_comparison,
+                    comp_item=comp_item),
+            repl_role=SETUP_SLOT_ROLE
         )
-        self.attr_selector_cache.add(comp_row.attr_combo)
-        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
-        self.comparisons_table.setCellWidget(found_row, 0, comp_row)
-        self.update_combo_attrs()
-        comp_row.attr_combo.setCurrentIndex(prev_attr_index)
 
     def new_tool(self, tool: Tool) -> None:
         """
@@ -1388,8 +1370,8 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         # Set by_attr correctly to match the result type
         # Also migrates lost comparisons to shared
         self.update_comparison_dicts()
-        # Update the selection choices to match the tool
-        self.update_combo_attrs()
+        # refresh table, updating choices
+        self.comparisons_table.refresh()
 
     def new_tool_selected(self, tool_name: str) -> None:
         """

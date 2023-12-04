@@ -105,9 +105,8 @@ class Configuration:
         new_attr: str,
         comp_attrs: List[str],
     ) -> None:
-        print(f'super.move_comparison: ({comp}) -> {new_attr}')
         if not any(hasattr(self, att) for att in comp_attrs + ["shared"]):
-            print('an attr is missing')
+            logger.debug('cannot find a requested attr in dataclass')
             return
 
         # remove from all attrs

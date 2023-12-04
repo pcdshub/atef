@@ -29,6 +29,7 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
     def __init__(
         self,
         *args,
+        title: Optional[str] = None,
         item_list: Optional[List[Any]] = None,
         page_size: Optional[int] = None,
         widget_cls: Optional[QtWidgets.QWidget] = ComparisonRowWidget,
@@ -48,7 +49,11 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.row_delegate = CustDelegate(widget_cls=self.row_cls)
         self.table_view.setItemDelegateForColumn(0, self.row_delegate)
         self.table_view.horizontalHeader().setStretchLastSection(True)
-        self.table_view.setSortingEnabled(True)
+        if title:
+            self.source_model.setHeaderData(0, Qt.Horizontal, title, Qt.DisplayRole)
+        else:
+            self.table_view.horizontalHeader().hide()
+        self.table_view.verticalHeader().hide()
         self.proxy_model.sort(-1)
 
         if item_list:
@@ -63,7 +68,7 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.page_spinbox.valueChanged.connect(self.show_page)
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button.clicked.connect(self.next_page)
-        self.search_edit.editingFinished.connect(self.update_table)
+        self.search_edit.textChanged.connect(self.update_table)
         self.update_table()
 
     def next_page(self, *args, **kwargs) -> None:

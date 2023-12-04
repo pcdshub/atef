@@ -655,6 +655,7 @@ class DualTree(DesignerDisplay, QWidget):
             # typically this is fast enough, but if garbage collection is quick
             # the widget may be deleted before we can delete it ourselves
             try:
+                print(f'*** deleting widget from cache: {oldest_widget} ***')
                 oldest_widget.setParent(None)
                 oldest_widget.deleteLater()
             except RuntimeError:
