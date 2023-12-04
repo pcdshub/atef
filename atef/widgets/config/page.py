@@ -19,6 +19,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from collections import OrderedDict
+from functools import partial
 from typing import (TYPE_CHECKING, Any, ClassVar, Dict, Generator, List,
                     Optional, Tuple, Type, Union)
 from weakref import WeakSet, WeakValueDictionary
@@ -45,7 +46,8 @@ from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
-from atef.widgets.config.paged_table import PagedTableWidget
+from atef.widgets.config.paged_table import (SETUP_SLOT_ROLE, USER_DATA_ROLE,
+                                             PagedTableWidget)
 from atef.widgets.config.run_active import (DescriptionRunWidget,
                                             PassiveRunWidget,
                                             SetValueRunWidget)
@@ -512,6 +514,39 @@ class PageWidget(QWidget):
         self.setup_parent_button(self.name_desc_tags_widget.parent_button)
         # self.connect_tree_node_name(self.name_desc_tags_widget)
 
+    def configure_row_widget(
+        self,
+        widget: ComparisonRowWidget,
+        comparison: Comparison,
+        comp_item: TreeItem
+    ) -> None:
+        """
+        Function that finishes initialization of a row widget, connecting buttons,
+        adding slots etc.
+
+        Relies on ``update_comparison_attr`` and ``update_combo_attrs`` methods,
+        assumes they are implemented
+
+        This is to be held by a PagedTableWidget, but is itself not a qt slot.
+        Thus there is no need to WeakPartialMethodSlot it
+        """
+        self.setup_row_buttons(
+            row_widget=widget,
+            item=comp_item,
+            table=self.comparisons_table,
+        )
+        attr = get_comp_field_in_parent(comparison, self.data)
+
+        self.update_combo_attrs(widget)
+        widget.attr_combo.setCurrentText(attr)
+
+        update_slot = WeakPartialMethodSlot(
+            widget.attr_combo, widget.attr_combo.currentTextChanged,
+            self.update_comparison_attr, comparison=comparison,
+        )
+        # TODO: Figure out how to clean these up, delegates should be deleted
+        self._partial_slots.append(update_slot)
+
     def setup_comparison_table_link(
         self,
         by_attr_key: str,
@@ -565,9 +600,6 @@ class PageWidget(QWidget):
             if data_widget is not None:
                 # When the attrs update, update the allowed attrs in each row
                 getattr(data_widget.bridge, by_attr_key).updated.connect(
-                    self.update_combo_attrs
-                )
-                getattr(data_widget.bridge, by_attr_key).updated.connect(
                     self.update_comparison_dicts
                 )
             self.comp_table_setup_done = True
@@ -602,6 +634,12 @@ class PageWidget(QWidget):
     def update_combo_attrs(self) -> None:
         """
         For every row combobox, set the allowed values.
+        """
+        raise NotImplementedError()
+
+    def update_comparison_attr(self) -> None:
+        """
+        Update the comparison's attr in this dataclass
         """
         raise NotImplementedError()
 
@@ -794,12 +832,12 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     comparisons_table: PagedTableWidget
     add_comparison_button: QPushButton
 
-    attr_selector_cache: WeakSet[QComboBox]
+    # attr_selector_cache: WeakSet[QComboBox]
 
     def __init__(self, data: DeviceConfiguration, **kwargs):
         super().__init__(data=data, **kwargs)
         # Create the static sub-widgets and place them
-        self.attr_selector_cache = WeakSet()
+        # self.attr_selector_cache = WeakSet()
         self.setup_name_desc_tags_init()
         self.device_config_widget = DeviceConfigurationWidget(data=data)
         self.insert_widget(
@@ -807,7 +845,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             self.device_widget_placeholder,
         )
 
-        self.comparisons_table = PagedTableWidget(item_list=data.shared)
+        self.comparisons_table = PagedTableWidget(title="Comparisons")
         self.insert_widget(
             self.comparisons_table,
             self.comparisons_table_placeholder
@@ -823,6 +861,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             by_attr_key='by_attr',
             data_widget=self.device_config_widget,
         )
+        self.comparisons_table.show_page(1)
         self.setup_name_desc_tags_link()
 
     def add_comparison_row(
@@ -855,26 +894,13 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
 
         row_count = self.comparisons_table.rowCount()
 
-        def configure_row_widget(widget):
-            self.setup_row_buttons(
-                row_widget=widget,
-                item=comp_item,
-                table=self.comparisons_table,
-            )
-            attr = get_comp_field_in_parent(comparison, self.data)
-            self.attr_selector_cache.add(widget.attr_combo)
-
-            self.update_combo_attrs(widget)
-            widget.attr_combo.setCurrentText(attr)
-
-            update_slot = WeakPartialMethodSlot(
-                widget.attr_combo, widget.attr_combo.currentTextChanged,
-                self.update_comparison_dicts, comparison=comparison,
-            )
-
-            self._partial_slots.append(update_slot)
-
-        self.comparisons_table.insert_setup_row(row_count, comparison, configure_row_widget)
+        self.comparisons_table.insert_setup_row(
+            row_count,
+            comparison,
+            partial(self.configure_row_widget,
+                    comparison=comparison,
+                    comp_item=comp_item)
+        )
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -896,7 +922,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         """
         For every row combobox, set the allowed values.
         """
-        print('update_combo_attrs')
         # for combo in self.attr_selector_cache:
         combo = row_widget.attr_combo
         orig_value = combo.currentText()
@@ -912,20 +937,23 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             # Should be shared
             combo.setCurrentIndex(combo.count() - 1)
 
-    def update_comparison_dicts(self, text: str, *args, comparison: Comparison, **kwargs) -> None:
+    def update_comparison_attr(self, text: str, *args, comparison: Comparison, **kwargs) -> None:
         """
         Update comparison location in parent config
         """
-        print('called for update')
-        print(f'{text} -> {comparison}')
         self.data.move_comparison(comparison, text)
         return
+
+    def update_comparison_dicts(self, *args, **kwargs) -> None:
         unsorted: List[Tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.rowCount()):
-            row_widget = self.comparisons_table.cellWidget(row_index, 0)
+            # TODO: make thisd page table method
+            comp = self.comparisons_table.source_model.index(row_index, 0).data(USER_DATA_ROLE)
+            curr_attr = get_comp_field_in_parent(comp, self.data)
+            # row_widget = self.comparisons_table.cellWidget(row_index, 0)
             unsorted.append(
-                (row_widget.attr_combo.currentText(), row_widget.data)
+                (curr_attr, comp)
             )
 
         def get_sort_key(elem: Tuple[str, Comparison]):
@@ -946,6 +974,8 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         self.data.by_attr = by_attr
         self.data.shared = shared
 
+        self.comparisons_table.refresh()
+
     def replace_comparison(
         self,
         old_comparison: Comparison,
@@ -957,27 +987,15 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
 
         Also finds the row widget and replaces it with a new row widget.
         """
-        found_row = None
-        prev_attr_index = 0
-        for row_index in range(self.comparisons_table.rowCount()):
-            widget = self.comparisons_table.cellWidget(row_index, 0)
-            if widget.data is old_comparison:
-                found_row = row_index
-                prev_attr_index = widget.attr_combo.currentIndex()
-                break
-        if found_row is None:
-            return
-        comp_row = ComparisonRowWidget(data=new_comparison)
-        self.setup_row_buttons(
-            row_widget=comp_row,
-            item=comp_item,
-            table=self.comparisons_table,
+        self.comparisons_table.replace_data(old_comparison, new_comparison)
+
+        self.comparisons_table.replace_data(
+            new_comparison,
+            partial(self.configure_row_widget,
+                    comparison=new_comparison,
+                    comp_item=comp_item),
+            repl_role=SETUP_SLOT_ROLE
         )
-        self.attr_selector_cache.add(comp_row.attr_combo)
-        comp_row.attr_combo.activated.connect(self.update_comparison_dicts)
-        self.comparisons_table.setCellWidget(found_row, 0, comp_row)
-        self.update_combo_attrs()
-        comp_row.attr_combo.setCurrentIndex(prev_attr_index)
 
 
 class PVConfigurationPage(DesignerDisplay, PageWidget):
