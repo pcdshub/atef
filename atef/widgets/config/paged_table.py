@@ -21,10 +21,8 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
 
     filename = 'paged_table.ui'
 
-    # TODO mimic QTableWidget methods used?
-    # TODO: Dynamic page size
     # TODO: Show specific comparison
-    # TODO: title header
+    # TODO: toggle for auto-page-size
 
     def __init__(
         self,
@@ -58,7 +56,7 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
 
         if item_list:
             for item in item_list:
-                self.insertRow(item, self.rowCount())
+                self.insert_row(item, self.row_count())
 
         self.setup_ui()
         self.show_page(1)
@@ -110,10 +108,33 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.proxy_model.curr_page = page_no
         self.update_table()
 
+    def set_page(self, page_no: int) -> None:
+        """External facing method"""
+        self.page_spinbox.setValue(page_no)
+
+    def show_row_for_data(self, data: Any) -> None:
+        orig_page = self.proxy_model.curr_page
+
+        for page_num in range(self.proxy_model.total_pages):
+            # reset filter without enabling persistent delegates
+            self.proxy_model.curr_page = 0
+            self.proxy_model.invalidateFilter()
+            # set proper page for filter model
+            self.proxy_model.curr_page = page_num + 1
+            self.proxy_model.invalidateFilter()
+
+            for row in range(self.proxy_model.rowCount()):
+                if self.proxy_model.index(row, 0).data(USER_DATA_ROLE) is data:
+                    self.set_page(page_num + 1)
+                    return
+
+        # current filters hide ``data``, return to original page
+        self.set_page(orig_page)
+
     def refresh(self) -> None:
         self.show_page(self.proxy_model.curr_page)
 
-    def insertRow(self, data: Any, index: int) -> None:
+    def insert_row(self, data: Any, index: int) -> None:
         # add item to model
         # if widget: self.table_widget.{insertRow -> setRowHeight -> setCellWidget}
         item = QtGui.QStandardItem()
@@ -128,9 +149,8 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         item.setData(setup_slot, role=SETUP_SLOT_ROLE)
         self.source_model.insertRow(index, item)
         self.update_table()
-        # TODO: Figure out how to ensure
 
-    def find_data(self, data: Any, role: int = USER_DATA_ROLE) -> QModelIndex:
+    def find_data_index(self, data: Any, role: int = USER_DATA_ROLE) -> QModelIndex:
         """Return index for ``data`` at ``role`` in source model"""
         for row_num in range(self.source_model.rowCount()):
             row_index = self.source_model.index(row_num, 0)
@@ -139,7 +159,7 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
 
     def remove_data(self, data: Any) -> None:
         """Removes ``data`` from source model"""
-        index = self.find_data(data)
+        index = self.find_data_index(data)
         self.source_model.removeRow(index.row())
 
     def replace_data(
@@ -149,19 +169,23 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         search_role: int = USER_DATA_ROLE,
         repl_role: int = USER_DATA_ROLE
     ) -> None:
-        index = self.find_data(old_data, search_role)
+        index = self.find_data_index(old_data, search_role)
         item = self.source_model.itemFromIndex(index)
         item.setData(new_data, repl_role)
 
-    def rowCount(self) -> int:
+    def row_count(self) -> int:
         # return total number of rows
         return self.source_model.rowCount()
+
+    def row_data(self, index: int, role: int = USER_DATA_ROLE) -> Any:
+        return self.source_model.index(index, 0).data(role)
 
     def resizeEvent(self, a0: QtGui.QResizeEvent) -> None:
         super().resizeEvent(a0)
         table_height = self.table_view.size().height()
         index = self.proxy_model.index(0, 0)
         row_widget = self.table_view.indexWidget(index)
+
         if not row_widget:
             return
         row_height = row_widget.sizeHint().height()

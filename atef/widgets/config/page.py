@@ -857,7 +857,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             by_attr_key='by_attr',
             data_widget=self.device_config_widget,
         )
-        self.comparisons_table.show_page(1)
+        self.comparisons_table.set_page(1)
         self.setup_name_desc_tags_link()
 
     def add_comparison_row(
@@ -888,8 +888,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                     tree_parent=self.tree_item,
                 )
 
-        row_count = self.comparisons_table.rowCount()
-
+        row_count = self.comparisons_table.row_count()
         self.comparisons_table.insert_setup_row(
             row_count,
             comparison,
@@ -897,6 +896,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                     comparison=comparison,
                     comp_item=comp_item)
         )
+        self.comparisons_table.show_row_for_data(comparison)
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -942,11 +942,9 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     def update_comparison_dicts(self, *args, **kwargs) -> None:
         unsorted: List[Tuple[str, Comparison]] = []
 
-        for row_index in range(self.comparisons_table.rowCount()):
-            # TODO: make thisd page table method
-            comp = self.comparisons_table.source_model.index(row_index, 0).data(USER_DATA_ROLE)
+        for row_index in range(self.comparisons_table.row_count()):
+            comp = self.comparisons_table.row_data(row_index)
             curr_attr = get_comp_field_in_parent(comp, self.data)
-            # row_widget = self.comparisons_table.cellWidget(row_index, 0)
             unsorted.append(
                 (curr_attr, comp)
             )
@@ -1031,6 +1029,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             by_attr_key='by_pv',
             data_widget=self.pv_configuration_widget,
         )
+        self.comparisons_table.set_page(1)
         self.setup_name_desc_tags_link()
 
     def add_comparison_row(
@@ -1062,7 +1061,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                     tree_parent=self.tree_item,
                 )
 
-        row_count = self.comparisons_table.rowCount()
+        row_count = self.comparisons_table.row_count()
         self.comparisons_table.insert_setup_row(
             row_count,
             comparison,
@@ -1070,6 +1069,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                     comparison=comparison,
                     comp_item=comp_item)
         )
+        self.comparisons_table.show_row_for_data(comparison)
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -1114,9 +1114,8 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         """
         unsorted: List[Tuple[str, Comparison]] = []
 
-        for row_index in range(self.comparisons_table.rowCount()):
-            # TODO: make thisd page table method
-            comp = self.comparisons_table.source_model.index(row_index, 0).data(USER_DATA_ROLE)
+        for row_index in range(self.comparisons_table.row_count()):
+            comp = self.comparisons_table.row_data(row_index)
             curr_attr = get_comp_field_in_parent(comp, self.data)
             unsorted.append(
                 (curr_attr, comp)
@@ -1213,6 +1212,8 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 self.tool_select_combo.addItem(tool.__name__)
                 self.tool_names[tool.__name__] = tool
             self.tool_select_combo.activated.connect(self.new_tool_selected)
+
+        self.comparisons_table.set_page(1)
         self.setup_name_desc_tags_link()
 
     def add_comparison_row(
@@ -1243,8 +1244,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                     tree_parent=self.tree_item,
                 )
 
-        row_count = self.comparisons_table.rowCount()
-
+        row_count = self.comparisons_table.row_count()
         self.comparisons_table.insert_setup_row(
             row_count,
             comparison,
@@ -1252,6 +1252,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                     comparison=comparison,
                     comp_item=comp_item)
         )
+        self.comparisons_table.show_row_for_data(comparison)
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -1300,7 +1301,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         """
         unsorted: List[Tuple[str, Comparison]] = []
 
-        for row_index in range(self.comparisons_table.rowCount()):
+        for row_index in range(self.comparisons_table.row_count()):
             comp = self.comparisons_table.source_model.index(row_index, 0).data(USER_DATA_ROLE)
             curr_attr = get_comp_field_in_parent(comp, self.data)
             unsorted.append(
