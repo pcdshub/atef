@@ -46,8 +46,7 @@ from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
-from atef.widgets.config.paged_table import (SETUP_SLOT_ROLE, USER_DATA_ROLE,
-                                             PagedTableWidget)
+from atef.widgets.config.paged_table import SETUP_SLOT_ROLE, PagedTableWidget
 from atef.widgets.config.run_active import (DescriptionRunWidget,
                                             PassiveRunWidget,
                                             SetValueRunWidget)
@@ -440,11 +439,6 @@ class PageWidget(QWidget):
 
         # Remove row from the table
         table.remove_data(row.data)
-        # for row_index in range(table.rowCount()):
-        #     widget = table.cellWidget(row_index, 0)
-        #     if widget is row:
-        #         table.removeRow(row_index)
-        #         break
         # Remove configuration from the data structure
         self.remove_table_data(data)
 
@@ -889,7 +883,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
                 )
 
         row_count = self.comparisons_table.row_count()
-        self.comparisons_table.insert_setup_row(
+        self.comparisons_table.insert_row(
             row_count,
             comparison,
             partial(self.configure_row_widget,
@@ -916,7 +910,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
 
     def update_combo_attrs(self, row_widget: ComparisonRowWidget) -> None:
         """
-        For every row combobox, set the allowed values.
+        Set the allowed values for ``attr_combo`` in ``row_widget``
         """
         combo = row_widget.attr_combo
         orig_value = combo.currentText()
@@ -940,6 +934,10 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         return
 
     def update_comparison_dicts(self, *args, **kwargs) -> None:
+        """
+        Rebuild the comparison lists when anything changes.  Refresh the
+        comparisons table to reflect the changes.
+        """
         unsorted: List[Tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.row_count()):
@@ -1062,7 +1060,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
                 )
 
         row_count = self.comparisons_table.row_count()
-        self.comparisons_table.insert_setup_row(
+        self.comparisons_table.insert_row(
             row_count,
             comparison,
             partial(self.configure_row_widget,
@@ -1089,7 +1087,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
 
     def update_combo_attrs(self, row_widget: ComparisonRowWidget) -> None:
         """
-        For set the allowed values for ``row_widget``
+        Set the allowed values for ``attr_combo`` in ``row_widget``
         """
         combo = row_widget.attr_combo
         orig_value = combo.currentText()
@@ -1106,6 +1104,9 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             combo.setCurrentIndex(combo.count() - 1)
 
     def update_comparison_attr(self, text: str, *args, comparison: Comparison, **kwargs) -> None:
+        """
+        Update comparison location in parent config
+        """
         self.data.move_comparison(comparison, text)
 
     def update_comparison_dicts(self, *args, **kwargs) -> None:
@@ -1245,7 +1246,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
                 )
 
         row_count = self.comparisons_table.row_count()
-        self.comparisons_table.insert_setup_row(
+        self.comparisons_table.insert_row(
             row_count,
             comparison,
             partial(self.configure_row_widget,
@@ -1272,7 +1273,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
 
     def update_combo_attrs(self, row_widget: ComparisonRowWidget) -> None:
         """
-        For every row combobox, set the allowed values.
+        Set the allowed values for ``attr_combo`` in ``row_widget``
         """
         combo = row_widget.attr_combo
         orig_value = combo.currentText()
@@ -1302,7 +1303,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         unsorted: List[Tuple[str, Comparison]] = []
 
         for row_index in range(self.comparisons_table.row_count()):
-            comp = self.comparisons_table.source_model.index(row_index, 0).data(USER_DATA_ROLE)
+            comp = self.comparisons_table.row_data(row_index)
             curr_attr = get_comp_field_in_parent(comp, self.data)
             unsorted.append(
                 (curr_attr, comp)

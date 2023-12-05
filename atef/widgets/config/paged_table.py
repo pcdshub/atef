@@ -12,6 +12,36 @@ SETUP_SLOT_ROLE = Qt.UserRole + 2
 
 
 class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
+    """
+    A table widget that separates its contents into pages, and allows seaching
+    by text to filter those rows further.
+
+    Major components include:
+    - source model: contains all data, sort-filter-proxy model, and table view.
+
+    PagedTableWidget is designed to custom row widgets for each item saved to
+    the source model.  These widgets are expected to take the stored data as an
+    init argument. Any setup to be performed after that widget is created
+    (connections to signals, slots, etc), must by packaged into a function that
+    can be stored alongside the data.
+
+    Example setup::
+
+        class MyWidget(QWidget):
+            def __init__(self, *args, data_items: List[AnyDataclass], **kwargs):
+                self.table = PagedTableWidget()
+
+                for i, data in enumerate(data_items):
+                    self.table.insert_setup_row(
+                        i,
+                        data,
+                        self.setup_row_widget
+                    )
+
+            def setup_row_widget(self, widget):
+                widget.button.clicked.connect(lambda *args, **kwargs: print('hi'))
+
+    """
     table_view: QtWidgets.QTableView
     page_spinbox: QtWidgets.QSpinBox
     next_button: QtWidgets.QToolButton
@@ -20,9 +50,6 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
     page_count_label: QtWidgets.QLabel
 
     filename = 'paged_table.ui'
-
-    # TODO: Show specific comparison
-    # TODO: toggle for auto-page-size
 
     def __init__(
         self,
@@ -33,8 +60,18 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         widget_cls: Optional[QtWidgets.QWidget] = ComparisonRowWidget,
         **kwargs
     ):
-        # TODO: remove row numbers
-        # TODO: set up title for column
+        """
+        Parameters
+        ----------
+        title : Optional[str], optional
+            title to be used as a header label, by default None
+        item_list : Optional[List[Any]], optional
+            a list of items to add to this table, by default None
+        page_size : Optional[int], optional
+            number of rows to show per page, by default None
+        widget_cls : Optional[QtWidgets.QWidget], optional
+            a widget class to create via delegates, by default ComparisonRowWidget
+        """
         super().__init__(*args, **kwargs)
         self.page_size = page_size
         self.row_cls = widget_cls
@@ -43,9 +80,13 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.proxy_model = PagedProxyModel(self)
         self.proxy_model.setSourceModel(self.source_model)
         self.table_view.setModel(self.proxy_model)
+        if page_size is not None:
+            self.proxy_model.page_size = self.page_size
 
-        self.row_delegate = CustDelegate(widget_cls=self.row_cls)
-        self.table_view.setItemDelegateForColumn(0, self.row_delegate)
+        if widget_cls:
+            self.row_delegate = CustDelegate(widget_cls=self.row_cls)
+            self.table_view.setItemDelegateForColumn(0, self.row_delegate)
+
         self.table_view.horizontalHeader().setStretchLastSection(True)
         if title:
             self.source_model.setHeaderData(0, Qt.Horizontal, title, Qt.DisplayRole)
@@ -56,13 +97,13 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
 
         if item_list:
             for item in item_list:
-                self.insert_row(item, self.row_count())
+                self.insert_row(self.row_count(), item)
 
         self.setup_ui()
         self.show_page(1)
 
     def setup_ui(self) -> None:
-        # link spinbox to show_page
+        """Connect slots to callbacks"""
         self.page_spinbox.valueChanged.connect(self.show_page)
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button.clicked.connect(self.next_page)
@@ -70,12 +111,18 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.update_table()
 
     def next_page(self, *args, **kwargs) -> None:
+        """Navigate to the next page, constrained by limits of the spinbox"""
         self.page_spinbox.stepUp()
 
     def prev_page(self, *args, **kwargs) -> None:
+        """Navigate to the previous page, constrained by limits of the spinbox"""
         self.page_spinbox.stepDown()
 
     def update_table(self) -> None:
+        """
+        Update the proxy model with filter information, re-filter the related
+        rows, and enable the delegates for visible rows
+        """
         # Update search
         self.proxy_model.search_regexp.setPattern(self.search_edit.text())
         self.proxy_model.invalidateFilter()
@@ -96,6 +143,14 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
             self.page_spinbox.setMinimum(1)
 
     def show_page(self, page_no: int):
+        """
+        Show page #``page_no``.  For use as slot in QSpinBox.valueChanged
+
+        Parameters
+        ----------
+        page_no : int
+            page number to show
+        """
         # set page 0 to clear history effects
         # I don't like how this is, but apparently filterAcceptsRow gets called
         # first on the rows that were already showing.  Because the proxy model
@@ -109,10 +164,28 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.update_table()
 
     def set_page(self, page_no: int) -> None:
-        """External facing method"""
+        """
+        External facing method for changing the page, constrained by QSpinBox
+
+        Parameters
+        ----------
+        page_no : int
+            page number to show
+        """
         self.page_spinbox.setValue(page_no)
 
-    def show_row_for_data(self, data: Any) -> None:
+    def show_row_for_data(self, data: Any, role: int = USER_DATA_ROLE) -> None:
+        """
+        Modify the page to show the row containing ``data``.  If data is hidden
+        by the filters
+
+        Parameters
+        ----------
+        data : Any
+            data contained by the displayed row
+        role : int, optional
+            data-role to look in, by default USER_DATA_ROLE
+        """
         orig_page = self.proxy_model.curr_page
 
         for page_num in range(self.proxy_model.total_pages):
@@ -124,7 +197,7 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
             self.proxy_model.invalidateFilter()
 
             for row in range(self.proxy_model.rowCount()):
-                if self.proxy_model.index(row, 0).data(USER_DATA_ROLE) is data:
+                if self.proxy_model.index(row, 0).data(role) is data:
                     self.set_page(page_num + 1)
                     return
 
@@ -132,33 +205,68 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.set_page(orig_page)
 
     def refresh(self) -> None:
+        """Refresh the widget.  (re-applies filters, returning to current page)"""
         self.show_page(self.proxy_model.curr_page)
 
-    def insert_row(self, data: Any, index: int) -> None:
-        # add item to model
-        # if widget: self.table_widget.{insertRow -> setRowHeight -> setCellWidget}
-        item = QtGui.QStandardItem()
-        item.setData(data)  # Qt.UserRole + 1
-        item.setData(data.name or '', role=Qt.ToolTipRole)
-        self.source_model.insertRow(index, item)
+    def insert_row(
+        self,
+        index: int,
+        data: Any,
+        setup_slot: Optional[Callable[[QtWidgets.QWidget], None]] = None
+    ) -> None:
+        """
+        Add ``data`` to the table's model.
+        - ``data`` is stored in ``USER_DATA_ROLE``,
+        - ``data.name`` is stored in ``Qt.ToolTipRole`` for searching if available
+        - ``setup_slot`` is stored in ``SETUP_SLOT_ROLE`` if provided
 
-    def insert_setup_row(self, index: int, data: Any, setup_slot: Callable) -> None:
+        Parameters
+        ----------
+        index : int
+            index to insert data at
+        data : Any
+            data to be added
+        setup_slot : Optional[Callable[[QtWidgets.QWidget], None]]
+            a function used to setup the row widget delegate after creation
+        """
         item = QtGui.QStandardItem()
-        item.setData(data, role=USER_DATA_ROLE)  # Qt.UserRole + 1
+        item.setData(data, role=USER_DATA_ROLE)
         item.setData(data.name or '', role=Qt.ToolTipRole)
-        item.setData(setup_slot, role=SETUP_SLOT_ROLE)
+        if setup_slot is not None:
+            item.setData(setup_slot, role=SETUP_SLOT_ROLE)
         self.source_model.insertRow(index, item)
         self.update_table()
 
     def find_data_index(self, data: Any, role: int = USER_DATA_ROLE) -> QModelIndex:
-        """Return index for ``data`` at ``role`` in source model"""
+        """
+        Return a QModelIndex for ``data`` at ``role`` in source model
+
+        Parameters
+        ----------
+        data : Any
+            data to search for
+        role : int, optional
+            role to match ``data`` in, by default USER_DATA_ROLE
+
+        Returns
+        -------
+        QModelIndex
+            index of the source model containing ``data`` at ``role``
+        """
         for row_num in range(self.source_model.rowCount()):
             row_index = self.source_model.index(row_num, 0)
             if row_index.data(role) is data:
                 return row_index
 
     def remove_data(self, data: Any) -> None:
-        """Removes ``data`` from source model"""
+        """
+        Removes ``data`` from source model
+
+        Parameters
+        ----------
+        data : Any
+            data to remove from the source model
+        """
         index = self.find_data_index(data)
         self.source_model.removeRow(index.row())
 
@@ -169,19 +277,56 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         search_role: int = USER_DATA_ROLE,
         repl_role: int = USER_DATA_ROLE
     ) -> None:
+        """
+        Search for ``old_data`` in ``search_role``, then replace the data at
+        ``repl_role`` with ``new_data``
+
+        This means you can search for a dataclass and replace its setup slot
+        or tooltip, for example.
+
+        Parameters
+        ----------
+        old_data : Any
+            data to search for
+        new_data : Any
+            data to replace once the correct index is found
+        search_role : int, optional
+            role to search for ``old_data`` in, by default USER_DATA_ROLE
+        repl_role : int, optional
+            role to replace with ``new_data``, by default USER_DATA_ROLE
+        """
         index = self.find_data_index(old_data, search_role)
         item = self.source_model.itemFromIndex(index)
         item.setData(new_data, repl_role)
 
     def row_count(self) -> int:
-        # return total number of rows
+        """Return total number of rows"""
         return self.source_model.rowCount()
 
     def row_data(self, index: int, role: int = USER_DATA_ROLE) -> Any:
+        """
+        Return the data at row number ``index`` for ``role``.
+        References the source model, meaning all rows are available
+
+        Parameters
+        ----------
+        index : int
+            row number to grab data from
+        role : int, optional
+            role to retrieve data from, by default USER_DATA_ROLE
+
+        Returns
+        -------
+        Any
+            requested data at row ``index`` under ``role``
+        """
         return self.source_model.index(index, 0).data(role)
 
     def resizeEvent(self, a0: QtGui.QResizeEvent) -> None:
+        """Dynamically set the page size when the table is resized"""
         super().resizeEvent(a0)
+        if self.page_size is not None:
+            return
         table_height = self.table_view.size().height()
         index = self.proxy_model.index(0, 0)
         row_widget = self.table_view.indexWidget(index)
@@ -196,6 +341,10 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
 
 
 class PagedProxyModel(QtCore.QSortFilterProxyModel):
+    """
+    A QSortFilterProxyModel that filters based on search text and the set page
+    size.  Page size determines the number of rows per page.
+    """
     def __init__(self, *args, page_size=3, max_page_size=50, **kwargs):
         super().__init__(*args, **kwargs)
         self.page_size = page_size
@@ -211,6 +360,7 @@ class PagedProxyModel(QtCore.QSortFilterProxyModel):
         self.max_count = self.min_count + self.page_size
 
     def invalidateFilter(self) -> None:
+        """Reset count variables and set the count range for the current page"""
         self.page_size = min(self.page_size, self.max_page_size)
         self.total_pages = 0
 
@@ -232,9 +382,19 @@ class PagedProxyModel(QtCore.QSortFilterProxyModel):
         Process the row, and remember how many rows passed.
         Rows can be valid but not shown, reducing the page count.
 
-        accept: row is accepted, will be displayed
-        allowed: row passes filter, will be considered in page count
-        reason: reason for decision
+        Parameters
+        ----------
+        accepted : bool
+            row is accepted, will be displayed
+        allowed : bool
+            row has passed filter criteria, but is not necessarily displayed
+        reason : Optional[str], optional
+            reason for the decision, for logging purposes, by default None
+
+        Returns
+        -------
+        bool
+            ``accepted``, whether or not the row will be displayed
         """
         if accepted and not allowed:
             self.total_displayed += 1
@@ -247,9 +407,24 @@ class PagedProxyModel(QtCore.QSortFilterProxyModel):
         return accepted
 
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
+        """
+        Assess whether the row at ``source_row`` will be displayed
+
+        Parameters
+        ----------
+        source_row : int
+            row in the source model
+        source_parent : QModelIndex
+            parent index.  Unused here, used in TreeViews
+
+        Returns
+        -------
+        bool
+            whether the row will be displayed
+        """
         source = self.sourceModel()
         index = source.index(source_row, self.filterKeyColumn(), source_parent)
-        # TODO: Include basic search text (for name field?)
+
         inside_page_range = ((self.total_allowed >= self.min_count)
                              and (self.total_allowed < self.max_count))
         row_text = source.data(index, Qt.ToolTipRole)
@@ -268,7 +443,7 @@ class PagedProxyModel(QtCore.QSortFilterProxyModel):
 
 
 class CustDelegate(QtWidgets.QStyledItemDelegate):
-    # An edit-mode delegate
+    """A Custom delegate that creates ``widget_cls`` for each row"""
     def __init__(self, *args, widget_cls=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.widget_cls = widget_cls
@@ -276,9 +451,28 @@ class CustDelegate(QtWidgets.QStyledItemDelegate):
     def createEditor(
         self,
         parent: QtWidgets.QWidget,
-        option,
+        option: QtWidgets.QStyleOptionViewItem,
         index: QtCore.QModelIndex
     ) -> QtWidgets.QWidget:
+        """
+        Create the row widget and set it up using the setup slot
+
+        Parameters
+        ----------
+        parent : QtWidgets.QWidget
+            the parent of the widget
+        option : QtWidgets.QStyleOptionViewItem
+            Option to determine how widget appears
+        index : QtCore.QModelIndex
+            Index from the model to show
+
+        Returns
+        -------
+        QtWidgets.QWidget
+            the requested widget
+        """
+        if self.widget_cls is None:
+            return QtWidgets.QLabel('no widget class found', parent=parent)
         row_widget = self.widget_cls(index.data(USER_DATA_ROLE), parent=parent)
         setup_slot = index.data(SETUP_SLOT_ROLE)
         if callable(setup_slot):
