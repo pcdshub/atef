@@ -172,7 +172,10 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         page_no : int
             page number to show
         """
+        orig_page = self.proxy_model.curr_page
         self.page_spinbox.setValue(page_no)
+        if page_no == orig_page:
+            self.refresh()
 
     def show_row_for_data(self, data: Any, role: int = USER_DATA_ROLE) -> None:
         """
