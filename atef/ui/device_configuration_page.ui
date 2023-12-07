@@ -35,7 +35,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QWidget" name="comparisons_table_placeholder" native="true"/>
+    <widget class="PagedTableWidget" name="comparisons_table" native="true"/>
    </item>
    <item>
     <widget class="QPushButton" name="add_comparison_button">
@@ -46,6 +46,14 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PagedTableWidget</class>
+   <extends>QWidget</extends>
+   <header>atef.widgets.config.paged_table</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

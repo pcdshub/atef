@@ -861,7 +861,6 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
     device_widget_placeholder: QWidget
     device_config_widget: DeviceConfigurationWidget
 
-    comparisons_table_placeholder: QWidget
     comparisons_table: PagedTableWidget
     add_comparison_button: QPushButton
 
@@ -874,11 +873,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             self.device_widget_placeholder,
         )
 
-        self.comparisons_table = PagedTableWidget(title="Comparisons")
-        self.insert_widget(
-            self.comparisons_table,
-            self.comparisons_table_placeholder
-        )
+        self.comparisons_table.set_title("Comparisons")
         self.post_tree_setup()
 
     def post_tree_setup(self) -> None:
@@ -1037,7 +1032,6 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
     pv_widget_placeholder: QWidget
     pv_configuration_widget: PVConfigurationWidget
 
-    comparisons_table_placeholder: QWidget
     comparisons_table: PagedTableWidget
     add_comparison_button: QPushButton
 
@@ -1050,11 +1044,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             self.pv_widget_placeholder,
         )
 
-        self.comparisons_table = PagedTableWidget(title="Comparisons")
-        self.insert_widget(
-            self.comparisons_table,
-            self.comparisons_table_placeholder
-        )
+        self.comparisons_table.set_title('Comparisons')
         self.post_tree_setup()
 
     def post_tree_setup(self) -> None:
@@ -1213,7 +1203,6 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
     tool_placeholder: QWidget
     tool_widget: DataWidget
 
-    comparisons_table_placeholder: QWidget
     comparisons_table: PagedTableWidget
     add_comparison_button: QPushButton
     tool_select_combo: QComboBox
@@ -1226,14 +1215,9 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
 
     def __init__(self, data: ToolConfiguration, **kwargs):
         super().__init__(data=data, **kwargs)
-        # Create the static sub-widgets and place them
         self.setup_name_desc_tags_init()
 
-        self.comparisons_table = PagedTableWidget(title="Comparisons")
-        self.insert_widget(
-            self.comparisons_table,
-            self.comparisons_table_placeholder
-        )
+        self.comparisons_table.set_title('Comparisons')
         self.post_tree_setup()
 
     def post_tree_setup(self) -> None:

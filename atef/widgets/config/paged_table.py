@@ -87,11 +87,8 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
             self.row_delegate = CustDelegate(widget_cls=self.row_cls)
             self.table_view.setItemDelegateForColumn(0, self.row_delegate)
 
+        self.set_title(title)
         self.table_view.horizontalHeader().setStretchLastSection(True)
-        if title:
-            self.source_model.setHeaderData(0, Qt.Horizontal, title, Qt.DisplayRole)
-        else:
-            self.table_view.horizontalHeader().hide()
         self.table_view.verticalHeader().hide()
         self.proxy_model.sort(-1)
 
@@ -109,6 +106,12 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.next_button.clicked.connect(self.next_page)
         self.search_edit.textChanged.connect(self.update_table)
         self.update_table()
+
+    def set_title(self, title: Optional[str] = None) -> None:
+        if title is not None:
+            self.source_model.setHeaderData(0, Qt.Horizontal, title, Qt.DisplayRole)
+        else:
+            self.table_view.horizontalHeader().hide()
 
     def next_page(self, *args, **kwargs) -> None:
         """Navigate to the next page, constrained by limits of the spinbox"""
