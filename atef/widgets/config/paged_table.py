@@ -345,6 +345,11 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self.refresh()
         return
 
+    def showEvent(self, a0: QtGui.QShowEvent) -> None:
+        """Refresh table whenever revealed"""
+        super().showEvent(a0)
+        self.refresh()
+
 
 class PagedProxyModel(QtCore.QSortFilterProxyModel):
     """
