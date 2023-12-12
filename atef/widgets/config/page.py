@@ -583,11 +583,13 @@ class PageWidget(QWidget):
                     self.add_comparison_row(
                         attr=attr,
                         comparison=config,
+                        update=False
                     )
             for config in self.data.shared:
                 self.add_comparison_row(
                     attr='shared',
                     comparison=config,
+                    update=False
                 )
             # Allow the user to add more rows
             self.add_comparison_button.clicked.connect(self.add_comparison_row)
@@ -605,6 +607,7 @@ class PageWidget(QWidget):
         checked: bool = False,
         attr: str = '',
         comparison: Optional[Comparison] = None,
+        update: bool = True
     ) -> None:
         """
         Add a new row to the comparison table.
@@ -893,6 +896,7 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
         checked: bool = False,
         attr: str = '',
         comparison: Optional[Comparison] = None,
+        update: bool = True
     ) -> None:
         """
         Add a new row to the comparison table.
@@ -922,9 +926,11 @@ class DeviceConfigurationPage(DesignerDisplay, PageWidget):
             comparison,
             partial(self.configure_row_widget,
                     comparison=comparison,
-                    comp_item=comp_item)
+                    comp_item=comp_item),
+            update=update
         )
-        self.comparisons_table.show_row_for_data(comparison)
+        if update:
+            self.comparisons_table.show_row_for_data(comparison)
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -1064,6 +1070,7 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
         checked: bool = False,
         attr: str = '',
         comparison: Optional[Comparison] = None,
+        update: bool = True
     ):
         """
         Add a new row to the comparison table.
@@ -1094,9 +1101,11 @@ class PVConfigurationPage(DesignerDisplay, PageWidget):
             comparison,
             partial(self.configure_row_widget,
                     comparison=comparison,
-                    comp_item=comp_item)
+                    comp_item=comp_item),
+            update=update
         )
-        self.comparisons_table.show_row_for_data(comparison)
+        if update:
+            self.comparisons_table.show_row_for_data(comparison)
 
     def remove_table_data(self, data: Comparison) -> None:
         """
@@ -1245,6 +1254,7 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         checked: bool = False,
         attr: str = '',
         comparison: Optional[Comparison] = None,
+        update: bool = True
     ) -> None:
         """
         Add a new row to the comparison table.
@@ -1274,9 +1284,11 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             comparison,
             partial(self.configure_row_widget,
                     comparison=comparison,
-                    comp_item=comp_item)
+                    comp_item=comp_item),
+            update=update
         )
-        self.comparisons_table.show_row_for_data(comparison)
+        if update:
+            self.comparisons_table.show_row_for_data(comparison)
 
     def remove_table_data(self, data: Comparison) -> None:
         """

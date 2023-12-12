@@ -1,3 +1,4 @@
+import logging
 import math
 from typing import Any, Callable, List, Optional
 
@@ -6,6 +7,8 @@ from qtpy.QtCore import QModelIndex, Qt
 
 from atef.widgets.config.data_passive import ComparisonRowWidget
 from atef.widgets.core import DesignerDisplay
+
+logger = logging.getLogger(__name__)
 
 USER_DATA_ROLE = Qt.UserRole + 1
 SETUP_SLOT_ROLE = Qt.UserRole + 2
@@ -218,7 +221,8 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         self,
         index: int,
         data: Any,
-        setup_slot: Optional[Callable[[QtWidgets.QWidget], None]] = None
+        setup_slot: Optional[Callable[[QtWidgets.QWidget], None]] = None,
+        update: bool = False
     ) -> None:
         """
         Add ``data`` to the table's model.
@@ -235,13 +239,15 @@ class PagedTableWidget(DesignerDisplay, QtWidgets.QWidget):
         setup_slot : Optional[Callable[[QtWidgets.QWidget], None]]
             a function used to setup the row widget delegate after creation
         """
+        logger.debug(f'inserting row ({data} @ {index}), update: {update}')
         item = QtGui.QStandardItem()
         item.setData(data, role=USER_DATA_ROLE)
         item.setData(data.name or '', role=Qt.ToolTipRole)
         if setup_slot is not None:
             item.setData(setup_slot, role=SETUP_SLOT_ROLE)
         self.source_model.insertRow(index, item)
-        self.update_table()
+        if update:
+            self.update_table()
 
     def find_data_index(self, data: Any, role: int = USER_DATA_ROLE) -> QModelIndex:
         """
