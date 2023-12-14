@@ -153,6 +153,13 @@ async def run_in_executor(
     return await loop.run_in_executor(executor, wrapped)
 
 
-def replace_in_list(old: T, new: T, item_list: List[T]):
+def replace_in_list(old: T, new: T, item_list: List[T]) -> None:
     index = item_list.index(old)
     item_list[index] = new
+
+
+def remove_by_id(series: List[T], item: T) -> None:
+    for i in range(len(series)):
+        if series[i] is item:
+            series.pop(i)
+            return
