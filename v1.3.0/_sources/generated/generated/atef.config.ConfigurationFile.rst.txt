@@ -1,0 +1,35 @@
+atef.config.ConfigurationFile
+=============================
+
+.. currentmodule:: atef.config
+
+.. autoclass:: ConfigurationFile
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: children
+    .. automethod:: from_filename
+    .. automethod:: from_json
+    .. automethod:: from_yaml
+    .. automethod:: get_by_device
+    .. automethod:: get_by_pv
+    .. automethod:: get_by_tag
+    .. automethod:: to_json
+    .. automethod:: to_yaml
+    .. automethod:: walk_configs
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: version
+    .. autoattribute:: root
+    
+    

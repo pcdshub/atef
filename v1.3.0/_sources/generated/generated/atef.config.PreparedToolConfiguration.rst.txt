@@ -1,0 +1,34 @@
+atef.config.PreparedToolConfiguration
+=====================================
+
+.. currentmodule:: atef.config
+
+.. autoclass:: PreparedToolConfiguration
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: compare
+    .. automethod:: from_config
+    .. automethod:: from_tool
+    .. automethod:: walk_comparisons
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: parent
+    .. autoattribute:: result
+    .. autoattribute:: config
+    .. autoattribute:: comparisons
+    .. autoattribute:: prepare_failures
+    .. autoattribute:: cache
+    .. autoattribute:: combined_result
+    
+    
