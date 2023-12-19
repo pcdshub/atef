@@ -2,17 +2,47 @@ Release History
 ###############
 
 
+v1.3.0 (2023-12-19)
+===================
+
+Features
+--------
+- Adds results summary page accessible from run-mode in the `atef config` GUI
+- Adds icons to run-mode tree view
+- Adds page widget cache and lazy loading functionality to the atef config GUI
+
+Bugfixes
+--------
+- :class:`~atef.widgets.config.data_passive.RangeWidget`'s visualizations update a bit more frequently, and also the label text actually updates. Closes #212
+- Adds a menu option to open the welcome tab, since people like it.  Closes #201
+- Properly shows an error message box when a file can't be opened.  Closes #202
+- Allow tolerances to be `None` in `Equals` comparison.  Modifies the line-edit setup to allow null values (`''`, `None`) when casting the line edit value.  Closes #128
+
+Maintenance
+-----------
+- Make comparisons against enum signals more robust by trying both the int and string versions if the check fails.
+- Refactors tree-walking helpers to a separate submodle (`atef.walk`)
+- Replaces use of `functools.partial` with `WeakPartialMethodSlot` in qt slots, cleaning up intermittent test suite failures (and hopefully production crashes)
+- Refactors GUI backend to support lazy page loading
+- Move tree-building logic to dataclasses
+- Consolidate GUI backend classes (`EditTree` / `RunTree` -> `DualTree`, `AtefItem` / `TreeItem` -> `TreeItem`)
+
+Contributors
+------------
+- tangkong
+
+
+
 v1.2.0 (2023-09-27)
 ===================
 
 Features
 --------
-- Adds `ScientificDoubleSpinbox` and uses it in MultiModeValueEdit.
+- Adds :class:`~atef.widgets.config.utils.ScientificDoubleSpinbox` and uses it in MultiModeValueEdit.
 
 Bugfixes
 --------
-- Waits for signal connection during :class:`ActionRowWidget` initialization to properly
-  read enum strings from signal.
+- Waits for signal connection during :class:`~atef.widgets.config.data_active.ActionRowWidget` initialization to properly read enum strings from signal.
 
 Contributors
 ------------

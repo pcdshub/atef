@@ -62,9 +62,9 @@ def walk_find_match(
     Yields a list of 'paths' to the matching key / field. A path is a list of
     (object, field) tuples that lead from the top level ``item`` to the matching
     key / field.
-    - If the object is a dataclass, `field` will be a field in that dataclass
-    - If the object is a list, `field` will be the index in that list
-    - If the object is a dict, `field` will be a key in that dictionary
+    - If the object is a dataclass, ``field`` will be a field in that dataclass
+    - If the object is a list, ``field`` will be the index in that list
+    - If the object is a dict, ``field`` will be a key in that dictionary
 
     ``match`` should be a Callable taking a single argument and returning a boolean,
     specifying whether that argument matched a search term or not.  This is
