@@ -85,7 +85,11 @@ def test_add_delete_comparison(
     new_comp_list = gather_comparisons(cfg)
     assert len(new_comp_list) == len(orig_comp_list) + 1
 
-    widget = group_page.comparisons_table.cellWidget(0, 0)
+    table = group_page.comparisons_table
+    table.update_table()
+    index = table.proxy_model.index(0, 0)
+    widget = table.table_view.indexWidget(index)
+
     deleted_comparison = widget.data
 
     # mock to auto-confirm deletion
@@ -112,7 +116,11 @@ def test_change_attr(
     group_page = make_page(cfg)
     qtbot.addWidget(group_page)
 
-    row_widget = group_page.comparisons_table.cellWidget(0, 0)
+    table = group_page.comparisons_table
+    table.update_table()
+    index = table.proxy_model.index(0, 0)
+    row_widget = table.table_view.indexWidget(index)
+
     new_idxs = get_different_combo_options(row_widget.attr_combo)
     if not new_idxs:
         return
@@ -120,9 +128,8 @@ def test_change_attr(
     for idx in new_idxs:
         row_widget.attr_combo.setCurrentIndex(idx)
         row_widget.attr_combo.activated.emit(idx)
-        new_comps = gather_comparisons(cfg)
-        assert len(new_comps) == len(orig_comps)
-        assert new_comps != orig_comps
+        qtbot.waitUntil(lambda: gather_comparisons(cfg) != orig_comps, timeout=10000)
+        assert len(gather_comparisons(cfg)) == len(orig_comps)
 
 
 @pytest.mark.parametrize(
@@ -138,10 +145,15 @@ def test_change_comparison(
 ):
     cfg = request.getfixturevalue(group)
     group_page = make_page(cfg)
-    qtbot.addWidget(group_page)
+    group_data = group_page.data
+    full_tree = group_page.full_tree
 
     # get comparison page
-    row_widget = group_page.comparisons_table.cellWidget(0, 0)
+    table = group_page.comparisons_table
+    table.update_table()
+    index = table.proxy_model.index(0, 0)
+    row_widget = table.table_view.indexWidget(index)
+
     row_widget.child_button.clicked.emit()
     qtbot.wait_until(lambda: isinstance(group_page.full_tree.current_widget,
                                         ComparisonPage))
@@ -149,13 +161,20 @@ def test_change_comparison(
     old_comp = comp_page.data
 
     new_idxs = get_different_combo_options(comp_page.specific_combo)
-
     monkeypatch.setattr(QtWidgets.QMessageBox, 'question',
                         lambda *args, **kwargs: QtWidgets.QMessageBox.Yes)
     for idx in new_idxs:
+        qtbot.addWidget(group_page)
+        qtbot.addWidget(comp_page)
         comp_page.specific_combo.setCurrentIndex(idx)
         comp_page.specific_combo.activated.emit(idx)
 
-        new_comp = group_page.comparisons_table.cellWidget(0, 0).data
-        qtbot.waitUntil(lambda: new_comp != old_comp, timeout=10000)
-        assert new_comp != old_comp
+        def condition():
+            assert full_tree.current_widget.data != old_comp
+
+        qtbot.waitUntil(condition, timeout=10000)
+        new_data = full_tree.current_widget.data
+        # ensure group_page still exists even if it falls out of cache
+        full_tree.select_by_data(group_data)
+        full_tree.select_by_data(new_data)
+        comp_page = full_tree.current_widget

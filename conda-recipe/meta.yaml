@@ -34,7 +34,7 @@ requirements:
   - ipython
   - numpy
   - ophyd
-  - pcdsutils >=0.14.0
+  - pcdsutils >=0.14.1
   - pydm
   - pyyaml
   - qtpy
