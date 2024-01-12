@@ -4,7 +4,7 @@ be converted into a PVConfiguration.  Note that default tolerances will be used 
 checks.
 
 An example invocation might be:
-"python scripts/pmgr_check.py cxi "KB1 DS SLIT LEF" CXI:KB1:MMS:13 test_pmgr_checkout.json"
+"python scripts/pmgr_check.py cxi test_pmgr_checkout.json --names "KB1 DS SLIT LEF" --prefix CXI:KB1:MMS:13"
 """
 import argparse
 import json
@@ -52,7 +52,8 @@ def get_pv(prefix: str, key: str):
     suffix_parts = suffix.split("__")
     new_suffix_list = [":".join(substr.split('_')) for substr in suffix_parts]
     suffix = '_'.join(new_suffix_list)
-    suffix = ".".join(suffix.rsplit(":", 1))
+    if 'FLD_' in key:
+        suffix = ".".join(suffix.rsplit(":", 1))
     pv = prefix + suffix
     return pv
 
@@ -122,28 +123,34 @@ def _create_arg_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "hutch",
+        dest="hutch",
         type=str,
         help="name of hutch, e.g. 'cxi'",
-    )
-
-    parser.add_argument(
-        "pmgr_name",
-        type=str,
-        help="name of stored pmgr configuration, case and whitespace sensitive."
-             "e.g. 'KB1 DS SLIT LEF'",
-    )
-
-    parser.add_argument(
-        "prefix",
-        type=str,
-        help="EPICS PV Prefix, e.g. 'CXI:KB1:MMS:13'",
     )
 
     parser.add_argument(
         "filename",
         type=str,
         help="Output filepath",
+    )
+
+    parser.add_argument(
+        "--names",
+        "-m",
+        dest="pmgr_name",
+        type=str,
+        nargs="+",
+        help="a list of stored pmgr configuration names, case and whitespace sensitive."
+             "e.g. 'KB1 DS SLIT LEF'.  Length must match --prefixes",
+    )
+
+    parser.add_argument(
+        "--prefixes",
+        "-p",
+        dest="prefix",
+        type=str,
+        nargs="+",
+        help="a list of EPICS PV prefixes, e.g. 'CXI:KB1:MMS:13'.  Length must match --names",
     )
 
     parser.add_argument(
@@ -174,10 +181,16 @@ def main(args=None) -> None:
     logger.setLevel(log_level)
     logging.basicConfig()
 
-    cfg_data = get_cfg_data(argp.hutch, argp.pmgr_name)
-    pv_config = create_atef_check(argp.pmgr_name, cfg_data, argp.prefix)
-    # try looking at the whole thing
-    file = ConfigurationFile(root=ConfigurationGroup(name='base group', configs=[pv_config]))
+    if len(argp.prefix) != len(argp.pmgr_name):
+        raise ValueError('Must provide the same number of configuration names '
+                         f'{len(argp.pmgr_name)} and prefixes {len(argp.prefix)}')
+
+    file = ConfigurationFile(root=ConfigurationGroup(name='base group', configs=[]))
+    for prefix, name in zip(argp.prefix, argp.pmgr_name):
+        cfg_data = get_cfg_data(argp.hutch, name)
+        pv_config = create_atef_check(name, cfg_data, prefix)
+
+        file.root.configs.append(pv_config)
 
     ser = apischema.serialize(ConfigurationFile, file)
 
