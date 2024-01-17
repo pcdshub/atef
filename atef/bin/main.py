@@ -19,6 +19,7 @@ DESCRIPTION = __doc__
 COMMAND_TO_MODULE = {
     "check": "check",
     "config": "config",
+    "scripts": "scripts",
 }
 
 

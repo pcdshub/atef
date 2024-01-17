@@ -4,12 +4,12 @@ be converted into a PVConfiguration.  Note that default tolerances will be used 
 checks.
 
 An example invocation might be:
-"python scripts/pmgr_check.py cxi test_pmgr_checkout.json --names "KB1 DS SLIT LEF" --prefix CXI:KB1:MMS:13"
+python scripts/pmgr_check.py cxi test_pmgr_checkout.json --names "KB1 DS SLIT LEF" --prefix CXI:KB1:MMS:13
 """
 import argparse
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import apischema
 from pmgr import pmgrAPI
@@ -58,7 +58,7 @@ def get_pv(prefix: str, key: str):
     return pv
 
 
-def get_cfg_data(hutch: str, config_name: str) -> Dict[str, Any]:
+def get_cfg_data(hutch: str, config_name: str, table_name: str = 'ims_motor') -> Dict[str, Any]:
     """
     Get pmgr config data corresponding to ``config_name`` and ``hutch``
 
@@ -68,13 +68,15 @@ def get_cfg_data(hutch: str, config_name: str) -> Dict[str, Any]:
         the hutch name, e.g. 'cxi'
     config_name : str
         the pmgr config name, e.g. 'KB1 DS SLIT LEF'
+    table_name : str
+        the name of the pmgr table to examine, by default 'ims_motor'
 
     Returns
     -------
     Dict[str, Any]
         The configuration values dictionary
     """
-    pm = pmgrAPI.pmgrAPI('ims_motor', hutch.lower())
+    pm = pmgrAPI.pmgrAPI(table_name, hutch.lower())
     cfg_data = pm.get_config_values(config_name)
 
     return cfg_data
@@ -116,53 +118,34 @@ def create_atef_check(config_name: str, cfg_data: Dict[str, Any], prefix: str) -
     return pv_config
 
 
-def _create_arg_parser() -> argparse.ArgumentParser:
+def build_arg_parser(argparser=None) -> argparse.ArgumentParser:
     """Create the argparser."""
-    parser = argparse.ArgumentParser(
-        description=DESCRIPTION, formatter_class=argparse.RawTextHelpFormatter
-    )
+    if argparser is None:
+        argparser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        dest="hutch",
-        type=str,
-        help="name of hutch, e.g. 'cxi'",
-    )
+    argparser.description = DESCRIPTION
+    argparser.formatter_class = argparse.RawTextHelpFormatter
 
-    parser.add_argument(
-        "filename",
-        type=str,
-        help="Output filepath",
-    )
-
-    parser.add_argument(
+    argparser.add_argument(
         "--names",
         "-m",
-        dest="pmgr_name",
+        dest="pmgr_names",
         type=str,
         nargs="+",
         help="a list of stored pmgr configuration names, case and whitespace sensitive."
              "e.g. 'KB1 DS SLIT LEF'.  Length must match --prefixes",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--prefixes",
         "-p",
-        dest="prefix",
+        dest="prefixes",
         type=str,
         nargs="+",
         help="a list of EPICS PV prefixes, e.g. 'CXI:KB1:MMS:13'.  Length must match --names",
     )
 
-    parser.add_argument(
-        "--log",
-        "-l",
-        dest="log_level",
-        default="INFO",
-        type=str,
-        help="Python logging level (e.g. DEBUG, INFO, WARNING), by default INFO",
-    )
-
-    parser.add_argument(
+    argparser.add_argument(
         "--table",
         "-t",
         dest="table_name",
@@ -171,32 +154,65 @@ def _create_arg_parser() -> argparse.ArgumentParser:
         help="Table type, by default 'ims_motor'",
     )
 
-    return parser
+    argparser.add_argument(
+        dest="hutch",
+        type=str,
+        help="name of hutch, e.g. 'cxi'",
+    )
+
+    argparser.add_argument(
+        "filename",
+        type=str,
+        help="Output filepath",
+    )
+
+    return argparser
 
 
-def main(args=None) -> None:
-    """Get pmgr data and contruct checkout."""
-    argp = _create_arg_parser().parse_args(args=args)
-    log_level = argp.log_level
-    logger.setLevel(log_level)
-    logging.basicConfig()
-
-    if len(argp.prefix) != len(argp.pmgr_name):
+def main(
+    hutch: str,
+    filename: str,
+    pmgr_names: List[str],
+    prefixes: List[str],
+    table_name: str = 'ims_motor'
+) -> None:
+    if len(prefixes) != len(pmgr_names):
         raise ValueError('Must provide the same number of configuration names '
-                         f'{len(argp.pmgr_name)} and prefixes {len(argp.prefix)}')
+                         f'{len(pmgr_names)} and prefixes {len(prefixes)}')
 
     file = ConfigurationFile(root=ConfigurationGroup(name='base group', configs=[]))
-    for prefix, name in zip(argp.prefix, argp.pmgr_name):
-        cfg_data = get_cfg_data(argp.hutch, name)
+    for prefix, name in zip(prefixes, pmgr_names):
+        cfg_data = get_cfg_data(hutch, name, table_name=table_name)
         pv_config = create_atef_check(name, cfg_data, prefix)
 
         file.root.configs.append(pv_config)
 
     ser = apischema.serialize(ConfigurationFile, file)
 
-    with open(argp.filename, 'w') as fd:
+    with open(filename, 'w') as fd:
         json.dump(ser, fd, indent=2)
 
 
+def main_script(args=None) -> None:
+    """Get pmgr data and contruct checkout."""
+    parser = build_arg_parser()
+    # Add log_level if running file alone
+    parser.add_argument(
+        "--log",
+        "-l",
+        dest="log_level",
+        default="INFO",
+        type=str,
+        help="Python logging level (e.g. DEBUG, INFO, WARNING), by default INFO",
+    )
+    args = parser.parse_args()
+    kwargs = vars(args)
+    logger.setLevel(args.log_level)
+    kwargs.pop('log_level')
+    logging.basicConfig()
+
+    main(**kwargs)
+
+
 if __name__ == "__main__":
-    main()
+    main_script()
