@@ -270,13 +270,15 @@ def convert(fn: AnyPath) -> str:
     return json.dumps(load(fn).to_json(), indent=2)
 
 
-def _create_arg_parser() -> argparse.ArgumentParser:
+def build_arg_parser(argparser=None) -> argparse.ArgumentParser:
     """Create the argparser."""
-    parser = argparse.ArgumentParser(
-        description=DESCRIPTION, formatter_class=argparse.RawTextHelpFormatter
-    )
+    if argparser is None:
+        argparser = argparse.ArgumentParser()
 
-    parser.add_argument(
+    argparser.description = DESCRIPTION
+    argparser.formatter_class = argparse.RawTextHelpFormatter
+
+    argparser.add_argument(
         "--log",
         "-l",
         dest="log_level",
@@ -285,32 +287,30 @@ def _create_arg_parser() -> argparse.ArgumentParser:
         help="Python logging level (e.g. DEBUG, INFO, WARNING)",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "filename",
         type=str,
         nargs="+",
         help="File(s) to convert",
     )
 
-    parser.add_argument(
+    argparser.add_argument(
         "--write",
         action="store_true",
         help="Convert and overwrite the files in-place",
     )
-    return parser
+
+    return argparser
 
 
-def main(args=None) -> None:
-    """Run the conversion tool."""
-    args = _create_arg_parser().parse_args(args=args)
-    log_level = args.log_level
-    logger.setLevel(log_level)
-    logging.basicConfig()
-
-    for filename in args.filename:
+def main(
+    filename: str,
+    write: bool
+):
+    for filename in filename:
         converted = convert(filename)
 
-        if args.write:
+        if write:
             logger.warning("Overwriting converted file: %s", filename)
             with open(filename, "wt") as fp:
                 print(converted, file=fp)
@@ -320,5 +320,27 @@ def main(args=None) -> None:
             print()
 
 
+def main_script(args=None) -> None:
+    """Run the conversion tool."""
+    parser = build_arg_parser()
+
+    # Add log_level if running file alone
+    parser.add_argument(
+        "--log",
+        "-l",
+        dest="log_level",
+        default="INFO",
+        type=str,
+        help="Python logging level (e.g. DEBUG, INFO, WARNING), by default INFO",
+    )
+    args = parser.parse_args()
+    kwargs = vars(args)
+    logger.setLevel(args.log_level)
+    kwargs.pop('log_level')
+    logging.basicConfig()
+
+    main(**kwargs)
+
+
 if __name__ == "__main__":
-    main()
+    main_script()

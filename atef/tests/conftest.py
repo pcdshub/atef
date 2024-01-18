@@ -339,7 +339,7 @@ def make_page():
         else:
             raise NotImplementedError()
 
-        tree = DualTree(orig_file=file)
+        tree = DualTree(orig_file=file, widget_cache_size=50)
         tree.select_by_data(cfg)
         cfg_page = tree.current_widget
 
