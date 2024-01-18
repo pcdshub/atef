@@ -1,8 +1,5 @@
 """
 `atef scripts` runs helper scripts.  Scripts may be added over time.
-
-Try:
-
 """
 
 import argparse
@@ -20,6 +17,7 @@ def gather_scripts() -> Dict[str, Tuple[Callable, Callable]]:
     """Gather scripts, one main function from each submodule"""
     # similar to main's _build_commands
     global DESCRIPTION
+    DESCRIPTION += "\nTry:\n"
     results = {}
     unavailable = []
 

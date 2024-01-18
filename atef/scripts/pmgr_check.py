@@ -58,7 +58,11 @@ def get_pv(prefix: str, key: str):
     return pv
 
 
-def get_cfg_data(hutch: str, config_name: str, table_name: str = 'ims_motor') -> Dict[str, Any]:
+def get_cfg_data(
+    hutch: str,
+    config_name: str,
+    table_name: str = 'ims_motor'
+) -> Dict[str, Any]:
     """
     Get pmgr config data corresponding to ``config_name`` and ``hutch``
 
@@ -82,7 +86,11 @@ def get_cfg_data(hutch: str, config_name: str, table_name: str = 'ims_motor') ->
     return cfg_data
 
 
-def create_atef_check(config_name: str, cfg_data: Dict[str, Any], prefix: str) -> PVConfiguration:
+def create_atef_check(
+    config_name: str,
+    cfg_data: Dict[str, Any],
+    prefix: str
+) -> PVConfiguration:
     """
     Construct the full atef checkout.  Simply creates an Equals comparison for each
     value in the pmgr configuration, and groups it in a PVConfiguration
@@ -128,11 +136,11 @@ def build_arg_parser(argparser=None) -> argparse.ArgumentParser:
 
     argparser.add_argument(
         "--names",
-        "-m",
+        "-n",
         dest="pmgr_names",
         type=str,
         nargs="+",
-        help="a list of stored pmgr configuration names, case and whitespace sensitive."
+        help="a list of stored pmgr configuration names, case and whitespace sensitive. "
              "e.g. 'KB1 DS SLIT LEF'.  Length must match --prefixes",
     )
 
