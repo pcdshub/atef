@@ -652,15 +652,6 @@ class DualTree(DesignerDisplay, QWidget):
             logger.debug(f'{mode} cache full, popping last widget: '
                          f'({oldest_widget})')
 
-            # typically this is fast enough, but if garbage collection is quick
-            # the widget may be deleted before we can delete it ourselves
-            try:
-                logger.debug(f'deleting widget from cache: {type(oldest_widget)}')
-                oldest_widget.setParent(None)
-                oldest_widget.deleteLater()
-            except RuntimeError:
-                pass
-
     def create_widget(self, item: TreeItem, mode: str) -> PageWidget:
         """Create the widget for ``item`` in ``mode``."""
         data = item.orig_data
