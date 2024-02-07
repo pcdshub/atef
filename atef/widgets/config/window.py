@@ -520,7 +520,7 @@ class DualTree(DesignerDisplay, QWidget):
         self.toggle = Toggle()
 
         # select top level root
-        self.select_by_item(self.root_item.child(0))
+        self.tree_view.setCurrentIndex(self.model.index(0, 0, QtCore.QModelIndex()))
 
     def assemble_tree(self) -> None:
         """init-time tree setup.  Sets the tree into edit mode"""
@@ -581,8 +581,7 @@ class DualTree(DesignerDisplay, QWidget):
         # check if item is in tree before selecting?
         logger.debug(f'selecting page for item: {item.data(0)}')
         new_index = self.model.index_from_item(item)
-        sel_model = self.tree_view.selectionModel()
-        sel_model.select(new_index, sel_model.ClearAndSelect | sel_model.Rows)
+        self.tree_view.setCurrentIndex(new_index)
 
     def select_by_data(self, data: AnyDataclass) -> None:
         """Select the TreeItem containing ``data``"""
