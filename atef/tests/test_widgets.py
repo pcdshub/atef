@@ -7,7 +7,7 @@ import happi
 import pytest
 import yaml
 from pytestqt.qtbot import QtBot
-from qtpy import QtCore
+from qtpy import QtCore, QtWidgets
 
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydDeviceTableWidget
@@ -221,26 +221,54 @@ def test_config_window_save_load(qtbot: QtBot, tmp_path: pathlib.Path,
     qtbot.addWidget(window)
 
 
-# # Test encountered frequent failures due to C++ objects being deleted before
-# # garbage collection attempted to clean up.  There are likely too many widgets
-# # (and with PR#208 too many signal wait conditions) for this to not fail.
-# # the concept of this test is still good, but for now does not work
-# @pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
-# def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike, monkeypatch):
-#     """
-#     Pass if the RunTree can be created from an EditTree
-#     This can hang if a checkout cannot be prepared, so patch to ensure
-#     the gui continues
-#     """
-#     monkeypatch.setattr(QtWidgets.QMessageBox, 'exec', lambda *a, **k: True)
-#     window = Window(show_welcome=False)
-#     window.open_file(filename=str(config))
-#     print(config)
-#     qtbot.addWidget(window)
-#     toggle = window.tab_widget.widget(0).toggle
-#     toggle.setChecked(True)
-#     qtbot.waitSignal(window.tab_widget.currentWidget().mode_switch_finished)
-#     assert window.tab_widget.widget(0).mode == 'run'
+@pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
+def test_edit_run_toggle(qtbot: QtBot, config: os.PathLike, monkeypatch):
+    """
+    Pass if the RunTree can be created from an EditTree
+    This can hang if a checkout cannot be prepared, so patch to ensure
+    the gui continues.
+
+    For now, this is nearly a no-op, since changing to run-mode does not create
+    widgets.  But it can be used
+    """
+    monkeypatch.setattr(QtWidgets.QMessageBox, 'exec', lambda *a, **k: True)
+    window = Window(show_welcome=False)
+    window.open_file(filename=str(config))
+    print(config)
+    qtbot.addWidget(window)
+    toggle = window.tab_widget.widget(0).toggle
+    toggle.setChecked(True)
+    qtbot.waitSignal(window.tab_widget.currentWidget().mode_switch_finished)
+    assert window.tab_widget.widget(0).mode == 'run'
+
+
+@pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
+def test_open_all_pages(qtbot: QtBot, config: os.PathLike):
+    """Pass if all pages in the test configs can be opened by selecting the treeview"""
+    # Issues from enum signals timing out after widget has been gc'd, if cache size
+    # drops widget.  For now just make cache arbitrarily large.
+    window = Window(show_welcome=False, cache_size=100)
+    window.open_file(filename=str(config))
+
+    curr_tree = window.get_current_tree()
+    tree_view = curr_tree.tree_view
+    curr_index = tree_view.selectionModel().currentIndex()
+    curr_page = curr_tree.current_widget
+
+    # Assuming we have less than 100 items in test configs
+    for _ in range(100):
+        new_index = tree_view.indexBelow(curr_index)
+        print(curr_tree.model.data(new_index, 0))
+        if curr_tree.model.data(new_index, 0) is None:
+            break
+
+        tree_view.setCurrentIndex(new_index)
+        qtbot.waitUntil(lambda: curr_page != curr_tree.current_widget)
+        curr_page = curr_tree.current_widget
+        curr_index = new_index
+
+    # if there are epics calls they may still be going on at test teardown?...
+    qtbot.addWidget(window)
 
 
 def test_open_happi_viewer(qtbot: QtBot, happi_client: happi.Client):

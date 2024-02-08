@@ -519,9 +519,6 @@ class DualTree(DesignerDisplay, QWidget):
 
         self.toggle = Toggle()
 
-        # select top level root
-        self.select_by_item(self.root_item.child(0))
-
     def assemble_tree(self) -> None:
         """init-time tree setup.  Sets the tree into edit mode"""
         # self.tree_view = QtWidgets.QTreeView()
@@ -556,9 +553,8 @@ class DualTree(DesignerDisplay, QWidget):
 
         # Clear widget caches
         for cache in (self.edit_widget_cache, self.run_widget_cache):
-            for widget in cache.values():
-                widget.setParent(None)
-                widget.deleteLater()
+            for _ in range(len(cache)):
+                cache.popitem()
 
         self.root_item = create_tree_from_file(
             data=self.orig_file,
@@ -576,13 +572,15 @@ class DualTree(DesignerDisplay, QWidget):
             self.show_selected_display
         )
 
+        # select top level root
+        self.tree_view.setCurrentIndex(self.model.index(0, 0, QtCore.QModelIndex()))
+
     def select_by_item(self, item: TreeItem) -> None:
         """Select desired TreeItem(and show corresponding page) in TreeView"""
         # check if item is in tree before selecting?
         logger.debug(f'selecting page for item: {item.data(0)}')
         new_index = self.model.index_from_item(item)
-        sel_model = self.tree_view.selectionModel()
-        sel_model.select(new_index, sel_model.ClearAndSelect | sel_model.Rows)
+        self.tree_view.setCurrentIndex(new_index)
 
     def select_by_data(self, data: AnyDataclass) -> None:
         """Select the TreeItem containing ``data``"""
@@ -821,12 +819,17 @@ class DualTree(DesignerDisplay, QWidget):
             self.tree_view.setColumnHidden(1, True)
 
         # navigate away and back to trigger selectionChanged
-        if update_run:
+        curr_item = self.current_item
+        curr_index = self.model.index_from_item(self.current_item)
+        alt_index = self.tree_view.indexBelow(curr_index)
+        if self.model.data(alt_index, 0) is None:
             self.select_by_item(self.root_item)
+        else:
+            self.tree_view.setCurrentIndex(alt_index)
+
+        if update_run:
             self.select_by_item(self.root_item.child(0))
         else:
-            curr_item = self.current_item
-            self.select_by_item(self.root_item)
             self.select_by_item(curr_item)
 
     def print_report(self, *args, **kwargs):
