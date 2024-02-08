@@ -556,9 +556,8 @@ class DualTree(DesignerDisplay, QWidget):
 
         # Clear widget caches
         for cache in (self.edit_widget_cache, self.run_widget_cache):
-            for widget in cache.values():
-                widget.setParent(None)
-                widget.deleteLater()
+            for _ in range(len(cache)):
+                cache.popitem()
 
         self.root_item = create_tree_from_file(
             data=self.orig_file,
