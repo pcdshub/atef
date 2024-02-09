@@ -2109,17 +2109,22 @@ class MultiModeValueEdit(DesignerDisplay, QWidget):
                             enums_in_order.append(enum_str)
 
         def fill_enums():
-            for text in enums_in_order:
-                self.enum_input.addItem(text)
-            value = str(self.value.get())
-            if value in enums_in_order:
-                self.enum_input.setCurrentText(value)
+            try:
+                for text in enums_in_order:
+                    self.enum_input.addItem(text)
+                value = str(self.value.get())
+                if value in enums_in_order:
+                    self.enum_input.setCurrentText(value)
 
-            if set_mode:
-                if enums_in_order:
-                    self.set_mode(EditMode.ENUM)
-                else:
-                    self.set_mode(EditMode.STR)
+                if set_mode:
+                    if enums_in_order:
+                        self.set_mode(EditMode.ENUM)
+                    else:
+                        self.set_mode(EditMode.STR)
+            except RuntimeError:
+                # Widget sometimes destroyed before this completes
+                # simply return if this happens
+                return
 
         self.thread_worker = BusyCursorThread(func=get_signal_enums)
         self.thread_worker.task_finished.connect(fill_enums)
