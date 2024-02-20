@@ -1,0 +1,30 @@
+atef.check.EpicsValue
+=====================
+
+.. currentmodule:: atef.check
+
+.. autoclass:: EpicsValue
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: get
+    .. automethod:: prepare
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: pvname
+    .. autoattribute:: reduce_method
+    .. autoattribute:: reduce_period
+    .. autoattribute:: string
+    .. autoattribute:: value
+    
+    

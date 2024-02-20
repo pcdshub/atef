@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>atef.check &mdash; atef  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            atef
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">ATEF API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../releases.html">Release History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../upcoming_changes.html">Upcoming Changes</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/pcdshub/atef">Github Repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">atef</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">atef.check</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for atef.check</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Dataclasses for describing comparisons.  Comparisons generally subclass ``Comparison``,</span>
+<span class="sd">which hold ``Value`` and ``DynamicValue`` objects.  Comparisons involving</span>
+<span class="sd">``DynamicValue`` must be prepared before comparisons can be run.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span> <span class="nn">concurrent.futures</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">asdict</span><span class="p">,</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">zip_longest</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">ophyd</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">reduce</span><span class="p">,</span> <span class="n">serialization</span><span class="p">,</span> <span class="n">util</span>
+<span class="kn">from</span> <span class="nn">.cache</span> <span class="kn">import</span> <span class="n">DataCache</span>
+<span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">Severity</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="p">(</span><span class="n">ComparisonError</span><span class="p">,</span> <span class="n">ComparisonException</span><span class="p">,</span>
+                         <span class="n">ComparisonWarning</span><span class="p">,</span> <span class="n">DynamicValueError</span><span class="p">,</span>
+                         <span class="n">UnpreparedComparisonException</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.result</span> <span class="kn">import</span> <span class="n">Result</span><span class="p">,</span> <span class="n">successful_result</span>
+<span class="kn">from</span> <span class="nn">.type_hints</span> <span class="kn">import</span> <span class="n">Number</span><span class="p">,</span> <span class="n">PrimitiveType</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_is_in_range</span><span class="p">(</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">Number</span><span class="p">,</span> <span class="n">low</span><span class="p">:</span> <span class="n">Number</span><span class="p">,</span> <span class="n">high</span><span class="p">:</span> <span class="n">Number</span><span class="p">,</span> <span class="n">inclusive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Is `value` in the range of low to high?&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">inclusive</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">low</span> <span class="o">&lt;=</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="n">high</span>
+    <span class="k">return</span> <span class="n">low</span> <span class="o">&lt;</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="n">high</span>
+
+
+<span class="k">def</span> <span class="nf">_raise_for_severity</span><span class="p">(</span><span class="n">severity</span><span class="p">:</span> <span class="n">Severity</span><span class="p">,</span> <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">severity</span> <span class="o">==</span> <span class="n">Severity</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="n">severity</span> <span class="o">==</span> <span class="n">Severity</span><span class="o">.</span><span class="n">warning</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ComparisonWarning</span><span class="p">(</span><span class="n">reason</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="n">ComparisonError</span><span class="p">(</span><span class="n">reason</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Value">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Value.html#atef.check.Value">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Value</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A primitive (static) value with optional metadata.&quot;&quot;&quot;</span>
+    <span class="c1">#: The value for comparison.</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span>
+    <span class="c1">#: A description of what the value represents.</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="c1">#: Relative tolerance value.</span>
+    <span class="n">rtol</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: Absolute tolerance value.</span>
+    <span class="n">atol</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: Severity to set on a match (if applicable).</span>
+    <span class="n">severity</span><span class="p">:</span> <span class="n">Severity</span> <span class="o">=</span> <span class="n">Severity</span><span class="o">.</span><span class="n">success</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">atol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">rtol</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;rtol=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">rtol</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+            <span class="n">atol</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;atol=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">atol</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">atol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+            <span class="n">tolerance</span> <span class="o">=</span> <span class="s2">&quot; within &quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tol</span> <span class="k">for</span> <span class="n">tol</span> <span class="ow">in</span> <span class="p">(</span><span class="n">rtol</span><span class="p">,</span> <span class="n">atol</span><span class="p">)</span> <span class="k">if</span> <span class="n">tol</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tolerance</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># Since &quot;success&quot; is likely implicit here, only specify the resulting</span>
+        <span class="c1"># severity in the description when it&#39;s not &quot;success&quot;:</span>
+        <span class="c1">#   at2l0.blade_01.state.state not equal to 0</span>
+        <span class="c1">#   (for a result of success): Filter is moving</span>
+        <span class="c1"># becomes</span>
+        <span class="c1">#   at2l0.blade_01.state.state not equal to 0: Filter is moving</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">severity</span> <span class="o">==</span> <span class="n">Severity</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+            <span class="n">value_desc</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="si">}{</span><span class="n">tolerance</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">value_desc</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="si">}{</span><span class="n">tolerance</span><span class="si">}</span><span class="s2"> (for a result of </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">severity</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">value_desc</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">return</span> <span class="n">value_desc</span>
+
+<div class="viewcode-block" id="Value.get">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Value.html#atef.check.Value.get">[docs]</a>
+    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PrimitiveType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the value from this container.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span></div>
+
+
+<div class="viewcode-block" id="Value.compare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Value.html#atef.check.Value.compare">[docs]</a>
+    <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compare the provided value with this one, using tolerance settings.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">rtol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">atol</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bool</span><span class="p">))):</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span>
+                <span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="n">rtol</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rtol</span> <span class="ow">or</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="n">atol</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atol</span> <span class="ow">or</span> <span class="mf">0.0</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="DynamicValue">
+<a class="viewcode-back" href="../../generated/generated/atef.check.DynamicValue.html#atef.check.DynamicValue">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="nd">@serialization</span><span class="o">.</span><span class="n">as_tagged_union</span>
+<span class="k">class</span> <span class="nc">DynamicValue</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A primitive value from an external source that may change over time.</span>
+<span class="sd">    This necessarily picks up a runtime performance cost and getting</span>
+<span class="sd">    the value is not guaranteed to be successful. If unsuccessful,</span>
+<span class="sd">    this will raise a DynamicValueError from the original exception.</span>
+
+<span class="sd">    Includes settings for reduction of multiple samples.</span>
+
+<span class="sd">    Value will be cached on preparation, and this value used for comparisons</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#: Value is now optional, and will be filled in when prepared</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PrimitiveType</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1">#: Period over which the value will be read</span>
+    <span class="n">reduce_period</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1">#: Reduce collected samples by this reduce method</span>
+    <span class="n">reduce_method</span><span class="p">:</span> <span class="n">reduce</span><span class="o">.</span><span class="n">ReduceMethod</span> <span class="o">=</span> <span class="n">reduce</span><span class="o">.</span><span class="n">ReduceMethod</span><span class="o">.</span><span class="n">average</span>
+
+    <span class="c1">#: If applicable, request and compare string values rather than the default</span>
+    <span class="n">string</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">kwds</span> <span class="o">=</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">asdict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">))</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">kwds</span><span class="p">)</span><span class="si">}</span><span class="s2">) [</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">]&quot;</span>
+
+<div class="viewcode-block" id="DynamicValue.get">
+<a class="viewcode-back" href="../../generated/generated/atef.check.DynamicValue.html#atef.check.DynamicValue.get">[docs]</a>
+    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PrimitiveType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the cached value from `prepare`, or raise a `DynamicValueError` if there is no such value.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">DynamicValueError</span><span class="p">(</span><span class="s1">&#39;Dynamic value has not been prepared.&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DynamicValue.prepare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.DynamicValue.html#atef.check.DynamicValue.prepare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">DataCache</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Implement in child class to get the current value from source.</span>
+<span class="sd">        Should set the self.value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="EpicsValue">
+<a class="viewcode-back" href="../../generated/generated/atef.check.EpicsValue.html#atef.check.EpicsValue">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">EpicsValue</span><span class="p">(</span><span class="n">DynamicValue</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A primitive value sourced from an EPICS PV.</span>
+<span class="sd">    This will create and cache an EpicsSignalRO object, and defer</span>
+<span class="sd">    to that signal&#39;s get handling.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># as of 3.10, use kw_only=True to allow mandatory arguments after the inherited</span>
+    <span class="c1"># optional ones.  Until then, these must have a default</span>
+    <span class="c1">#: The EPICS PV to use.</span>
+    <span class="n">pvname</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+<div class="viewcode-block" id="EpicsValue.prepare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.EpicsValue.html#atef.check.EpicsValue.prepare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare the EpicsValue.  Accesses the EPICS PV using the data</span>
+<span class="sd">        cache provided.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cache : DataCache, optional</span>
+<span class="sd">            The data cache instance, if available.  If unspecified, a new data</span>
+<span class="sd">            cache will be instantiated.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        DynamicValueError</span>
+<span class="sd">            if the EpicsValue does not have a pv specified</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">pvname</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">DynamicValueError</span><span class="p">(</span><span class="s1">&#39;No PV specified&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cache</span> <span class="o">=</span> <span class="n">DataCache</span><span class="p">()</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">cache</span><span class="o">.</span><span class="n">get_pv_data</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pvname</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+            <span class="n">reduce_period</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reduce_period</span><span class="p">,</span>
+            <span class="n">reduce_method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reduce_method</span><span class="p">,</span>
+            <span class="n">string</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">string</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">data</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="HappiValue">
+<a class="viewcode-back" href="../../generated/generated/atef.check.HappiValue.html#atef.check.HappiValue">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">HappiValue</span><span class="p">(</span><span class="n">DynamicValue</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A primitive value sourced from a specific happi device signal.</span>
+<span class="sd">    This will query happi to cache a Signal object, and defer to</span>
+<span class="sd">    that signal&#39;s get handling.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#: The name of the device to use.</span>
+    <span class="n">device_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="c1">#: The attr name of the signal to get from.</span>
+    <span class="n">signal_attr</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+<div class="viewcode-block" id="HappiValue.prepare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.HappiValue.html#atef.check.HappiValue.prepare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare the HappiValue. Accesses the specified device and component</span>
+<span class="sd">        from the happi database.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cache : DataCache, optional</span>
+<span class="sd">            The data cache instance, if available.  If unspecified, a new data</span>
+<span class="sd">            cache will be instantiated.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        DynamicValueError</span>
+<span class="sd">            if the EpicsValue does not have a pv specified</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">signal_attr</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">DynamicValueError</span><span class="p">(</span><span class="s1">&#39;Happi value is unspecified&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cache</span> <span class="o">=</span> <span class="n">DataCache</span><span class="p">()</span>
+
+        <span class="n">device</span> <span class="o">=</span> <span class="n">util</span><span class="o">.</span><span class="n">get_happi_device_by_name</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device_name</span><span class="p">)</span>
+        <span class="n">signal</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">signal_attr</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">cache</span><span class="o">.</span><span class="n">get_signal_data</span><span class="p">(</span>
+            <span class="n">signal</span><span class="p">,</span>
+            <span class="n">reduce_period</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reduce_period</span><span class="p">,</span>
+            <span class="n">reduce_method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reduce_method</span><span class="p">,</span>
+            <span class="n">string</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">string</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">data</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ValueRange">
+<a class="viewcode-back" href="../../generated/generated/atef.check.ValueRange.html#atef.check.ValueRange">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ValueRange</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A range of primitive values with optional metadata.&quot;&quot;&quot;</span>
+    <span class="c1">#: The low value for comparison.</span>
+    <span class="n">low</span><span class="p">:</span> <span class="n">Number</span>
+    <span class="c1">#: The high value for comparison.</span>
+    <span class="n">high</span><span class="p">:</span> <span class="n">Number</span>
+    <span class="c1">#: Should the low and high values be included in the range?</span>
+    <span class="n">inclusive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="c1">#: Check if inside the range.</span>
+    <span class="n">in_range</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="c1">#: A description of what the value represents.</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="c1">#: Severity to set on a match (if applicable).</span>
+    <span class="n">severity</span><span class="p">:</span> <span class="n">Severity</span> <span class="o">=</span> <span class="n">Severity</span><span class="o">.</span><span class="n">success</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">open_paren</span><span class="p">,</span> <span class="n">close_paren</span> <span class="o">=</span> <span class="s2">&quot;[]&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">inclusive</span> <span class="k">else</span> <span class="s2">&quot;()&quot;</span>
+        <span class="n">inside</span> <span class="o">=</span> <span class="s2">&quot;inside&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_range</span> <span class="k">else</span> <span class="s2">&quot;outside&quot;</span>
+        <span class="n">range_desc</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">inside</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">open_paren</span><span class="si">}{</span><span class="bp">self</span><span class="o">.</span><span class="n">low</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">high</span><span class="si">}{</span><span class="n">close_paren</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">value_desc</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">range_desc</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">severity</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">value_desc</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="n">value_desc</span>
+
+<div class="viewcode-block" id="ValueRange.compare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.ValueRange.html#atef.check.ValueRange.compare">[docs]</a>
+    <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Number</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compare the provided value with this range.&quot;&quot;&quot;</span>
+        <span class="n">in_range</span> <span class="o">=</span> <span class="n">_is_in_range</span><span class="p">(</span>
+            <span class="n">value</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">low</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">high</span><span class="p">,</span> <span class="n">inclusive</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inclusive</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">in_range</span><span class="p">:</span>
+            <span class="c1"># Normal functionality - is value in the range?</span>
+            <span class="k">return</span> <span class="n">in_range</span>
+
+        <span class="c1"># Inverted - is value outside of the range?</span>
+        <span class="k">return</span> <span class="ow">not</span> <span class="n">in_range</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Comparison.html#atef.check.Comparison">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="nd">@serialization</span><span class="o">.</span><span class="n">as_tagged_union</span>
+<span class="k">class</span> <span class="nc">Comparison</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base class for all atef value comparisons.</span>
+
+<span class="sd">    Subclasses of Comparison will be serialized as a tagged union.  This means</span>
+<span class="sd">    that the subclass name will be used as an identifier for the generated</span>
+<span class="sd">    serialized dictionary (and JSON object).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Short name to use in the UI</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1">#: Description tied to this comparison.</span>
+    <span class="n">description</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1">#: Invert the comparison&#39;s result.  Normally, a valid comparison - that is,</span>
+    <span class="c1">#: one that evaluates to True - is considered successful.  When `invert` is</span>
+    <span class="c1">#: set, such a comparison would be considered a failure.</span>
+    <span class="n">invert</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1">#: Period over which the comparison will occur, where multiple samples</span>
+    <span class="c1">#: may be acquired prior to a result being available.</span>
+    <span class="n">reduce_period</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1">#: Reduce collected samples by this reduce method.</span>
+    <span class="n">reduce_method</span><span class="p">:</span> <span class="n">reduce</span><span class="o">.</span><span class="n">ReduceMethod</span> <span class="o">=</span> <span class="n">reduce</span><span class="o">.</span><span class="n">ReduceMethod</span><span class="o">.</span><span class="n">average</span>
+
+    <span class="c1">#: If applicable, request and compare string values rather than the default</span>
+    <span class="c1">#: specified.</span>
+    <span class="n">string</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1">#: If the comparison fails, use this result severity.</span>
+    <span class="n">severity_on_failure</span><span class="p">:</span> <span class="n">Severity</span> <span class="o">=</span> <span class="n">Severity</span><span class="o">.</span><span class="n">error</span>
+
+    <span class="c1">#: If disconnected and unable to perform the comparison, set this</span>
+    <span class="c1">#: result severity.</span>
+    <span class="n">if_disconnected</span><span class="p">:</span> <span class="n">Severity</span> <span class="o">=</span> <span class="n">Severity</span><span class="o">.</span><span class="n">error</span>
+
+    <span class="k">def</span> <span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_prepared</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Result</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the comparison against ``value``.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Comparison.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Comparison.html#atef.check.Comparison.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Human-readable description of the comparison operation itself.</span>
+
+<span class="sd">        To be implemented by subclass.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compare a non-None value using the configured settings.</span>
+
+<span class="sd">        To be implemented by subclass.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.describe() failure &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">ex</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">ex</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+
+<div class="viewcode-block" id="Comparison.compare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Comparison.html#atef.check.Comparison.compare">[docs]</a>
+    <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">identifier</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compare the provided value using the comparator&#39;s settings.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        value :</span>
+<span class="sd">            The value to compare.</span>
+
+<span class="sd">        identifier : str, optional</span>
+<span class="sd">            An identifier that goes along with the provided value.  Used for</span>
+<span class="sd">            severity result descriptions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_prepared</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UnpreparedComparisonException</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Comparison </span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2"> was not prepared.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">if_disconnected</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;Value unset (i.e., disconnected)&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">identifier_prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">identifier</span><span class="si">}</span><span class="s2"> &quot;</span> <span class="k">if</span> <span class="n">identifier</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">passed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compare</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">ComparisonException</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">ex</span><span class="o">.</span><span class="n">severity</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">identifier_prefix</span><span class="si">}</span><span class="s2">Value </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> </span><span class="si">{</span><span class="n">ex</span><span class="o">.</span><span class="n">severity</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">ex</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Result</span><span class="p">(</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">internal_error</span><span class="p">,</span>
+                <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">identifier_prefix</span><span class="si">}</span><span class="s2">Value </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;raised </span><span class="si">{</span><span class="n">ex</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">ex</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">invert</span><span class="p">:</span>
+            <span class="n">passed</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">passed</span>
+
+        <span class="c1"># Some comparisons may be done with array values; require that</span>
+        <span class="c1"># all match for a success here:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">passed</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+            <span class="n">passed</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span><span class="n">passed</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">passed</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">successful_result</span><span class="p">()</span>
+
+        <span class="n">desc</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">identifier_prefix</span><span class="si">}{</span><span class="bp">self</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">return</span> <span class="n">Result</span><span class="p">(</span>
+            <span class="n">severity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">severity_on_failure</span><span class="p">,</span>
+            <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2">: value of </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Comparison.get_data_for_signal">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Comparison.html#atef.check.Comparison.get_data_for_signal">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_data_for_signal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">signal</span><span class="p">:</span> <span class="n">ophyd</span><span class="o">.</span><span class="n">Signal</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get data for the given signal, according to the string and data</span>
+<span class="sd">        reduction settings.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        signal : ophyd.Signal</span>
+<span class="sd">            The signal.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Any</span>
+<span class="sd">            The acquired data.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        TimeoutError</span>
+<span class="sd">            If the get operation times out.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">reduce</span><span class="o">.</span><span class="n">get_data_for_signal</span><span class="p">(</span>
+            <span class="n">signal</span><span class="p">,</span>
+            <span class="n">reduce_period</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reduce_period</span><span class="p">,</span>
+            <span class="n">reduce_method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reduce_method</span><span class="p">,</span>
+            <span class="n">string</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">string</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Comparison.get_data_for_signal_async">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Comparison.html#atef.check.Comparison.get_data_for_signal_async">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">get_data_for_signal_async</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">signal</span><span class="p">:</span> <span class="n">ophyd</span><span class="o">.</span><span class="n">Signal</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">executor</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">concurrent</span><span class="o">.</span><span class="n">futures</span><span class="o">.</span><span class="n">Executor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get data for the given signal, according to the string and data</span>
+<span class="sd">        reduction settings.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        signal : ophyd.Signal</span>
+<span class="sd">            The signal.</span>
+<span class="sd">        executor : concurrent.futures.Executor, optional</span>
+<span class="sd">            The executor to run the synchronous call in.  Defaults to</span>
+<span class="sd">            the loop-defined default executor.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Any</span>
+<span class="sd">            The acquired data.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        TimeoutError</span>
+<span class="sd">            If the get operation times out.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="n">reduce</span><span class="o">.</span><span class="n">get_data_for_signal_async</span><span class="p">(</span>
+            <span class="n">signal</span><span class="p">,</span>
+            <span class="n">reduce_period</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reduce_period</span><span class="p">,</span>
+            <span class="n">reduce_method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reduce_method</span><span class="p">,</span>
+            <span class="n">string</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">string</span> <span class="ow">or</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="n">executor</span><span class="o">=</span><span class="n">executor</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Comparison.prepare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Comparison.html#atef.check.Comparison.prepare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Implement in subclass to grab and cache dynamic values.</span>
+<span class="sd">        This is expected to set self.is_prepared to True if</span>
+<span class="sd">        successful.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO: think about renaming this method, collides with PreparedComparison</span>
+        <span class="c1"># Why would we have to prepare the comparison AND make a prepared comparison?</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="BasicDynamic">
+<a class="viewcode-back" href="../../generated/generated/atef.check.BasicDynamic.html#atef.check.BasicDynamic">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">BasicDynamic</span><span class="p">(</span><span class="n">Comparison</span><span class="p">):</span>
+    <span class="n">value_dynamic</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicValue</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="BasicDynamic.prepare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.BasicDynamic.html#atef.check.BasicDynamic.prepare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare this comparison&#39;s value data.  If a value_dynamic is specified,</span>
+<span class="sd">        prepare its data</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cache : DataCache, optional</span>
+<span class="sd">            The data cache instance, if available.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_prepared</span> <span class="o">=</span> <span class="kc">True</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Equals">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Equals.html#atef.check.Equals">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Equals</span><span class="p">(</span><span class="n">BasicDynamic</span><span class="p">):</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">rtol</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">atol</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Value</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Value</span><span class="p">(</span>
+            <span class="n">value</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">rtol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">rtol</span><span class="p">,</span>
+            <span class="n">atol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">atol</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="Equals.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Equals.html#atef.check.Equals.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Describe the equality comparison in words.&quot;&quot;&quot;</span>
+        <span class="n">comparison</span> <span class="o">=</span> <span class="s2">&quot;equal to&quot;</span> <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">invert</span> <span class="k">else</span> <span class="s2">&quot;not equal to&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">dynamic</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dynamic</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">comparison</span><span class="si">}{</span><span class="n">dynamic</span><span class="si">}{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="NotEquals">
+<a class="viewcode-back" href="../../generated/generated/atef.check.NotEquals.html#atef.check.NotEquals">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">NotEquals</span><span class="p">(</span><span class="n">BasicDynamic</span><span class="p">):</span>
+    <span class="c1"># Less confusing shortcut for `Equals(..., invert=True)`</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">rtol</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">atol</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Value</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Value</span><span class="p">(</span>
+            <span class="n">value</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+            <span class="n">rtol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">rtol</span><span class="p">,</span>
+            <span class="n">atol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">atol</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="NotEquals.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.NotEquals.html#atef.check.NotEquals.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Describe the equality comparison in words.&quot;&quot;&quot;</span>
+        <span class="n">comparison</span> <span class="o">=</span> <span class="s2">&quot;equal to&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">invert</span> <span class="k">else</span> <span class="s2">&quot;not equal to&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">dynamic</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dynamic</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span><span class="si">}</span><span class="s2"> &quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">comparison</span><span class="si">}{</span><span class="n">dynamic</span><span class="si">}{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ValueSet">
+<a class="viewcode-back" href="../../generated/generated/atef.check.ValueSet.html#atef.check.ValueSet">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">ValueSet</span><span class="p">(</span><span class="n">Comparison</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A set of values with corresponding severities and descriptions.&quot;&quot;&quot;</span>
+    <span class="c1"># Review: really a &quot;value sequence&quot;/list as the first ones have priority,</span>
+    <span class="c1"># but that sounds like a vector version of &quot;Value&quot; above; better ideas?</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Value</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">values_dynamic</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">DynamicValue</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ValueSet.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.ValueSet.html#atef.check.ValueSet.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Describe the equality comparison in words.&quot;&quot;&quot;</span>
+        <span class="n">accumulated_values</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">value</span><span class="p">,</span> <span class="n">dynamic</span> <span class="ow">in</span> <span class="n">zip_longest</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">values_dynamic</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">dynamic</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">accumulated_values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">accumulated_values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dynamic</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">accumulated_values</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Any of:</span><span class="se">\n</span><span class="si">{</span><span class="n">values</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">compare_value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">compare_value</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+                <span class="n">_raise_for_severity</span><span class="p">(</span>
+                    <span class="n">compare_value</span><span class="o">.</span><span class="n">severity</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;== </span><span class="si">{</span><span class="n">compare_value</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="ValueSet.prepare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.ValueSet.html#atef.check.ValueSet.prepare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare this comparison&#39;s value data.  If a value_dynamic is specified,</span>
+<span class="sd">        prepare its data</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cache : DataCache, optional</span>
+<span class="sd">            The data cache instance, if available.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO revisit this logic, seems to overwrite normal values.</span>
+        <span class="c1"># How are these populated?  is there a value for every dynamic?</span>
+        <span class="k">for</span> <span class="n">value</span><span class="p">,</span> <span class="n">dynamic</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">values_dynamic</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">await</span> <span class="n">dynamic</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+                <span class="n">value</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">dynamic</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_prepared</span> <span class="o">=</span> <span class="kc">True</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="AnyValue">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyValue.html#atef.check.AnyValue">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">AnyValue</span><span class="p">(</span><span class="n">Comparison</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comparison passes if the value is in the ``values`` list.&quot;&quot;&quot;</span>
+    <span class="n">values</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PrimitiveType</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">values_dynamic</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">DynamicValue</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="AnyValue.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyValue.html#atef.check.AnyValue.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Describe the comparison in words.&quot;&quot;&quot;</span>
+        <span class="n">accumulated_values</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">value</span><span class="p">,</span> <span class="n">dynamic</span> <span class="ow">in</span> <span class="n">zip_longest</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">values_dynamic</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">dynamic</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">accumulated_values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">accumulated_values</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dynamic</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">accumulated_values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;one of </span><span class="si">{</span><span class="n">values</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">values</span>
+
+<div class="viewcode-block" id="AnyValue.prepare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyValue.html#atef.check.AnyValue.prepare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare this comparison&#39;s value data.  Prepares each DynamicValue in the</span>
+<span class="sd">        value_dynamic list, if specified.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cache : DataCache, optional</span>
+<span class="sd">            The data cache instance, if available.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">dynamic</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">values_dynamic</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">await</span> <span class="n">dynamic</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">dynamic</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_prepared</span> <span class="o">=</span> <span class="kc">True</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="AnyComparison">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyComparison.html#atef.check.AnyComparison">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">AnyComparison</span><span class="p">(</span><span class="n">Comparison</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comparison passes if *any* contained comparison passes.&quot;&quot;&quot;</span>
+    <span class="n">comparisons</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+<div class="viewcode-block" id="AnyComparison.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyComparison.html#atef.check.AnyComparison.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Describe the comparison in words.&quot;&quot;&quot;</span>
+        <span class="n">comparisons</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">comparison</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">comparison</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;any of:</span><span class="se">\n</span><span class="si">{</span><span class="n">comparisons</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">PrimitiveType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">comparison</span><span class="o">.</span><span class="n">_compare</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">comparison</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="AnyComparison.prepare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyComparison.html#atef.check.AnyComparison.prepare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare this comparison&#39;s value data.  Prepares all comparisons contained</span>
+<span class="sd">        in this comparison.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cache : DataCache, optional</span>
+<span class="sd">            The data cache instance, if available.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO make sure all comparisons have a prepare?  Or allow for case where</span>
+        <span class="c1"># non-dynamic comparisons that don&#39;t have prepare</span>
+        <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span><span class="p">:</span>
+            <span class="k">await</span> <span class="n">comp</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_prepared</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="AnyComparison.children">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyComparison.html#atef.check.AnyComparison.children">[docs]</a>
+    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span></div>
+
+
+<div class="viewcode-block" id="AnyComparison.replace_comparison">
+<a class="viewcode-back" href="../../generated/generated/atef.check.AnyComparison.html#atef.check.AnyComparison.replace_comparison">[docs]</a>
+    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+        <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Replace ``old_comp`` with ``new_comp`` in this dataclass.</span>
+<span class="sd">        A common method for all dataclasses that hold comparisons.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        old_comp : Comparison</span>
+<span class="sd">            Comparsion to replace</span>
+<span class="sd">        new_comp : Comparison</span>
+<span class="sd">            Comparison to replace ``old_comp`` with</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">util</span><span class="o">.</span><span class="n">replace_in_list</span><span class="p">(</span>
+            <span class="n">old</span><span class="o">=</span><span class="n">old_comp</span><span class="p">,</span>
+            <span class="n">new</span><span class="o">=</span><span class="n">new_comp</span><span class="p">,</span>
+            <span class="n">item_list</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Greater">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Greater.html#atef.check.Greater">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Greater</span><span class="p">(</span><span class="n">BasicDynamic</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comparison: value &gt; self.value.&quot;&quot;&quot;</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">Number</span> <span class="o">=</span> <span class="mi">0</span>
+
+<div class="viewcode-block" id="Greater.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Greater.html#atef.check.Greater.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&gt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Number</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span></div>
+
+
+
+<div class="viewcode-block" id="GreaterOrEqual">
+<a class="viewcode-back" href="../../generated/generated/atef.check.GreaterOrEqual.html#atef.check.GreaterOrEqual">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">GreaterOrEqual</span><span class="p">(</span><span class="n">BasicDynamic</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comparison: value &gt;= self.value.&quot;&quot;&quot;</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">Number</span> <span class="o">=</span> <span class="mi">0</span>
+
+<div class="viewcode-block" id="GreaterOrEqual.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.GreaterOrEqual.html#atef.check.GreaterOrEqual.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&gt;= </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Number</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span></div>
+
+
+
+<div class="viewcode-block" id="Less">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Less.html#atef.check.Less">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Less</span><span class="p">(</span><span class="n">BasicDynamic</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comparison: value &lt; self.value.&quot;&quot;&quot;</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">Number</span> <span class="o">=</span> <span class="mi">0</span>
+
+<div class="viewcode-block" id="Less.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Less.html#atef.check.Less.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&lt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Number</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span></div>
+
+
+
+<div class="viewcode-block" id="LessOrEqual">
+<a class="viewcode-back" href="../../generated/generated/atef.check.LessOrEqual.html#atef.check.LessOrEqual">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">LessOrEqual</span><span class="p">(</span><span class="n">BasicDynamic</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Comparison: value &lt;= self.value.&quot;&quot;&quot;</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">Number</span> <span class="o">=</span> <span class="mi">0</span>
+
+<div class="viewcode-block" id="LessOrEqual.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.LessOrEqual.html#atef.check.LessOrEqual.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&lt;= </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">value_dynamic</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Number</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span></div>
+
+
+
+<div class="viewcode-block" id="Range">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Range.html#atef.check.Range">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Range</span><span class="p">(</span><span class="n">Comparison</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A range comparison.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    If the following inequality holds, the range comparison will succeed:</span>
+
+<span class="sd">        low &lt; value &lt; high  (inclusive=False)</span>
+<span class="sd">        low &lt;= value &lt;= high  (inclusive=True)</span>
+
+<span class="sd">    Additionally, warning levels may be specified.  These should be configured</span>
+<span class="sd">    such that:</span>
+
+<span class="sd">        low &lt;= warn_low &lt;= warn_high &lt;= high</span>
+
+<span class="sd">    With these warning levels configured, a warning will be raised when the</span>
+<span class="sd">    value falls within the following ranges.  For ``inclusive=False``::</span>
+
+<span class="sd">        low &lt; value &lt; warn_low</span>
+<span class="sd">        warn_high &lt; value &lt; high</span>
+
+<span class="sd">    or, when ``inclusive=True``:</span>
+
+<span class="sd">        low &lt;= value &lt;= warn_low</span>
+<span class="sd">        warn_high &lt;= value &lt;= high</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#: The low end of the range, which must be &lt;= high.</span>
+    <span class="n">low</span><span class="p">:</span> <span class="n">Number</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">low_dynamic</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicValue</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: The high end of the range, which must be &gt;= low.</span>
+    <span class="n">high</span><span class="p">:</span> <span class="n">Number</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">high_dynamic</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicValue</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: The low end of the warning range, which must be &lt;= warn_high.</span>
+    <span class="n">warn_low</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">warn_low_dynamic</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicValue</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: The high end of the warning range, which must be &gt;= warn_low.</span>
+    <span class="n">warn_high</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Number</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">warn_high_dynamic</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicValue</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#: Should the low and high values be included in the range?</span>
+    <span class="n">inclusive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">ranges</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">ValueRange</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="k">yield</span> <span class="n">ValueRange</span><span class="p">(</span>
+            <span class="n">low</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">low</span><span class="p">,</span>
+            <span class="n">high</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">high</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="n">inclusive</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inclusive</span><span class="p">,</span>
+            <span class="n">in_range</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">severity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">severity_on_failure</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_low</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_high</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">ValueRange</span><span class="p">(</span>
+                <span class="n">low</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">low</span><span class="p">,</span>
+                <span class="n">high</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">warn_low</span><span class="p">,</span>
+                <span class="n">description</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+                <span class="n">inclusive</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inclusive</span><span class="p">,</span>
+                <span class="n">in_range</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">warning</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">yield</span> <span class="n">ValueRange</span><span class="p">(</span>
+                <span class="n">low</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">warn_high</span><span class="p">,</span>
+                <span class="n">high</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">high</span><span class="p">,</span>
+                <span class="n">description</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+                <span class="n">inclusive</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inclusive</span><span class="p">,</span>
+                <span class="n">in_range</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">warning</span><span class="p">,</span>
+            <span class="p">)</span>
+
+<div class="viewcode-block" id="Range.describe">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Range.html#atef.check.Range.describe">[docs]</a>
+    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">range_</span><span class="p">)</span> <span class="k">for</span> <span class="n">range_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ranges</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">low_dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">text</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2"> Dynamic low value: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">low_dynamic</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">high_dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">text</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2"> Dynamic high value: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">high_dynamic</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_low_dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">text</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2"> Dynamic warn_low value: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">warn_low_dynamic</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_high_dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">text</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2"> Dynamic warn_high value: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">warn_high_dynamic</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">text</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Number</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">range_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ranges</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">range_</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+                <span class="n">_raise_for_severity</span><span class="p">(</span><span class="n">range_</span><span class="o">.</span><span class="n">severity</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">range_</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="Range.prepare">
+<a class="viewcode-back" href="../../generated/generated/atef.check.Range.html#atef.check.Range.prepare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare this comparison&#39;s value data.  If a value_dynamic is specified,</span>
+<span class="sd">        prepare its data.  Prepares the high/low limits along with dynamic high/low</span>
+<span class="sd">        warning values if they exist</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        cache : DataCache, optional</span>
+<span class="sd">            The data cache instance, if available.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">low_dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">low_dynamic</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">low</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">low_dynamic</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">high_dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">high_dynamic</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">high</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">high_dynamic</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_low_dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_low_dynamic</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn_low</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_low_dynamic</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_high_dynamic</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_high_dynamic</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn_high</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">warn_high_dynamic</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_prepared</span> <span class="o">=</span> <span class="kc">True</span></div>
+</div>
+
+
+
+<span class="n">ALL_COMPARISONS</span> <span class="o">=</span> <span class="p">[</span><span class="n">Equals</span><span class="p">,</span> <span class="n">NotEquals</span><span class="p">,</span> <span class="n">Greater</span><span class="p">,</span> <span class="n">GreaterOrEqual</span><span class="p">,</span> <span class="n">Less</span><span class="p">,</span> <span class="n">LessOrEqual</span><span class="p">,</span>
+                   <span class="n">Range</span><span class="p">,</span> <span class="n">ValueSet</span><span class="p">,</span> <span class="n">AnyValue</span><span class="p">,</span> <span class="n">AnyComparison</span><span class="p">]</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SLAC National Accelerator Laboratory.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
