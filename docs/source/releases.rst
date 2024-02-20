@@ -2,6 +2,30 @@ Release History
 ###############
 
 
+v1.4.0 (2024-02-20)
+===================
+
+Features
+--------
+- Adds script for converting pmgr configurations to atef checks.
+- Adds `PagedTableWidget`, and applies it to passive checkout group pages to substantially improve the loading performance of group pages with many, many comparisons.
+
+Bugfixes
+--------
+- Catch RuntimeErrors from widget deletion during enum filling
+- Avoid running deleteLater on widgets that garbage collection handles, preventing segfaults
+
+Maintenance
+-----------
+- Make selection behavior more consistent by using `QTreeView.setCurrentIndex()` instead of manipulating the selection model
+- adds `atef scripts` subcommand for invoking existing scripts.  Includes `converter_v0` and `pmgr_check` scripts.
+
+Contributors
+------------
+- tangkong
+
+
+
 v1.3.0 (2023-12-19)
 ===================
 
