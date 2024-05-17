@@ -8,10 +8,9 @@ from atef.check import Equals, GreaterOrEqual
 from atef.config import (ConfigurationGroup, DeviceConfiguration,
                          PreparedDeviceConfiguration)
 from atef.enums import Severity
-from atef.widgets.config.find_replace import (get_deepest_dataclass_in_path,
-                                              get_item_from_path,
-                                              replace_item_from_path,
-                                              walk_find_match)
+from atef.find_replace import (get_deepest_dataclass_in_path,
+                               get_item_from_path, replace_item_from_path,
+                               walk_find_match)
 
 
 @pytest.mark.parametrize(
