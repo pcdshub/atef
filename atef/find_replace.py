@@ -10,8 +10,8 @@ from typing import (Any, Callable, Generator, List, Optional, Tuple, Union,
 import happi
 
 from atef.cache import DataCache
-from atef.config import ConfigurationFile
-from atef.procedure import ProcedureFile
+from atef.config import ConfigurationFile, PreparedFile
+from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.type_hints import PrimitiveType
 
 logger = logging.getLogger(__name__)
@@ -322,3 +322,26 @@ class FindReplaceAction:
             return False
 
         return True
+
+
+def verify_file(
+    file: Union[ConfigurationFile, ProcedureFile],
+) -> Tuple[bool, str]:
+    try:
+        if isinstance(file, ConfigurationFile):
+            prep_file = PreparedFile.from_config(file)
+        elif isinstance(file, ProcedureFile):
+            # clear all results when making a new run tree
+            prep_file = PreparedProcedureFile.from_origin(file)
+        else:
+            msg = 'File type not recognized.'
+            return False, msg
+        prep_failures = len(prep_file.root.prepare_failures)
+        if prep_failures > 0:
+            return False, f'Failed to prepare {prep_failures} steps'
+    except Exception as ex:
+        logger.debug(ex)
+        msg = f'Unknown Error: {ex}.'
+        return False, msg
+
+    return True, ''

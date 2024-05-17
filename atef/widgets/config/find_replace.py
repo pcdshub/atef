@@ -23,7 +23,7 @@ from atef.find_replace import (FindReplaceAction, MatchFunction,
                                ReplaceFunction, get_deepest_dataclass_in_path,
                                get_default_match_fn, get_default_replace_fn,
                                get_item_from_path, patch_client_cache,
-                               walk_find_match)
+                               verify_file, walk_find_match)
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.util import get_happi_client
 from atef.widgets.config.utils import TableWidgetWithAddRow
@@ -56,38 +56,13 @@ def verify_file_and_notify(
     bool
         the verification success
     """
-    verified = True
-    try:
-        if isinstance(file, ConfigurationFile):
-            prep_file = PreparedFile.from_config(file)
-            if len(prep_file.root.prepare_failures) > 0:
-                verified = False
-        elif isinstance(file, ProcedureFile):
-            # clear all results when making a new run tree
-            prep_file = PreparedProcedureFile.from_origin(file)
-            if len(prep_file.root.prepare_failures) > 0:
-                verified = False
-        else:
-            QtWidgets.QMessageBox.warning(
-                parent_widget,
-                'Verification FAIL',
-                'File type not recognized.'
-            )
-            return False
-    except Exception as ex:
-        logger.debug(ex)
-        QtWidgets.QMessageBox.warning(
-            parent_widget,
-            'Verification FAIL',
-            f'Unknown Error: {ex}.'
-        )
-        return False
+    verified, msg = verify_file(file)
 
     if not verified:
         QtWidgets.QMessageBox.warning(
             parent_widget,
             'Verification FAIL',
-            'File could not be prepared successfully, edits will not work'
+            'File could not be prepared, edits will not work.\n' + msg
         )
     else:
         QtWidgets.QMessageBox.information(
