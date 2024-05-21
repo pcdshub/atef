@@ -17,6 +17,7 @@ atef.procedure.ProcedureFile
     .. automethod:: from_yaml
     .. automethod:: to_json
     .. automethod:: to_yaml
+    .. automethod:: validate
     .. automethod:: walk_steps
     
     
