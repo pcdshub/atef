@@ -1,0 +1,34 @@
+atef.config.PreparedTemplateConfiguration
+=========================================
+
+.. currentmodule:: atef.config
+
+.. autoclass:: PreparedTemplateConfiguration
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: compare
+    .. automethod:: from_config
+    .. automethod:: walk_comparisons
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: parent
+    .. autoattribute:: result
+    .. autoattribute:: config
+    .. autoattribute:: file
+    .. autoattribute:: cache
+    .. autoattribute:: comparisons
+    .. autoattribute:: prepare_failures
+    .. autoattribute:: combined_result
+    
+    

@@ -7,7 +7,7 @@
   <title>atef.config.ConfigurationGroup &mdash; atef  documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
-      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
 
   
   <!--[if lt IE 9]>
@@ -17,7 +17,7 @@
         <script src="../../_static/jquery.js?v=5d32c60e"></script>
         <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
         <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
-        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
         <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -67,8 +67,10 @@
 <li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedGroup.html">atef.config.PreparedGroup</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedPVConfiguration.html">atef.config.PreparedPVConfiguration</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedSignalComparison.html">atef.config.PreparedSignalComparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedTemplateConfiguration.html">atef.config.PreparedTemplateConfiguration</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedToolComparison.html">atef.config.PreparedToolComparison</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedToolConfiguration.html">atef.config.PreparedToolConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.TemplateConfiguration.html">atef.config.TemplateConfiguration</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.config.ToolConfiguration.html">atef.config.ToolConfiguration</a></li>
 </ul>
 </li>
@@ -187,7 +189,7 @@ Looks through <code class="docutils literal notranslate"><span class="pre">share
 
 <dl class="py method">
 <dt class="sig sig-object py" id="atef.config.ConfigurationGroup.walk_configs">
-<span class="sig-name descname"><span class="pre">walk_configs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.12)"><span class="pre">Generator</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="atef.config.PVConfiguration.html#atef.config.PVConfiguration" title="atef.config.PVConfiguration"><span class="pre">PVConfiguration</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.config.DeviceConfiguration.html#atef.config.DeviceConfiguration" title="atef.config.DeviceConfiguration"><span class="pre">DeviceConfiguration</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.config.ToolConfiguration.html#atef.config.ToolConfiguration" title="atef.config.ToolConfiguration"><span class="pre">ToolConfiguration</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#atef.config.ConfigurationGroup" title="atef.config.ConfigurationGroup"><span class="pre">ConfigurationGroup</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/atef/config.html#ConfigurationGroup.walk_configs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.config.ConfigurationGroup.walk_configs" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">walk_configs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.12)"><span class="pre">Generator</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="atef.config.PVConfiguration.html#atef.config.PVConfiguration" title="atef.config.PVConfiguration"><span class="pre">PVConfiguration</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.config.DeviceConfiguration.html#atef.config.DeviceConfiguration" title="atef.config.DeviceConfiguration"><span class="pre">DeviceConfiguration</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.config.ToolConfiguration.html#atef.config.ToolConfiguration" title="atef.config.ToolConfiguration"><span class="pre">ToolConfiguration</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#atef.config.ConfigurationGroup" title="atef.config.ConfigurationGroup"><span class="pre">ConfigurationGroup</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.config.TemplateConfiguration.html#atef.config.TemplateConfiguration" title="atef.config.TemplateConfiguration"><span class="pre">TemplateConfiguration</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/atef/config.html#ConfigurationGroup.walk_configs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.config.ConfigurationGroup.walk_configs" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Attributes</p>

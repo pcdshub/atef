@@ -44,6 +44,7 @@
       PreparedProcedureGroup
       PreparedProcedureStep
       PreparedSetValueStep
+      PreparedTemplateStep
       PreparedValueToSignal
       ProcedureFile
       ProcedureGroup
@@ -51,6 +52,7 @@
       PydmDisplayStep
       SetValueStep
       Target
+      TemplateStep
       TyphosDisplayStep
       ValueToTarget
    

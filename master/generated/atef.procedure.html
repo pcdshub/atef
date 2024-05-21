@@ -7,7 +7,7 @@
   <title>atef.procedure &mdash; atef  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=fa44fd50" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
-      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=fd3f3429" />
 
   
   <!--[if lt IE 9]>
@@ -17,7 +17,7 @@
         <script src="../_static/jquery.js?v=5d32c60e"></script>
         <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
         <script src="../_static/documentation_options.js?v=5929fcd5"></script>
-        <script src="../_static/doctools.js?v=888ff710"></script>
+        <script src="../_static/doctools.js?v=9a2dae69"></script>
         <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script src="../_static/docs-versions-menu.js?v=3d6a1aea"></script>
     <script src="../_static/js/theme.js"></script>
@@ -77,6 +77,7 @@
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.PreparedProcedureGroup.html">atef.procedure.PreparedProcedureGroup</a></li>
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.PreparedProcedureStep.html">atef.procedure.PreparedProcedureStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.PreparedSetValueStep.html">atef.procedure.PreparedSetValueStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.PreparedTemplateStep.html">atef.procedure.PreparedTemplateStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.PreparedValueToSignal.html">atef.procedure.PreparedValueToSignal</a></li>
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.ProcedureFile.html">atef.procedure.ProcedureFile</a></li>
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.ProcedureGroup.html">atef.procedure.ProcedureGroup</a></li>
@@ -84,6 +85,7 @@
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.PydmDisplayStep.html">atef.procedure.PydmDisplayStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.SetValueStep.html">atef.procedure.SetValueStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.Target.html">atef.procedure.Target</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.TemplateStep.html">atef.procedure.TemplateStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.TyphosDisplayStep.html">atef.procedure.TyphosDisplayStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="generated/atef.procedure.ValueToTarget.html">atef.procedure.ValueToTarget</a></li>
 </ul>
@@ -255,30 +257,40 @@ Result objects and a .run() method.</p>
 </dl>
 </p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.procedure.PreparedValueToSignal.html#atef.procedure.PreparedValueToSignal" title="atef.procedure.PreparedValueToSignal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PreparedValueToSignal</span></code></a>(name, signal, value, ...)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.procedure.PreparedTemplateStep.html#atef.procedure.PreparedTemplateStep" title="atef.procedure.PreparedTemplateStep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PreparedTemplateStep</span></code></a>(name, origin, parent, ...)</p></td>
 <td><p><dl class="field-list simple">
 <dt class="field-odd">Attributes<span class="colon">:</span></dt>
 <dd class="field-odd"><p></p></dd>
 </dl>
 </p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile" title="atef.procedure.ProcedureFile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ProcedureFile</span></code></a>(version, root)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.procedure.PreparedValueToSignal.html#atef.procedure.PreparedValueToSignal" title="atef.procedure.PreparedValueToSignal"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PreparedValueToSignal</span></code></a>(name, signal, value, ...)</p></td>
+<td><p><dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile" title="atef.procedure.ProcedureFile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ProcedureFile</span></code></a>(version, root)</p></td>
 <td><p>File comprised of several Procedure steps</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.procedure.ProcedureGroup.html#atef.procedure.ProcedureGroup" title="atef.procedure.ProcedureGroup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ProcedureGroup</span></code></a>(name, description, parent, ...)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.procedure.ProcedureGroup.html#atef.procedure.ProcedureGroup" title="atef.procedure.ProcedureGroup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ProcedureGroup</span></code></a>(name, description, parent, ...)</p></td>
 <td><p>A group of procedure steps (or nested groups).</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.procedure.ProcedureStep.html#atef.procedure.ProcedureStep" title="atef.procedure.ProcedureStep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ProcedureStep</span></code></a>([name, description, parent, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.procedure.ProcedureStep.html#atef.procedure.ProcedureStep" title="atef.procedure.ProcedureStep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ProcedureStep</span></code></a>([name, description, parent, ...])</p></td>
 <td><p>A basic step in an atef procedure.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.procedure.PydmDisplayStep.html#atef.procedure.PydmDisplayStep" title="atef.procedure.PydmDisplayStep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PydmDisplayStep</span></code></a>(name, description, parent, ...)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.procedure.PydmDisplayStep.html#atef.procedure.PydmDisplayStep" title="atef.procedure.PydmDisplayStep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PydmDisplayStep</span></code></a>(name, description, parent, ...)</p></td>
 <td><p>A procedure step which a opens a PyDM display.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.procedure.SetValueStep.html#atef.procedure.SetValueStep" title="atef.procedure.SetValueStep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SetValueStep</span></code></a>(name, description, parent, ...)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.procedure.SetValueStep.html#atef.procedure.SetValueStep" title="atef.procedure.SetValueStep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SetValueStep</span></code></a>(name, description, parent, ...)</p></td>
 <td><p>A step that sets one or more values and checks one or more values after</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.procedure.Target.html#atef.procedure.Target" title="atef.procedure.Target"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Target</span></code></a>([name, device, attr, pv])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.procedure.Target.html#atef.procedure.Target" title="atef.procedure.Target"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Target</span></code></a>([name, device, attr, pv])</p></td>
 <td><p>A destination for a value.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="generated/atef.procedure.TemplateStep.html#atef.procedure.TemplateStep" title="atef.procedure.TemplateStep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TemplateStep</span></code></a>(name, description, parent, ...)</p></td>
+<td><p>A procedure step that replaces items an existing checkout</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="generated/atef.procedure.TyphosDisplayStep.html#atef.procedure.TyphosDisplayStep" title="atef.procedure.TyphosDisplayStep"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TyphosDisplayStep</span></code></a>(name, description, parent, ...)</p></td>
 <td><p>A procedure step which opens one or more typhos displays.</p></td>

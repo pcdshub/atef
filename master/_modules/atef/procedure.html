@@ -6,7 +6,7 @@
   <title>atef.procedure &mdash; atef  documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
-      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
 
   
   <!--[if lt IE 9]>
@@ -16,7 +16,7 @@
         <script src="../../_static/jquery.js?v=5d32c60e"></script>
         <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
         <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
-        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
         <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -118,7 +118,8 @@
 <span class="kn">from</span> <span class="nn">atef.config</span> <span class="kn">import</span> <span class="p">(</span><span class="n">ConfigurationFile</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">,</span> <span class="n">PreparedFile</span><span class="p">,</span>
                          <span class="n">PreparedSignalComparison</span><span class="p">,</span> <span class="n">run_passive_step</span><span class="p">)</span>
 <span class="kn">from</span> <span class="nn">atef.enums</span> <span class="kn">import</span> <span class="n">GroupResultMode</span><span class="p">,</span> <span class="n">PlanDestination</span><span class="p">,</span> <span class="n">Severity</span>
-<span class="kn">from</span> <span class="nn">atef.exceptions</span> <span class="kn">import</span> <span class="n">PreparedComparisonException</span>
+<span class="kn">from</span> <span class="nn">atef.exceptions</span> <span class="kn">import</span> <span class="n">PreparationError</span><span class="p">,</span> <span class="n">PreparedComparisonException</span>
+<span class="kn">from</span> <span class="nn">atef.find_replace</span> <span class="kn">import</span> <span class="n">RegexFindReplace</span>
 <span class="kn">from</span> <span class="nn">atef.plan_utils</span> <span class="kn">import</span> <span class="p">(</span><span class="n">BlueskyState</span><span class="p">,</span> <span class="n">GlobalRunEngine</span><span class="p">,</span>
                              <span class="n">get_default_namespace</span><span class="p">,</span> <span class="n">register_run_identifier</span><span class="p">,</span>
                              <span class="n">run_in_local_RE</span><span class="p">)</span>
@@ -518,6 +519,18 @@
 
 
 
+<div class="viewcode-block" id="TemplateStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.TemplateStep.html#atef.procedure.TemplateStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">TemplateStep</span><span class="p">(</span><span class="n">ProcedureStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A procedure step that replaces items an existing checkout&quot;&quot;&quot;</span>
+    <span class="c1"># Path to a valid ProcedureFile or ConfigurationFile</span>
+    <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="c1"># List of edits to be applied to ``file_path``</span>
+    <span class="n">edits</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">RegexFindReplace</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+
+
+
 <div class="viewcode-block" id="ProcedureFile">
 <a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile">[docs]</a>
 <span class="nd">@dataclass</span>
@@ -596,6 +609,23 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump this configuration file to yaml.&quot;&quot;&quot;</span>
         <span class="n">init_yaml_support</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_json</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="ProcedureFile.validate">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.ProcedureFile.html#atef.procedure.ProcedureFile.validate">[docs]</a>
+    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Validate the file is properly formed and can be prepared&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">prep_file</span> <span class="o">=</span> <span class="n">PreparedProcedureFile</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+            <span class="n">prep_failures</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">prep_file</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">prepare_failures</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">prep_failures</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;Failed to prepare </span><span class="si">{</span><span class="n">prep_failures</span><span class="si">}</span><span class="s1"> steps&#39;</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;Unknown Error: </span><span class="si">{</span><span class="n">ex</span><span class="si">}</span><span class="s1">.&#39;</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="n">msg</span>
+
+        <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;&#39;</span></div>
 </div>
 
 
@@ -799,6 +829,10 @@
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">PlanStep</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">PreparedPlanStep</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
                     <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">TemplateStep</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">PreparedTemplateStep</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span>
+                    <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
                 <span class="p">)</span>
 
             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Step type unsupported: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">step</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -1112,6 +1146,122 @@
 
         <span class="k">return</span> <span class="n">prep_step</span></div>
 </div>
+
+
+
+<div class="viewcode-block" id="PreparedTemplateStep">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedTemplateStep.html#atef.procedure.PreparedTemplateStep">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedTemplateStep</span><span class="p">(</span><span class="n">PreparedProcedureStep</span><span class="p">):</span>
+    <span class="c1"># configuration origin</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">TemplateStep</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">TemplateStep</span><span class="p">)</span>
+    <span class="c1"># prepared file with edits applied</span>
+    <span class="n">file</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedFile</span><span class="p">,</span> <span class="n">PreparedProcedureFile</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="n">PreparedFile</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedTemplateStep.from_origin">
+<a class="viewcode-back" href="../../generated/generated/atef.procedure.PreparedTemplateStep.html#atef.procedure.PreparedTemplateStep.from_origin">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_origin</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">step</span><span class="p">:</span> <span class="n">TemplateStep</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedTemplateStep</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare a TemplateStep for running.  Applies edits and attempts</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        step : TemplateStep</span>
+<span class="sd">            the original TemplateStep (not prepared)</span>
+<span class="sd">        parent : Optional[PreparedProcedureGroup]</span>
+<span class="sd">            the hierarchical parent for the prepared step.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        PreparedTemplateStep</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># load file</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">orig_file</span> <span class="o">=</span> <span class="n">ConfigurationFile</span><span class="o">.</span><span class="n">from_filename</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">apischema</span><span class="o">.</span><span class="n">ValidationError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;failed to open as passive checkout&#39;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">orig_file</span> <span class="o">=</span> <span class="n">ProcedureFile</span><span class="o">.</span><span class="n">from_filename</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">apischema</span><span class="o">.</span><span class="n">ValidationError</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;failed to open file as either active &#39;</span>
+                             <span class="s1">&#39;or passive checkout&#39;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Could not open the file as either active or &#39;</span>
+                                 <span class="s1">&#39;passive checkout.&#39;</span><span class="p">)</span>
+
+        <span class="c1"># convert and apply edits</span>
+        <span class="n">edits</span> <span class="o">=</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">to_action</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">step</span><span class="o">.</span><span class="n">edits</span><span class="p">]</span>
+        <span class="n">edit_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">edit</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">orig_file</span><span class="p">)</span> <span class="k">for</span> <span class="n">edit</span> <span class="ow">in</span> <span class="n">edits</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">edit_results</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">FailedStep</span><span class="p">(</span>
+                <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
+                <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+                <span class="n">exception</span><span class="o">=</span><span class="n">PreparationError</span><span class="p">,</span>
+                <span class="n">result</span><span class="o">=</span><span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">internal_error</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s1">&#39;Failed to prepare templated config: (</span><span class="si">{</span><span class="n">step</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">) &#39;</span>
+                        <span class="sa">f</span><span class="s1">&#39;Could not apply all edits.&#39;</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># verify edited file</span>
+        <span class="n">success</span><span class="p">,</span> <span class="n">msg</span> <span class="o">=</span> <span class="n">orig_file</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">success</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">FailedStep</span><span class="p">(</span>
+                <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
+                <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+                <span class="n">exception</span><span class="o">=</span><span class="n">PreparationError</span><span class="p">,</span>
+                <span class="n">combined_result</span><span class="o">=</span><span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">internal_error</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s1">&#39;Failed to prepare templated config: (</span><span class="si">{</span><span class="n">step</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">) &#39;</span>
+                        <span class="sa">f</span><span class="s1">&#39;Configuration not valid when edits were applied. </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s1">&#39;</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># prepare file</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">orig_file</span><span class="p">,</span> <span class="n">ConfigurationFile</span><span class="p">):</span>
+            <span class="n">prep_file</span> <span class="o">=</span> <span class="n">PreparedFile</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">file</span><span class="o">=</span><span class="n">orig_file</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># need to set all the verifications off.</span>
+            <span class="c1"># TODO: refactor when global settings are implemented</span>
+            <span class="k">for</span> <span class="n">orig_step</span> <span class="ow">in</span> <span class="n">orig_file</span><span class="o">.</span><span class="n">walk_steps</span><span class="p">():</span>
+                <span class="n">orig_step</span><span class="o">.</span><span class="n">verify_required</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">prep_file</span> <span class="o">=</span> <span class="n">PreparedProcedureFile</span><span class="o">.</span><span class="n">from_origin</span><span class="p">(</span><span class="n">file</span><span class="o">=</span><span class="n">orig_file</span><span class="p">)</span>
+
+        <span class="n">prepared</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">prep_file</span><span class="p">,</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">prepared</span></div>
+
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run the edited ProcedureFile</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Result</span>
+<span class="sd">            the step_reesult for this step</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">,</span> <span class="n">PreparedFile</span><span class="p">):</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">run_passive_step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
 
 
 
@@ -1593,7 +1743,8 @@
     <span class="n">DescriptionStep</span><span class="p">,</span>
     <span class="n">PassiveStep</span><span class="p">,</span>
     <span class="n">SetValueStep</span><span class="p">,</span>
-    <span class="n">PlanStep</span>
+    <span class="n">PlanStep</span><span class="p">,</span>
+    <span class="n">TemplateStep</span><span class="p">,</span>
 <span class="p">]</span>
 
 <span class="n">AnyPreparedProcedure</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span>
@@ -1601,7 +1752,8 @@
     <span class="n">PreparedDescriptionStep</span><span class="p">,</span>
     <span class="n">PreparedPassiveStep</span><span class="p">,</span>
     <span class="n">PreparedSetValueStep</span><span class="p">,</span>
-    <span class="n">PreparedPlanStep</span>
+    <span class="n">PreparedPlanStep</span><span class="p">,</span>
+    <span class="n">PreparedTemplateStep</span><span class="p">,</span>
 <span class="p">]</span>
 </pre></div>
 
