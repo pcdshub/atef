@@ -35,8 +35,10 @@
       PreparedGroup
       PreparedPVConfiguration
       PreparedSignalComparison
+      PreparedTemplateConfiguration
       PreparedToolComparison
       PreparedToolConfiguration
+      TemplateConfiguration
       ToolConfiguration
    
    

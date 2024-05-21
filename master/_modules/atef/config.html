@@ -6,7 +6,7 @@
   <title>atef.config &mdash; atef  documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
-      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
 
   
   <!--[if lt IE 9]>
@@ -16,7 +16,7 @@
         <script src="../../_static/jquery.js?v=5d32c60e"></script>
         <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
         <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
-        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
         <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -101,13 +101,14 @@
 <span class="kn">import</span> <span class="nn">yaml</span>
 <span class="kn">from</span> <span class="nn">ophyd.signal</span> <span class="kn">import</span> <span class="n">ConnectionTimeoutError</span>
 
+<span class="kn">from</span> <span class="nn">atef.find_replace</span> <span class="kn">import</span> <span class="n">RegexFindReplace</span>
 <span class="kn">from</span> <span class="nn">atef.result</span> <span class="kn">import</span> <span class="n">_summarize_result_severity</span>
 
 <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">serialization</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">util</span>
 <span class="kn">from</span> <span class="nn">.cache</span> <span class="kn">import</span> <span class="n">DataCache</span>
 <span class="kn">from</span> <span class="nn">.check</span> <span class="kn">import</span> <span class="n">Comparison</span>
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">GroupResultMode</span><span class="p">,</span> <span class="n">Severity</span>
-<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">PreparedComparisonException</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">PreparationError</span><span class="p">,</span> <span class="n">PreparedComparisonException</span>
 <span class="kn">from</span> <span class="nn">.result</span> <span class="kn">import</span> <span class="n">Result</span><span class="p">,</span> <span class="n">incomplete_result</span>
 <span class="kn">from</span> <span class="nn">.type_hints</span> <span class="kn">import</span> <span class="n">AnyPath</span>
 <span class="kn">from</span> <span class="nn">.yaml_support</span> <span class="kn">import</span> <span class="n">init_yaml_support</span>
@@ -449,11 +450,28 @@
 
 
 
+<div class="viewcode-block" id="TemplateConfiguration">
+<a class="viewcode-back" href="../../generated/generated/atef.config.TemplateConfiguration.html#atef.config.TemplateConfiguration">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">TemplateConfiguration</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A Configuration for applying changes to a template file.</span>
+<span class="sd">    Breaks the convention for Configuration by not directly having any</span>
+<span class="sd">    comparisons, but the generated file will have comparisons</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Path to a valid ConfigurationFile</span>
+    <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="c1"># List of edits to be applied to ``file_path``</span>
+    <span class="n">edits</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">RegexFindReplace</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span></div>
+
+
+
 <span class="n">AnyConfiguration</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span>
     <span class="n">PVConfiguration</span><span class="p">,</span>
     <span class="n">DeviceConfiguration</span><span class="p">,</span>
     <span class="n">ToolConfiguration</span><span class="p">,</span>
     <span class="n">ConfigurationGroup</span><span class="p">,</span>
+    <span class="n">TemplateConfiguration</span><span class="p">,</span>
 <span class="p">]</span>
 
 
@@ -572,6 +590,30 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump this configuration file to yaml.&quot;&quot;&quot;</span>
         <span class="n">init_yaml_support</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_json</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="ConfigurationFile.validate">
+<a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.validate">[docs]</a>
+    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validate the file is properly formed and can be prepared</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Tuple[bool, str]</span>
+<span class="sd">            The verification success and reason (if verification failed)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">prep_file</span> <span class="o">=</span> <span class="n">PreparedFile</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+            <span class="n">prep_failures</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">prep_file</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">prepare_failures</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">prep_failures</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;Failed to prepare </span><span class="si">{</span><span class="n">prep_failures</span><span class="si">}</span><span class="s1"> steps&#39;</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;Unknown Error: </span><span class="si">{</span><span class="n">ex</span><span class="si">}</span><span class="s1">.&#39;</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="n">msg</span>
+
+        <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;&#39;</span></div>
 </div>
 
 
@@ -757,6 +799,7 @@
         <span class="n">PreparedDeviceConfiguration</span><span class="p">,</span>
         <span class="n">PreparedToolConfiguration</span><span class="p">,</span>
         <span class="n">PreparedGroup</span><span class="p">,</span>
+        <span class="n">PreparedTemplateConfiguration</span><span class="p">,</span>
         <span class="n">FailedConfiguration</span><span class="p">,</span>
     <span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -804,6 +847,13 @@
                 <span class="p">)</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">ConfigurationGroup</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">PreparedGroup</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span>
+                    <span class="n">config</span><span class="p">,</span>
+                    <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">,</span>
+                    <span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">,</span>
+                    <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">TemplateConfiguration</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">PreparedTemplateConfiguration</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span>
                     <span class="n">config</span><span class="p">,</span>
                     <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">,</span>
                     <span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">,</span>
@@ -1471,6 +1521,119 @@
 
 
 
+<div class="viewcode-block" id="PreparedTemplateConfiguration">
+<a class="viewcode-back" href="../../generated/generated/atef.config.PreparedTemplateConfiguration.html#atef.config.PreparedTemplateConfiguration">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">PreparedTemplateConfiguration</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
+    <span class="c1"># configuration origin</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">TemplateConfiguration</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">TemplateConfiguration</span><span class="p">)</span>
+    <span class="c1"># prepared file with edits applied</span>
+    <span class="n">file</span><span class="p">:</span> <span class="n">PreparedFile</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">PreparedFile</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PreparedTemplateConfiguration.from_config">
+<a class="viewcode-back" href="../../generated/generated/atef.config.PreparedTemplateConfiguration.html#atef.config.PreparedTemplateConfiguration.from_config">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">TemplateConfiguration</span><span class="p">,</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">client</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">happi</span><span class="o">.</span><span class="n">Client</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DataCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedTemplateConfiguration</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepares a TemplateConfiguration for running.  Preparation fails if the</span>
+<span class="sd">        edited file cannot itself be prepared</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        config : TemplateConfiguration</span>
+<span class="sd">            the configuration to be prepared</span>
+<span class="sd">        parent : PreparedGroup, optional</span>
+<span class="sd">            The parent group, if available.</span>
+<span class="sd">        client : happi.Client, optional</span>
+<span class="sd">            A happi Client instance.</span>
+<span class="sd">        cache : DataCache, optional</span>
+<span class="sd">            The data cache instance, if available.  If unspecified, a new data</span>
+<span class="sd">            cache will be instantiated.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        PreparedTemplateConfiguration</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cache</span> <span class="o">=</span> <span class="n">DataCache</span><span class="p">()</span>
+
+        <span class="c1"># load file</span>
+        <span class="n">config_file</span> <span class="o">=</span> <span class="n">ConfigurationFile</span><span class="o">.</span><span class="n">from_filename</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span>
+
+        <span class="c1"># convert and apply edits</span>
+        <span class="n">edits</span> <span class="o">=</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">to_action</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">edits</span><span class="p">]</span>
+        <span class="n">edit_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">edit</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">config_file</span><span class="p">)</span> <span class="k">for</span> <span class="n">edit</span> <span class="ow">in</span> <span class="n">edits</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">edit_results</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">FailedConfiguration</span><span class="p">(</span>
+                <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+                <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+                <span class="n">exception</span><span class="o">=</span><span class="n">PreparationError</span><span class="p">,</span>
+                <span class="n">result</span><span class="o">=</span><span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">internal_error</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s1">&#39;Failed to prepare templated config: (</span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">) &#39;</span>
+                        <span class="sa">f</span><span class="s1">&#39;Could not apply all edits.&#39;</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># verify edited file</span>
+        <span class="n">success</span><span class="p">,</span> <span class="n">msg</span> <span class="o">=</span> <span class="n">config_file</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">success</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">FailedConfiguration</span><span class="p">(</span>
+                <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+                <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+                <span class="n">exception</span><span class="o">=</span><span class="n">PreparationError</span><span class="p">,</span>
+                <span class="n">result</span><span class="o">=</span><span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">internal_error</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s1">&#39;Failed to prepare templated config: (</span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">) &#39;</span>
+                        <span class="sa">f</span><span class="s1">&#39;Configuration not valid when edits were applied. </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s1">&#39;</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># prepare file</span>
+        <span class="n">prep_file</span> <span class="o">=</span> <span class="n">PreparedFile</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">file</span><span class="o">=</span><span class="n">config_file</span><span class="p">,</span> <span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">,</span>
+                                             <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>
+
+        <span class="n">prepared</span> <span class="o">=</span> <span class="n">PreparedTemplateConfiguration</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+            <span class="n">file</span><span class="o">=</span><span class="n">prep_file</span><span class="p">,</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">parent</span><span class="p">,</span>
+            <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">prepared</span></div>
+
+
+<div class="viewcode-block" id="PreparedTemplateConfiguration.compare">
+<a class="viewcode-back" href="../../generated/generated/atef.config.PreparedTemplateConfiguration.html#atef.config.PreparedTemplateConfiguration.compare">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the edited checkout and return the combined result&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">compare</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">combined_result</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Re-compute combined result and return it.  Override standard since this</span>
+<span class="sd">        configuration has no comparisons</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">combined_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">result</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">combined_result</span></div>
+
+
+
 <div class="viewcode-block" id="PreparedComparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedComparison.html#atef.config.PreparedComparison">[docs]</a>
 <span class="nd">@dataclass</span>
@@ -1932,7 +2095,8 @@
     <span class="n">PreparedDeviceConfiguration</span><span class="p">,</span>
     <span class="n">PreparedGroup</span><span class="p">,</span>
     <span class="n">PreparedPVConfiguration</span><span class="p">,</span>
-    <span class="n">PreparedToolConfiguration</span>
+    <span class="n">PreparedToolConfiguration</span><span class="p">,</span>
+    <span class="n">PreparedTemplateConfiguration</span><span class="p">,</span>
 <span class="p">]</span>
 
 <span class="n">_class_to_prepared</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">type</span><span class="p">,</span> <span class="nb">type</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
@@ -1941,6 +2105,7 @@
     <span class="n">ToolConfiguration</span><span class="p">:</span> <span class="n">PreparedToolConfiguration</span><span class="p">,</span>
     <span class="n">DeviceConfiguration</span><span class="p">:</span> <span class="n">PreparedDeviceConfiguration</span><span class="p">,</span>
     <span class="n">PVConfiguration</span><span class="p">:</span> <span class="n">PreparedPVConfiguration</span><span class="p">,</span>
+    <span class="n">TemplateConfiguration</span><span class="p">:</span> <span class="n">PreparedTemplateConfiguration</span><span class="p">,</span>
 <span class="p">}</span>
 
 

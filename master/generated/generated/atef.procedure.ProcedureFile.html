@@ -7,7 +7,7 @@
   <title>atef.procedure.ProcedureFile &mdash; atef  documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
-      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
 
   
   <!--[if lt IE 9]>
@@ -17,7 +17,7 @@
         <script src="../../_static/jquery.js?v=5d32c60e"></script>
         <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
         <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
-        <script src="../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
         <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
     <script src="../../_static/js/theme.js"></script>
@@ -77,6 +77,7 @@
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedProcedureGroup.html">atef.procedure.PreparedProcedureGroup</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedProcedureStep.html">atef.procedure.PreparedProcedureStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedSetValueStep.html">atef.procedure.PreparedSetValueStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedTemplateStep.html">atef.procedure.PreparedTemplateStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedValueToSignal.html">atef.procedure.PreparedValueToSignal</a></li>
 <li class="toctree-l4 current"><a class="current reference internal" href="#">atef.procedure.ProcedureFile</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.ProcedureGroup.html">atef.procedure.ProcedureGroup</a></li>
@@ -84,6 +85,7 @@
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.PydmDisplayStep.html">atef.procedure.PydmDisplayStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.SetValueStep.html">atef.procedure.SetValueStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.Target.html">atef.procedure.Target</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.TemplateStep.html">atef.procedure.TemplateStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.TyphosDisplayStep.html">atef.procedure.TyphosDisplayStep</a></li>
 <li class="toctree-l4"><a class="reference internal" href="atef.procedure.ValueToTarget.html">atef.procedure.ValueToTarget</a></li>
 </ul>
@@ -154,6 +156,9 @@ if design/methods do not diverge</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#atef.procedure.ProcedureFile.to_yaml" title="atef.procedure.ProcedureFile.to_yaml"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_yaml</span></code></a>()</p></td>
 <td><p>Dump this configuration file to yaml.</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#atef.procedure.ProcedureFile.validate" title="atef.procedure.ProcedureFile.validate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">validate</span></code></a>()</p></td>
+<td><p>Validate the file is properly formed and can be prepared</p></td>
+</tr>
 </tbody>
 </table>
 <table class="docutils align-default">
@@ -208,8 +213,14 @@ if design/methods do not diverge</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="atef.procedure.ProcedureFile.validate">
+<span class="sig-name descname"><span class="pre">validate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.12)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><span class="pre">bool</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/atef/procedure.html#ProcedureFile.validate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.procedure.ProcedureFile.validate" title="Link to this definition"></a></dt>
+<dd><p>Validate the file is properly formed and can be prepared</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="atef.procedure.ProcedureFile.walk_steps">
-<span class="sig-name descname"><span class="pre">walk_steps</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.12)"><span class="pre">Generator</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="atef.procedure.ProcedureGroup.html#atef.procedure.ProcedureGroup" title="atef.procedure.ProcedureGroup"><span class="pre">ProcedureGroup</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.DescriptionStep.html#atef.procedure.DescriptionStep" title="atef.procedure.DescriptionStep"><span class="pre">DescriptionStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PassiveStep.html#atef.procedure.PassiveStep" title="atef.procedure.PassiveStep"><span class="pre">PassiveStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.SetValueStep.html#atef.procedure.SetValueStep" title="atef.procedure.SetValueStep"><span class="pre">SetValueStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PlanStep.html#atef.procedure.PlanStep" title="atef.procedure.PlanStep"><span class="pre">PlanStep</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/atef/procedure.html#ProcedureFile.walk_steps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.procedure.ProcedureFile.walk_steps" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">walk_steps</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.12)"><span class="pre">Generator</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="atef.procedure.ProcedureGroup.html#atef.procedure.ProcedureGroup" title="atef.procedure.ProcedureGroup"><span class="pre">ProcedureGroup</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.DescriptionStep.html#atef.procedure.DescriptionStep" title="atef.procedure.DescriptionStep"><span class="pre">DescriptionStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PassiveStep.html#atef.procedure.PassiveStep" title="atef.procedure.PassiveStep"><span class="pre">PassiveStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.SetValueStep.html#atef.procedure.SetValueStep" title="atef.procedure.SetValueStep"><span class="pre">SetValueStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PlanStep.html#atef.procedure.PlanStep" title="atef.procedure.PlanStep"><span class="pre">PlanStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.TemplateStep.html#atef.procedure.TemplateStep" title="atef.procedure.TemplateStep"><span class="pre">TemplateStep</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/atef/procedure.html#ProcedureFile.walk_steps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.procedure.ProcedureFile.walk_steps" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Attributes</p>

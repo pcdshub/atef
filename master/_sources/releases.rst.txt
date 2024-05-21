@@ -2,6 +2,33 @@ Release History
 ###############
 
 
+v1.5.0 (2024-08-20)
+===================
+
+Features
+--------
+- Adds report output option to `atef check` cli tool
+- Adds template step active and passive dataclasses, along with report support.
+- Adds RegexFindReplace for serializable, regex specific FindReplaceAction
+- Adds atef config GUI pages for passive and active templated checkouts
+  featuring a clear staging area and tree-view for added clarity
+
+Bugfixes
+--------
+- Unifies usage of ``create_tree_from_file``
+
+Maintenance
+-----------
+- Pins numpy<2.0 to avoid issues with upstream incompatibilities
+- Refactors find-replace logic and dataclasses into a separate module from the widgets that display them
+- Specify bluesky-base and pin matplotlib in conda dependencies to avoid unintended qt6 dependencies
+
+Contributors
+------------
+- tangkong
+
+
+
 v1.4.0 (2024-02-20)
 ===================
 
