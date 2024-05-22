@@ -410,6 +410,20 @@ class ProcedureFile:
         init_yaml_support()
         return yaml.dump(self.to_json())
 
+    def verify(self) -> Tuple[bool, str]:
+        """Verify the file is properly formed and can be prepared"""
+        try:
+            prep_file = PreparedProcedureFile.from_origin(self)
+            prep_failures = len(prep_file.root.prepare_failures)
+            if prep_failures > 0:
+                return False, f'Failed to prepare {prep_failures} steps'
+        except Exception as ex:
+            logger.debug(ex)
+            msg = f'Unknown Error: {ex}.'
+            return False, msg
+
+        return True, ''
+
 
 ######################
 # Prepared Dataclasses
