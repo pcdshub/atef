@@ -20,6 +20,7 @@ import ophyd
 import yaml
 from ophyd.signal import ConnectionTimeoutError
 
+from atef.find_replace import RegexFindReplace
 from atef.result import _summarize_result_severity
 
 from . import serialization, tools, util
@@ -311,11 +312,25 @@ class ToolConfiguration(Configuration):
         super().move_comparison(comp, new_attr, comp_attrs=['by_attr'])
 
 
+@dataclass
+class TemplateConfiguration(Configuration):
+    """
+    A Configuration for applying changes to a template file.
+    Somewhat breaks the convention for Configuration by not directly having any
+    comparisons, but the generated file will have comparisons
+    """
+    # Path to a valid ConfigurationFile
+    filename: AnyPath = ''
+    # List of edits to be applied to ``file_path``
+    edits: List[RegexFindReplace] = field(default_factory=list)
+
+
 AnyConfiguration = Union[
     PVConfiguration,
     DeviceConfiguration,
     ToolConfiguration,
     ConfigurationGroup,
+    TemplateConfiguration,
 ]
 
 
@@ -407,7 +422,7 @@ class ConfigurationFile:
     def verify(self) -> Tuple[bool, str]:
         """Verify the file is properly formed and can be prepared"""
         try:
-            prep_file = PreparedFile.from_origin(self)
+            prep_file = PreparedFile.from_config(self)
             prep_failures = len(prep_file.root.prepare_failures)
             if prep_failures > 0:
                 return False, f'Failed to prepare {prep_failures} steps'
@@ -572,6 +587,7 @@ class PreparedConfiguration:
         PreparedDeviceConfiguration,
         PreparedToolConfiguration,
         PreparedGroup,
+        PreparedTemplateConfiguration,
         FailedConfiguration,
     ]:
         """
@@ -619,6 +635,13 @@ class PreparedConfiguration:
                 )
             if isinstance(config, ConfigurationGroup):
                 return PreparedGroup.from_config(
+                    config,
+                    cache=cache,
+                    client=client,
+                    parent=parent,
+                )
+            if isinstance(config, TemplateConfiguration):
+                return PreparedTemplateConfiguration.from_config(
                     config,
                     cache=cache,
                     client=client,
@@ -1234,6 +1257,71 @@ class PreparedToolConfiguration(PreparedConfiguration):
 
 
 @dataclass
+class PreparedTemplateConfiguration(PreparedConfiguration):
+    # configuration origin
+    config: TemplateConfiguration = field(default_factory=TemplateConfiguration)
+    # original, unprepared file
+    original_file: ConfigurationFile = field(default_factory=ConfigurationFile)
+    # prepared file with edits applied
+    file: PreparedFile = field(default_factory=PreparedFile)
+
+    @classmethod
+    def from_config(
+        cls,
+        config: TemplateConfiguration,
+        parent: Optional[PreparedGroup] = None,
+        *,
+        client: Optional[happi.Client] = None,
+        cache: Optional[DataCache] = None,
+    ) -> PreparedTemplateConfiguration:
+        if cache is None:
+            cache = DataCache()
+
+        # load file
+        config_file = ConfigurationFile.from_filename(config.filename)
+
+        # convert and apply edits
+        edits = [e.to_action() for e in config.edits]
+        for edit in edits:
+            edit.apply(target=config_file)
+
+        # verify edited file
+        success, msg = config_file.verify()
+        if not success:
+            return FailedConfiguration(
+                config=config,
+                parent=parent,
+                exception=ValueError,  # TODO: get a better exception
+                result=Result(
+                    severity=Severity.internal_error,
+                    reason=(
+                        f'Failed to prepare templated config: ({config.name}) '
+                        f'Configuration not valid when edits were applied. {msg}'
+                    )
+                )
+            )
+
+        # prepare file
+        prep_file = PreparedFile.from_config(file=config_file, client=client,
+                                             cache=cache)
+
+        prepared = PreparedTemplateConfiguration(
+            config=config,
+            original_file=config_file,
+            file=prep_file,
+            parent=parent,
+            cache=cache,
+        )
+        return prepared
+
+    async def compare(self) -> Result:
+        """Run the edited checkoutand return the combined result"""
+        result = await self.file.compare()
+        self.combined_result = result
+        return result
+
+
+@dataclass
 class PreparedComparison:
     """
     A unified representation of comparisons for device signals and standalone PVs.
@@ -1661,7 +1749,8 @@ AnyPreparedConfiguration = Union[
     PreparedDeviceConfiguration,
     PreparedGroup,
     PreparedPVConfiguration,
-    PreparedToolConfiguration
+    PreparedToolConfiguration,
+    PreparedTemplateConfiguration,
 ]
 
 _class_to_prepared: Dict[type, type] = {
@@ -1670,6 +1759,7 @@ _class_to_prepared: Dict[type, type] = {
     ToolConfiguration: PreparedToolConfiguration,
     DeviceConfiguration: PreparedDeviceConfiguration,
     PVConfiguration: PreparedPVConfiguration,
+    TemplateConfiguration: PreparedTemplateConfiguration,
 }
 
 
