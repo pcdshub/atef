@@ -1,17 +1,22 @@
 """Find-and-Replace functionality, for use in templating checkouts as well"""
+from __future__ import annotations
+
 import logging
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
-from typing import (Any, Callable, Generator, List, Optional, Tuple, Union,
-                    get_args)
+from typing import (TYPE_CHECKING, Any, Callable, Generator, List, Optional,
+                    Tuple, Union, get_args)
 
 import happi
 
 from atef.cache import DataCache
-from atef.config import ConfigurationFile
-from atef.procedure import ProcedureFile
+
+if TYPE_CHECKING:
+    from atef.config import ConfigurationFile
+    from atef.procedure import ProcedureFile
+
 from atef.type_hints import PrimitiveType
 
 logger = logging.getLogger(__name__)
@@ -102,6 +107,35 @@ def walk_find_match(
 
     elif match(item):
         yield parent
+
+
+def simplify_path(path: List[Tuple[Any, Any]]) -> List[Tuple[str, Any]]:
+    """
+    Simplify ``path`` by replacing any objects with their type.
+    Useful for creating a path that can be easily serialized.
+
+    Simplified paths can be used in ``get_item_from_path`` and
+    ``replace_item_from_path``, as long as ``item`` is provided.
+
+    Parameters
+    ----------
+    path : List[Tuple[Any, Any]]
+        the path to be simplified
+
+    Returns
+    -------
+    List[Tuple[str, Any]]
+        the simplified path
+    """
+    simplified_path = []
+    for seg in path:
+        if not isinstance(seg[0], str):
+            item = str(type(seg[0]))
+        else:
+            item = seg[0]
+        simplified_path.append((item, seg[1]))
+
+    return simplified_path
 
 
 def get_item_from_path(
@@ -272,10 +306,40 @@ def get_default_replace_fn(
 
 
 @dataclass
+class RegexFindReplace:
+    """
+    A specialized FindReplaceAction
+    Limited to default regex search and replace function
+    """
+    # attribute access chain leading to the item of interest.
+    # A simplified path please
+    path: List[Tuple[Any, Any]]
+    # search regex, used to generate path and replace elements
+    search_regex: str
+    # parameters used to re-construct replace function
+    replace_text: str
+    # case-sensitive
+    case_sensitive: bool = True
+
+    def to_action(self, target: Optional[Any] = None) -> FindReplaceAction:
+        """Create FindReplaceAction from a SerializableFindReplaceAction"""
+        try:
+            re.compile(self.search_regex)
+        except re.error:
+            raise ValueError(f'regex is not valid: {self.search_regex}, '
+                             'could not construct FindReplaceAction')
+        replace_fn = get_default_replace_fn(
+            self.replace_text, re.compile(self.search_regex)
+        )
+        return FindReplaceAction(target=target, path=self.path, replace_fn=replace_fn)
+
+
+@dataclass
 class FindReplaceAction:
-    target: Union[ConfigurationFile, ProcedureFile]
     path: List[Tuple[Any, Any]]
     replace_fn: ReplaceFunction
+    # Union[ConfigurationFile, ProcedureFile], but circular imports
+    target: Optional[Any] = None
 
     def apply(
         self,
