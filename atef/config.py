@@ -1260,8 +1260,6 @@ class PreparedToolConfiguration(PreparedConfiguration):
 class PreparedTemplateConfiguration(PreparedConfiguration):
     # configuration origin
     config: TemplateConfiguration = field(default_factory=TemplateConfiguration)
-    # original, unprepared file
-    original_file: ConfigurationFile = field(default_factory=ConfigurationFile)
     # prepared file with edits applied
     file: PreparedFile = field(default_factory=PreparedFile)
 
@@ -1307,7 +1305,6 @@ class PreparedTemplateConfiguration(PreparedConfiguration):
 
         prepared = PreparedTemplateConfiguration(
             config=config,
-            original_file=config_file,
             file=prep_file,
             parent=parent,
             cache=cache,
