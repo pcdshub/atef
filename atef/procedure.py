@@ -965,6 +965,10 @@ class PreparedTemplateStep(PreparedProcedureStep):
         if filetype == "passive":
             prep_file = PreparedFile.from_config(file=orig_file)
         else:
+            # need to set all the verifications off.
+            # TODO: refactor when global settings are implemented
+            for step in orig_file.walk_steps():
+                step.verify_required = False
             prep_file = PreparedProcedureFile.from_origin(file=orig_file)
 
         prepared = PreparedTemplateStep(
@@ -973,6 +977,22 @@ class PreparedTemplateStep(PreparedProcedureStep):
             parent=parent,
         )
         return prepared
+
+    async def _run(self) -> Result:
+        """
+        Run the edited ProcedureFile
+
+        Returns
+        -------
+        Result
+            the step_reesult for this step
+        """
+        if isinstance(self.file, PreparedFile):
+            result = await self.file.compare()
+        else:
+            result = await self.file.run()
+
+        return result
 
 
 @dataclass
