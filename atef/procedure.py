@@ -1430,7 +1430,8 @@ AnyProcedure = Union[
     DescriptionStep,
     PassiveStep,
     SetValueStep,
-    PlanStep
+    PlanStep,
+    TemplateStep,
 ]
 
 AnyPreparedProcedure = Union[
@@ -1438,5 +1439,6 @@ AnyPreparedProcedure = Union[
     PreparedDescriptionStep,
     PreparedPassiveStep,
     PreparedSetValueStep,
-    PreparedPlanStep
+    PreparedPlanStep,
+    PreparedTemplateStep,
 ]
