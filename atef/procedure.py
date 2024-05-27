@@ -420,8 +420,8 @@ class ProcedureFile:
         init_yaml_support()
         return yaml.dump(self.to_json())
 
-    def verify(self) -> Tuple[bool, str]:
-        """Verify the file is properly formed and can be prepared"""
+    def validate(self) -> Tuple[bool, str]:
+        """Validate the file is properly formed and can be prepared"""
         try:
             prep_file = PreparedProcedureFile.from_origin(self)
             prep_failures = len(prep_file.root.prepare_failures)
@@ -945,7 +945,7 @@ class PreparedTemplateStep(PreparedProcedureStep):
             edit.apply(target=orig_file)
 
         # verify edited file
-        success, msg = orig_file.verify()
+        success, msg = orig_file.validate()
         if not success:
             return FailedStep(
                 origin=step,

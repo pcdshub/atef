@@ -316,7 +316,7 @@ class ToolConfiguration(Configuration):
 class TemplateConfiguration(Configuration):
     """
     A Configuration for applying changes to a template file.
-    Somewhat breaks the convention for Configuration by not directly having any
+    Breaks the convention for Configuration by not directly having any
     comparisons, but the generated file will have comparisons
     """
     # Path to a valid ConfigurationFile
@@ -419,8 +419,15 @@ class ConfigurationFile:
         init_yaml_support()
         return yaml.dump(self.to_json())
 
-    def verify(self) -> Tuple[bool, str]:
-        """Verify the file is properly formed and can be prepared"""
+    def validate(self) -> Tuple[bool, str]:
+        """
+        Validate the file is properly formed and can be prepared
+
+        Returns
+        -------
+        Tuple[bool, str]
+            The verification success and reason (if verification failed)
+        """
         try:
             prep_file = PreparedFile.from_config(self)
             prep_failures = len(prep_file.root.prepare_failures)
@@ -1272,6 +1279,26 @@ class PreparedTemplateConfiguration(PreparedConfiguration):
         client: Optional[happi.Client] = None,
         cache: Optional[DataCache] = None,
     ) -> PreparedTemplateConfiguration:
+        """
+        Prepares a TemplateConfiguration for running.  Preparation fails if the
+        edited file cannot itself be prepared
+
+        Parameters
+        ----------
+        config : TemplateConfiguration
+            the configuration to be prepared
+        parent : PreparedGroup, optional
+            The parent group, if available.
+        client : happi.Client, optional
+            A happi Client instance.
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Returns
+        -------
+        PreparedTemplateConfiguration
+        """
         if cache is None:
             cache = DataCache()
 
@@ -1284,7 +1311,7 @@ class PreparedTemplateConfiguration(PreparedConfiguration):
             edit.apply(target=config_file)
 
         # verify edited file
-        success, msg = config_file.verify()
+        success, msg = config_file.validate()
         if not success:
             return FailedConfiguration(
                 config=config,
