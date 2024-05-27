@@ -535,6 +535,7 @@ class PreparedProcedureStep:
         """
         results = []
         reason = ''
+        print(type(self), self.origin.verify_required, self.origin.step_success_required)
         if self.origin.verify_required:
             results.append(self.verify_result)
             if self.verify_result.severity != Severity.success:
@@ -927,12 +928,10 @@ class PreparedTemplateStep(PreparedProcedureStep):
         """
         # load file
         try:
-            filetype = "passive"
             orig_file = ConfigurationFile.from_filename(step.filename)
         except apischema.ValidationError:
             logger.debug('failed to open as passive checkout')
             try:
-                filetype = "active"
                 orig_file = ProcedureFile.from_filename(step.filename)
             except apischema.ValidationError:
                 logger.error('failed to open file as either active '
@@ -962,16 +961,16 @@ class PreparedTemplateStep(PreparedProcedureStep):
             )
 
         # prepare file
-        if filetype == "passive":
+        if isinstance(orig_file, ConfigurationFile):
             prep_file = PreparedFile.from_config(file=orig_file)
         else:
             # need to set all the verifications off.
             # TODO: refactor when global settings are implemented
-            for step in orig_file.walk_steps():
-                step.verify_required = False
+            for orig_step in orig_file.walk_steps():
+                orig_step.verify_required = False
             prep_file = PreparedProcedureFile.from_origin(file=orig_file)
 
-        prepared = PreparedTemplateStep(
+        prepared = cls(
             origin=step,
             file=prep_file,
             parent=parent,
@@ -988,7 +987,7 @@ class PreparedTemplateStep(PreparedProcedureStep):
             the step_reesult for this step
         """
         if isinstance(self.file, PreparedFile):
-            result = await self.file.compare()
+            result = await run_passive_step(self.file)
         else:
             result = await self.file.run()
 
