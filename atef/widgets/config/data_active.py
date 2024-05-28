@@ -39,7 +39,7 @@ from atef.result import Result, incomplete_result
 from atef.widgets.config.data_base import DataWidget, SimpleRowWidget
 from atef.widgets.config.run_base import create_tree_from_file
 from atef.widgets.config.utils import (ConfigTreeModel, MultiInputDialog,
-                                       TableWidgetWithAddRow, TreeItem)
+                                       TableWidgetWithAddRow)
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydAttributeData
@@ -517,8 +517,7 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
             Passive checkout configuration file dataclass
         """
         # tree data
-        root_item = TreeItem(data=config_file)
-        create_tree_from_file(data=config_file.root, parent=root_item)
+        root_item = create_tree_from_file(data=config_file)
 
         model = ConfigTreeModel(data=root_item)
 

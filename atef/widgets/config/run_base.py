@@ -430,7 +430,7 @@ class VerifyEntryWidget(DesignerDisplay, QWidget):
 
 def create_tree_from_file(
     data: Union[ConfigurationFile, ProcedureFile],
-    prepared_file: Union[PreparedFile, PreparedProcedureFile]
+    prepared_file: Optional[Union[PreparedFile, PreparedProcedureFile]] = None,
 ) -> TreeItem:
     """
     Create a TreeItem Tree with items linked to original and prepared dataclasses
@@ -463,12 +463,14 @@ def create_tree_from_file(
     else:
         raise TypeError("Data was not a passive or active checkout file")
 
-    def create_tree(data, parent: TreeItem, prepared_data):
+    def create_tree(data, parent: TreeItem, prepared_data=None):
         if not hasattr(data, 'children'):
             return
         for child_data in data.children():
             if prepared_data:
                 prepared_subset = gather_fn(prepared_data, child_data)
+            else:
+                prepared_subset = None
             item = TreeItem(child_data, prepared_data=prepared_subset)
             create_tree(child_data, item, prepared_data)
             parent.addChild(item)
