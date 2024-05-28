@@ -535,7 +535,6 @@ class PreparedProcedureStep:
         """
         results = []
         reason = ''
-        print(type(self), self.origin.verify_required, self.origin.step_success_required)
         if self.origin.verify_required:
             results.append(self.verify_result)
             if self.verify_result.severity != Severity.success:
