@@ -23,7 +23,7 @@ from atef.find_replace import (FindReplaceAction, MatchFunction,
                                ReplaceFunction, get_deepest_dataclass_in_path,
                                get_default_match_fn, get_default_replace_fn,
                                get_item_from_path, patch_client_cache,
-                               verify_file, walk_find_match)
+                               walk_find_match)
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.util import get_happi_client
 from atef.widgets.config.utils import TableWidgetWithAddRow
@@ -56,7 +56,7 @@ def verify_file_and_notify(
     bool
         the verification success
     """
-    verified, msg = verify_file(file)
+    verified, msg = file.verify()
 
     if not verified:
         QtWidgets.QMessageBox.warning(

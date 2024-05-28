@@ -1,10 +1,16 @@
+import json
+
+import apischema
 import pytest
 
 from atef.check import Equals
+from atef.config import ConfigurationFile, ConfigurationGroup
 from atef.enums import Severity
+from atef.find_replace import RegexFindReplace
 from atef.procedure import (ComparisonToPlanData, DescriptionStep, PlanOptions,
                             PlanStep, PreparedPlanStep, PreparedProcedureFile,
-                            PreparedProcedureStep, ProcedureFile)
+                            PreparedProcedureStep, PreparedTemplateStep,
+                            ProcedureFile, ProcedureGroup, TemplateStep)
 from atef.result import Result
 
 pass_result = Result()
@@ -106,3 +112,67 @@ async def test_plan_step():
     assert prepared_plan_step.prepared_checks[0].result.severity == pass_result.severity
     print(prepared_plan_step.prepared_plans[0].result)
     assert prepared_plan_step.prepared_plans[0].result.severity == pass_result.severity
+
+
+@pytest.mark.asyncio
+async def test_template_step_active_target(tmp_path):
+    cfg_path = tmp_path / 'tmp_checkout.json'
+    orig_file = ProcedureFile(root=ProcedureGroup(name='root'))
+    ser = apischema.serialize(ProcedureFile, orig_file)
+    with open(cfg_path, 'w') as fp:
+        json.dump(ser, fp)
+
+    replace_title_path = [
+        ('atef.config.ConfigurationFile', 'root'),
+        ('atef.config.ConfigurationGroup', 'name')
+    ]
+    replace_title_edit = RegexFindReplace(
+        path=replace_title_path,
+        search_regex='root',
+        replace_text='template replaced title'
+    )
+    ts = TemplateStep(
+        name='template all fields',
+        filename=cfg_path,
+        edits=[replace_title_edit],
+        verify_required=False,
+    )
+
+    pts = PreparedTemplateStep.from_origin(step=ts)
+
+    assert pts.file.root.origin.name == 'template replaced title'
+
+    result = await pts.run()
+    assert result.severity == Severity.success
+
+
+@pytest.mark.asyncio
+async def test_template_step_passive_target(tmp_path):
+    cfg_path = tmp_path / 'tmp_checkout.json'
+    orig_file = ConfigurationFile(root=ConfigurationGroup(name='root'))
+    ser = apischema.serialize(ConfigurationFile, orig_file)
+    with open(cfg_path, 'w') as fp:
+        json.dump(ser, fp)
+
+    replace_title_path = [
+        ('atef.config.ConfigurationFile', 'root'),
+        ('atef.config.ConfigurationGroup', 'name')
+    ]
+    replace_title_edit = RegexFindReplace(
+        path=replace_title_path,
+        search_regex='root',
+        replace_text='template replaced title'
+    )
+    ts = TemplateStep(
+        name='template all fields',
+        filename=cfg_path,
+        edits=[replace_title_edit],
+        verify_required=False,
+    )
+
+    pts = PreparedTemplateStep.from_origin(step=ts)
+
+    assert pts.file.root.config.name == 'template replaced title'
+
+    result = await pts.run()
+    assert result.severity == Severity.success

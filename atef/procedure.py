@@ -38,6 +38,7 @@ from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
 from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparedComparisonException
+from atef.find_replace import RegexFindReplace
 from atef.plan_utils import (BlueskyState, GlobalRunEngine,
                              get_default_namespace, register_run_identifier,
                              run_in_local_RE)
@@ -354,6 +355,15 @@ class PydmDisplayStep(ProcedureStep):
 
 
 @dataclass
+class TemplateStep(ProcedureStep):
+    """A procedure step that replaces items an existing checkout"""
+    # Path to a valid ProcedureFile or ConfigurationFile
+    filename: AnyPath = ''
+    # List of edits to be applied to ``file_path``
+    edits: List[RegexFindReplace] = field(default_factory=list)
+
+
+@dataclass
 class ProcedureFile:
     """
     File comprised of several Procedure steps
@@ -409,6 +419,20 @@ class ProcedureFile:
         """Dump this configuration file to yaml."""
         init_yaml_support()
         return yaml.dump(self.to_json())
+
+    def validate(self) -> Tuple[bool, str]:
+        """Validate the file is properly formed and can be prepared"""
+        try:
+            prep_file = PreparedProcedureFile.from_origin(self)
+            prep_failures = len(prep_file.root.prepare_failures)
+            if prep_failures > 0:
+                return False, f'Failed to prepare {prep_failures} steps'
+        except Exception as ex:
+            logger.debug(ex)
+            msg = f'Unknown Error: {ex}.'
+            return False, msg
+
+        return True, ''
 
 
 ######################
@@ -873,6 +897,103 @@ class PreparedSetValueStep(PreparedProcedureStep):
 
 
 @dataclass
+class PreparedTemplateStep(PreparedProcedureStep):
+    # configuration origin
+    origin: TemplateStep = field(default_factory=TemplateStep)
+    # prepared file with edits applied
+    file: Union[PreparedFile, PreparedProcedureFile] = field(
+        default_factory=PreparedFile
+    )
+
+    @classmethod
+    def from_origin(
+        cls,
+        step: TemplateStep,
+        parent: Optional[PreparedProcedureGroup] = None
+    ) -> PreparedTemplateStep:
+        """
+        Prepare a TemplateStep for running.  Applies edits and attempts
+
+        Parameters
+        ----------
+        step : TemplateStep
+            the original TemplateStep (not prepared)
+        parent : Optional[PreparedProcedureGroup]
+            the hierarchical parent for the prepared step.
+
+        Returns
+        -------
+        PreparedTemplateStep
+        """
+        # load file
+        try:
+            orig_file = ConfigurationFile.from_filename(step.filename)
+        except apischema.ValidationError:
+            logger.debug('failed to open as passive checkout')
+            try:
+                orig_file = ProcedureFile.from_filename(step.filename)
+            except apischema.ValidationError:
+                logger.error('failed to open file as either active '
+                             'or passive checkout')
+                raise ValueError('Could not open the file as either active or '
+                                 'passive checkout.')
+
+        # convert and apply edits
+        edits = [e.to_action() for e in step.edits]
+        for edit in edits:
+            edit.apply(target=orig_file)
+
+        # verify edited file
+        success, msg = orig_file.validate()
+        if not success:
+            return FailedStep(
+                origin=step,
+                parent=parent,
+                exception=ValueError,  # TODO: get a better exception
+                combined_result=Result(
+                    severity=Severity.internal_error,
+                    reason=(
+                        f'Failed to prepare templated config: ({step.name}) '
+                        f'Configuration not valid when edits were applied. {msg}'
+                    )
+                )
+            )
+
+        # prepare file
+        if isinstance(orig_file, ConfigurationFile):
+            prep_file = PreparedFile.from_config(file=orig_file)
+        else:
+            # need to set all the verifications off.
+            # TODO: refactor when global settings are implemented
+            for orig_step in orig_file.walk_steps():
+                orig_step.verify_required = False
+            prep_file = PreparedProcedureFile.from_origin(file=orig_file)
+
+        prepared = cls(
+            origin=step,
+            file=prep_file,
+            parent=parent,
+        )
+        return prepared
+
+    async def _run(self) -> Result:
+        """
+        Run the edited ProcedureFile
+
+        Returns
+        -------
+        Result
+            the step_reesult for this step
+        """
+        if isinstance(self.file, PreparedFile):
+            result = await run_passive_step(self.file)
+        else:
+            result = await self.file.run()
+
+        return result
+
+
+@dataclass
 class PreparedValueToSignal:
     #: identifying name
     name: str
@@ -1308,7 +1429,8 @@ AnyProcedure = Union[
     DescriptionStep,
     PassiveStep,
     SetValueStep,
-    PlanStep
+    PlanStep,
+    TemplateStep,
 ]
 
 AnyPreparedProcedure = Union[
@@ -1316,5 +1438,6 @@ AnyPreparedProcedure = Union[
     PreparedDescriptionStep,
     PreparedPassiveStep,
     PreparedSetValueStep,
-    PreparedPlanStep
+    PreparedPlanStep,
+    PreparedTemplateStep,
 ]

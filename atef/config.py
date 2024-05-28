@@ -20,6 +20,7 @@ import ophyd
 import yaml
 from ophyd.signal import ConnectionTimeoutError
 
+from atef.find_replace import RegexFindReplace
 from atef.result import _summarize_result_severity
 
 from . import serialization, tools, util
@@ -311,11 +312,25 @@ class ToolConfiguration(Configuration):
         super().move_comparison(comp, new_attr, comp_attrs=['by_attr'])
 
 
+@dataclass
+class TemplateConfiguration(Configuration):
+    """
+    A Configuration for applying changes to a template file.
+    Breaks the convention for Configuration by not directly having any
+    comparisons, but the generated file will have comparisons
+    """
+    # Path to a valid ConfigurationFile
+    filename: AnyPath = ''
+    # List of edits to be applied to ``file_path``
+    edits: List[RegexFindReplace] = field(default_factory=list)
+
+
 AnyConfiguration = Union[
     PVConfiguration,
     DeviceConfiguration,
     ToolConfiguration,
     ConfigurationGroup,
+    TemplateConfiguration,
 ]
 
 
@@ -403,6 +418,27 @@ class ConfigurationFile:
         """Dump this configuration file to yaml."""
         init_yaml_support()
         return yaml.dump(self.to_json())
+
+    def validate(self) -> Tuple[bool, str]:
+        """
+        Validate the file is properly formed and can be prepared
+
+        Returns
+        -------
+        Tuple[bool, str]
+            The verification success and reason (if verification failed)
+        """
+        try:
+            prep_file = PreparedFile.from_config(self)
+            prep_failures = len(prep_file.root.prepare_failures)
+            if prep_failures > 0:
+                return False, f'Failed to prepare {prep_failures} steps'
+        except Exception as ex:
+            logger.debug(ex)
+            msg = f'Unknown Error: {ex}.'
+            return False, msg
+
+        return True, ''
 
 
 @dataclass
@@ -558,6 +594,7 @@ class PreparedConfiguration:
         PreparedDeviceConfiguration,
         PreparedToolConfiguration,
         PreparedGroup,
+        PreparedTemplateConfiguration,
         FailedConfiguration,
     ]:
         """
@@ -605,6 +642,13 @@ class PreparedConfiguration:
                 )
             if isinstance(config, ConfigurationGroup):
                 return PreparedGroup.from_config(
+                    config,
+                    cache=cache,
+                    client=client,
+                    parent=parent,
+                )
+            if isinstance(config, TemplateConfiguration):
+                return PreparedTemplateConfiguration.from_config(
                     config,
                     cache=cache,
                     client=client,
@@ -1220,6 +1264,88 @@ class PreparedToolConfiguration(PreparedConfiguration):
 
 
 @dataclass
+class PreparedTemplateConfiguration(PreparedConfiguration):
+    # configuration origin
+    config: TemplateConfiguration = field(default_factory=TemplateConfiguration)
+    # prepared file with edits applied
+    file: PreparedFile = field(default_factory=PreparedFile)
+
+    @classmethod
+    def from_config(
+        cls,
+        config: TemplateConfiguration,
+        parent: Optional[PreparedGroup] = None,
+        *,
+        client: Optional[happi.Client] = None,
+        cache: Optional[DataCache] = None,
+    ) -> PreparedTemplateConfiguration:
+        """
+        Prepares a TemplateConfiguration for running.  Preparation fails if the
+        edited file cannot itself be prepared
+
+        Parameters
+        ----------
+        config : TemplateConfiguration
+            the configuration to be prepared
+        parent : PreparedGroup, optional
+            The parent group, if available.
+        client : happi.Client, optional
+            A happi Client instance.
+        cache : DataCache, optional
+            The data cache instance, if available.  If unspecified, a new data
+            cache will be instantiated.
+
+        Returns
+        -------
+        PreparedTemplateConfiguration
+        """
+        if cache is None:
+            cache = DataCache()
+
+        # load file
+        config_file = ConfigurationFile.from_filename(config.filename)
+
+        # convert and apply edits
+        edits = [e.to_action() for e in config.edits]
+        for edit in edits:
+            edit.apply(target=config_file)
+
+        # verify edited file
+        success, msg = config_file.validate()
+        if not success:
+            return FailedConfiguration(
+                config=config,
+                parent=parent,
+                exception=ValueError,  # TODO: get a better exception
+                result=Result(
+                    severity=Severity.internal_error,
+                    reason=(
+                        f'Failed to prepare templated config: ({config.name}) '
+                        f'Configuration not valid when edits were applied. {msg}'
+                    )
+                )
+            )
+
+        # prepare file
+        prep_file = PreparedFile.from_config(file=config_file, client=client,
+                                             cache=cache)
+
+        prepared = PreparedTemplateConfiguration(
+            config=config,
+            file=prep_file,
+            parent=parent,
+            cache=cache,
+        )
+        return prepared
+
+    async def compare(self) -> Result:
+        """Run the edited checkoutand return the combined result"""
+        result = await self.file.compare()
+        self.combined_result = result
+        return result
+
+
+@dataclass
 class PreparedComparison:
     """
     A unified representation of comparisons for device signals and standalone PVs.
@@ -1647,7 +1773,8 @@ AnyPreparedConfiguration = Union[
     PreparedDeviceConfiguration,
     PreparedGroup,
     PreparedPVConfiguration,
-    PreparedToolConfiguration
+    PreparedToolConfiguration,
+    PreparedTemplateConfiguration,
 ]
 
 _class_to_prepared: Dict[type, type] = {
@@ -1656,6 +1783,7 @@ _class_to_prepared: Dict[type, type] = {
     ToolConfiguration: PreparedToolConfiguration,
     DeviceConfiguration: PreparedDeviceConfiguration,
     PVConfiguration: PreparedPVConfiguration,
+    TemplateConfiguration: PreparedTemplateConfiguration,
 }
 
 

@@ -3,7 +3,9 @@ import pathlib
 import pytest
 
 from atef.config import (ConfigurationFile, DeviceConfiguration, PreparedFile,
-                         PVConfiguration)
+                         PreparedTemplateConfiguration, PVConfiguration,
+                         TemplateConfiguration)
+from atef.enums import Severity
 from atef.type_hints import AnyDataclass
 from atef.widgets.config.utils import get_relevant_pvs
 
@@ -50,3 +52,16 @@ def test_gather_pvs(
     readback_comp = device_configuration.by_attr['readback'][0]
     assert len(get_relevant_pvs(setpoint_comp, device_configuration)) == 2
     assert len(get_relevant_pvs(readback_comp, device_configuration)) == 2
+
+
+@pytest.mark.asyncio
+async def test_template_configuration(template_configuration: TemplateConfiguration):
+    assert len(template_configuration.edits) == 1
+
+    # prepare and verify changes were applied
+    ptc = PreparedTemplateConfiguration.from_config(template_configuration)
+
+    assert ptc.file.root.config.name == 'template replaced title'
+
+    result = await ptc.compare()
+    assert result.severity == Severity.success

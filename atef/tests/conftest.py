@@ -20,7 +20,9 @@ from atef.cache import get_signal_cache
 from atef.check import Equals, Greater, GreaterOrEqual, LessOrEqual, NotEquals
 from atef.config import (AnyConfiguration, ConfigurationFile,
                          ConfigurationGroup, DeviceConfiguration,
-                         PVConfiguration, ToolConfiguration)
+                         PVConfiguration, TemplateConfiguration,
+                         ToolConfiguration)
+from atef.find_replace import RegexFindReplace
 from atef.procedure import AnyProcedure, ProcedureFile
 from atef.tools import Ping
 from atef.type_hints import AnyDataclass
@@ -376,6 +378,25 @@ def tool_configuration():
         name='ping tool',
         tool=Ping(hosts=['psbuild-rhel7', 'localhost']),
         shared=[Equals(value=3)]
+    )
+    return group
+
+
+@pytest.fixture
+def template_configuration():
+    replace_title_path = [
+        ('atef.config.ConfigurationFile', 'root'),
+        ('atef.config.ConfigurationGroup', 'name')
+    ]
+    replace_title_edit = RegexFindReplace(
+        path=replace_title_path,
+        search_regex='root',
+        replace_text='template replaced title'
+    )
+    group = TemplateConfiguration(
+        name='template all fields',
+        filename=CONFIG_PATH / 'blank_passive.json',
+        edits=[replace_title_edit],
     )
     return group
 
