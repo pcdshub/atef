@@ -522,8 +522,6 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
         model = ConfigTreeModel(data=root_item)
 
         self.tree_view.setModel(model)
-        header = self.tree_view.header()
-        header.setSectionResizeMode(header.ResizeToContents)
         # Hide the irrelevant status column
         self.tree_view.setColumnHidden(1, True)
         self.tree_view.expandAll()

@@ -66,9 +66,6 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
         model = ConfigTreeModel(data=root_item)
         self.tree_view.setModel(model)
 
-        # Customize the look of the table
-        header = self.tree_view.header()
-        header.setSectionResizeMode(header.ResizeToContents)
         self.tree_view.header().swapSections(0, 1)
         self.tree_view.expandAll()
 
