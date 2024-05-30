@@ -761,12 +761,6 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         refresh_button.setToolTip('refresh edit details')
         refresh_button.setIcon(qta.icon('ei.refresh'))
 
-        apply_button = self.button_box.button(QtWidgets.QDialogButtonBox.Apply)
-        apply_button.clicked.connect(self.apply_edits)
-        apply_button.setText('')
-        apply_button.setToolTip('apply all changes')
-        apply_button.setIcon(qta.icon('ei.check'))
-
         # settings menu (regex, case)
         self.setting_widget = QtWidgets.QWidget()
         self.setting_layout = QtWidgets.QHBoxLayout()
@@ -811,30 +805,6 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
 
         match_fn = get_default_match_fn(self._search_regex)
         self._match_fn = match_fn
-
-    def apply_edits(self) -> None:
-        """Apply all the actions corresponding to this edit"""
-        self.refresh_paths()
-        if len(self.actions) <= 0:
-            return
-
-        reply = QtWidgets.QMessageBox.question(
-            self,
-            'Apply remaning edits?',
-            (
-                'Would you like to apply the remaining '
-                f'({len(self.actions)}) edits?'
-            )
-        )
-        if reply == QtWidgets.QMessageBox.Yes:
-            for action in self.actions:
-                success = action.apply()
-                if not success:
-                    logger.warning(f'action failed {action}')
-
-            self.actions.clear()
-
-        self.refresh_paths()
 
     def refresh_paths(self) -> None:
         """
