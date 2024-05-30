@@ -370,17 +370,19 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     file_name_label: QtWidgets.QLabel
     type_label: QtWidgets.QLabel
 
+    tree_view: QtWidgets.QTreeView
     device_table: QtWidgets.QTableWidget
     # TODO?: filter by device type?  look at specific device types?
     vert_splitter: QtWidgets.QSplitter
-    horiz_splitter: QtWidgets.QSplitter
+    overview_splitter: QtWidgets.QSplitter
     details_list: QtWidgets.QListWidget
     edits_table: TableWidgetWithAddRow
     edits_table_placeholder: QtWidgets.QWidget
+    staged_list: QtWidgets.QListWidget
     # TODO?: smart initialization?  Choosing edits by clicking on devices?
     # TODO?: starting device / string, happi selector for replace?
 
-    apply_all_button: QtWidgets.QPushButton
+    stage_all_button: QtWidgets.QPushButton
     open_button: QtWidgets.QPushButton
     save_button: QtWidgets.QPushButton
     verify_button: QtWidgets.QPushButton
@@ -399,7 +401,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         super().__init__(*args, **kwargs)
         self._window = window
         self.fp = filepath
-        self.all_actions: List[FindReplaceAction] = []
+        self.staged_actions: List[FindReplaceAction] = []
         self._signals: List[str] = []
         self._devices: List[str] = []
         self.busy_thread = None
@@ -411,11 +413,11 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     def setup_ui(self) -> None:
         self.open_button.clicked.connect(self.open_file)
         self.save_button.clicked.connect(self.save_file)
-        self.apply_all_button.clicked.connect(self.apply_all)
+        self.stage_all_button.clicked.connect(self.stage_all)
         self.verify_button.clicked.connect(self.verify_changes)
 
-        self.horiz_splitter.setSizes([375, 375])  # in pixels, a good first shot
-        self.vert_splitter.setSizes([175, 375])
+        self.overview_splitter.setSizes([375, 375])  # in pixels, a good first shot
+        self.vert_splitter.setSizes([200, 200, 200, 200,])
 
         horiz_header = self.device_table.horizontalHeader()
         horiz_header.setSectionResizeMode(horiz_header.Stretch)
@@ -427,9 +429,6 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             row_widget_cls=partial(TemplateEditRowWidget, orig_file=self.orig_file)
         )
         insert_widget(self.edits_table, self.edits_table_placeholder)
-        self.edits_table.table_updated.connect(
-            self.update_change_list
-        )
 
         self.edits_table.setSelectionMode(self.edits_table.SingleSelection)
         self.edits_table.setSelectionBehavior(self.edits_table.SelectRows)
@@ -569,26 +568,21 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
                 'File saved successfully'
             )
 
-    def apply_all(self) -> None:
-        self.prompt_apply()
-        self.update_title()
-
     def prompt_apply(self) -> None:
         # message box with details on remaining changes
-        self.update_change_list()
-        if len(self.all_actions) <= 0:
+        if len(self.staged_actions) <= 0:
             return
 
         reply = QtWidgets.QMessageBox.question(
             self,
-            'Apply remaning edits?',
+            'Apply staged edits?',
             (
                 'Would you like to apply the remaining '
-                f'({len(self.all_actions)}) edits?'
+                f'({len(self.staged_actions)}) staged edits?'
             )
         )
         if reply == QtWidgets.QMessageBox.Yes:
-            for action in self.all_actions:
+            for action in self.staged_actions:
                 action.apply()
 
             # clear all rows
@@ -597,28 +591,16 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
     def update_title(self) -> None:
         """
-        Update the title.  Will be the name and the number of unapplied edits
+        Update the title.  Will be the name and the number of staged edits
         """
         if self.fp is None:
             return
 
         file_name = os.path.basename(self.fp)
-        if len(self.all_actions) > 0:
-            file_name += f'[{len(self.all_actions)}]'
+        if len(self.staged_actions) > 0:
+            file_name += f'[{len(self.staged_actions)}]'
         self.file_name_label.setText(file_name)
         self.type_label.setText(type(self.orig_file).__name__)
-
-    def update_change_list(self) -> None:
-        """
-        update the global change list, gathering all ``FindReplaceAction``'s
-        """
-        # walk through edits_table, gather list of list of paths
-        self.all_actions = []
-        for row_idx in range(self.edits_table.rowCount()):
-            template_widget = self.edits_table.cellWidget(row_idx, 0)
-            self.all_actions.extend(template_widget.get_actions())
-
-        self.update_title()
 
     def show_changes_from_edit(self, *args, **kwargs) -> None:
         """
@@ -663,9 +645,76 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             )
             self._partial_slots.append(remove_slot)
 
+            # Disconnect existing apply slot, replace with stage slot
+            row_widget.button_box.accepted.disconnect(row_widget.apply_action)
+            stage_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.button_box.accepted,
+                self.stage_item_from_details, row_widget.data, l_item,
+            )
+            self._partial_slots.append(stage_slot)
+
     def remove_item_from_details(self, item: QtWidgets.QListWidgetItem) -> None:
         """remove an item from the details list"""
         self.details_list.takeItem(self.details_list.row(item))
+
+    def remove_item_from_staged(self, item: QtWidgets.QListWidgetItem) -> None:
+        """remove an item from the staged list, GUI and internal"""
+        data = self.staged_list.itemWidget(item).data
+        self.staged_actions.remove(data)
+        self.staged_list.takeItem(self.staged_list.row(item))
+        self.update_title()
+
+    def stage_item_from_details(
+        self,
+        data: FindReplaceAction,
+        item: QtWidgets.QListWidgetItem
+    ) -> None:
+        """stage an item from the details list"""
+        if any([data.same_path(action.path) for action in self.staged_actions]):
+            QtWidgets.QMessageBox.information(
+                self,
+                'Duplicate Edit Not Staged',
+                'Edit was not staged, had a path matching an already staged path'
+            )
+            return
+        # Add data to staged list
+        self.stage_edit(data)
+        self.refresh_staged_table()
+        self.remove_item_from_details(item)
+
+    def stage_all(self) -> None:
+        """Move actions from edit details to staged_actions and refresh table"""
+        for _ in range(self.details_list.count()):
+            l_item = self.details_list.item(0)
+            data = self.details_list.itemWidget(l_item).data
+            self.stage_item_from_details(data, item=l_item)
+            self.details_list.takeItem(0)
+
+    def stage_edit(self, edit: FindReplaceAction) -> None:
+        """Add ``edit`` to the staging list, do nothing to the GUI"""
+        self.staged_actions.append(edit)
+
+    def refresh_staged_table(self) -> None:
+        """Re-populate staged edits table"""
+        self.staged_list.clear()
+        for action in self.staged_actions:
+            l_item = QtWidgets.QListWidgetItem()
+            row_widget = FindReplaceRow(data=action)
+            l_item.setSizeHint(QtCore.QSize(row_widget.width(), row_widget.height()))
+            self.staged_list.addItem(l_item)
+            self.staged_list.setItemWidget(l_item, row_widget)
+
+            remove_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.remove_item,
+                self.remove_item_from_staged, l_item
+            )
+            self._partial_slots.append(remove_slot)
+
+            # Hide ok button
+            ok_button = row_widget.button_box.button(QtWidgets.QDialogButtonBox.Ok)
+            row_widget.button_box.removeButton(ok_button)
+
+        self.update_title()
 
 
 class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
