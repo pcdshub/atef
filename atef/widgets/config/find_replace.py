@@ -26,7 +26,8 @@ from atef.find_replace import (FindReplaceAction, MatchFunction,
                                walk_find_match)
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.util import get_happi_client
-from atef.widgets.config.utils import TableWidgetWithAddRow
+from atef.widgets.config.run_base import create_tree_from_file
+from atef.widgets.config.utils import ConfigTreeModel, TableWidgetWithAddRow
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import BusyCursorThread, insert_widget
 
@@ -56,7 +57,7 @@ def verify_file_and_notify(
     bool
         the verification success
     """
-    verified, msg = file.verify()
+    verified, msg = file.validate()
 
     if not verified:
         QtWidgets.QMessageBox.warning(
@@ -452,6 +453,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         def finish_setup():
             self.details_list.clear()
             self.setup_edits_table()
+            self.setup_tree_view()
             self.setup_devices_list()
             self.update_title()
 
@@ -509,9 +511,25 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         for i, dev in enumerate(self._devices):
             self.device_table.setItem(i, 0, QtWidgets.QTableWidgetItem(dev))
 
+    def setup_tree_view(self) -> None:
+        """Populate tree view with preview of loaded file"""
+        root_item = create_tree_from_file(data=self.orig_file)
+
+        model = ConfigTreeModel(data=root_item)
+
+        self.tree_view.setModel(model)
+        # Hide the irrelevant status column
+        self.tree_view.setColumnHidden(1, True)
+        self.tree_view.expandAll()
+
     def verify_changes(self) -> None:
+        """Apply staged changes and validate copy of file"""
         if self.orig_file is not None:
-            verify_file_and_notify(self.orig_file, self)
+            temp_file = copy.deepcopy(self.orig_file)
+            for action in self.staged_actions:
+                action.apply(target=temp_file)
+
+            verify_file_and_notify(temp_file, self)
 
     def save_file(self) -> None:
         if self.orig_file is None:
