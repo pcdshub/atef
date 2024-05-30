@@ -20,8 +20,8 @@ import dataclasses
 import logging
 from collections import OrderedDict
 from functools import partial
-from typing import (TYPE_CHECKING, Any, ClassVar, Dict, Generator, List,
-                    Optional, Tuple, Type, Union)
+from typing import (TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Tuple,
+                    Type, Union)
 from weakref import WeakValueDictionary
 
 from pcdsutils.qt.callbacks import WeakPartialMethodSlot
@@ -73,26 +73,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-def walk_tree_items(item: TreeItem) -> Generator[TreeItem, None, None]:
-    """
-    Walk the tree depth first, starting at `item`.
-
-    Parameters
-    ----------
-    item : TreeItem
-        the root node of the tree to walk
-
-    Yields
-    ------
-    Generator[TreeItem, None, None]
-        Yields TreeItem from the the tree.
-    """
-    yield item
-
-    for child_idx in range(item.childCount()):
-        yield from walk_tree_items(item.child(child_idx))
 
 
 def setup_multi_mode_edit_widget(

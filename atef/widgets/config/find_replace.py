@@ -27,7 +27,8 @@ from atef.find_replace import (FindReplaceAction, MatchFunction,
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.util import get_happi_client
 from atef.widgets.config.run_base import create_tree_from_file
-from atef.widgets.config.utils import ConfigTreeModel, TableWidgetWithAddRow
+from atef.widgets.config.utils import (ConfigTreeModel, TableWidgetWithAddRow,
+                                       walk_tree_items)
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import BusyCursorThread, insert_widget
 
@@ -440,6 +441,20 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         # on a row different from the currently selected one
         self.edits_table.row_interacted.connect(self.show_changes_from_edit)
 
+        # reveal in tree when detail is highlighted.
+        # (These may not need to be WPMS but I'll be safe)
+        reveal_details_slot = WeakPartialMethodSlot(
+            self.details_list, self.details_list.itemSelectionChanged,
+            self.reveal_tree_item, self.details_list,
+        )
+        self._partial_slots.append(reveal_details_slot)
+
+        reveal_staged_slot = WeakPartialMethodSlot(
+            self.staged_list, self.staged_list.itemSelectionChanged,
+            self.reveal_tree_item, self.staged_list,
+        )
+        self._partial_slots.append(reveal_staged_slot)
+
     def open_file(self, *args, filename: Optional[str] = None, **kwargs) -> None:
         if filename is None:
             filename, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -521,6 +536,32 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         # Hide the irrelevant status column
         self.tree_view.setColumnHidden(1, True)
         self.tree_view.expandAll()
+
+    def reveal_tree_item(
+        self,
+        this_list: QtWidgets.QListWidget,
+        action: Optional[FindReplaceAction] = None
+    ) -> None:
+        """Reveal and highlight the tree-item referenced by ``action``"""
+        if not action:
+            curr_widget = this_list.itemWidget(this_list.currentItem())
+            if curr_widget is None:  # selection has likely been removed
+                return
+
+            action: FindReplaceAction = curr_widget.data
+
+        model: ConfigTreeModel = self.tree_view.model()
+
+        closest_index = None
+        # Gather objects in path, ignoring steps that jump into lists etc
+        path_objs = [part[0] for part in action.path if not isinstance(part[0], str)]
+        for tree_item in walk_tree_items(model.root_item):
+            if tree_item.orig_data in path_objs:
+                closest_index = model.index_from_item(tree_item)
+
+        if closest_index:
+            self.tree_view.setCurrentIndex(closest_index)
+            self.tree_view.scrollTo(closest_index)
 
     def verify_changes(self) -> None:
         """Apply staged changes and validate copy of file"""
@@ -671,6 +712,13 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             )
             self._partial_slots.append(stage_slot)
 
+            # reveal tree when deails selected
+            reveal_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.details_button.pressed,
+                self.reveal_tree_item, self.details_list, action=row_widget.data
+            )
+            self._partial_slots.append(reveal_slot)
+
     def remove_item_from_details(self, item: QtWidgets.QListWidgetItem) -> None:
         """remove an item from the details list"""
         self.details_list.takeItem(self.details_list.row(item))
@@ -726,6 +774,13 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
                 self.remove_item_from_staged, l_item
             )
             self._partial_slots.append(remove_slot)
+
+            # reveal tree when deails selected
+            reveal_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.details_button.pressed,
+                self.reveal_tree_item, self.staged_list, action=row_widget.data
+            )
+            self._partial_slots.append(reveal_slot)
 
             # Hide ok button
             ok_button = row_widget.button_box.button(QtWidgets.QDialogButtonBox.Ok)

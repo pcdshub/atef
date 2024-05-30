@@ -38,10 +38,11 @@ from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
-from .page import PAGE_MAP, FailPage, PageWidget, RunStepPage, walk_tree_items
+from .page import PAGE_MAP, FailPage, PageWidget, RunStepPage
 from .result_summary import ResultsSummaryWidget
 from .run_base import create_tree_from_file, make_run_page
-from .utils import ConfigTreeModel, MultiInputDialog, Toggle, TreeItem
+from .utils import (ConfigTreeModel, MultiInputDialog, Toggle, TreeItem,
+                    walk_tree_items)
 
 logger = logging.getLogger(__name__)
 

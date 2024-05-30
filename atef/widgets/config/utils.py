@@ -2259,3 +2259,23 @@ def gather_relevant_identifiers(
                     identifiers.append(signal.pvname)
 
     return identifiers
+
+
+def walk_tree_items(item: TreeItem) -> Generator[TreeItem, None, None]:
+    """
+    Walk the tree depth first, starting at `item`.
+
+    Parameters
+    ----------
+    item : TreeItem
+        the root node of the tree to walk
+
+    Yields
+    ------
+    Generator[TreeItem, None, None]
+        Yields TreeItem from the the tree.
+    """
+    yield item
+
+    for child_idx in range(item.childCount()):
+        yield from walk_tree_items(item.child(child_idx))
