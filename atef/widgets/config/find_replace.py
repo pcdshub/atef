@@ -706,7 +706,6 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             l_item = self.details_list.item(0)
             data = self.details_list.itemWidget(l_item).data
             self.stage_item_from_details(data, item=l_item)
-            self.details_list.takeItem(0)
 
     def stage_edit(self, edit: FindReplaceAction) -> None:
         """Add ``edit`` to the staging list, do nothing to the GUI"""
