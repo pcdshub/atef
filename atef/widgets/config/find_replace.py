@@ -431,7 +431,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     def setup_edits_table(self) -> None:
         # set up add row widget for edits
         self.edits_table = TableWidgetWithAddRow(
-            add_row_text='add edit', title_text='edits',
+            add_row_text='add edit', title_text='Edits',
             row_widget_cls=partial(TemplateEditRowWidget, orig_file=self.orig_file)
         )
         insert_widget(self.edits_table, self.edits_table_placeholder)
