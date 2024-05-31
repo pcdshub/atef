@@ -386,6 +386,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
     stage_all_button: QtWidgets.QPushButton
     open_button: QtWidgets.QPushButton
+    top_open_button: QtWidgets.QPushButton
     save_button: QtWidgets.QPushButton
     verify_button: QtWidgets.QPushButton
 
@@ -408,12 +409,15 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self._devices: List[str] = []
         self.busy_thread = None
         self._partial_slots: list[WeakPartialMethodSlot] = []
+        self.file_name_label.hide()
+        self.type_label.hide()
         if filepath:
             self.open_file(filename=filepath)
         self.setup_ui()
 
     def setup_ui(self) -> None:
         self.open_button.clicked.connect(self.open_file)
+        self.top_open_button.clicked.connect(self.open_file)
         self.save_button.clicked.connect(self.save_file)
         self.stage_all_button.clicked.connect(self.stage_all)
         self.verify_button.clicked.connect(self.verify_changes)
@@ -471,6 +475,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             self.setup_tree_view()
             self.setup_devices_list()
             self.update_title()
+            self.vert_splitter.setSizes([200, 200, 200, 200,])
 
         self.busy_thread = BusyCursorThread(
             func=partial(self.load_file, filepath=filename)
@@ -653,7 +658,14 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         Update the title.  Will be the name and the number of staged edits
         """
         if self.fp is None:
+            self.type_label.hide()
+            self.file_name_label.hide()
+            self.top_open_button.show()
             return
+
+        self.type_label.show()
+        self.file_name_label.show()
+        self.top_open_button.hide()
 
         file_name = os.path.basename(self.fp)
         if len(self.staged_actions) > 0:
@@ -752,7 +764,11 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         """Move actions from edit details to staged_actions and refresh table"""
         for _ in range(self.details_list.count()):
             l_item = self.details_list.item(0)
-            data = self.details_list.itemWidget(l_item).data
+            widget = self.details_list.itemWidget(l_item)
+            if widget is None:
+                return  # no details loaded, simple help text item
+
+            data = widget.data
             self.stage_item_from_details(data, item=l_item)
 
     def stage_edit(self, edit: FindReplaceAction) -> None:
