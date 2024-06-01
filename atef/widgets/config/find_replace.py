@@ -16,14 +16,16 @@ import qtawesome as qta
 from apischema import ValidationError, serialize
 from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import Signal as QSignal
 
 from atef.cache import get_signal_cache
 from atef.config import ConfigurationFile, PreparedFile
 from atef.find_replace import (FindReplaceAction, MatchFunction,
-                               ReplaceFunction, get_deepest_dataclass_in_path,
+                               RegexFindReplace, ReplaceFunction,
+                               get_deepest_dataclass_in_path,
                                get_default_match_fn, get_default_replace_fn,
                                get_item_from_path, patch_client_cache,
-                               walk_find_match)
+                               simplify_path, walk_find_match)
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.util import get_happi_client
 from atef.widgets.config.run_base import create_tree_from_file
@@ -392,6 +394,8 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
     busy_thread: Optional[BusyCursorThread]
 
+    data_updated: ClassVar[QtCore.Signal] = QSignal()
+
     filename = 'fill_template_page.ui'
 
     def __init__(
@@ -471,11 +475,14 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
         def finish_setup():
             self.details_list.clear()
+            self.staged_list.clear()
+            self.staged_actions.clear()
             self.setup_edits_table()
             self.setup_tree_view()
             self.setup_devices_list()
             self.update_title()
             self.vert_splitter.setSizes([200, 200, 200, 200,])
+            self.data_updated.emit()
 
         self.busy_thread = BusyCursorThread(
             func=partial(self.load_file, filepath=filename)
@@ -803,6 +810,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             row_widget.button_box.removeButton(ok_button)
 
         self.update_title()
+        self.data_updated.emit()
 
 
 class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
@@ -911,8 +919,15 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         # generator can be unstable if dataclass changes during walk
         # this is only ok because we consume generator entirely
         for path in self.match_paths:
+            origin_action = RegexFindReplace(
+                path=simplify_path(path),
+                search_regex=self._search_regex.pattern,
+                replace_text=self.replace_edit.text(),
+                case_sensitive=self.case_button.isChecked(),
+            )
             action = FindReplaceAction(target=self.orig_file, path=path,
-                                       replace_fn=self._replace_fn)
+                                       replace_fn=self._replace_fn,
+                                       origin=origin_action)
 
             self.actions.append(action)
 
