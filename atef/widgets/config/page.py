@@ -35,7 +35,7 @@ from atef.check import (ALL_COMPARISONS, AnyComparison, AnyValue, Comparison,
                         NotEquals, Range, ValueSet)
 from atef.config import (Configuration, ConfigurationGroup,
                          DeviceConfiguration, PVConfiguration,
-                         ToolConfiguration)
+                         TemplateConfiguration, ToolConfiguration)
 from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedDescriptionStep, PreparedPassiveStep,
                             PreparedProcedureStep, PreparedSetValueStep,
@@ -46,6 +46,7 @@ from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
+from atef.widgets.config.find_replace import FillTemplatePage
 from atef.widgets.config.paged_table import SETUP_SLOT_ROLE, PagedTableWidget
 from atef.widgets.config.run_active import (DescriptionRunWidget,
                                             PassiveRunWidget,
@@ -661,6 +662,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             DeviceConfiguration,
             PVConfiguration,
             ToolConfiguration,
+            TemplateConfiguration,
         )
     }
 
@@ -1399,6 +1401,67 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
             return
         new_tool = tool_type()
         self.new_tool_widget(new_tool)
+
+
+class TemplateConfigurationPage(DesignerDisplay, PageWidget):
+    """Widget for configuring Templated checkouts within other checkouts"""
+    filename = "template_group_page.ui"
+
+    template_page_widget: FillTemplatePage
+    template_page_placeholder: QWidget
+
+    data: TemplateConfiguration
+
+    def __init__(self, data: TemplateConfiguration, **kwargs):
+        super().__init__(data=data, **kwargs)
+        self.setup_name_desc_tags_init()
+        self.setup_template_widget_init()
+
+    def setup_template_widget_init(self) -> None:
+        self.template_page_widget = FillTemplatePage()
+
+        def finish_widget_setup(*args, **kwargs):
+            # only run this once, when we're loading an existing template checkout
+            # subsequent opening of files do not populate staged list
+            self.template_page_widget.data_updated.disconnect(finish_widget_setup)
+
+            target = getattr(self.template_page_widget, 'orig_file', None)
+            if target is not None:
+                for regexFR in self.data.edits:
+                    action = regexFR.to_action(target=target)
+                    self.template_page_widget.stage_edit(action)
+                self.template_page_widget.refresh_staged_table()
+
+        self.template_page_widget.data_updated.connect(finish_widget_setup)
+        self.template_page_widget.open_file(filename=self.data.filename)
+
+        # remove save as button
+        self.template_page_widget.save_button.hide()
+
+        # setup update data with each change to staged, new file
+        self.template_page_widget.data_updated.connect(self.update_data)
+        self.template_page_widget.data_updated.connect(self.update_data)
+
+        self.insert_widget(self.template_page_widget, self.template_page_placeholder)
+
+    def update_data(self) -> None:
+        """Update the dataclass with information from the FillTemplatePage widget"""
+        # FillTemplatePage is not a normal datawidget, and does not have a bridge.
+        # Luckily there isn't much to track, via children, so we can do it manually
+        self.data.filename = self.template_page_widget.fp
+        staged_list = self.template_page_widget.staged_list
+        edits = []
+        for idx in range(staged_list.count()):
+            row_data = staged_list.itemWidget(staged_list.item(idx)).data
+            edits.append(row_data.origin)
+
+        self.data.edits = edits
+        print(f'update_data: {self.data.filename}, {len(self.data.edits)}')
+
+    def post_tree_setup(self) -> None:
+        super().post_tree_setup()
+
+        self.setup_name_desc_tags_link()
 
 
 class ProcedureGroupPage(DesignerDisplay, PageWidget):
@@ -2362,6 +2425,7 @@ PAGE_MAP = {
     DeviceConfiguration: DeviceConfigurationPage,
     PVConfiguration: PVConfigurationPage,
     ToolConfiguration: ToolConfigurationPage,
+    TemplateConfiguration: TemplateConfigurationPage,
     # Active Pages
     ProcedureGroup: ProcedureGroupPage,
     DescriptionStep: StepPage,
