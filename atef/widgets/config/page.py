@@ -1416,6 +1416,7 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
         super().__init__(data=data, **kwargs)
         self.setup_name_desc_tags_init()
         self.setup_template_widget_init()
+        self.post_tree_setup()
 
     def setup_template_widget_init(self) -> None:
         self.template_page_widget = FillTemplatePage()
@@ -1456,7 +1457,6 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
             edits.append(row_data.origin)
 
         self.data.edits = edits
-        print(f'update_data: {self.data.filename}, {len(self.data.edits)}')
 
     def post_tree_setup(self) -> None:
         super().post_tree_setup()
