@@ -7,17 +7,24 @@ take a subclass of PreparedProcedureStep as their ``data``.
 import asyncio
 import logging
 import pathlib
+from typing import Optional, Union
 
 import qtawesome
-from qtpy import QtWidgets
+from pcdsutils.qt.callbacks import WeakPartialMethodSlot
+from qtpy import QtCore, QtWidgets
 
 from atef.config import (ConfigurationFile, PreparedFile,
-                         PreparedSignalComparison, run_passive_step)
+                         PreparedSignalComparison,
+                         PreparedTemplateConfiguration, run_passive_step)
+from atef.find_replace import FindReplaceAction
 from atef.procedure import (PreparedDescriptionStep, PreparedPassiveStep,
-                            PreparedSetValueStep, PreparedValueToSignal)
+                            PreparedProcedureFile, PreparedSetValueStep,
+                            PreparedTemplateStep, PreparedValueToSignal,
+                            ProcedureFile)
 from atef.widgets.config.data_base import DataWidget
+from atef.widgets.config.find_replace import FindReplaceRow
 from atef.widgets.config.run_base import ResultStatus, create_tree_from_file
-from atef.widgets.config.utils import ConfigTreeModel
+from atef.widgets.config.utils import ConfigTreeModel, walk_tree_items
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import insert_widget
 
@@ -182,3 +189,125 @@ class CheckRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
         self.name_label.setText(data.name)
         self.target_label.setText(data.signal.name)
         self.check_summary_label.setText(data.comparison.describe())
+
+
+class TemplateRunWidget(DesignerDisplay, DataWidget):
+    """Widget for viewing TemplateConfigurations, either passive or active"""
+    filename = 'template_run_widget.ui'
+
+    refresh_button: QtWidgets.QPushButton
+    tree_view: QtWidgets.QTreeView
+    edits_list: QtWidgets.QListWidget
+
+    def __init__(
+        self,
+        *args,
+        data: Union[PreparedTemplateConfiguration, PreparedTemplateStep],
+        **kwargs
+    ):
+        super().__init__(*args, data=data, **kwargs)
+        self._partial_slots: list[WeakPartialMethodSlot] = []
+        self.orig_step = getattr(data, 'config', None) or getattr(data, 'origin', None)
+        if not self.orig_step.filename:
+            logger.warning('no passive step to run')
+            return
+
+        self.prepared_file = self.bridge.file.get()
+        self.orig_file = self.prepared_file.file
+
+        fp = pathlib.Path(self.orig_step.filename)
+        if not fp.is_file():
+            return
+
+        if isinstance(self.orig_file, ConfigurationFile):
+            self.unedited_file = ConfigurationFile.from_filename(fp)
+        elif isinstance(self.orig_file, ProcedureFile):
+            self.unedited_file = ProcedureFile.from_filename(fp)
+
+        self.setup_tree()
+        self.setup_edits_list()
+
+        self.refresh_button.setIcon(qtawesome.icon('fa.refresh'))
+        self.refresh_button.clicked.connect(self.run_config)
+
+    def setup_tree(self):
+        """Sets up ConfigTreeModel with the data from the ConfigurationFile"""
+
+        root_item = create_tree_from_file(
+            data=self.orig_file,
+            prepared_file=self.prepared_file
+        )
+
+        model = ConfigTreeModel(data=root_item)
+        self.tree_view.setModel(model)
+
+        self.tree_view.header().swapSections(0, 1)
+        self.tree_view.expandAll()
+
+    def setup_edits_list(self):
+        """Populate edit_list with edits for display.  Links """
+        target = self.unedited_file
+        if target is not None:
+            for regexFR in self.orig_step.edits:
+                action = regexFR.to_action(target=target)
+                l_item = QtWidgets.QListWidgetItem()
+                row_widget = FindReplaceRow(data=action)
+                row_widget.button_box.hide()
+                l_item.setSizeHint(QtCore.QSize(row_widget.width(), row_widget.height()))
+                self.edits_list.addItem(l_item)
+                self.edits_list.setItemWidget(l_item, row_widget)
+
+                # reveal tree when details selected
+                reveal_slot = WeakPartialMethodSlot(
+                    row_widget, row_widget.details_button.pressed,
+                    self.reveal_tree_item, self.edits_list, action=row_widget.data
+                )
+                self._partial_slots.append(reveal_slot)
+
+        reveal_staged_slot = WeakPartialMethodSlot(
+            self.edits_list, self.edits_list.itemSelectionChanged,
+            self.reveal_tree_item, self.edits_list,
+        )
+        self._partial_slots.append(reveal_staged_slot)
+
+    def reveal_tree_item(
+        self,
+        this_list: QtWidgets.QListWidget,
+        action: Optional[FindReplaceAction] = None
+    ) -> None:
+        """Reveal and highlight the tree-item referenced by ``action``"""
+        if not action:
+            curr_widget = this_list.itemWidget(this_list.currentItem())
+            if curr_widget is None:  # selection has likely been removed
+                return
+
+            action: FindReplaceAction = curr_widget.data
+
+        model: ConfigTreeModel = self.tree_view.model()
+
+        closest_index = None
+        # Gather objects in path, ignoring steps that jump into lists etc
+        path_objs = [part[0] for part in action.path if not isinstance(part[0], str)]
+        for tree_item in walk_tree_items(model.root_item):
+            if tree_item.orig_data in path_objs:
+                closest_index = model.index_from_item(tree_item)
+
+        if closest_index:
+            self.tree_view.setCurrentIndex(closest_index)
+            self.tree_view.scrollTo(closest_index)
+
+    def run_config(self, *args, **kwargs) -> None:
+        """slot to be connected to RunCheck Button"""
+        try:
+            self.tree_view.model().layoutAboutToBeChanged.emit()
+        except AttributeError:
+            # no model has been set, this method should be no-op
+            return
+
+        if isinstance(self.prepared_file, PreparedFile):
+            asyncio.run(run_passive_step(self.prepared_file))
+        elif isinstance(self.prepared_file, PreparedProcedureFile):
+            # ensure
+            asyncio.run(self.prepared_file.run())
+
+        self.tree_view.model().layoutChanged.emit()

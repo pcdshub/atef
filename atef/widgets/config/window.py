@@ -26,9 +26,10 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
                             QTabWidget, QWidget)
 
 from atef.cache import DataCache
-from atef.config import ConfigurationFile, PreparedFile
+from atef.config import ConfigurationFile, PreparedFile, TemplateConfiguration
 from atef.procedure import (DescriptionStep, PassiveStep,
-                            PreparedProcedureFile, ProcedureFile, SetValueStep)
+                            PreparedProcedureFile, ProcedureFile, SetValueStep,
+                            TemplateStep)
 from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.type_hints import AnyDataclass
 from atef.walk import get_prepared_step, get_relevant_configs_comps
@@ -38,7 +39,7 @@ from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
 from ..core import DesignerDisplay
-from .page import PAGE_MAP, FailPage, PageWidget, RunStepPage
+from .page import PAGE_MAP, FailPage, PageWidget, RunConfigPage, RunStepPage
 from .result_summary import ResultsSummaryWidget
 from .run_base import create_tree_from_file, make_run_page
 from .utils import (ConfigTreeModel, MultiInputDialog, Toggle, TreeItem,
@@ -457,9 +458,11 @@ class LandingPage(DesignerDisplay, QWidget):
 
 
 EDIT_TO_RUN_PAGE: Dict[type, PageWidget] = {
+    TemplateConfiguration: RunConfigPage,
     DescriptionStep: RunStepPage,
     PassiveStep: RunStepPage,
     SetValueStep: RunStepPage,
+    TemplateStep: RunStepPage,
 }
 
 
