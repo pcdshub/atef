@@ -36,7 +36,7 @@
       </size>
      </property>
      <property name="standardButtons">
-      <set>QDialogButtonBox::Apply|QDialogButtonBox::Retry</set>
+      <set>QDialogButtonBox::Retry</set>
      </property>
      <property name="centerButtons">
       <bool>true</bool>
@@ -76,7 +76,7 @@
     </widget>
    </item>
    <item>
-    <widget class="PyDMDrawingLine" name="arrow" native="true">
+    <widget class="PyDMDrawingLine" name="arrow">
      <property name="minimumSize">
       <size>
        <width>20</width>

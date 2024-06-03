@@ -26,7 +26,9 @@ from atef.find_replace import (FindReplaceAction, MatchFunction,
                                walk_find_match)
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.util import get_happi_client
-from atef.widgets.config.utils import TableWidgetWithAddRow
+from atef.widgets.config.run_base import create_tree_from_file
+from atef.widgets.config.utils import (ConfigTreeModel, TableWidgetWithAddRow,
+                                       walk_tree_items)
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import BusyCursorThread, insert_widget
 
@@ -56,7 +58,7 @@ def verify_file_and_notify(
     bool
         the verification success
     """
-    verified, msg = file.verify()
+    verified, msg = file.validate()
 
     if not verified:
         QtWidgets.QMessageBox.warning(
@@ -370,18 +372,21 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     file_name_label: QtWidgets.QLabel
     type_label: QtWidgets.QLabel
 
+    tree_view: QtWidgets.QTreeView
     device_table: QtWidgets.QTableWidget
     # TODO?: filter by device type?  look at specific device types?
     vert_splitter: QtWidgets.QSplitter
-    horiz_splitter: QtWidgets.QSplitter
+    overview_splitter: QtWidgets.QSplitter
     details_list: QtWidgets.QListWidget
     edits_table: TableWidgetWithAddRow
     edits_table_placeholder: QtWidgets.QWidget
+    staged_list: QtWidgets.QListWidget
     # TODO?: smart initialization?  Choosing edits by clicking on devices?
     # TODO?: starting device / string, happi selector for replace?
 
-    apply_all_button: QtWidgets.QPushButton
+    stage_all_button: QtWidgets.QPushButton
     open_button: QtWidgets.QPushButton
+    top_open_button: QtWidgets.QPushButton
     save_button: QtWidgets.QPushButton
     verify_button: QtWidgets.QPushButton
 
@@ -399,23 +404,26 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         super().__init__(*args, **kwargs)
         self._window = window
         self.fp = filepath
-        self.all_actions: List[FindReplaceAction] = []
+        self.staged_actions: List[FindReplaceAction] = []
         self._signals: List[str] = []
         self._devices: List[str] = []
         self.busy_thread = None
         self._partial_slots: list[WeakPartialMethodSlot] = []
+        self.file_name_label.hide()
+        self.type_label.hide()
         if filepath:
             self.open_file(filename=filepath)
         self.setup_ui()
 
     def setup_ui(self) -> None:
         self.open_button.clicked.connect(self.open_file)
+        self.top_open_button.clicked.connect(self.open_file)
         self.save_button.clicked.connect(self.save_file)
-        self.apply_all_button.clicked.connect(self.apply_all)
+        self.stage_all_button.clicked.connect(self.stage_all)
         self.verify_button.clicked.connect(self.verify_changes)
 
-        self.horiz_splitter.setSizes([375, 375])  # in pixels, a good first shot
-        self.vert_splitter.setSizes([175, 375])
+        self.overview_splitter.setSizes([375, 375])  # in pixels, a good first shot
+        self.vert_splitter.setSizes([200, 200, 200, 200,])
 
         horiz_header = self.device_table.horizontalHeader()
         horiz_header.setSectionResizeMode(horiz_header.Stretch)
@@ -423,13 +431,10 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
     def setup_edits_table(self) -> None:
         # set up add row widget for edits
         self.edits_table = TableWidgetWithAddRow(
-            add_row_text='add edit', title_text='edits',
+            add_row_text='add edit', title_text='Edits',
             row_widget_cls=partial(TemplateEditRowWidget, orig_file=self.orig_file)
         )
         insert_widget(self.edits_table, self.edits_table_placeholder)
-        self.edits_table.table_updated.connect(
-            self.update_change_list
-        )
 
         self.edits_table.setSelectionMode(self.edits_table.SingleSelection)
         self.edits_table.setSelectionBehavior(self.edits_table.SelectRows)
@@ -439,6 +444,20 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         # this might call show_changes_from_edit twice if clicking refresh
         # on a row different from the currently selected one
         self.edits_table.row_interacted.connect(self.show_changes_from_edit)
+
+        # reveal in tree when detail is highlighted.
+        # (These may not need to be WPMS but I'll be safe)
+        reveal_details_slot = WeakPartialMethodSlot(
+            self.details_list, self.details_list.itemSelectionChanged,
+            self.reveal_tree_item, self.details_list,
+        )
+        self._partial_slots.append(reveal_details_slot)
+
+        reveal_staged_slot = WeakPartialMethodSlot(
+            self.staged_list, self.staged_list.itemSelectionChanged,
+            self.reveal_tree_item, self.staged_list,
+        )
+        self._partial_slots.append(reveal_staged_slot)
 
     def open_file(self, *args, filename: Optional[str] = None, **kwargs) -> None:
         if filename is None:
@@ -453,8 +472,10 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         def finish_setup():
             self.details_list.clear()
             self.setup_edits_table()
+            self.setup_tree_view()
             self.setup_devices_list()
             self.update_title()
+            self.vert_splitter.setSizes([200, 200, 200, 200,])
 
         self.busy_thread = BusyCursorThread(
             func=partial(self.load_file, filepath=filename)
@@ -510,9 +531,51 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         for i, dev in enumerate(self._devices):
             self.device_table.setItem(i, 0, QtWidgets.QTableWidgetItem(dev))
 
+    def setup_tree_view(self) -> None:
+        """Populate tree view with preview of loaded file"""
+        root_item = create_tree_from_file(data=self.orig_file)
+
+        model = ConfigTreeModel(data=root_item)
+
+        self.tree_view.setModel(model)
+        # Hide the irrelevant status column
+        self.tree_view.setColumnHidden(1, True)
+        self.tree_view.expandAll()
+
+    def reveal_tree_item(
+        self,
+        this_list: QtWidgets.QListWidget,
+        action: Optional[FindReplaceAction] = None
+    ) -> None:
+        """Reveal and highlight the tree-item referenced by ``action``"""
+        if not action:
+            curr_widget = this_list.itemWidget(this_list.currentItem())
+            if curr_widget is None:  # selection has likely been removed
+                return
+
+            action: FindReplaceAction = curr_widget.data
+
+        model: ConfigTreeModel = self.tree_view.model()
+
+        closest_index = None
+        # Gather objects in path, ignoring steps that jump into lists etc
+        path_objs = [part[0] for part in action.path if not isinstance(part[0], str)]
+        for tree_item in walk_tree_items(model.root_item):
+            if tree_item.orig_data in path_objs:
+                closest_index = model.index_from_item(tree_item)
+
+        if closest_index:
+            self.tree_view.setCurrentIndex(closest_index)
+            self.tree_view.scrollTo(closest_index)
+
     def verify_changes(self) -> None:
+        """Apply staged changes and validate copy of file"""
         if self.orig_file is not None:
-            verify_file_and_notify(self.orig_file, self)
+            temp_file = copy.deepcopy(self.orig_file)
+            for action in self.staged_actions:
+                action.apply(target=temp_file)
+
+            verify_file_and_notify(temp_file, self)
 
     def save_file(self) -> None:
         if self.orig_file is None:
@@ -569,26 +632,21 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
                 'File saved successfully'
             )
 
-    def apply_all(self) -> None:
-        self.prompt_apply()
-        self.update_title()
-
     def prompt_apply(self) -> None:
         # message box with details on remaining changes
-        self.update_change_list()
-        if len(self.all_actions) <= 0:
+        if len(self.staged_actions) <= 0:
             return
 
         reply = QtWidgets.QMessageBox.question(
             self,
-            'Apply remaning edits?',
+            'Apply staged edits?',
             (
                 'Would you like to apply the remaining '
-                f'({len(self.all_actions)}) edits?'
+                f'({len(self.staged_actions)}) staged edits?'
             )
         )
         if reply == QtWidgets.QMessageBox.Yes:
-            for action in self.all_actions:
+            for action in self.staged_actions:
                 action.apply()
 
             # clear all rows
@@ -597,28 +655,23 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
     def update_title(self) -> None:
         """
-        Update the title.  Will be the name and the number of unapplied edits
+        Update the title.  Will be the name and the number of staged edits
         """
         if self.fp is None:
+            self.type_label.hide()
+            self.file_name_label.hide()
+            self.top_open_button.show()
             return
 
+        self.type_label.show()
+        self.file_name_label.show()
+        self.top_open_button.hide()
+
         file_name = os.path.basename(self.fp)
-        if len(self.all_actions) > 0:
-            file_name += f'[{len(self.all_actions)}]'
+        if len(self.staged_actions) > 0:
+            file_name += f'[{len(self.staged_actions)}]'
         self.file_name_label.setText(file_name)
         self.type_label.setText(type(self.orig_file).__name__)
-
-    def update_change_list(self) -> None:
-        """
-        update the global change list, gathering all ``FindReplaceAction``'s
-        """
-        # walk through edits_table, gather list of list of paths
-        self.all_actions = []
-        for row_idx in range(self.edits_table.rowCount()):
-            template_widget = self.edits_table.cellWidget(row_idx, 0)
-            self.all_actions.extend(template_widget.get_actions())
-
-        self.update_title()
 
     def show_changes_from_edit(self, *args, **kwargs) -> None:
         """
@@ -663,9 +716,93 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             )
             self._partial_slots.append(remove_slot)
 
+            # Disconnect existing apply slot, replace with stage slot
+            row_widget.button_box.accepted.disconnect(row_widget.apply_action)
+            stage_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.button_box.accepted,
+                self.stage_item_from_details, row_widget.data, l_item,
+            )
+            self._partial_slots.append(stage_slot)
+
+            # reveal tree when deails selected
+            reveal_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.details_button.pressed,
+                self.reveal_tree_item, self.details_list, action=row_widget.data
+            )
+            self._partial_slots.append(reveal_slot)
+
     def remove_item_from_details(self, item: QtWidgets.QListWidgetItem) -> None:
         """remove an item from the details list"""
         self.details_list.takeItem(self.details_list.row(item))
+
+    def remove_item_from_staged(self, item: QtWidgets.QListWidgetItem) -> None:
+        """remove an item from the staged list, GUI and internal"""
+        data = self.staged_list.itemWidget(item).data
+        self.staged_actions.remove(data)
+        self.staged_list.takeItem(self.staged_list.row(item))
+        self.update_title()
+
+    def stage_item_from_details(
+        self,
+        data: FindReplaceAction,
+        item: QtWidgets.QListWidgetItem
+    ) -> None:
+        """stage an item from the details list"""
+        if any([data.same_path(action.path) for action in self.staged_actions]):
+            QtWidgets.QMessageBox.information(
+                self,
+                'Duplicate Edit Not Staged',
+                'Edit was not staged, had a path matching an already staged path'
+            )
+            return
+        # Add data to staged list
+        self.stage_edit(data)
+        self.refresh_staged_table()
+        self.remove_item_from_details(item)
+
+    def stage_all(self) -> None:
+        """Move actions from edit details to staged_actions and refresh table"""
+        for _ in range(self.details_list.count()):
+            l_item = self.details_list.item(0)
+            widget = self.details_list.itemWidget(l_item)
+            if widget is None:
+                return  # no details loaded, simple help text item
+
+            data = widget.data
+            self.stage_item_from_details(data, item=l_item)
+
+    def stage_edit(self, edit: FindReplaceAction) -> None:
+        """Add ``edit`` to the staging list, do nothing to the GUI"""
+        self.staged_actions.append(edit)
+
+    def refresh_staged_table(self) -> None:
+        """Re-populate staged edits table"""
+        self.staged_list.clear()
+        for action in self.staged_actions:
+            l_item = QtWidgets.QListWidgetItem()
+            row_widget = FindReplaceRow(data=action)
+            l_item.setSizeHint(QtCore.QSize(row_widget.width(), row_widget.height()))
+            self.staged_list.addItem(l_item)
+            self.staged_list.setItemWidget(l_item, row_widget)
+
+            remove_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.remove_item,
+                self.remove_item_from_staged, l_item
+            )
+            self._partial_slots.append(remove_slot)
+
+            # reveal tree when deails selected
+            reveal_slot = WeakPartialMethodSlot(
+                row_widget, row_widget.details_button.pressed,
+                self.reveal_tree_item, self.staged_list, action=row_widget.data
+            )
+            self._partial_slots.append(reveal_slot)
+
+            # Hide ok button
+            ok_button = row_widget.button_box.button(QtWidgets.QDialogButtonBox.Ok)
+            row_widget.button_box.removeButton(ok_button)
+
+        self.update_title()
 
 
 class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
@@ -712,12 +849,6 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         refresh_button.setToolTip('refresh edit details')
         refresh_button.setIcon(qta.icon('ei.refresh'))
 
-        apply_button = self.button_box.button(QtWidgets.QDialogButtonBox.Apply)
-        apply_button.clicked.connect(self.apply_edits)
-        apply_button.setText('')
-        apply_button.setToolTip('apply all changes')
-        apply_button.setIcon(qta.icon('ei.check'))
-
         # settings menu (regex, case)
         self.setting_widget = QtWidgets.QWidget()
         self.setting_layout = QtWidgets.QHBoxLayout()
@@ -762,30 +893,6 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
 
         match_fn = get_default_match_fn(self._search_regex)
         self._match_fn = match_fn
-
-    def apply_edits(self) -> None:
-        """Apply all the actions corresponding to this edit"""
-        self.refresh_paths()
-        if len(self.actions) <= 0:
-            return
-
-        reply = QtWidgets.QMessageBox.question(
-            self,
-            'Apply remaning edits?',
-            (
-                'Would you like to apply the remaining '
-                f'({len(self.actions)}) edits?'
-            )
-        )
-        if reply == QtWidgets.QMessageBox.Yes:
-            for action in self.actions:
-                success = action.apply()
-                if not success:
-                    logger.warning(f'action failed {action}')
-
-            self.actions.clear()
-
-        self.refresh_paths()
 
     def refresh_paths(self) -> None:
         """

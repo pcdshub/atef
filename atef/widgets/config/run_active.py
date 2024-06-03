@@ -17,7 +17,7 @@ from atef.procedure import (PreparedDescriptionStep, PreparedPassiveStep,
                             PreparedSetValueStep, PreparedValueToSignal)
 from atef.widgets.config.data_base import DataWidget
 from atef.widgets.config.run_base import ResultStatus, create_tree_from_file
-from atef.widgets.config.utils import ConfigTreeModel, TreeItem
+from atef.widgets.config.utils import ConfigTreeModel
 from atef.widgets.core import DesignerDisplay
 from atef.widgets.utils import insert_widget
 
@@ -57,18 +57,15 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
 
     def setup_tree(self):
         """Sets up ConfigTreeModel with the data from the ConfigurationFile"""
-        root_item = TreeItem(
-            data=self.config_file, prepared_data=self.prepared_config
+
+        root_item = create_tree_from_file(
+            data=self.config_file,
+            prepared_file=self.prepared_config
         )
-        create_tree_from_file(data=self.config_file.root, parent=root_item,
-                              prepared_file=self.prepared_config)
 
         model = ConfigTreeModel(data=root_item)
         self.tree_view.setModel(model)
 
-        # Customize the look of the table
-        header = self.tree_view.header()
-        header.setSectionResizeMode(header.ResizeToContents)
         self.tree_view.header().swapSections(0, 1)
         self.tree_view.expandAll()
 
