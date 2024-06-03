@@ -748,6 +748,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.staged_actions.remove(data)
         self.staged_list.takeItem(self.staged_list.row(item))
         self.update_title()
+        self.data_updated.emit()
 
     def stage_item_from_details(
         self,
