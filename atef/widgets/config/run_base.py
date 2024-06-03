@@ -442,8 +442,9 @@ def create_tree_from_file(
     ----------
     data : Union[ConfigurationFile, ProcedureFile]
         The "original" file (edit-mode, un-prepared)
-    prepared_file : Union[PreparedFile, PreparedProcedureFile]
-        The "prepared" file (run-mode, prepared)
+    prepared_file : Optional[Union[PreparedFile, PreparedProcedureFile]], optional
+        The "prepared" file (run-mode, prepared), by default None.
+        If no prepared file is provided, tree will not include gathered prepared data
 
     Returns
     -------
