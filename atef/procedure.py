@@ -616,6 +616,10 @@ class PreparedProcedureStep:
                 return PreparedPlanStep.from_origin(
                     origin=step, parent=parent
                 )
+            if isinstance(step, TemplateStep):
+                return PreparedTemplateStep.from_origin(
+                    step=step, parent=parent,
+                )
 
             raise NotImplementedError(f"Step type unsupported: {type(step)}")
         except Exception as ex:
