@@ -9,7 +9,7 @@ import re
 from functools import partial
 from pathlib import Path
 from typing import (TYPE_CHECKING, Any, ClassVar, Iterable, List, Optional,
-                    Union)
+                    Tuple, Union)
 
 import happi
 import qtawesome as qta
@@ -403,11 +403,14 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         *args,
         filepath: Optional[str] = None,
         window: Optional[Window] = None,
+        allowed_types: Optional[Tuple[Any]] = None,
         **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
         self._window = window
         self.fp = filepath
+        self.orig_file = None
+        self.allowed_types = allowed_types
         self.staged_actions: List[FindReplaceAction] = []
         self._signals: List[str] = []
         self._devices: List[str] = []
@@ -501,6 +504,18 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
                 logger.error('failed to open file as either active '
                              'or passive checkout')
 
+        if self.allowed_types and not isinstance(data, self.allowed_types):
+            logger.error("loaded checkout is of a disallowed type: "
+                         f"({type(data)})")
+            QtWidgets.QMessageBox.warning(
+                self,
+                'Template Checkout type error',
+                f'Loaded checkout is one of the allowed types: {self.allowed_types}'
+            )
+            self.fp = None
+            self.orig_file = None
+            return
+
         self.fp = filepath
         self.orig_file = data
 
@@ -540,6 +555,10 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
     def setup_tree_view(self) -> None:
         """Populate tree view with preview of loaded file"""
+        if self.orig_file is None:
+            # clear tree
+            self.tree_view.setModel(None)
+            return
         root_item = create_tree_from_file(data=self.orig_file)
 
         model = ConfigTreeModel(data=root_item)

@@ -33,7 +33,7 @@ from qtpy.QtWidgets import (QComboBox, QFrame, QLabel, QMessageBox,
 from atef.check import (ALL_COMPARISONS, AnyComparison, AnyValue, Comparison,
                         Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
                         NotEquals, Range, ValueSet)
-from atef.config import (Configuration, ConfigurationGroup,
+from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
                          DeviceConfiguration, PreparedConfiguration,
                          PreparedGroup, PreparedTemplateConfiguration,
                          PVConfiguration, TemplateConfiguration,
@@ -41,8 +41,9 @@ from atef.config import (Configuration, ConfigurationGroup,
 from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedDescriptionStep, PreparedPassiveStep,
                             PreparedProcedureStep, PreparedSetValueStep,
-                            PreparedTemplateStep, ProcedureGroup,
-                            ProcedureStep, SetValueStep, TemplateStep)
+                            PreparedTemplateStep, ProcedureFile,
+                            ProcedureGroup, ProcedureStep, SetValueStep,
+                            TemplateStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.type_hints import AnyDataclass
 from atef.widgets.config.data_active import (CheckRowWidget,
@@ -1414,16 +1415,22 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
     template_page_widget: FillTemplatePage
     template_page_placeholder: QWidget
 
-    data: TemplateConfiguration
+    data: Union[TemplateConfiguration, TemplateStep]
+    ALLOWED_TYPE_MAP: ClassVar[Dict[Any, Tuple[Any]]] = {
+        TemplateConfiguration: (ConfigurationFile),
+        TemplateStep: (ConfigurationFile, ProcedureFile)
+    }
 
-    def __init__(self, data: TemplateConfiguration, **kwargs):
+    def __init__(self, data: Union[TemplateConfiguration, TemplateStep], **kwargs):
         super().__init__(data=data, **kwargs)
         self.setup_name_desc_tags_init()
         self.setup_template_widget_init()
         self.post_tree_setup()
 
     def setup_template_widget_init(self) -> None:
-        self.template_page_widget = FillTemplatePage()
+        self.template_page_widget = FillTemplatePage(
+            allowed_types=self.ALLOWED_TYPE_MAP[type(self.data)]
+        )
 
         def finish_widget_setup(*args, **kwargs):
             # only run this once, when we're loading an existing template checkout
