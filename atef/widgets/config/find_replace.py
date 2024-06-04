@@ -577,12 +577,21 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
     def verify_changes(self) -> None:
         """Apply staged changes and validate copy of file"""
-        if self.orig_file is not None:
-            temp_file = copy.deepcopy(self.orig_file)
-            for action in self.staged_actions:
-                action.apply(target=temp_file)
+        if self.orig_file is None:
+            return
+        temp_file = copy.deepcopy(self.orig_file)
 
-            verify_file_and_notify(temp_file, self)
+        edit_results = [e.apply(target=temp_file) for e in self.staged_actions]
+        if not all(edit_results):
+            fail_idx = [i for i, result in enumerate(edit_results) if not result]
+            QtWidgets.QMessageBox.warning(
+                self,
+                'Verification FAIL',
+                f'Some staged edits at {fail_idx} could not be applied:'
+            )
+            return
+
+        verify_file_and_notify(temp_file, self)
 
     def save_file(self) -> None:
         if self.orig_file is None:
