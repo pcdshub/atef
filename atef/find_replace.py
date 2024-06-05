@@ -31,11 +31,11 @@ def patch_client_cache():
     try:
         happi.loader.cache = {}
         dcache = DataCache()
+        # Clear the global signal cache to prevent previous signals from leaking
         dcache.signals.clear()
         yield
     finally:
         happi.loader.cache = old_happi_cache
-        dcache.signals.clear()
 
 
 def walk_find_match(
