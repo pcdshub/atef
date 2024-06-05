@@ -1352,10 +1352,19 @@ class PreparedTemplateConfiguration(PreparedConfiguration):
         return prepared
 
     async def compare(self) -> Result:
-        """Run the edited checkoutand return the combined result"""
+        """Run the edited checkout and return the combined result"""
         result = await self.file.compare()
         self.combined_result = result
         return result
+
+    @property
+    def result(self) -> Result:
+        """
+        Re-compute combined result and return it.  Override standard since this
+        configuration has no comparisons
+        """
+        self.combined_result = self.file.root.result
+        return self.combined_result
 
 
 @dataclass
