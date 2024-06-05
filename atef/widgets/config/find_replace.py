@@ -477,6 +477,13 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             return
 
         def finish_setup():
+            if self.fp is None:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    'Template Checkout type error',
+                    'Loaded checkout is NOT one of the allowed types: '
+                    f'{[t.__name__ for t in self.allowed_types]}'
+                )
             self.details_list.clear()
             self.staged_list.clear()
             self.staged_actions.clear()
@@ -507,11 +514,6 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         if self.allowed_types and not isinstance(data, self.allowed_types):
             logger.error("loaded checkout is of a disallowed type: "
                          f"({type(data)})")
-            QtWidgets.QMessageBox.warning(
-                self,
-                'Template Checkout type error',
-                f'Loaded checkout is one of the allowed types: {self.allowed_types}'
-            )
             self.fp = None
             self.orig_file = None
             return

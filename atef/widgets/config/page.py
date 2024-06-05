@@ -1417,7 +1417,7 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
 
     data: Union[TemplateConfiguration, TemplateStep]
     ALLOWED_TYPE_MAP: ClassVar[Dict[Any, Tuple[Any]]] = {
-        TemplateConfiguration: (ConfigurationFile),
+        TemplateConfiguration: (ConfigurationFile,),
         TemplateStep: (ConfigurationFile, ProcedureFile)
     }
 
