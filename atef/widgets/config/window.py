@@ -27,6 +27,7 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
 
 from atef.cache import DataCache
 from atef.config import ConfigurationFile, PreparedFile, TemplateConfiguration
+from atef.exceptions import PreparationError
 from atef.procedure import (DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile, SetValueStep,
                             TemplateStep)
@@ -797,9 +798,12 @@ class DualTree(DesignerDisplay, QWidget):
         update_run = False
         if self.mode == 'run':
             # store a copy of the edit tree to detect diffs
-            current_edit_config = deepcopy(
-                serialize(type(self.orig_file), self.orig_file)
-            )
+            try:
+                ser = serialize(type(self.orig_file), self.orig_file)
+            except Exception:
+                logger.debug(f'Unable to serialize file as defined: {self.orig_file}')
+                raise PreparationError('Unable to serialize file with current settings')
+            current_edit_config = deepcopy(ser)
 
             if self.prepared_file is None:
                 update_run = True

@@ -369,7 +369,12 @@ class RegexFindReplace:
         else:
             path = self.path
 
-        return FindReplaceAction(target=target, path=path, replace_fn=replace_fn)
+        return FindReplaceAction(
+            path=path,
+            replace_fn=replace_fn,
+            target=target,
+            origin=self,
+        )
 
 
 @dataclass
