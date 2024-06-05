@@ -1669,6 +1669,45 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         )
         self.procedure_table.setCellWidget(found_row, 0, step_row)
 
+    def delete_table_row(
+        self,
+        *args,
+        table: QTableWidget,
+        item: TreeItem,
+        row: DataWidget,
+        **kwargs
+    ) -> None:
+        # Use old QTableWidget handling
+        # Confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to delete the '
+                f'{item.data(2)} named "{item.data(0)}"? '
+                'Note that this will delete any child nodes in the tree.'
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
+        # Get the identity of the data
+        data = row.bridge.data
+        # Remove item from the tree
+        with self.full_tree.modifies_tree():
+            try:
+                self.tree_item.removeChild(item)
+            except ValueError:
+                pass
+
+        # Remove row from the table
+        for row_index in range(table.rowCount()):
+            widget = table.cellWidget(row_index, 0)
+            if widget is row:
+                table.removeRow(row_index)
+                break
+        # Remove configuration from the data structure
+        self.remove_table_data(data)
+
 
 class StepPage(DesignerDisplay, PageWidget):
     """
