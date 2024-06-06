@@ -362,7 +362,7 @@ class RegexFindReplace:
             raise ValueError(f'regex is not valid: {self.search_regex}, '
                              'could not construct FindReplaceAction')
         replace_fn = get_default_replace_fn(
-            self.replace_text, re.compile(search_regex)
+            self.replace_text, search_regex
         )
         if target:
             path = expand_path(self.path, target=target)

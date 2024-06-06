@@ -1416,7 +1416,7 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
     template_page_placeholder: QWidget
 
     data: Union[TemplateConfiguration, TemplateStep]
-    ALLOWED_TYPE_MAP: ClassVar[Dict[Any, Tuple[Any]]] = {
+    ALLOWED_TYPE_MAP: ClassVar[Dict[Any, Tuple[Any, ...]]] = {
         TemplateConfiguration: (ConfigurationFile,),
         TemplateStep: (ConfigurationFile, ProcedureFile)
     }
