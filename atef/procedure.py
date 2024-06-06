@@ -37,7 +37,7 @@ from atef.check import Comparison
 from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
 from atef.enums import GroupResultMode, PlanDestination, Severity
-from atef.exceptions import PreparedComparisonException
+from atef.exceptions import PreparationError, PreparedComparisonException
 from atef.find_replace import RegexFindReplace
 from atef.plan_utils import (BlueskyState, GlobalRunEngine,
                              get_default_namespace, register_run_identifier,
@@ -616,6 +616,10 @@ class PreparedProcedureStep:
                 return PreparedPlanStep.from_origin(
                     origin=step, parent=parent
                 )
+            if isinstance(step, TemplateStep):
+                return PreparedTemplateStep.from_origin(
+                    step=step, parent=parent,
+                )
 
             raise NotImplementedError(f"Step type unsupported: {type(step)}")
         except Exception as ex:
@@ -940,8 +944,21 @@ class PreparedTemplateStep(PreparedProcedureStep):
 
         # convert and apply edits
         edits = [e.to_action() for e in step.edits]
-        for edit in edits:
-            edit.apply(target=orig_file)
+        edit_results = [edit.apply(target=orig_file) for edit in edits]
+
+        if not all(edit_results):
+            return FailedStep(
+                origin=step,
+                parent=parent,
+                exception=PreparationError,
+                result=Result(
+                    severity=Severity.internal_error,
+                    reason=(
+                        f'Failed to prepare templated config: ({step.name}) '
+                        f'Could not apply all edits.'
+                    )
+                )
+            )
 
         # verify edited file
         success, msg = orig_file.validate()
@@ -949,7 +966,7 @@ class PreparedTemplateStep(PreparedProcedureStep):
             return FailedStep(
                 origin=step,
                 parent=parent,
-                exception=ValueError,  # TODO: get a better exception
+                exception=PreparationError,
                 combined_result=Result(
                     severity=Severity.internal_error,
                     reason=(

@@ -33,23 +33,29 @@ from qtpy.QtWidgets import (QComboBox, QFrame, QLabel, QMessageBox,
 from atef.check import (ALL_COMPARISONS, AnyComparison, AnyValue, Comparison,
                         Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
                         NotEquals, Range, ValueSet)
-from atef.config import (Configuration, ConfigurationGroup,
-                         DeviceConfiguration, PVConfiguration,
+from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
+                         DeviceConfiguration, PreparedConfiguration,
+                         PreparedGroup, PreparedTemplateConfiguration,
+                         PVConfiguration, TemplateConfiguration,
                          ToolConfiguration)
 from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedDescriptionStep, PreparedPassiveStep,
                             PreparedProcedureStep, PreparedSetValueStep,
-                            ProcedureGroup, ProcedureStep, SetValueStep)
+                            PreparedTemplateStep, ProcedureFile,
+                            ProcedureGroup, ProcedureStep, SetValueStep,
+                            TemplateStep)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.type_hints import AnyDataclass
 from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
+from atef.widgets.config.find_replace import FillTemplatePage
 from atef.widgets.config.paged_table import SETUP_SLOT_ROLE, PagedTableWidget
 from atef.widgets.config.run_active import (DescriptionRunWidget,
                                             PassiveRunWidget,
-                                            SetValueRunWidget)
+                                            SetValueRunWidget,
+                                            TemplateRunWidget)
 from atef.widgets.config.run_base import RunCheck
 from atef.widgets.utils import ExpandableFrame, insert_widget
 
@@ -661,6 +667,7 @@ class ConfigurationGroupPage(DesignerDisplay, PageWidget):
             DeviceConfiguration,
             PVConfiguration,
             ToolConfiguration,
+            TemplateConfiguration,
         )
     }
 
@@ -1401,6 +1408,72 @@ class ToolConfigurationPage(DesignerDisplay, PageWidget):
         self.new_tool_widget(new_tool)
 
 
+class TemplateConfigurationPage(DesignerDisplay, PageWidget):
+    """Widget for configuring Templated checkouts within other checkouts"""
+    filename = "template_group_page.ui"
+
+    template_page_widget: FillTemplatePage
+    template_page_placeholder: QWidget
+
+    data: Union[TemplateConfiguration, TemplateStep]
+    ALLOWED_TYPE_MAP: ClassVar[Dict[Any, Tuple[Any, ...]]] = {
+        TemplateConfiguration: (ConfigurationFile,),
+        TemplateStep: (ConfigurationFile, ProcedureFile)
+    }
+
+    def __init__(self, data: Union[TemplateConfiguration, TemplateStep], **kwargs):
+        super().__init__(data=data, **kwargs)
+        self.setup_name_desc_tags_init()
+        self.setup_template_widget_init()
+        self.post_tree_setup()
+
+    def setup_template_widget_init(self) -> None:
+        self.template_page_widget = FillTemplatePage(
+            allowed_types=self.ALLOWED_TYPE_MAP[type(self.data)]
+        )
+
+        def finish_widget_setup(*args, **kwargs):
+            # only run this once, when we're loading an existing template checkout
+            # subsequent opening of files do not populate staged list
+            self.template_page_widget.data_updated.disconnect(finish_widget_setup)
+
+            target = getattr(self.template_page_widget, 'orig_file', None)
+            if target is not None:
+                for regexFR in self.data.edits:
+                    action = regexFR.to_action(target=target)
+                    self.template_page_widget.stage_edit(action)
+                self.template_page_widget.refresh_staged_table()
+
+            # setup update data with each change to staged, new file
+            self.template_page_widget.data_updated.connect(self.update_data)
+
+        self.template_page_widget.data_updated.connect(finish_widget_setup)
+        self.template_page_widget.open_file(filename=self.data.filename)
+
+        # remove save as button
+        self.template_page_widget.save_button.hide()
+
+        self.insert_widget(self.template_page_widget, self.template_page_placeholder)
+
+    def update_data(self) -> None:
+        """Update the dataclass with information from the FillTemplatePage widget"""
+        # FillTemplatePage is not a normal datawidget, and does not have a bridge.
+        # Luckily there isn't much to track, via children, so we can do it manually
+        self.data.filename = self.template_page_widget.fp
+        staged_list = self.template_page_widget.staged_list
+        edits = []
+        for idx in range(staged_list.count()):
+            row_data = staged_list.itemWidget(staged_list.item(idx)).data
+            edits.append(row_data.origin)
+
+        self.data.edits = edits
+
+    def post_tree_setup(self) -> None:
+        super().post_tree_setup()
+
+        self.setup_name_desc_tags_link()
+
+
 class ProcedureGroupPage(DesignerDisplay, PageWidget):
     """
     Top level page for Procedures (active checkout)
@@ -1421,7 +1494,8 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
             ProcedureGroup,
             DescriptionStep,
             PassiveStep,
-            SetValueStep
+            SetValueStep,
+            TemplateStep,
         )
     }
 
@@ -1595,6 +1669,45 @@ class ProcedureGroupPage(DesignerDisplay, PageWidget):
         )
         self.procedure_table.setCellWidget(found_row, 0, step_row)
 
+    def delete_table_row(
+        self,
+        *args,
+        table: QTableWidget,
+        item: TreeItem,
+        row: DataWidget,
+        **kwargs
+    ) -> None:
+        # Use old QTableWidget handling
+        # Confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            'Confirm deletion',
+            (
+                'Are you sure you want to delete the '
+                f'{item.data(2)} named "{item.data(0)}"? '
+                'Note that this will delete any child nodes in the tree.'
+            ),
+        )
+        if reply != QMessageBox.Yes:
+            return
+        # Get the identity of the data
+        data = row.bridge.data
+        # Remove item from the tree
+        with self.full_tree.modifies_tree():
+            try:
+                self.tree_item.removeChild(item)
+            except ValueError:
+                pass
+
+        # Remove row from the table
+        for row_index in range(table.rowCount()):
+            widget = table.cellWidget(row_index, 0)
+            if widget is row:
+                table.removeRow(row_index)
+                break
+        # Remove configuration from the data structure
+        self.remove_table_data(data)
+
 
 class StepPage(DesignerDisplay, PageWidget):
     """
@@ -1619,7 +1732,7 @@ class StepPage(DesignerDisplay, PageWidget):
     step_map: ClassVar[Dict[ProcedureStep, DataWidget]] = {
         DescriptionStep: None,
         PassiveStep: PassiveEditWidget,
-        SetValueStep: SetValueEditWidget
+        SetValueStep: SetValueEditWidget,
     }
     step_types: Dict[str, ProcedureStep]
 
@@ -1938,6 +2051,43 @@ class StepPage(DesignerDisplay, PageWidget):
             self.data.success_criteria.remove(data)
 
 
+class RunConfigPage(DesignerDisplay, PageWidget):
+    """
+    Base Widget for running active checkout steps and displaying their
+    results
+
+    Will always have a RunCheck widget, which should be connected after
+    instantiation via ``RunCheck.setup_buttons()``
+
+    Contains a placeholder for a DataWidget
+    """
+    filename = 'run_step_page.ui'
+
+    run_widget_placeholder: QWidget
+    run_widget: DataWidget
+    run_check_placeholder: QWidget
+    run_check: RunCheck
+
+    run_widget_map: ClassVar[Dict[Union[PreparedConfiguration, PreparedGroup], DataWidget]] = {
+        PreparedTemplateConfiguration: TemplateRunWidget,
+    }
+
+    def __init__(self, *args, data, **kwargs):
+        super().__init__(*args, data, **kwargs)
+        self.run_check = RunCheck(data=[data])
+        self.insert_widget(self.run_check, self.run_check_placeholder)
+        # gather run_widget
+        run_widget_cls = self.run_widget_map[type(data)]
+        self.run_widget = run_widget_cls(data=data)
+
+        self.insert_widget(self.run_widget, self.run_widget_placeholder)
+
+        if isinstance(data, PreparedTemplateConfiguration):
+            self.run_check.run_button.clicked.connect(self.run_widget.run_config)
+
+        self.post_tree_setup()
+
+
 class RunStepPage(DesignerDisplay, PageWidget):
     """
     Base Widget for running active checkout steps and displaying their
@@ -1959,6 +2109,7 @@ class RunStepPage(DesignerDisplay, PageWidget):
         PreparedDescriptionStep: DescriptionRunWidget,
         PreparedPassiveStep: PassiveRunWidget,
         PreparedSetValueStep: SetValueRunWidget,
+        PreparedTemplateStep: TemplateRunWidget,
     }
 
     def __init__(self, *args, data, **kwargs):
@@ -1971,7 +2122,7 @@ class RunStepPage(DesignerDisplay, PageWidget):
 
         self.insert_widget(self.run_widget, self.run_widget_placeholder)
 
-        if isinstance(data, PreparedPassiveStep):
+        if isinstance(data, (PreparedPassiveStep, PreparedTemplateStep)):
             self.run_check.run_button.clicked.connect(self.run_widget.run_config)
         elif isinstance(data, PreparedSetValueStep):
             self.run_check.busy_thread.task_finished.connect(
@@ -2362,11 +2513,13 @@ PAGE_MAP = {
     DeviceConfiguration: DeviceConfigurationPage,
     PVConfiguration: PVConfigurationPage,
     ToolConfiguration: ToolConfigurationPage,
+    TemplateConfiguration: TemplateConfigurationPage,
     # Active Pages
     ProcedureGroup: ProcedureGroupPage,
     DescriptionStep: StepPage,
     PassiveStep: StepPage,
     SetValueStep: StepPage,
+    TemplateStep: TemplateConfigurationPage,
 }
 
 # add comparison pages

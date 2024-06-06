@@ -27,7 +27,7 @@ from . import serialization, tools, util
 from .cache import DataCache
 from .check import Comparison
 from .enums import GroupResultMode, Severity
-from .exceptions import PreparedComparisonException
+from .exceptions import PreparationError, PreparedComparisonException
 from .result import Result, incomplete_result
 from .type_hints import AnyPath
 from .yaml_support import init_yaml_support
@@ -1307,8 +1307,21 @@ class PreparedTemplateConfiguration(PreparedConfiguration):
 
         # convert and apply edits
         edits = [e.to_action() for e in config.edits]
-        for edit in edits:
-            edit.apply(target=config_file)
+        edit_results = [edit.apply(target=config_file) for edit in edits]
+
+        if not all(edit_results):
+            return FailedConfiguration(
+                config=config,
+                parent=parent,
+                exception=PreparationError,
+                result=Result(
+                    severity=Severity.internal_error,
+                    reason=(
+                        f'Failed to prepare templated config: ({config.name}) '
+                        f'Could not apply all edits.'
+                    )
+                )
+            )
 
         # verify edited file
         success, msg = config_file.validate()
@@ -1316,7 +1329,7 @@ class PreparedTemplateConfiguration(PreparedConfiguration):
             return FailedConfiguration(
                 config=config,
                 parent=parent,
-                exception=ValueError,  # TODO: get a better exception
+                exception=PreparationError,
                 result=Result(
                     severity=Severity.internal_error,
                     reason=(
@@ -1339,10 +1352,19 @@ class PreparedTemplateConfiguration(PreparedConfiguration):
         return prepared
 
     async def compare(self) -> Result:
-        """Run the edited checkoutand return the combined result"""
+        """Run the edited checkout and return the combined result"""
         result = await self.file.compare()
         self.combined_result = result
         return result
+
+    @property
+    def result(self) -> Result:
+        """
+        Re-compute combined result and return it.  Override standard since this
+        configuration has no comparisons
+        """
+        self.combined_result = self.file.root.result
+        return self.combined_result
 
 
 @dataclass

@@ -31,11 +31,11 @@ def patch_client_cache():
     try:
         happi.loader.cache = {}
         dcache = DataCache()
+        # Clear the global signal cache to prevent previous signals from leaking
         dcache.signals.clear()
         yield
     finally:
         happi.loader.cache = old_happi_cache
-        dcache.signals.clear()
 
 
 def walk_find_match(
@@ -136,6 +136,38 @@ def simplify_path(path: List[Tuple[Any, Any]]) -> List[Tuple[str, Any]]:
         simplified_path.append((item, seg[1]))
 
     return simplified_path
+
+
+def expand_path(path: List[Tuple[str, Any]], target: Any) -> List[Tuple[Any, Any]]:
+    """
+    Expands ``path`` using ``target`` as the object to traverse.
+    Replaces all string type references with the object in question.
+
+    The inverse of ``simplify_path``
+
+    Parameters
+    ----------
+    path : List[Tuple[str, Any]]
+        the simplified path to expand
+    target : Any
+        the object that ``path`` is referring to
+
+    Returns
+    -------
+    List[Tuple[Any, Any]]
+        the expanded path
+    """
+    new_path = []
+    new_path.append((target, path[0][1]))
+    # Look at all path segments after index 0, replace the next object in line.
+    for idx in range(len(path) - 1):
+        if path[idx+1][0].startswith("__") and path[idx+1][0].endswith("__"):
+            seg_object = path[idx+1][0]
+        else:
+            seg_object = get_item_from_path(path[:idx+1], item=target)
+        new_path.append((seg_object, path[idx + 1][1]))
+
+    return new_path
 
 
 def get_item_from_path(
@@ -323,15 +355,26 @@ class RegexFindReplace:
 
     def to_action(self, target: Optional[Any] = None) -> FindReplaceAction:
         """Create FindReplaceAction from a SerializableFindReplaceAction"""
+        flags = re.IGNORECASE if not self.case_sensitive else 0
         try:
-            re.compile(self.search_regex)
+            search_regex = re.compile(self.search_regex, flags=flags)
         except re.error:
             raise ValueError(f'regex is not valid: {self.search_regex}, '
                              'could not construct FindReplaceAction')
         replace_fn = get_default_replace_fn(
-            self.replace_text, re.compile(self.search_regex)
+            self.replace_text, search_regex
         )
-        return FindReplaceAction(target=target, path=self.path, replace_fn=replace_fn)
+        if target:
+            path = expand_path(self.path, target=target)
+        else:
+            path = self.path
+
+        return FindReplaceAction(
+            path=path,
+            replace_fn=replace_fn,
+            target=target,
+            origin=self,
+        )
 
 
 @dataclass
@@ -340,6 +383,8 @@ class FindReplaceAction:
     replace_fn: ReplaceFunction
     # Union[ConfigurationFile, ProcedureFile], but circular imports
     target: Optional[Any] = None
+
+    origin: Optional[RegexFindReplace] = None
 
     def apply(
         self,

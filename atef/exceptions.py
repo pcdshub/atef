@@ -61,6 +61,11 @@ class UnpreparedComparisonException(ComparisonException):
     ...
 
 
+class PreparationError(Exception):
+    """Raise this when failing to prepare a configuration or procedure"""
+    ...
+
+
 class PreparedComparisonException(Exception):
     """Exception caught during preparation of comparisons."""
     #: The exception instance itself.

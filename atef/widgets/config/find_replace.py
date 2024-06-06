@@ -9,21 +9,23 @@ import re
 from functools import partial
 from pathlib import Path
 from typing import (TYPE_CHECKING, Any, ClassVar, Iterable, List, Optional,
-                    Union)
+                    Tuple, Union)
 
 import happi
 import qtawesome as qta
 from apischema import ValidationError, serialize
 from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
+from qtpy.QtCore import Signal as QSignal
 
 from atef.cache import get_signal_cache
 from atef.config import ConfigurationFile, PreparedFile
 from atef.find_replace import (FindReplaceAction, MatchFunction,
-                               ReplaceFunction, get_deepest_dataclass_in_path,
+                               RegexFindReplace, ReplaceFunction,
+                               get_deepest_dataclass_in_path,
                                get_default_match_fn, get_default_replace_fn,
                                get_item_from_path, patch_client_cache,
-                               walk_find_match)
+                               simplify_path, walk_find_match)
 from atef.procedure import PreparedProcedureFile, ProcedureFile
 from atef.util import get_happi_client
 from atef.widgets.config.run_base import create_tree_from_file
@@ -392,6 +394,8 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
     busy_thread: Optional[BusyCursorThread]
 
+    data_updated: ClassVar[QtCore.Signal] = QSignal()
+
     filename = 'fill_template_page.ui'
 
     def __init__(
@@ -399,11 +403,14 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         *args,
         filepath: Optional[str] = None,
         window: Optional[Window] = None,
+        allowed_types: Optional[Tuple[Any]] = None,
         **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)
         self._window = window
         self.fp = filepath
+        self.orig_file = None
+        self.allowed_types = allowed_types
         self.staged_actions: List[FindReplaceAction] = []
         self._signals: List[str] = []
         self._devices: List[str] = []
@@ -470,12 +477,22 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             return
 
         def finish_setup():
+            if self.fp is None:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    'Template Checkout type error',
+                    'Loaded checkout is NOT one of the allowed types: '
+                    f'{[t.__name__ for t in self.allowed_types]}'
+                )
             self.details_list.clear()
+            self.staged_list.clear()
+            self.staged_actions.clear()
             self.setup_edits_table()
             self.setup_tree_view()
             self.setup_devices_list()
             self.update_title()
             self.vert_splitter.setSizes([200, 200, 200, 200,])
+            self.data_updated.emit()
 
         self.busy_thread = BusyCursorThread(
             func=partial(self.load_file, filepath=filename)
@@ -493,6 +510,13 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             except ValidationError:
                 logger.error('failed to open file as either active '
                              'or passive checkout')
+
+        if self.allowed_types and not isinstance(data, self.allowed_types):
+            logger.error("loaded checkout is of a disallowed type: "
+                         f"({type(data)})")
+            self.fp = None
+            self.orig_file = None
+            return
 
         self.fp = filepath
         self.orig_file = data
@@ -533,6 +557,10 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
     def setup_tree_view(self) -> None:
         """Populate tree view with preview of loaded file"""
+        if self.orig_file is None:
+            # clear tree
+            self.tree_view.setModel(None)
+            return
         root_item = create_tree_from_file(data=self.orig_file)
 
         model = ConfigTreeModel(data=root_item)
@@ -570,12 +598,21 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
 
     def verify_changes(self) -> None:
         """Apply staged changes and validate copy of file"""
-        if self.orig_file is not None:
-            temp_file = copy.deepcopy(self.orig_file)
-            for action in self.staged_actions:
-                action.apply(target=temp_file)
+        if self.orig_file is None:
+            return
+        temp_file = copy.deepcopy(self.orig_file)
 
-            verify_file_and_notify(temp_file, self)
+        edit_results = [e.apply(target=temp_file) for e in self.staged_actions]
+        if not all(edit_results):
+            fail_idx = [i for i, result in enumerate(edit_results) if not result]
+            QtWidgets.QMessageBox.warning(
+                self,
+                'Verification FAIL',
+                f'Some staged edits at {fail_idx} could not be applied:'
+            )
+            return
+
+        verify_file_and_notify(temp_file, self)
 
     def save_file(self) -> None:
         if self.orig_file is None:
@@ -741,6 +778,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
         self.staged_actions.remove(data)
         self.staged_list.takeItem(self.staged_list.row(item))
         self.update_title()
+        self.data_updated.emit()
 
     def stage_item_from_details(
         self,
@@ -803,6 +841,7 @@ class FillTemplatePage(DesignerDisplay, QtWidgets.QWidget):
             row_widget.button_box.removeButton(ok_button)
 
         self.update_title()
+        self.data_updated.emit()
 
 
 class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
@@ -911,8 +950,15 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         # generator can be unstable if dataclass changes during walk
         # this is only ok because we consume generator entirely
         for path in self.match_paths:
+            origin_action = RegexFindReplace(
+                path=simplify_path(path),
+                search_regex=self._search_regex.pattern,
+                replace_text=self.replace_edit.text(),
+                case_sensitive=self.case_button.isChecked(),
+            )
             action = FindReplaceAction(target=self.orig_file, path=path,
-                                       replace_fn=self._replace_fn)
+                                       replace_fn=self._replace_fn,
+                                       origin=origin_action)
 
             self.actions.append(action)
 

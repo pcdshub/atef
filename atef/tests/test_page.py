@@ -4,6 +4,7 @@ import pytest
 from pytestqt.qtbot import QtBot
 from qtpy import QtCore, QtWidgets
 
+from atef.config import TemplateConfiguration
 from atef.type_hints import AnyDataclass
 from atef.widgets.config.page import ComparisonPage, ConfigurationGroupPage
 
@@ -178,3 +179,26 @@ def test_change_comparison(
         full_tree.select_by_data(group_data)
         full_tree.select_by_data(new_data)
         comp_page = full_tree.current_widget
+
+
+def test_template_page(
+    qtbot: QtBot,
+    template_configuration: TemplateConfiguration,
+    make_page: Callable,
+):
+    group_page = make_page(template_configuration)
+
+    # Does the configuration initialize properly?
+    qtbot.wait_until(
+        lambda: group_page.template_page_widget.staged_list.count() == 1
+    )
+
+    # test preparation
+    group_page.full_tree.mode = 'run'
+    group_page.full_tree.switch_mode('run')
+
+    qtbot.wait_signal(group_page.full_tree.mode_switch_finished)
+    qtbot.wait_until(
+        lambda: group_page.template_page_widget.staged_list.count() == 1
+    )
+    qtbot.addWidget(group_page)
