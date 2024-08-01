@@ -20,6 +20,7 @@ from ..check import Comparison, Severity
 from ..config import (AnyConfiguration, AnyPreparedConfiguration,
                       ConfigurationFile, FailedConfiguration,
                       PreparedComparison, PreparedFile, PreparedGroup)
+from ..report import PassiveAtefReport
 from ..result import Result
 from ..util import ophyd_cleanup
 
@@ -128,6 +129,11 @@ def build_arg_parser(argparser=None):
         "-p", "--parallel",
         action="store_true",
         help="Acquire data for comparisons in parallel",
+    )
+
+    argparser.add_argument(
+        "-r", "--report-path",
+        help="Path to the report save path, if provided"
     )
 
     return argparser
@@ -400,7 +406,7 @@ async def check_and_log(
     parallel: bool = True,
     cache: Optional[DataCache] = None,
     filename: Optional[str] = None,
-):
+) -> PreparedFile:
     """
     Check a configuration and log the results.
 
@@ -420,6 +426,11 @@ async def check_and_log(
         Pre-fill cache in parallel when possible.
     cache : DataCache
         The data cache instance.
+
+    Returns
+    -------
+    PreparedFile
+        The completed checkout file, with results recorded
     """
     name_filter = list(name_filter or [])
 
@@ -452,6 +463,17 @@ async def check_and_log(
     else:
         console.print(tree)
 
+    return prepared_file
+
+
+def save_report(prep_file: PreparedFile, report_path: str):
+    # Normalize report path
+    from pathlib import Path
+    save_path = Path(report_path).resolve()
+
+    doc = PassiveAtefReport(str(save_path), config=prep_file)
+    doc.create_report()
+
 
 async def main(
     filename: str,
@@ -465,6 +487,7 @@ async def main(
     show_config_description: bool = False,
     show_tags: bool = False,
     show_passed_tests: bool = False,
+    report_path: Optional[str] = None,
 ):
 
     verbosity = VerbositySetting.from_kwargs(
@@ -481,7 +504,7 @@ async def main(
     cache = DataCache(signals=signal_cache or get_signal_cache())
     try:
         with console.status("[bold green] Performing checks..."):
-            await check_and_log(
+            prep_file = await check_and_log(
                 config_file,
                 console=console,
                 name_filter=name_filter,
@@ -490,6 +513,9 @@ async def main(
                 filename=filename,
                 verbosity=verbosity,
             )
+        if report_path is not None:
+            with console.status("[bold green] Saving report..."):
+                save_report(prep_file, report_path)
     finally:
         if cleanup:
             ophyd_cleanup()
