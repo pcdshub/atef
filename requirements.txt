@@ -7,7 +7,8 @@ bluesky-widgets
 databroker<2.0.0a0
 happi
 ipython
-numpy
+# numpy >2 incompatible with xraylib and others
+numpy<2.0.0
 ophyd
 pcdsutils>=0.14.1
 pydm
