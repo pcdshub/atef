@@ -28,12 +28,13 @@ from atef.check import (Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
 from atef.config import (PreparedComparison, PreparedConfiguration,
                          PreparedDeviceConfiguration, PreparedFile,
                          PreparedGroup, PreparedPVConfiguration,
-                         PreparedSignalComparison, PreparedToolComparison,
+                         PreparedSignalComparison,
+                         PreparedTemplateConfiguration, PreparedToolComparison,
                          PreparedToolConfiguration)
 from atef.enums import Severity
 from atef.procedure import (PreparedPassiveStep, PreparedProcedureFile,
                             PreparedProcedureGroup, PreparedProcedureStep,
-                            PreparedSetValueStep)
+                            PreparedSetValueStep, PreparedTemplateStep)
 from atef.result import Result
 from atef.type_hints import AnyDataclass
 from atef.walk import walk_config_file, walk_procedure_file
@@ -136,6 +137,54 @@ def build_passive_summary_table(story: List[Flowable], prep_file: PreparedFile):
     )
 
     story.append(table)
+
+
+def build_active_summary_table(story: List[Flowable], prep_file: PreparedProcedureFile):
+    """
+    Build active summary table for checkout
+
+    Parameters
+    ----------
+    story : List[Flowable]
+        List of story objects that compose a reportlab PDF
+    prep_file : PreparedFile
+        A prepared (and preferably run) passive checkout
+    """
+    # table with results
+    lines = walk_procedure_file(prep_file.root)
+    table_data = [['Step Name', 'Result']]
+    style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
+             ('ALIGN', (0, 0), (1, 0), 'CENTER'),
+             ('BOX', (0, 0), (-1, -1), 1, colors.black),
+             ('BOX', (0, 0), (0, -1), 1, colors.black)]
+
+    for i, (item, level) in enumerate(lines):
+        # content
+        prefix = '    ' * level
+        if isinstance(item, PreparedProcedureStep):
+            name = item.origin.name
+        elif isinstance(item, PreparedComparison):
+            name = str(item.comparison.name) + ' - ' + str(item.identifier)
+        name = name or type(item).__name__
+        table_data.append(
+            [
+                prefix + f'{name}',
+                get_result_text(item.result)
+            ]
+        )
+
+        # style
+        if isinstance(item, PreparedProcedureGroup):
+            style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.black])
+        else:
+            style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.lightgrey])
+
+    table = platypus.Table(
+        table_data, style=style
+    )
+
+    story.append(table)
+    story.append(platypus.PageBreak())
 
 
 def build_action_check_table(
@@ -815,11 +864,11 @@ class PassiveAtefReport(AtefReport):
             the configuration or comparison dataclass
         """
         # Build default page, settings (and maybe data) table
+        omit_keys = ['name', 'description', 'by_pv', 'by_attr', 'shared', 'configs']
         if isinstance(config, (PreparedGroup, PreparedDeviceConfiguration,
                       PreparedPVConfiguration, PreparedToolConfiguration)):
             self.build_header_with_default(story, config, 'config.name', style=h2)
             story.append(Paragraph(config.config.description or ''))
-            omit_keys = ['name', 'description', 'by_pv', 'by_attr', 'shared', 'configs']
             build_group_page(story, config, omit_keys)
         elif isinstance(config, (PreparedSignalComparison, PreparedToolComparison)):
             header_text = config.comparison.name or ''
@@ -827,6 +876,14 @@ class PassiveAtefReport(AtefReport):
             story.append(self.build_linked_header(header_text, style=h2))
             story.append(Paragraph(config.comparison.description or ''))
             build_comparison_page(story, config)
+        elif isinstance(config, PreparedTemplateConfiguration):
+            self.build_header_with_default(story, config, 'config.name', style=h2)
+            story.append(Paragraph(config.config.description or ''))
+            build_settings_table(story, config.config, omit_keys=omit_keys)
+            story.append(platypus.Spacer(width=0, height=.5*cm))
+
+            story.append(Paragraph('Templated Checkout Summary'))
+            build_passive_summary_table(story, config.file)
         else:
             config_type = str(type(config).__name__)
             header = self.build_linked_header(config_type, h1)
@@ -868,52 +925,10 @@ class ActiveAtefReport(AtefReport):
         self.multiBuild(story)
 
     def build_summary(self, story: List[Flowable]):
-        """
-        Build summary table for checkout
-
-        Parameters
-        ----------
-        story : List[Flowable]
-            a list of components used to render the report.  New items
-            are appended to this directly
-        """
         story.append(self.build_linked_header('Checkout Summary', h1))
         story.append(platypus.Spacer(width=0, height=.5*cm))
-        # table with results
-        lines = walk_procedure_file(self.config.root)
-        table_data = [['Step Name', 'Result']]
-        style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                 ('ALIGN', (0, 0), (1, 0), 'CENTER'),
-                 ('BOX', (0, 0), (-1, -1), 1, colors.black),
-                 ('BOX', (0, 0), (0, -1), 1, colors.black)]
 
-        for i, (item, level) in enumerate(lines):
-            # content
-            prefix = '    ' * level
-            if isinstance(item, PreparedProcedureStep):
-                name = item.origin.name
-            elif isinstance(item, PreparedComparison):
-                name = str(item.comparison.name) + ' - ' + str(item.identifier)
-            name = name or type(item).__name__
-            table_data.append(
-                [
-                    prefix + f'{name}',
-                    get_result_text(item.result)
-                ]
-            )
-
-            # style
-            if isinstance(item, PreparedProcedureGroup):
-                style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.black])
-            else:
-                style.append(['LINEABOVE', (0, i+1), (-1, i+1), 1, colors.lightgrey])
-
-        table = platypus.Table(
-            table_data, style=style
-        )
-
-        story.append(table)
-        story.append(platypus.PageBreak())
+        build_active_summary_table(story, self.config)
 
     def build_step_page(
         self,
@@ -940,6 +955,17 @@ class ActiveAtefReport(AtefReport):
             story.append(Paragraph('Passive Checkout Results', l0))
             build_passive_summary_table(story, step.prepared_passive_file)
             build_results_table(story, step, attr_names=result_attrs)
+        elif isinstance(step, PreparedTemplateStep):
+            self.build_header_with_default(story, step, 'origin.name', style=h2)
+            story.append(Paragraph(step.origin.description or ''))
+            build_settings_table(story, step.origin, omit_keys=omit_keys)
+            story.append(platypus.Spacer(width=0, height=.5*cm))
+
+            story.append(Paragraph('Templated Checkout Summary'))
+            if isinstance(step.file, PreparedFile):
+                build_passive_summary_table(story, step.file)
+            elif isinstance(step.file, PreparedProcedureFile):
+                build_active_summary_table(story, step.file)
         elif isinstance(step, PreparedProcedureStep):
             self.build_header_with_default(story, step, 'origin.name', style=h2)
             story.append(Paragraph(step.origin.description or ''))
