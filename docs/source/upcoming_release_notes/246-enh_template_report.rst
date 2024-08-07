@@ -15,7 +15,7 @@ Bugfixes
 
 Maintenance
 -----------
-- Pins numpy>2.0 to avoid issues with upstream incompatibilities
+- Pins numpy<2.0 to avoid issues with upstream incompatibilities
 
 Contributors
 ------------
