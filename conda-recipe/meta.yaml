@@ -25,7 +25,7 @@ requirements:
   - python >=3.7
   - apischema
   - archapp >=1.1.0
-  - bluesky
+  - bluesky-base
   - bluesky-queueserver >=0.0.19
   - bluesky-widgets
   # databroker >2 incompatible with pydantic v2
