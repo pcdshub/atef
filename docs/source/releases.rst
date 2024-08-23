@@ -21,7 +21,7 @@ Maintenance
 -----------
 - Pins numpy<2.0 to avoid issues with upstream incompatibilities
 - Refactors find-replace logic and dataclasses into a separate module from the widgets that display them
-- Specify bluesky-base in conde dependnecies to avoid matplotlib
+- Specify bluesky-base and pin matplotlib in conda dependnecies to avoid unintended qt6 dependencies
 
 Contributors
 ------------
