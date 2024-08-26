@@ -1,0 +1,38 @@
+atef.check.Greater
+==================
+
+.. currentmodule:: atef.check
+
+.. autoclass:: Greater
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: compare
+    .. automethod:: describe
+    .. automethod:: get_data_for_signal
+    .. automethod:: get_data_for_signal_async
+    .. automethod:: prepare
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: description
+    .. autoattribute:: if_disconnected
+    .. autoattribute:: invert
+    .. autoattribute:: name
+    .. autoattribute:: reduce_method
+    .. autoattribute:: reduce_period
+    .. autoattribute:: severity_on_failure
+    .. autoattribute:: string
+    .. autoattribute:: value
+    .. autoattribute:: value_dynamic
+    
+    

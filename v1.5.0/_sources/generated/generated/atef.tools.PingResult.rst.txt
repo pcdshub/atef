@@ -1,0 +1,33 @@
+atef.tools.PingResult
+=====================
+
+.. currentmodule:: atef.tools
+
+.. autoclass:: PingResult
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: add_host_result
+    .. automethod:: from_output
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: max_time
+    .. autoattribute:: min_time
+    .. autoattribute:: num_alive
+    .. autoattribute:: num_unresponsive
+    .. autoattribute:: alive
+    .. autoattribute:: unresponsive
+    .. autoattribute:: times
+    .. autoattribute:: result
+    
+    
