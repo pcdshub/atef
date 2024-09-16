@@ -1,0 +1,31 @@
+atef.procedure.ConfigurationCheckStep
+=====================================
+
+.. currentmodule:: atef.procedure
+
+.. autoclass:: ConfigurationCheckStep
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: allow_verify
+    .. automethod:: children
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: description
+    .. autoattribute:: name
+    .. autoattribute:: parent
+    .. autoattribute:: step_success_required
+    .. autoattribute:: verify_required
+    .. autoattribute:: devices
+    
+    

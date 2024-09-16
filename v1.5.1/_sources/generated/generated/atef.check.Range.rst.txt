@@ -1,0 +1,46 @@
+atef.check.Range
+================
+
+.. currentmodule:: atef.check
+
+.. autoclass:: Range
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: compare
+    .. automethod:: describe
+    .. automethod:: get_data_for_signal
+    .. automethod:: get_data_for_signal_async
+    .. automethod:: prepare
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: description
+    .. autoattribute:: high
+    .. autoattribute:: high_dynamic
+    .. autoattribute:: if_disconnected
+    .. autoattribute:: inclusive
+    .. autoattribute:: invert
+    .. autoattribute:: low
+    .. autoattribute:: low_dynamic
+    .. autoattribute:: name
+    .. autoattribute:: ranges
+    .. autoattribute:: reduce_method
+    .. autoattribute:: reduce_period
+    .. autoattribute:: severity_on_failure
+    .. autoattribute:: string
+    .. autoattribute:: warn_high
+    .. autoattribute:: warn_high_dynamic
+    .. autoattribute:: warn_low
+    .. autoattribute:: warn_low_dynamic
+    
+    

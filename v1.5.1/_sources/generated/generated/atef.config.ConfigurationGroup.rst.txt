@@ -1,0 +1,33 @@
+atef.config.ConfigurationGroup
+==============================
+
+.. currentmodule:: atef.config
+
+.. autoclass:: ConfigurationGroup
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: children
+    .. automethod:: move_comparison
+    .. automethod:: replace_comparison
+    .. automethod:: walk_configs
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: description
+    .. autoattribute:: mode
+    .. autoattribute:: name
+    .. autoattribute:: tags
+    .. autoattribute:: configs
+    .. autoattribute:: values
+    
+    
