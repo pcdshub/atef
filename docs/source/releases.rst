@@ -2,6 +2,20 @@ Release History
 ###############
 
 
+v1.5.1 (2024-09-16)
+===================
+
+Bugfixes
+--------
+- Store the setpoint pv when creating a Target if possible, instead of storing pvname (which could be the readback pv).
+  Refactor OphydAttributeData slightly to this end.
+
+Contributors
+------------
+- tangkong
+
+
+
 v1.5.0 (2024-08-20)
 ===================
 
