@@ -68,10 +68,11 @@ class OphydAttributeData:
     attr: str
     description: Dict[str, Any]
     docstring: Optional[str]
-    pvname: str
+    pvname: str  # the readback, if setpoint_pvname is provided.
+    setpoint_pvname: Optional[str]
     read_only: bool
-    readback: Any
-    setpoint: Any
+    readback: Any  # readback value
+    setpoint: Any  # setpoint value
     units: Optional[str]
     signal: ophyd.Signal
 
@@ -88,6 +89,7 @@ class OphydAttributeData:
             description={},
             docstring=cpt.doc,
             pvname=getattr(inst, "pvname", "(Python)"),
+            setpoint_pvname=getattr(inst, "setpoint_pvname", None),
             read_only=read_only,
             readback=None,
             setpoint=None,
@@ -506,7 +508,7 @@ class PolledDeviceModel(QtCore.QAbstractTableModel):
             if column == DeviceColumn.read_pvname:
                 return info.pvname
             if column == DeviceColumn.set_pvname:
-                return getattr(info.signal, 'setpoint_pvname', 'None')
+                return info.setpoint_pvname
             return ""
 
         if role == Qt.ToolTipRole:

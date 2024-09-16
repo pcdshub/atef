@@ -874,7 +874,7 @@ class TargetEntryWidget(DesignerDisplay, QtWidgets.QWidget):
         dot_attr = attr.attr
         _attr = '_' + dot_attr.replace('.', '_')
         dev_name = full_name[:-len(_attr)]
-        write_pv = getattr(attr.signal, 'setpoint_pvname', attr.pvname)
+        write_pv = attr.setpoint_pvname or attr.pvname
 
         return Target(device=dev_name, attr=dot_attr, pv=write_pv)
 
