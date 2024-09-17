@@ -5,6 +5,7 @@ import pytest
 
 import atef.bin.main as atef_main
 from atef.bin import check as bin_check
+from atef.bin.subparsers import SUBCOMMANDS
 
 from .. import util
 from .conftest import CONFIG_PATH
@@ -16,7 +17,7 @@ def test_help_main(monkeypatch):
     atef_main.main()
 
 
-@pytest.mark.parametrize('subcommand', list(atef_main.COMMANDS))
+@pytest.mark.parametrize('subcommand', list(SUBCOMMANDS))
 def test_help_module(monkeypatch, subcommand):
     monkeypatch.setattr(sys, 'argv', [subcommand, '--help'])
     with pytest.raises(SystemExit):
