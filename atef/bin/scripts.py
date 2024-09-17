@@ -24,6 +24,8 @@ def gather_scripts() -> Dict[str, Tuple[Callable, Callable]]:
     scripts_module = importlib.import_module("atef.scripts")
     for sub_module in iter_modules(scripts_module.__path__):
         module_name = sub_module.name
+        if "_main" in module_name:
+            continue
         try:
             module = importlib.import_module(f".{module_name}", "atef.scripts")
         except Exception as ex:
