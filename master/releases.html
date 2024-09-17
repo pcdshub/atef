@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
@@ -6,20 +8,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Release History &mdash; atef  documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=fd3f3429" />
 
   
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="_static/jquery.js?v=5d32c60e"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=5929fcd5"></script>
-        <script src="_static/doctools.js?v=9a2dae69"></script>
-        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-        <script src="_static/docs-versions-menu.js?v=3d6a1aea"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/docs-versions-menu.js?v=3d6a1aea"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -226,7 +224,7 @@ featuring a clear staging area and tree-view for added clarity</p></li>
 <li><p><code class="xref py py-class docutils literal notranslate"><span class="pre">RangeWidget</span></code>’s visualizations update a bit more frequently, and also the label text actually updates. Closes #212</p></li>
 <li><p>Adds a menu option to open the welcome tab, since people like it.  Closes #201</p></li>
 <li><p>Properly shows an error message box when a file can’t be opened.  Closes #202</p></li>
-<li><p>Allow tolerances to be <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><code class="xref any docutils literal notranslate"><span class="pre">None</span></code></a> in <a class="reference internal" href="generated/generated/atef.check.Equals.html#atef.check.Equals" title="atef.check.Equals"><code class="xref any py py-class docutils literal notranslate"><span class="pre">Equals</span></code></a> comparison.  Modifies the line-edit setup to allow null values (<code class="xref any docutils literal notranslate"><span class="pre">''</span></code>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><code class="xref any docutils literal notranslate"><span class="pre">None</span></code></a>) when casting the line edit value.  Closes #128</p></li>
+<li><p>Allow tolerances to be <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref any docutils literal notranslate"><span class="pre">None</span></code></a> in <a class="reference internal" href="generated/generated/atef.check.Equals.html#atef.check.Equals" title="atef.check.Equals"><code class="xref any py py-class docutils literal notranslate"><span class="pre">Equals</span></code></a> comparison.  Modifies the line-edit setup to allow null values (<code class="xref any docutils literal notranslate"><span class="pre">''</span></code>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref any docutils literal notranslate"><span class="pre">None</span></code></a>) when casting the line edit value.  Closes #128</p></li>
 </ul>
 </section>
 <section id="id9">
@@ -234,7 +232,7 @@ featuring a clear staging area and tree-view for added clarity</p></li>
 <ul class="simple">
 <li><p>Make comparisons against enum signals more robust by trying both the int and string versions if the check fails.</p></li>
 <li><p>Refactors tree-walking helpers to a separate submodle (<a class="reference internal" href="generated/atef.walk.html#module-atef.walk" title="atef.walk"><code class="xref any py py-mod docutils literal notranslate"><span class="pre">atef.walk</span></code></a>)</p></li>
-<li><p>Replaces use of <a class="reference external" href="https://docs.python.org/3/library/functools.html#functools.partial" title="(in Python v3.12)"><code class="xref any docutils literal notranslate"><span class="pre">functools.partial</span></code></a> with <code class="xref any docutils literal notranslate"><span class="pre">WeakPartialMethodSlot</span></code> in qt slots, cleaning up intermittent test suite failures (and hopefully production crashes)</p></li>
+<li><p>Replaces use of <a class="reference external" href="https://docs.python.org/3/library/functools.html#functools.partial" title="(in Python v3.13)"><code class="xref any docutils literal notranslate"><span class="pre">functools.partial</span></code></a> with <code class="xref any docutils literal notranslate"><span class="pre">WeakPartialMethodSlot</span></code> in qt slots, cleaning up intermittent test suite failures (and hopefully production crashes)</p></li>
 <li><p>Refactors GUI backend to support lazy page loading</p></li>
 <li><p>Move tree-building logic to dataclasses</p></li>
 <li><p>Consolidate GUI backend classes (<code class="xref any docutils literal notranslate"><span class="pre">EditTree</span></code> / <code class="xref any docutils literal notranslate"><span class="pre">RunTree</span></code> -&gt; <code class="xref any docutils literal notranslate"><span class="pre">DualTree</span></code>, <code class="xref any docutils literal notranslate"><span class="pre">AtefItem</span></code> / <code class="xref any docutils literal notranslate"><span class="pre">TreeItem</span></code> -&gt; <code class="xref any docutils literal notranslate"><span class="pre">TreeItem</span></code>)</p></li>
