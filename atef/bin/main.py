@@ -20,6 +20,13 @@ def main():
     """
     Create the top-level parser for atef.  Gathers subparsers from
     atef.bin.subparsers, which have been separated to avoid pre-mature imports
+
+    Expects SUBCOMMANDS to be a dictionary mapping subcommand name to a tuple of:
+    - sub-parser builder function: Callable[[], argparse.ArgumentParser]
+    - function returning the main function for the sub command:
+      Callable[[], Callable[**subcommand_kwargs]]
+
+    Have fun "parsing" this ;D
     """
     top_parser = argparse.ArgumentParser(
         prog='atef',
