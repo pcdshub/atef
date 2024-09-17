@@ -4,7 +4,7 @@ import happi
 import pytest
 
 import atef.bin.main as atef_main
-from atef.bin import check as bin_check
+from atef.bin import check_main as bin_check
 
 from .. import util
 from .conftest import CONFIG_PATH
