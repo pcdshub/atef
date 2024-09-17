@@ -3,7 +3,6 @@
 """
 from __future__ import annotations
 
-import argparse
 import asyncio
 import enum
 import itertools
@@ -77,66 +76,6 @@ class VerbositySetting(enum.Flag):
             if setting_value is not None:
                 verbosity = set_or_clear(verbosity, setting.name, setting_value)
         return verbosity
-
-
-def build_arg_parser(argparser=None):
-    if argparser is None:
-        argparser = argparse.ArgumentParser()
-
-    argparser.description = DESCRIPTION
-    argparser.formatter_class = argparse.RawTextHelpFormatter
-
-    argparser.add_argument(
-        "filename",
-        type=str,
-        help="Configuration filename",
-    )
-
-    for setting in VerbositySetting:
-        flag_name = setting.name.replace("_", "-")
-        if setting == VerbositySetting.default:
-            continue
-
-        help_text = setting.name.replace("_", " ").capitalize()
-
-        argparser.add_argument(
-            f"--{flag_name}",
-            dest=setting.name,
-            help=help_text,
-            action="store_true",
-            default=setting in VerbositySetting.default,
-        )
-
-        if flag_name.startswith("show-"):
-            hide_flag_name = flag_name.replace("show-", "hide-")
-            help_text = help_text.replace("Show ", "Hide ")
-            argparser.add_argument(
-                f"--{hide_flag_name}",
-                dest=setting.name,
-                help=help_text,
-                action="store_false",
-            )
-
-    # argparser.add_argument(
-    #     "--filter",
-    #     type=str,
-    #     nargs="*",
-    #     dest="name_filter",
-    #     help="Limit checkout to the named device(s) or identifiers",
-    # )
-
-    argparser.add_argument(
-        "-p", "--parallel",
-        action="store_true",
-        help="Acquire data for comparisons in parallel",
-    )
-
-    argparser.add_argument(
-        "-r", "--report-path",
-        help="Path to the report save path, if provided"
-    )
-
-    return argparser
 
 
 default_severity_to_rich = {

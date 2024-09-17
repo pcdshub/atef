@@ -7,61 +7,26 @@ Try:
 
 import argparse
 import asyncio
-import importlib
 import logging
 from inspect import iscoroutinefunction
 
 import atef
+from atef.bin.subparsers import SUBCOMMANDS
 
 DESCRIPTION = __doc__
 
 
-COMMAND_TO_MODULE = {
-    "check": "check",
-    "config": "config",
-    "scripts": "scripts",
-}
-
-
-def _try_import(module_name):
-    return importlib.import_module(f".{module_name}", 'atef.bin')
-
-
-def _build_commands():
-    global DESCRIPTION
-    result = {}
-    unavailable = []
-
-    for command, module_name in sorted(COMMAND_TO_MODULE.items()):
-        try:
-            module = _try_import(module_name)
-        except Exception as ex:
-            unavailable.append((command, ex))
-        else:
-            result[module_name] = (module.build_arg_parser, module.main)
-            DESCRIPTION += f'\n    $ atef {command} --help'
-
-    if unavailable:
-        DESCRIPTION += '\n\n'
-
-        for command, ex in unavailable:
-            DESCRIPTION += (
-                f'\nWARNING: "atef {command}" is unavailable due to:'
-                f'\n\t{ex.__class__.__name__}: {ex}'
-            )
-
-    return result
-
-
-COMMANDS = _build_commands()
-
-
 def main():
+    """
+    Create the top-level parser for atef.  Gathers subparsers from
+    atef.bin.subparsers, which have been separated to avoid pre-mature imports
+    """
     top_parser = argparse.ArgumentParser(
         prog='atef',
-        description=DESCRIPTION,
         formatter_class=argparse.RawTextHelpFormatter
     )
+
+    desc = DESCRIPTION
 
     top_parser.add_argument(
         '--version', '-V',
@@ -78,10 +43,13 @@ def main():
     )
 
     subparsers = top_parser.add_subparsers(help='Possible subcommands')
-    for command_name, (build_func, main) in COMMANDS.items():
+    for command_name, (build_func, main) in SUBCOMMANDS.items():
+        desc += f'\n    $ atef {command_name} --help'
         sub = subparsers.add_parser(command_name)
         build_func(sub)
         sub.set_defaults(func=main)
+
+    top_parser.description = desc
 
     args = top_parser.parse_args()
     kwargs = vars(args)
@@ -93,11 +61,12 @@ def main():
 
     if hasattr(args, 'func'):
         func = kwargs.pop('func')
-        logger.debug('%s(**%r)', func.__name__, kwargs)
-        if iscoroutinefunction(func):
-            asyncio.run(func(**kwargs))
+        logger.debug('main(**%r)', kwargs)
+        main_fn = func()
+        if iscoroutinefunction(main_fn):
+            asyncio.run(main_fn(**kwargs))
         else:
-            func(**kwargs)
+            main_fn(**kwargs)
     else:
         top_parser.print_help()
 

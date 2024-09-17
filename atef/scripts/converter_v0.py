@@ -5,7 +5,6 @@ supported (and numbered) version.
 
 from __future__ import annotations
 
-import argparse
 import json
 import logging
 import pathlib
@@ -19,6 +18,7 @@ import atef
 import atef.config
 from atef import serialization, tools
 from atef.check import Comparison
+from atef.scripts.scripts_subparsers import build_converter_arg_parser
 from atef.type_hints import AnyPath
 
 logger = logging.getLogger(__name__)
@@ -270,39 +270,6 @@ def convert(fn: AnyPath) -> str:
     return json.dumps(load(fn).to_json(), indent=2)
 
 
-def build_arg_parser(argparser=None) -> argparse.ArgumentParser:
-    """Create the argparser."""
-    if argparser is None:
-        argparser = argparse.ArgumentParser()
-
-    argparser.description = DESCRIPTION
-    argparser.formatter_class = argparse.RawTextHelpFormatter
-
-    argparser.add_argument(
-        "--log",
-        "-l",
-        dest="log_level",
-        default="INFO",
-        type=str,
-        help="Python logging level (e.g. DEBUG, INFO, WARNING)",
-    )
-
-    argparser.add_argument(
-        "filename",
-        type=str,
-        nargs="+",
-        help="File(s) to convert",
-    )
-
-    argparser.add_argument(
-        "--write",
-        action="store_true",
-        help="Convert and overwrite the files in-place",
-    )
-
-    return argparser
-
-
 def main(
     filename: str,
     write: bool
@@ -322,7 +289,7 @@ def main(
 
 def main_script(args=None) -> None:
     """Run the conversion tool."""
-    parser = build_arg_parser()
+    parser = build_converter_arg_parser()
 
     # Add log_level if running file alone
     parser.add_argument(

@@ -6,7 +6,6 @@ checks.
 An example invocation might be:
 python scripts/pmgr_check.py cxi test_pmgr_checkout.json --names "KB1 DS SLIT LEF" --prefix CXI:KB1:MMS:13
 """
-import argparse
 import json
 import logging
 from typing import Any, Dict, List
@@ -16,6 +15,7 @@ from pmgr import pmgrAPI
 
 from atef.check import Equals
 from atef.config import ConfigurationFile, ConfigurationGroup, PVConfiguration
+from atef.scripts.scripts_subparsers import build_pmgr_arg_parser
 
 DESCRIPTION = __doc__
 logger = logging.getLogger()
@@ -126,57 +126,6 @@ def create_atef_check(
     return pv_config
 
 
-def build_arg_parser(argparser=None) -> argparse.ArgumentParser:
-    """Create the argparser."""
-    if argparser is None:
-        argparser = argparse.ArgumentParser()
-
-    argparser.description = DESCRIPTION
-    argparser.formatter_class = argparse.RawTextHelpFormatter
-
-    argparser.add_argument(
-        "--names",
-        "-n",
-        dest="pmgr_names",
-        type=str,
-        nargs="+",
-        help="a list of stored pmgr configuration names, case and whitespace sensitive. "
-             "e.g. 'KB1 DS SLIT LEF'.  Length must match --prefixes",
-    )
-
-    argparser.add_argument(
-        "--prefixes",
-        "-p",
-        dest="prefixes",
-        type=str,
-        nargs="+",
-        help="a list of EPICS PV prefixes, e.g. 'CXI:KB1:MMS:13'.  Length must match --names",
-    )
-
-    argparser.add_argument(
-        "--table",
-        "-t",
-        dest="table_name",
-        default="ims_motor",
-        type=str,
-        help="Table type, by default 'ims_motor'",
-    )
-
-    argparser.add_argument(
-        dest="hutch",
-        type=str,
-        help="name of hutch, e.g. 'cxi'",
-    )
-
-    argparser.add_argument(
-        "filename",
-        type=str,
-        help="Output filepath",
-    )
-
-    return argparser
-
-
 def main(
     hutch: str,
     filename: str,
@@ -203,7 +152,7 @@ def main(
 
 def main_script(args=None) -> None:
     """Get pmgr data and contruct checkout."""
-    parser = build_arg_parser()
+    parser = build_pmgr_arg_parser()
     # Add log_level if running file alone
     parser.add_argument(
         "--log",
