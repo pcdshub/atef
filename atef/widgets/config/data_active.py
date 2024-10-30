@@ -597,6 +597,7 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
             self.checks_table.add_row(data=check)
 
         self.checks_table.cellClicked.connect(self.update_all_desc)
+        self.checks_table.table_updated.connect(self.nav_to_self)
 
         # checkboxes
         self.bridge.halt_on_fail.changed_value.connect(
@@ -651,6 +652,14 @@ class SetValueEditWidget(DesignerDisplay, DataWidget):
         for ind in range(self.checks_table.rowCount()):
             row_widget: CheckRowWidget = self.checks_table.cellWidget(ind, 0)
             row_widget.update_summary()
+
+    def nav_to_self(self):
+        # A bit of a hack to prevent navigating to details prematurely
+        # normally an isinstance check would be good, but circular imports
+        try:
+            self.parent().parent().full_tree.select_by_data(self.data)
+        except AttributeError:
+            return
 
 
 class TargetRowWidget(DesignerDisplay, SimpleRowWidget):
