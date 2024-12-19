@@ -2,6 +2,21 @@ Release History
 ###############
 
 
+v1.5.2 (2024-12-19)
+===================
+
+Maintenance
+-----------
+- Increase the limit on spinboxes generated from MultiInputFormDialog, in response to a request that set-value-step timeouts not be limited to 99
+- Navigate BACK to the parent page when creating a new check in SetValueStep, preventing extra navigation clicks
+- Improves the performance of the CLI entrypoint, deferring functional imports as long as possible
+
+Contributors
+------------
+- tangkong
+
+
+
 v1.5.1 (2024-09-16)
 ===================
 
