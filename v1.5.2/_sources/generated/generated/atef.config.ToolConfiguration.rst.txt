@@ -1,0 +1,32 @@
+atef.config.ToolConfiguration
+=============================
+
+.. currentmodule:: atef.config
+
+.. autoclass:: ToolConfiguration
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: children
+    .. automethod:: move_comparison
+    .. automethod:: replace_comparison
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: description
+    .. autoattribute:: name
+    .. autoattribute:: tags
+    .. autoattribute:: tool
+    .. autoattribute:: by_attr
+    .. autoattribute:: shared
+    
+    

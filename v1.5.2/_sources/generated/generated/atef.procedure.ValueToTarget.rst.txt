@@ -1,0 +1,31 @@
+atef.procedure.ValueToTarget
+============================
+
+.. currentmodule:: atef.procedure
+
+.. autoclass:: ValueToTarget
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: to_signal
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: attr
+    .. autoattribute:: device
+    .. autoattribute:: name
+    .. autoattribute:: pv
+    .. autoattribute:: settle_time
+    .. autoattribute:: timeout
+    .. autoattribute:: value
+    
+    

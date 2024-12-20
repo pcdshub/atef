@@ -1,0 +1,28 @@
+atef.procedure.Target
+=====================
+
+.. currentmodule:: atef.procedure
+
+.. autoclass:: Target
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: to_signal
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: attr
+    .. autoattribute:: device
+    .. autoattribute:: name
+    .. autoattribute:: pv
+    
+    

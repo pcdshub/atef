@@ -1,0 +1,30 @@
+atef.check.Value
+================
+
+.. currentmodule:: atef.check
+
+.. autoclass:: Value
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: compare
+    .. automethod:: get
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: atol
+    .. autoattribute:: description
+    .. autoattribute:: rtol
+    .. autoattribute:: severity
+    .. autoattribute:: value
+    
+    

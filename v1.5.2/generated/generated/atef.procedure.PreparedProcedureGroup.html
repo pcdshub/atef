@@ -1,0 +1,292 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>atef.procedure.PreparedProcedureGroup &mdash; atef  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9a2dae69"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="atef.procedure.PreparedProcedureStep" href="atef.procedure.PreparedProcedureStep.html" />
+    <link rel="prev" title="atef.procedure.PreparedProcedureFile" href="atef.procedure.PreparedProcedureFile.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            atef
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../api.html">ATEF API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../../api.html#dataclasses">Dataclasses</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../atef.check.html">atef.check</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../atef.config.html">atef.config</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../atef.procedure.html">atef.procedure</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.create_prepared_comparison.html">atef.procedure.create_prepared_comparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.get_RE_data.html">atef.procedure.get_RE_data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.get_bs_state.html">atef.procedure.get_bs_state</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.CodeStep.html">atef.procedure.CodeStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.ComparisonToPlanData.html">atef.procedure.ComparisonToPlanData</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.ComparisonToTarget.html">atef.procedure.ComparisonToTarget</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.ConfigurationCheckStep.html">atef.procedure.ConfigurationCheckStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.DescriptionStep.html">atef.procedure.DescriptionStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.DeviceConfiguration.html">atef.procedure.DeviceConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.DisplayOptions.html">atef.procedure.DisplayOptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.FailedStep.html">atef.procedure.FailedStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PassiveStep.html">atef.procedure.PassiveStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PlanData.html">atef.procedure.PlanData</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PlanOptions.html">atef.procedure.PlanOptions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PlanStep.html">atef.procedure.PlanStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedDescriptionStep.html">atef.procedure.PreparedDescriptionStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedPassiveStep.html">atef.procedure.PreparedPassiveStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedPlan.html">atef.procedure.PreparedPlan</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedPlanComparison.html">atef.procedure.PreparedPlanComparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedPlanStep.html">atef.procedure.PreparedPlanStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedProcedureFile.html">atef.procedure.PreparedProcedureFile</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">atef.procedure.PreparedProcedureGroup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedProcedureStep.html">atef.procedure.PreparedProcedureStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedSetValueStep.html">atef.procedure.PreparedSetValueStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedTemplateStep.html">atef.procedure.PreparedTemplateStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PreparedValueToSignal.html">atef.procedure.PreparedValueToSignal</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.ProcedureFile.html">atef.procedure.ProcedureFile</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.ProcedureGroup.html">atef.procedure.ProcedureGroup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.ProcedureStep.html">atef.procedure.ProcedureStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.PydmDisplayStep.html">atef.procedure.PydmDisplayStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.SetValueStep.html">atef.procedure.SetValueStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.Target.html">atef.procedure.Target</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.TemplateStep.html">atef.procedure.TemplateStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.TyphosDisplayStep.html">atef.procedure.TyphosDisplayStep</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.procedure.ValueToTarget.html">atef.procedure.ValueToTarget</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../atef.tools.html">atef.tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../atef.walk.html">atef.walk</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../releases.html">Release History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../upcoming_changes.html">Upcoming Changes</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/pcdshub/atef">Github Repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">atef</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../api.html">ATEF API</a></li>
+          <li class="breadcrumb-item"><a href="../atef.procedure.html">atef.procedure</a></li>
+      <li class="breadcrumb-item active">atef.procedure.PreparedProcedureGroup</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/generated/generated/atef.procedure.PreparedProcedureGroup.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="atef-procedure-preparedproceduregroup">
+<h1>atef.procedure.PreparedProcedureGroup<a class="headerlink" href="#atef-procedure-preparedproceduregroup" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">atef.procedure.</span></span><span class="sig-name descname"><span class="pre">PreparedProcedureGroup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">'Optional[str]'</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin:</span> <span class="pre">'ProcedureStep'</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent:</span> <span class="pre">'Optional[Union[PreparedProcedureFile</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">PreparedProcedureGroup]]'</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">combined_result:</span> <span class="pre">'Result'</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verify_result:</span> <span class="pre">'Result'</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step_result:</span> <span class="pre">'Result'</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">steps:</span> <span class="pre">'List[AnyPreparedProcedure]'</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prepare_failures:</span> <span class="pre">'List[FailedStep]'</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/atef/procedure.html#PreparedProcedureGroup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>name</strong></dt><dd></dd>
+<dt><strong>parent</strong></dt><dd></dd>
+<dt><a class="reference internal" href="#atef.procedure.PreparedProcedureGroup.result" title="atef.procedure.PreparedProcedureGroup.result"><code class="xref py py-obj docutils literal notranslate"><span class="pre">result</span></code></a></dt><dd><p>Re-compute the combined result and return it</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#atef.procedure.PreparedProcedureGroup.from_origin" title="atef.procedure.PreparedProcedureGroup.from_origin"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_origin</span></code></a>(group[, parent])</p></td>
+<td><p>Prepare a ProcedureGroup for running.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#atef.procedure.PreparedProcedureGroup.run" title="atef.procedure.PreparedProcedureGroup.run"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run</span></code></a>()</p></td>
+<td><p>Run all steps and return a combined result</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><strong>walk_steps</strong></p></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Methods</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin:</span> <span class="pre">~atef.procedure.ProcedureStep</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent:</span> <span class="pre">~atef.procedure.PreparedProcedureFile</span> <span class="pre">|</span> <span class="pre">~atef.procedure.PreparedProcedureGroup</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">combined_result:</span> <span class="pre">~atef.result.Result</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verify_result:</span> <span class="pre">~atef.result.Result</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step_result:</span> <span class="pre">~atef.result.Result</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">steps:</span> <span class="pre">~typing.List[~atef.procedure.PreparedProcedureGroup</span> <span class="pre">|</span> <span class="pre">~atef.procedure.PreparedDescriptionStep</span> <span class="pre">|</span> <span class="pre">~atef.procedure.PreparedPassiveStep</span> <span class="pre">|</span> <span class="pre">~atef.procedure.PreparedSetValueStep</span> <span class="pre">|</span> <span class="pre">~atef.procedure.PreparedPlanStep</span> <span class="pre">|</span> <span class="pre">~atef.procedure.PreparedTemplateStep]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prepare_failures:</span> <span class="pre">~typing.List[~atef.procedure.FailedStep]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.from_origin">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_origin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="atef.procedure.ProcedureGroup.html#atef.procedure.ProcedureGroup" title="atef.procedure.ProcedureGroup"><span class="pre">ProcedureGroup</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#atef.procedure.PreparedProcedureGroup" title="atef.procedure.PreparedProcedureGroup"><span class="pre">PreparedProcedureGroup</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PreparedProcedureFile.html#atef.procedure.PreparedProcedureFile" title="atef.procedure.PreparedProcedureFile"><span class="pre">PreparedProcedureFile</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#atef.procedure.PreparedProcedureGroup" title="atef.procedure.PreparedProcedureGroup"><span class="pre">PreparedProcedureGroup</span></a></span></span><a class="reference internal" href="../../_modules/atef/procedure.html#PreparedProcedureGroup.from_origin"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.from_origin" title="Link to this definition"></a></dt>
+<dd><p>Prepare a ProcedureGroup for running.  Prepares all of the group’s children</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>group</strong><span class="classifier">ProcedureGroup</span></dt><dd><p>the group to prepare</p>
+</dd>
+<dt><strong>parent</strong><span class="classifier">Optional[PreparedProcedureGroup  |  PreparedProcedureFile]</span></dt><dd><p>the hierarchical parent of this step, by default None</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>PreparedProcedureGroup</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.run">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Result</span></span></span><a class="reference internal" href="../../_modules/atef/procedure.html#PreparedProcedureGroup.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.run" title="Link to this definition"></a></dt>
+<dd><p>Run all steps and return a combined result</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.walk_steps">
+<span class="sig-name descname"><span class="pre">walk_steps</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Generator</span><span class="p"><span class="pre">[</span></span><span class="pre">AnyPreparedProcedure</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/atef/procedure.html#PreparedProcedureGroup.walk_steps"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.walk_steps" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Attributes</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.name" title="Link to this definition"></a></dt>
+<dd><p>name of this comparison</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.parent">
+<span class="sig-name descname"><span class="pre">parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PreparedProcedureFile.html#atef.procedure.PreparedProcedureFile" title="atef.procedure.PreparedProcedureFile"><span class="pre">PreparedProcedureFile</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#atef.procedure.PreparedProcedureGroup" title="atef.procedure.PreparedProcedureGroup"><span class="pre">PreparedProcedureGroup</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.parent" title="Link to this definition"></a></dt>
+<dd><p>hierarchical parent of this step</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.result">
+<span class="sig-name descname"><span class="pre">result</span></span><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.result" title="Link to this definition"></a></dt>
+<dd><p>Re-compute the combined result and return it</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.steps">
+<span class="sig-name descname"><span class="pre">steps</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#atef.procedure.PreparedProcedureGroup" title="atef.procedure.PreparedProcedureGroup"><span class="pre">PreparedProcedureGroup</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PreparedDescriptionStep.html#atef.procedure.PreparedDescriptionStep" title="atef.procedure.PreparedDescriptionStep"><span class="pre">PreparedDescriptionStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PreparedPassiveStep.html#atef.procedure.PreparedPassiveStep" title="atef.procedure.PreparedPassiveStep"><span class="pre">PreparedPassiveStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PreparedSetValueStep.html#atef.procedure.PreparedSetValueStep" title="atef.procedure.PreparedSetValueStep"><span class="pre">PreparedSetValueStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PreparedPlanStep.html#atef.procedure.PreparedPlanStep" title="atef.procedure.PreparedPlanStep"><span class="pre">PreparedPlanStep</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.PreparedTemplateStep.html#atef.procedure.PreparedTemplateStep" title="atef.procedure.PreparedTemplateStep"><span class="pre">PreparedTemplateStep</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.steps" title="Link to this definition"></a></dt>
+<dd><p>the steps in this group</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.prepare_failures">
+<span class="sig-name descname"><span class="pre">prepare_failures</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.13)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="atef.procedure.FailedStep.html#atef.procedure.FailedStep" title="atef.procedure.FailedStep"><span class="pre">FailedStep</span></a><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.prepare_failures" title="Link to this definition"></a></dt>
+<dd><p>Steps that failed to be prepared</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.origin">
+<span class="sig-name descname"><span class="pre">origin</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="atef.procedure.ProcedureStep.html#atef.procedure.ProcedureStep" title="atef.procedure.ProcedureStep"><span class="pre">ProcedureStep</span></a></em><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.origin" title="Link to this definition"></a></dt>
+<dd><p>original procedure step, of which this is the prepared version</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.combined_result">
+<span class="sig-name descname"><span class="pre">combined_result</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Result</span></em><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.combined_result" title="Link to this definition"></a></dt>
+<dd><p>overall result of running the step</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.verify_result">
+<span class="sig-name descname"><span class="pre">verify_result</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Result</span></em><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.verify_result" title="Link to this definition"></a></dt>
+<dd><p>confirmation by the user that result matches expectations</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.procedure.PreparedProcedureGroup.step_result">
+<span class="sig-name descname"><span class="pre">step_result</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Result</span></em><a class="headerlink" href="#atef.procedure.PreparedProcedureGroup.step_result" title="Link to this definition"></a></dt>
+<dd><p>whether or not the step completed successfully</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="atef.procedure.PreparedProcedureFile.html" class="btn btn-neutral float-left" title="atef.procedure.PreparedProcedureFile" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="atef.procedure.PreparedProcedureStep.html" class="btn btn-neutral float-right" title="atef.procedure.PreparedProcedureStep" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SLAC National Accelerator Laboratory.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
