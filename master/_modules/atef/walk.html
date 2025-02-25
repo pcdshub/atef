@@ -6,7 +6,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>atef.walk &mdash; atef  documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
 
@@ -83,21 +83,21 @@
 <span class="sd">If relying on Prepared dataclass walk methods (walk_groups, walk_comparisons),</span>
 <span class="sd">note that if a configuration fails to prepare, they will be skipped</span>
 <span class="sd">&quot;&quot;&quot;</span>
-<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
-<span class="kn">from</span> <span class="nn">atef.check</span> <span class="kn">import</span> <span class="n">Comparison</span>
-<span class="kn">from</span> <span class="nn">atef.config</span> <span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedConfiguration</span><span class="p">,</span> <span class="n">Configuration</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.check</span><span class="w"> </span><span class="kn">import</span> <span class="n">Comparison</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedConfiguration</span><span class="p">,</span> <span class="n">Configuration</span><span class="p">,</span>
                          <span class="n">PreparedComparison</span><span class="p">,</span> <span class="n">PreparedConfiguration</span><span class="p">,</span>
                          <span class="n">PreparedFile</span><span class="p">)</span>
-<span class="kn">from</span> <span class="nn">atef.procedure</span> <span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedProcedure</span><span class="p">,</span> <span class="n">PreparedProcedureFile</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.procedure</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedProcedure</span><span class="p">,</span> <span class="n">PreparedProcedureFile</span><span class="p">,</span>
                             <span class="n">PreparedProcedureStep</span><span class="p">,</span> <span class="n">ProcedureStep</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="walk_config_file">
 <a class="viewcode-back" href="../../generated/generated/atef.walk.walk_config_file.html#atef.walk.walk_config_file">[docs]</a>
-<span class="k">def</span> <span class="nf">walk_config_file</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">walk_config_file</span><span class="p">(</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedFile</span><span class="p">,</span> <span class="n">PreparedConfiguration</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">],</span>
     <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">AnyPreparedConfiguration</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">],</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
@@ -131,7 +131,7 @@
 
 <div class="viewcode-block" id="walk_procedure_file">
 <a class="viewcode-back" href="../../generated/generated/atef.walk.walk_procedure_file.html#atef.walk.walk_procedure_file">[docs]</a>
-<span class="k">def</span> <span class="nf">walk_procedure_file</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">walk_procedure_file</span><span class="p">(</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedProcedureFile</span><span class="p">,</span> <span class="n">PreparedProcedureStep</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">],</span>
     <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">AnyPreparedProcedure</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">],</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
@@ -165,7 +165,7 @@
 
 <div class="viewcode-block" id="walk_steps">
 <a class="viewcode-back" href="../../generated/generated/atef.walk.walk_steps.html#atef.walk.walk_steps">[docs]</a>
-<span class="k">def</span> <span class="nf">walk_steps</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">walk_steps</span><span class="p">(</span>
     <span class="n">step</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">ProcedureStep</span><span class="p">,</span> <span class="n">PreparedProcedureStep</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">ProcedureStep</span><span class="p">,</span> <span class="n">PreparedProcedureStep</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -188,7 +188,7 @@
 
 <div class="viewcode-block" id="get_prepared_step">
 <a class="viewcode-back" href="../../generated/generated/atef.walk.get_prepared_step.html#atef.walk.get_prepared_step">[docs]</a>
-<span class="k">def</span> <span class="nf">get_prepared_step</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_prepared_step</span><span class="p">(</span>
     <span class="n">prepared_file</span><span class="p">:</span> <span class="n">PreparedProcedureFile</span><span class="p">,</span>
     <span class="n">origin</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">ProcedureStep</span><span class="p">,</span> <span class="n">Comparison</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PreparedProcedureStep</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">]]:</span>
@@ -231,7 +231,7 @@
 
 <div class="viewcode-block" id="get_relevant_configs_comps">
 <a class="viewcode-back" href="../../generated/generated/atef.walk.get_relevant_configs_comps.html#atef.walk.get_relevant_configs_comps">[docs]</a>
-<span class="k">def</span> <span class="nf">get_relevant_configs_comps</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_relevant_configs_comps</span><span class="p">(</span>
     <span class="n">prepared_file</span><span class="p">:</span> <span class="n">PreparedFile</span><span class="p">,</span>
     <span class="n">original_c</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Configuration</span><span class="p">,</span> <span class="n">Comparison</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PreparedConfiguration</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">]]:</span>
@@ -277,7 +277,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2024, SLAC National Accelerator Laboratory.</p>
+    <p>&#169; Copyright 2025, SLAC National Accelerator Laboratory.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

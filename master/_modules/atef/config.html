@@ -6,7 +6,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>atef.config &mdash; atef  documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
 
@@ -83,33 +83,33 @@
 <span class="sd">which link ``Comparisons`` to specific identifiers and hold ``Result`` objects.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">import</span> <span class="nn">asyncio</span>
-<span class="kn">import</span> <span class="nn">json</span>
-<span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">pathlib</span>
-<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span>
                     <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">cast</span><span class="p">,</span> <span class="n">get_args</span><span class="p">)</span>
 
-<span class="kn">import</span> <span class="nn">apischema</span>
-<span class="kn">import</span> <span class="nn">happi</span>
-<span class="kn">import</span> <span class="nn">ophyd</span>
-<span class="kn">import</span> <span class="nn">yaml</span>
-<span class="kn">from</span> <span class="nn">ophyd.signal</span> <span class="kn">import</span> <span class="n">ConnectionTimeoutError</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">apischema</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">happi</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">ophyd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ophyd.signal</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConnectionTimeoutError</span>
 
-<span class="kn">from</span> <span class="nn">atef.find_replace</span> <span class="kn">import</span> <span class="n">RegexFindReplace</span>
-<span class="kn">from</span> <span class="nn">atef.result</span> <span class="kn">import</span> <span class="n">_summarize_result_severity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.find_replace</span><span class="w"> </span><span class="kn">import</span> <span class="n">RegexFindReplace</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.result</span><span class="w"> </span><span class="kn">import</span> <span class="n">_summarize_result_severity</span>
 
-<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">serialization</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">util</span>
-<span class="kn">from</span> <span class="nn">.cache</span> <span class="kn">import</span> <span class="n">DataCache</span>
-<span class="kn">from</span> <span class="nn">.check</span> <span class="kn">import</span> <span class="n">Comparison</span>
-<span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">GroupResultMode</span><span class="p">,</span> <span class="n">Severity</span>
-<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">PreparationError</span><span class="p">,</span> <span class="n">PreparedComparisonException</span>
-<span class="kn">from</span> <span class="nn">.result</span> <span class="kn">import</span> <span class="n">Result</span><span class="p">,</span> <span class="n">incomplete_result</span>
-<span class="kn">from</span> <span class="nn">.type_hints</span> <span class="kn">import</span> <span class="n">AnyPath</span>
-<span class="kn">from</span> <span class="nn">.yaml_support</span> <span class="kn">import</span> <span class="n">init_yaml_support</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">serialization</span><span class="p">,</span> <span class="n">tools</span><span class="p">,</span> <span class="n">util</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataCache</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.check</span><span class="w"> </span><span class="kn">import</span> <span class="n">Comparison</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">GroupResultMode</span><span class="p">,</span> <span class="n">Severity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">PreparationError</span><span class="p">,</span> <span class="n">PreparedComparisonException</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.result</span><span class="w"> </span><span class="kn">import</span> <span class="n">Result</span><span class="p">,</span> <span class="n">incomplete_result</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.type_hints</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnyPath</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.yaml_support</span><span class="w"> </span><span class="kn">import</span> <span class="n">init_yaml_support</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -118,7 +118,7 @@
 <a class="viewcode-back" href="../../generated/generated/atef.config.Configuration.html#atef.config.Configuration">[docs]</a>
 <span class="nd">@dataclass</span>
 <span class="nd">@serialization</span><span class="o">.</span><span class="n">as_tagged_union</span>
-<span class="k">class</span> <span class="nc">Configuration</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Configuration</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Configuration base class for shared settings between all configurations.</span>
 
@@ -136,14 +136,14 @@
 
 <div class="viewcode-block" id="Configuration.children">
 <a class="viewcode-back" href="../../generated/generated/atef.config.Configuration.html#atef.config.Configuration.children">[docs]</a>
-    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">[]</span></div>
 
 
 <div class="viewcode-block" id="Configuration.replace_comparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.Configuration.html#atef.config.Configuration.replace_comparison">[docs]</a>
-    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">replace_comparison</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
         <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
@@ -189,7 +189,7 @@
 
 <div class="viewcode-block" id="Configuration.move_comparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.Configuration.html#atef.config.Configuration.move_comparison">[docs]</a>
-    <span class="k">def</span> <span class="nf">move_comparison</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_comparison</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
         <span class="n">new_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -220,7 +220,7 @@
 <div class="viewcode-block" id="ConfigurationGroup">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationGroup.html#atef.config.ConfigurationGroup">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">ConfigurationGroup</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ConfigurationGroup</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Configuration group.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -233,7 +233,7 @@
 
 <div class="viewcode-block" id="ConfigurationGroup.walk_configs">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationGroup.html#atef.config.ConfigurationGroup.walk_configs">[docs]</a>
-    <span class="k">def</span> <span class="nf">walk_configs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">AnyConfiguration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">walk_configs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">AnyConfiguration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">configs</span><span class="p">:</span>
             <span class="c1"># `config` is stored as Configuration due to the tagged union;</span>
             <span class="c1"># however we never yield Configuration instances, just subclasses</span>
@@ -246,7 +246,7 @@
 
 <div class="viewcode-block" id="ConfigurationGroup.children">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationGroup.html#atef.config.ConfigurationGroup.children">[docs]</a>
-    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Configuration</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Configuration</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">configs</span></div>
 </div>
@@ -256,7 +256,7 @@
 <div class="viewcode-block" id="DeviceConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.DeviceConfiguration.html#atef.config.DeviceConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">DeviceConfiguration</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DeviceConfiguration</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A configuration that is built to check one or more devices.</span>
 
@@ -276,7 +276,7 @@
 
 <div class="viewcode-block" id="DeviceConfiguration.children">
 <a class="viewcode-back" href="../../generated/generated/atef.config.DeviceConfiguration.html#atef.config.DeviceConfiguration.children">[docs]</a>
-    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">([</span><span class="n">comp</span> <span class="k">for</span> <span class="n">comp_list</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">by_attr</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">comp_list</span><span class="p">]</span>
                 <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">shared</span><span class="p">)</span></div>
@@ -284,7 +284,7 @@
 
 <div class="viewcode-block" id="DeviceConfiguration.replace_comparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.DeviceConfiguration.html#atef.config.DeviceConfiguration.replace_comparison">[docs]</a>
-    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">replace_comparison</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
         <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
@@ -311,7 +311,7 @@
 
 <div class="viewcode-block" id="DeviceConfiguration.move_comparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.DeviceConfiguration.html#atef.config.DeviceConfiguration.move_comparison">[docs]</a>
-    <span class="k">def</span> <span class="nf">move_comparison</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_comparison</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
         <span class="n">new_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -325,7 +325,7 @@
 <div class="viewcode-block" id="PVConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PVConfiguration.html#atef.config.PVConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PVConfiguration</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PVConfiguration</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A configuration that is built to check live EPICS PVs.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -336,7 +336,7 @@
 
 <div class="viewcode-block" id="PVConfiguration.children">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PVConfiguration.html#atef.config.PVConfiguration.children">[docs]</a>
-    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">([</span><span class="n">comp</span> <span class="k">for</span> <span class="n">comp_list</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">by_pv</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">comp_list</span><span class="p">]</span>
                 <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">shared</span><span class="p">)</span></div>
@@ -344,7 +344,7 @@
 
 <div class="viewcode-block" id="PVConfiguration.replace_comparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PVConfiguration.html#atef.config.PVConfiguration.replace_comparison">[docs]</a>
-    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">replace_comparison</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
         <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
@@ -371,7 +371,7 @@
 
 <div class="viewcode-block" id="PVConfiguration.move_comparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PVConfiguration.html#atef.config.PVConfiguration.move_comparison">[docs]</a>
-    <span class="k">def</span> <span class="nf">move_comparison</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_comparison</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
         <span class="n">new_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -385,7 +385,7 @@
 <div class="viewcode-block" id="ToolConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ToolConfiguration.html#atef.config.ToolConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">ToolConfiguration</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ToolConfiguration</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A configuration unrelated to PVs or Devices which verifies status via some</span>
 <span class="sd">    tool.</span>
@@ -402,7 +402,7 @@
 
 <div class="viewcode-block" id="ToolConfiguration.children">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ToolConfiguration.html#atef.config.ToolConfiguration.children">[docs]</a>
-    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">([</span><span class="n">comp</span> <span class="k">for</span> <span class="n">comp_list</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">by_attr</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">comp_list</span><span class="p">]</span>
                 <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">shared</span><span class="p">)</span></div>
@@ -410,7 +410,7 @@
 
 <div class="viewcode-block" id="ToolConfiguration.replace_comparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ToolConfiguration.html#atef.config.ToolConfiguration.replace_comparison">[docs]</a>
-    <span class="k">def</span> <span class="nf">replace_comparison</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">replace_comparison</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">old_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
         <span class="n">new_comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
@@ -437,7 +437,7 @@
 
 <div class="viewcode-block" id="ToolConfiguration.move_comparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ToolConfiguration.html#atef.config.ToolConfiguration.move_comparison">[docs]</a>
-    <span class="k">def</span> <span class="nf">move_comparison</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">move_comparison</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">comp</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
         <span class="n">new_attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -451,7 +451,7 @@
 <div class="viewcode-block" id="TemplateConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.TemplateConfiguration.html#atef.config.TemplateConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">TemplateConfiguration</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TemplateConfiguration</span><span class="p">(</span><span class="n">Configuration</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A Configuration for applying changes to a template file.</span>
 <span class="sd">    Breaks the convention for Configuration by not directly having any</span>
@@ -476,7 +476,7 @@
 <div class="viewcode-block" id="ConfigurationFile">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">ConfigurationFile</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ConfigurationFile</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A configuration file comprised of a number of devices/PV configurations.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -487,7 +487,7 @@
 
 <div class="viewcode-block" id="ConfigurationFile.walk_configs">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.walk_configs">[docs]</a>
-    <span class="k">def</span> <span class="nf">walk_configs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">AnyConfiguration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">walk_configs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">AnyConfiguration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Walk configurations defined in this file.  This includes the &quot;root&quot;</span>
 <span class="sd">        node.</span>
@@ -502,14 +502,14 @@
 
 <div class="viewcode-block" id="ConfigurationFile.children">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.children">[docs]</a>
-    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">ConfigurationGroup</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">ConfigurationGroup</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="ConfigurationFile.get_by_device">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.get_by_device">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_by_device</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">DeviceConfiguration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_by_device</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">DeviceConfiguration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get all configurations that match the device name.&quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">walk_configs</span><span class="p">():</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">DeviceConfiguration</span><span class="p">):</span>
@@ -519,7 +519,7 @@
 
 <div class="viewcode-block" id="ConfigurationFile.get_by_pv">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.get_by_pv">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_by_pv</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_by_pv</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">pvname</span><span class="p">:</span> <span class="nb">str</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PVConfiguration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get all configurations + IdentifierAndComparison that match the PV name.&quot;&quot;&quot;</span>
@@ -531,7 +531,7 @@
 
 <div class="viewcode-block" id="ConfigurationFile.get_by_tag">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.get_by_tag">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_by_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">tags</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Configuration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_by_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">tags</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Configuration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get all configurations that match the tag name.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">tags</span><span class="p">:</span>
             <span class="k">return</span>
@@ -545,7 +545,7 @@
 <div class="viewcode-block" id="ConfigurationFile.from_filename">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.from_filename">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_filename</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConfigurationFile</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_filename</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConfigurationFile</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a configuration file from a file.  Dispatches based on file type&quot;&quot;&quot;</span>
         <span class="n">path</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;.json&#39;</span><span class="p">:</span>
@@ -558,7 +558,7 @@
 <div class="viewcode-block" id="ConfigurationFile.from_json">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.from_json">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConfigurationFile</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConfigurationFile</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a configuration file from JSON.&quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
             <span class="n">serialized_config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
@@ -568,7 +568,7 @@
 <div class="viewcode-block" id="ConfigurationFile.from_yaml">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.from_yaml">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_yaml</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConfigurationFile</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_yaml</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="n">AnyPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConfigurationFile</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a configuration file from yaml.&quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
             <span class="n">serialized_config</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
@@ -577,14 +577,14 @@
 
 <div class="viewcode-block" id="ConfigurationFile.to_json">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.to_json">[docs]</a>
-    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump this configuration file to a JSON-compatible dictionary.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">apischema</span><span class="o">.</span><span class="n">serialize</span><span class="p">(</span><span class="n">ConfigurationFile</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">exclude_defaults</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="ConfigurationFile.to_yaml">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.to_yaml">[docs]</a>
-    <span class="k">def</span> <span class="nf">to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Dump this configuration file to yaml.&quot;&quot;&quot;</span>
         <span class="n">init_yaml_support</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_json</span><span class="p">())</span></div>
@@ -592,7 +592,7 @@
 
 <div class="viewcode-block" id="ConfigurationFile.validate">
 <a class="viewcode-back" href="../../generated/generated/atef.config.ConfigurationFile.html#atef.config.ConfigurationFile.validate">[docs]</a>
-    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Validate the file is properly formed and can be prepared</span>
 
@@ -619,7 +619,7 @@
 <div class="viewcode-block" id="PreparedFile">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedFile.html#atef.config.PreparedFile">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedFile</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedFile</span><span class="p">:</span>
     <span class="c1">#: The data cache to use for the preparation step.</span>
     <span class="n">cache</span><span class="p">:</span> <span class="n">DataCache</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="c1">#: The corresponding configuration file information.</span>
@@ -632,7 +632,7 @@
 <div class="viewcode-block" id="PreparedFile.from_config">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedFile.html#atef.config.PreparedFile.from_config">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">file</span><span class="p">:</span> <span class="n">ConfigurationFile</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
@@ -683,7 +683,7 @@
 
 <div class="viewcode-block" id="PreparedFile.fill_cache">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedFile.html#atef.config.PreparedFile.fill_cache">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">fill_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">]]:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fill_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span><span class="p">]]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Fill the DataCache.</span>
 
@@ -713,14 +713,14 @@
 
 <div class="viewcode-block" id="PreparedFile.walk_comparisons">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedFile.html#atef.config.PreparedFile.walk_comparisons">[docs]</a>
-    <span class="k">def</span> <span class="nf">walk_comparisons</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">walk_comparisons</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Walk through the prepared comparisons.&quot;&quot;&quot;</span>
         <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">walk_comparisons</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="PreparedFile.walk_groups">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedFile.html#atef.config.PreparedFile.walk_groups">[docs]</a>
-    <span class="k">def</span> <span class="nf">walk_groups</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">walk_groups</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">AnyPreparedConfiguration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Walk through the prepared groups.&quot;&quot;&quot;</span>
@@ -730,14 +730,14 @@
 
 <div class="viewcode-block" id="PreparedFile.children">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedFile.html#atef.config.PreparedFile.children">[docs]</a>
-    <span class="k">def</span> <span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return children of this group, as a tree view might expect&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="PreparedFile.compare">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedFile.html#atef.config.PreparedFile.compare">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Run all comparisons and return a combined result.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">compare</span><span class="p">()</span></div>
 </div>
@@ -747,7 +747,7 @@
 <div class="viewcode-block" id="FailedConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.FailedConfiguration.html#atef.config.FailedConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">FailedConfiguration</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">FailedConfiguration</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A Configuration that failed to be prepared for running.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -765,7 +765,7 @@
 <div class="viewcode-block" id="PreparedConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedConfiguration.html#atef.config.PreparedConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedConfiguration</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedConfiguration</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Base class for a Configuration that has been prepared to run.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -785,7 +785,7 @@
 <div class="viewcode-block" id="PreparedConfiguration.from_config">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedConfiguration.html#atef.config.PreparedConfiguration.from_config">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">AnyConfiguration</span><span class="p">,</span>
         <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -888,14 +888,14 @@
 
 <div class="viewcode-block" id="PreparedConfiguration.walk_comparisons">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedConfiguration.html#atef.config.PreparedConfiguration.walk_comparisons">[docs]</a>
-    <span class="k">def</span> <span class="nf">walk_comparisons</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">walk_comparisons</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Walk through the prepared comparisons.&quot;&quot;&quot;</span>
         <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span></div>
 
 
 <div class="viewcode-block" id="PreparedConfiguration.compare">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedConfiguration.html#atef.config.PreparedConfiguration.compare">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Run all comparisons and return a combined result.&quot;&quot;&quot;</span>
         <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparisons</span><span class="p">:</span>
@@ -916,7 +916,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Re-compute the combined result and return it&quot;&quot;&quot;</span>
         <span class="c1"># read results without running steps</span>
         <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
@@ -939,7 +939,7 @@
 <div class="viewcode-block" id="PreparedGroup">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedGroup.html#atef.config.PreparedGroup">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedGroup</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedGroup</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
     <span class="c1">#: The corresponding group from the configuration file.</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">ConfigurationGroup</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">ConfigurationGroup</span><span class="p">)</span>
     <span class="c1">#: The hierarhical parent of this group.  If this is the root group,</span>
@@ -952,7 +952,7 @@
 
 <div class="viewcode-block" id="PreparedGroup.get_value_by_name">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedGroup.html#atef.config.PreparedGroup.get_value_by_name">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_value_by_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_value_by_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get a value defined in this group or in any ancestor.  The first found</span>
 <span class="sd">        is returned.</span>
@@ -982,7 +982,7 @@
 <div class="viewcode-block" id="PreparedGroup.from_config">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedGroup.html#atef.config.PreparedGroup.from_config">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">group</span><span class="p">:</span> <span class="n">ConfigurationGroup</span><span class="p">,</span>
         <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">,</span> <span class="n">PreparedFile</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1043,7 +1043,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">subgroups</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">subgroups</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Direct descendent subgroups in this group.</span>
 
@@ -1059,7 +1059,7 @@
 
 <div class="viewcode-block" id="PreparedGroup.walk_groups">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedGroup.html#atef.config.PreparedGroup.walk_groups">[docs]</a>
-    <span class="k">def</span> <span class="nf">walk_groups</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">walk_groups</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">AnyPreparedConfiguration</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Walk through the prepared groups.&quot;&quot;&quot;</span>
@@ -1072,7 +1072,7 @@
 
 <div class="viewcode-block" id="PreparedGroup.walk_comparisons">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedGroup.html#atef.config.PreparedGroup.walk_comparisons">[docs]</a>
-    <span class="k">def</span> <span class="nf">walk_comparisons</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">walk_comparisons</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Walk through the prepared comparisons.&quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">configs</span><span class="p">:</span>
             <span class="k">yield from</span> <span class="n">config</span><span class="o">.</span><span class="n">walk_comparisons</span><span class="p">()</span></div>
@@ -1080,7 +1080,7 @@
 
 <div class="viewcode-block" id="PreparedGroup.compare">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedGroup.html#atef.config.PreparedGroup.compare">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Run all comparisons and return a combined result.&quot;&quot;&quot;</span>
         <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">configs</span><span class="p">:</span>
@@ -1102,7 +1102,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Re-compute the combined result and return it&quot;&quot;&quot;</span>
         <span class="c1"># read results without running steps</span>
         <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
@@ -1128,7 +1128,7 @@
 <div class="viewcode-block" id="PreparedDeviceConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedDeviceConfiguration.html#atef.config.PreparedDeviceConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedDeviceConfiguration</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedDeviceConfiguration</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
     <span class="c1">#: The configuration settings.</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">DeviceConfiguration</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">DeviceConfiguration</span><span class="p">)</span>
     <span class="c1">#: The device the comparisons apply to.</span>
@@ -1141,7 +1141,7 @@
 <div class="viewcode-block" id="PreparedDeviceConfiguration.from_device">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedDeviceConfiguration.html#atef.config.PreparedDeviceConfiguration.from_device">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_device</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_device</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">ophyd</span><span class="o">.</span><span class="n">Device</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">ophyd</span><span class="o">.</span><span class="n">Device</span><span class="p">]],</span>
         <span class="n">by_attr</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]],</span>
@@ -1196,7 +1196,7 @@
 <div class="viewcode-block" id="PreparedDeviceConfiguration.from_config">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedDeviceConfiguration.html#atef.config.PreparedDeviceConfiguration.from_config">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">DeviceConfiguration</span><span class="p">,</span>
         <span class="n">client</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">happi</span><span class="o">.</span><span class="n">Client</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1287,7 +1287,7 @@
 <div class="viewcode-block" id="PreparedPVConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedPVConfiguration.html#atef.config.PreparedPVConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedPVConfiguration</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedPVConfiguration</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
     <span class="c1">#: The configuration settings.</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">PVConfiguration</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">PVConfiguration</span><span class="p">)</span>
     <span class="c1">#: The comparisons to be run on the given devices.</span>
@@ -1298,7 +1298,7 @@
 <div class="viewcode-block" id="PreparedPVConfiguration.from_pvs">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedPVConfiguration.html#atef.config.PreparedPVConfiguration.from_pvs">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_pvs</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_pvs</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">by_pv</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]],</span>
         <span class="n">shared</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1339,7 +1339,7 @@
 <div class="viewcode-block" id="PreparedPVConfiguration.from_config">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedPVConfiguration.html#atef.config.PreparedPVConfiguration.from_config">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">PVConfiguration</span><span class="p">,</span>
         <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1402,7 +1402,7 @@
 <div class="viewcode-block" id="PreparedToolConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedToolConfiguration.html#atef.config.PreparedToolConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedToolConfiguration</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedToolConfiguration</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
     <span class="c1">#: The configuration settings.</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">ToolConfiguration</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">ToolConfiguration</span><span class="p">)</span>
     <span class="c1">#: The comparisons to be run on the given devices.</span>
@@ -1413,7 +1413,7 @@
 <div class="viewcode-block" id="PreparedToolConfiguration.from_tool">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedToolConfiguration.html#atef.config.PreparedToolConfiguration.from_tool">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_tool</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_tool</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">tool</span><span class="p">:</span> <span class="n">tools</span><span class="o">.</span><span class="n">Tool</span><span class="p">,</span>
         <span class="n">by_attr</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Comparison</span><span class="p">]],</span>
@@ -1458,7 +1458,7 @@
 <div class="viewcode-block" id="PreparedToolConfiguration.from_config">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedToolConfiguration.html#atef.config.PreparedToolConfiguration.from_config">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">ToolConfiguration</span><span class="p">,</span>
         <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1522,7 +1522,7 @@
 <div class="viewcode-block" id="PreparedTemplateConfiguration">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedTemplateConfiguration.html#atef.config.PreparedTemplateConfiguration">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedTemplateConfiguration</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedTemplateConfiguration</span><span class="p">(</span><span class="n">PreparedConfiguration</span><span class="p">):</span>
     <span class="c1"># configuration origin</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">TemplateConfiguration</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">TemplateConfiguration</span><span class="p">)</span>
     <span class="c1"># prepared file with edits applied</span>
@@ -1531,7 +1531,7 @@
 <div class="viewcode-block" id="PreparedTemplateConfiguration.from_config">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedTemplateConfiguration.html#atef.config.PreparedTemplateConfiguration.from_config">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_config</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">TemplateConfiguration</span><span class="p">,</span>
         <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1614,7 +1614,7 @@
 
 <div class="viewcode-block" id="PreparedTemplateConfiguration.compare">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedTemplateConfiguration.html#atef.config.PreparedTemplateConfiguration.compare">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the edited checkout and return the combined result&quot;&quot;&quot;</span>
         <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">compare</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">combined_result</span> <span class="o">=</span> <span class="n">result</span>
@@ -1622,7 +1622,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Re-compute combined result and return it.  Override standard since this</span>
 <span class="sd">        configuration has no comparisons</span>
@@ -1635,7 +1635,7 @@
 <div class="viewcode-block" id="PreparedComparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedComparison.html#atef.config.PreparedComparison">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedComparison</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedComparison</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A unified representation of comparisons for device signals and standalone PVs.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1654,7 +1654,7 @@
 
 <div class="viewcode-block" id="PreparedComparison.get_data_async">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedComparison.html#atef.config.PreparedComparison.get_data_async">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">get_data_async</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_data_async</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get the data according to the comparison&#39;s configuration.</span>
 
@@ -1668,7 +1668,7 @@
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
 
 
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the comparison.</span>
 
@@ -1678,7 +1678,7 @@
 
 <div class="viewcode-block" id="PreparedComparison.compare">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedComparison.html#atef.config.PreparedComparison.compare">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the comparison and return the Result.</span>
 
@@ -1751,7 +1751,7 @@
 <div class="viewcode-block" id="PreparedSignalComparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedSignalComparison.html#atef.config.PreparedSignalComparison">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedSignalComparison</span><span class="p">(</span><span class="n">PreparedComparison</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedSignalComparison</span><span class="p">(</span><span class="n">PreparedComparison</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A unified representation of comparisons for device signals and standalone</span>
 <span class="sd">    PVs.</span>
@@ -1779,7 +1779,7 @@
 
 <div class="viewcode-block" id="PreparedSignalComparison.get_data_async">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedSignalComparison.html#atef.config.PreparedSignalComparison.get_data_async">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">get_data_async</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_data_async</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get the provided signal&#39;s data from the cache according to the</span>
 <span class="sd">        reduction configuration.</span>
@@ -1809,7 +1809,7 @@
         <span class="k">return</span> <span class="n">data</span></div>
 
 
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the comparison with the already-acquired data in ``self.data``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -1832,7 +1832,7 @@
 <div class="viewcode-block" id="PreparedSignalComparison.from_device">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedSignalComparison.html#atef.config.PreparedSignalComparison.from_device">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_device</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_device</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">device</span><span class="p">:</span> <span class="n">ophyd</span><span class="o">.</span><span class="n">Device</span><span class="p">,</span>
         <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -1890,7 +1890,7 @@
 <div class="viewcode-block" id="PreparedSignalComparison.from_pvname">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedSignalComparison.html#atef.config.PreparedSignalComparison.from_pvname">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_pvname</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_pvname</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">pvname</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">comparison</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
@@ -1936,7 +1936,7 @@
 <div class="viewcode-block" id="PreparedSignalComparison.from_signal">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedSignalComparison.html#atef.config.PreparedSignalComparison.from_signal">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_signal</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_signal</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">signal</span><span class="p">:</span> <span class="n">ophyd</span><span class="o">.</span><span class="n">Signal</span><span class="p">,</span>
         <span class="n">comparison</span><span class="p">:</span> <span class="n">Comparison</span><span class="p">,</span>
@@ -1984,7 +1984,7 @@
 <div class="viewcode-block" id="PreparedToolComparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedToolComparison.html#atef.config.PreparedToolComparison">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PreparedToolComparison</span><span class="p">(</span><span class="n">PreparedComparison</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PreparedToolComparison</span><span class="p">(</span><span class="n">PreparedComparison</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A unified representation of comparisons for device signals and standalone PVs.</span>
 
@@ -2003,7 +2003,7 @@
 
 <div class="viewcode-block" id="PreparedToolComparison.get_data_async">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedToolComparison.html#atef.config.PreparedToolComparison.get_data_async">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">get_data_async</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_data_async</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get the provided tool&#39;s result data from the cache.</span>
 
@@ -2015,7 +2015,7 @@
         <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache</span><span class="o">.</span><span class="n">get_tool_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tool</span><span class="p">)</span></div>
 
 
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Result</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the prepared comparison.</span>
 
@@ -2043,7 +2043,7 @@
 <div class="viewcode-block" id="PreparedToolComparison.from_tool">
 <a class="viewcode-back" href="../../generated/generated/atef.config.PreparedToolComparison.html#atef.config.PreparedToolComparison.from_tool">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_tool</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_tool</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">tool</span><span class="p">:</span> <span class="n">tools</span><span class="o">.</span><span class="n">Tool</span><span class="p">,</span>
         <span class="n">result_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -2109,7 +2109,7 @@
 
 <div class="viewcode-block" id="get_result_from_comparison">
 <a class="viewcode-back" href="../../generated/generated/atef.config.get_result_from_comparison.html#atef.config.get_result_from_comparison">[docs]</a>
-<span class="k">def</span> <span class="nf">get_result_from_comparison</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_result_from_comparison</span><span class="p">(</span>
     <span class="n">item</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">],</span> <span class="n">Result</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -2150,7 +2150,7 @@
 
 <div class="viewcode-block" id="run_passive_step">
 <a class="viewcode-back" href="../../generated/generated/atef.config.run_passive_step.html#atef.config.run_passive_step">[docs]</a>
-<span class="k">async</span> <span class="k">def</span> <span class="nf">run_passive_step</span><span class="p">(</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">run_passive_step</span><span class="p">(</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedComparison</span><span class="p">,</span> <span class="n">PreparedConfiguration</span><span class="p">,</span> <span class="n">PreparedFile</span><span class="p">]</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Runs a given check and returns the result.&quot;&quot;&quot;</span>
@@ -2178,7 +2178,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2024, SLAC National Accelerator Laboratory.</p>
+    <p>&#169; Copyright 2025, SLAC National Accelerator Laboratory.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

@@ -6,7 +6,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>atef.tools &mdash; atef  documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
 
@@ -77,20 +77,20 @@
            <div itemprop="articleBody">
              
   <h1>Source code for atef.tools</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">import</span> <span class="nn">asyncio</span>
-<span class="kn">import</span> <span class="nn">re</span>
-<span class="kn">import</span> <span class="nn">shutil</span>
-<span class="kn">import</span> <span class="nn">sys</span>
-<span class="kn">import</span> <span class="nn">typing</span>
-<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">TypeVar</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">typing</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">TypeVar</span><span class="p">,</span> <span class="n">Union</span>
 
-<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">serialization</span>
-<span class="kn">from</span> <span class="nn">.check</span> <span class="kn">import</span> <span class="n">Severity</span>
-<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">ToolDependencyMissingException</span>
-<span class="kn">from</span> <span class="nn">.result</span> <span class="kn">import</span> <span class="n">Result</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">serialization</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.check</span><span class="w"> </span><span class="kn">import</span> <span class="n">Severity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">ToolDependencyMissingException</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.result</span><span class="w"> </span><span class="kn">import</span> <span class="n">Result</span>
 
 <span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="s2">&quot;Tool&quot;</span><span class="p">)</span>
 
@@ -98,7 +98,7 @@
 <div class="viewcode-block" id="ToolResult">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.ToolResult.html#atef.tools.ToolResult">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">ToolResult</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ToolResult</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    The base result dictionary of any tool.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -109,7 +109,7 @@
 <div class="viewcode-block" id="PingResult">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.PingResult.html#atef.tools.PingResult">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">PingResult</span><span class="p">(</span><span class="n">ToolResult</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PingResult</span><span class="p">(</span><span class="n">ToolResult</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    The result dictionary of the &#39;ping&#39; tool.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -135,7 +135,7 @@
 
 <div class="viewcode-block" id="PingResult.add_host_result">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.PingResult.html#atef.tools.PingResult.add_host_result">[docs]</a>
-    <span class="k">def</span> <span class="nf">add_host_result</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_host_result</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">result</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PingResult</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">],</span>
@@ -177,7 +177,7 @@
 <div class="viewcode-block" id="PingResult.from_output">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.PingResult.html#atef.tools.PingResult.from_output">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_output</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_output</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">unresponsive_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">100.0</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PingResult</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -224,7 +224,7 @@
 
 <div class="viewcode-block" id="get_result_value_by_key">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.get_result_value_by_key.html#atef.tools.get_result_value_by_key">[docs]</a>
-<span class="k">def</span> <span class="nf">get_result_value_by_key</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">ToolResult</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_result_value_by_key</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">ToolResult</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Retrieve the value indicated by the dotted key name from the ToolResult.</span>
 
@@ -269,12 +269,12 @@
             <span class="n">path_str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
             <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item</span><span class="si">}</span><span class="s2"> does not have key </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2"> (</span><span class="si">{</span><span class="n">path_str</span><span class="si">}</span><span class="s2">)&quot;</span>
-            <span class="p">)</span> <span class="kn">from</span> <span class="kc">None</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
         <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
             <span class="n">path_str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
             <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item</span><span class="si">}</span><span class="s2"> does not have attribute </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2"> (</span><span class="si">{</span><span class="n">path_str</span><span class="si">}</span><span class="s2">)&quot;</span>
-            <span class="p">)</span> <span class="kn">from</span> <span class="kc">None</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
         <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
             <span class="n">path_str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
             <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
@@ -289,14 +289,14 @@
 <a class="viewcode-back" href="../../generated/generated/atef.tools.Tool.html#atef.tools.Tool">[docs]</a>
 <span class="nd">@dataclass</span>
 <span class="nd">@serialization</span><span class="o">.</span><span class="n">as_tagged_union</span>
-<span class="k">class</span> <span class="nc">Tool</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Tool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Base class for atef tool checks.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="Tool.check_result_key">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.Tool.html#atef.tools.Tool.check_result_key">[docs]</a>
-    <span class="k">def</span> <span class="nf">check_result_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_result_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Check that the result ``key`` is valid for the given tool.</span>
 
@@ -338,7 +338,7 @@
 
 <div class="viewcode-block" id="Tool.run">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.Tool.html#atef.tools.Tool.run">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ToolResult</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ToolResult</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;To be implemented by subclass&quot;</span><span class="p">)</span></div>
 </div>
 
@@ -347,7 +347,7 @@
 <div class="viewcode-block" id="Ping">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.Ping.html#atef.tools.Ping">[docs]</a>
 <span class="nd">@dataclass</span>
-<span class="k">class</span> <span class="nc">Ping</span><span class="p">(</span><span class="n">Tool</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Ping</span><span class="p">(</span><span class="n">Tool</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Tool for pinging one or more hosts and summarizing the results.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -363,7 +363,7 @@
 
 <div class="viewcode-block" id="Ping.ping">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.Ping.html#atef.tools.Ping.ping">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">ping</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PingResult</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">ping</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PingResult</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Ping the given host.</span>
 
@@ -408,7 +408,7 @@
 
 <div class="viewcode-block" id="Ping.run">
 <a class="viewcode-back" href="../../generated/generated/atef.tools.Ping.html#atef.tools.Ping.run">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PingResult</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PingResult</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Run the &quot;Ping&quot; tool with the current settings.</span>
 
@@ -423,7 +423,7 @@
 
         <span class="n">ping_by_host</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Union</span><span class="p">[</span><span class="ne">Exception</span><span class="p">,</span> <span class="n">PingResult</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="k">async</span> <span class="k">def</span> <span class="nf">_ping</span><span class="p">(</span><span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_ping</span><span class="p">(</span><span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">ping_by_host</span><span class="p">[</span><span class="n">host</span><span class="p">]</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">ping</span><span class="p">(</span><span class="n">host</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
@@ -455,7 +455,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2024, SLAC National Accelerator Laboratory.</p>
+    <p>&#169; Copyright 2025, SLAC National Accelerator Laboratory.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

@@ -2,6 +2,21 @@ Release History
 ###############
 
 
+v1.5.3 (2025-04-09)
+===================
+
+Maintenance
+-----------
+- Fixes broken tests so they properly exercise the appropriate cli subcommands
+- Unpins numpy, now that upstream packages are compatible
+- Adjusts fonts to not rely on FontAwesome4 ("fa." prefix), which was deprecated in recent QtAwesome releases
+
+Contributors
+------------
+- tangkong
+
+
+
 v1.5.2 (2024-12-19)
 ===================
 
