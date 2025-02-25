@@ -12,13 +12,14 @@ from .test_comparison_device import at2l0, mock_signal_cache  # noqa: F401
 
 
 def test_help_main(monkeypatch):
-    monkeypatch.setattr(sys, 'argv', ['--help'])
-    atef_main.main()
+    monkeypatch.setattr(sys, 'argv', ["atef", '--help'])
+    with pytest.raises(SystemExit):
+        atef_main.main()
 
 
 @pytest.mark.parametrize('subcommand', list(atef_main.COMMANDS))
 def test_help_module(monkeypatch, subcommand):
-    monkeypatch.setattr(sys, 'argv', [subcommand, '--help'])
+    monkeypatch.setattr(sys, 'argv', ["atef", subcommand, '--help'])
     with pytest.raises(SystemExit):
         atef_main.main()
 
