@@ -908,7 +908,7 @@ class TemplateEditRowWidget(DesignerDisplay, QtWidgets.QWidget):
         widget_menu = QtWidgets.QMenu(self.setting_button)
         widget_menu.addAction(widget_action)
         self.setting_button.setMenu(widget_menu)
-        self.setting_button.setIcon(qta.icon('fa.gear'))
+        self.setting_button.setIcon(qta.icon('ph.gear-fill'))
 
     def update_replace_fn(self, *args, **kwargs) -> None:
         """Update the standard replace function for this edit"""

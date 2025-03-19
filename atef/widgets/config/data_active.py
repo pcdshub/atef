@@ -477,7 +477,7 @@ class PassiveEditWidget(DesignerDisplay, DataWidget):
         super().__init__(data=data, **kwargs)
         self.select_file(filepath=self.bridge.filepath.get())
 
-        self.select_button.setIcon(qtawesome.icon('fa.folder-open-o'))
+        self.select_button.setIcon(qtawesome.icon('fa5.folder-open'))
         self.open_button.setIcon(qtawesome.icon('mdi.open-in-new'))
         # set up buttons, connect to tree-opening method
         self.select_button.clicked.connect(self.select_file)

@@ -59,7 +59,7 @@ class PassiveRunWidget(DesignerDisplay, DataWidget):
 
         self.setup_tree()
 
-        self.refresh_button.setIcon(qtawesome.icon('fa.refresh'))
+        self.refresh_button.setIcon(qtawesome.icon('ei.refresh'))
         self.refresh_button.clicked.connect(self.run_config)
 
     def setup_tree(self):
@@ -227,7 +227,7 @@ class TemplateRunWidget(DesignerDisplay, DataWidget):
         self.setup_tree()
         self.setup_edits_list()
 
-        self.refresh_button.setIcon(qtawesome.icon('fa.refresh'))
+        self.refresh_button.setIcon(qtawesome.icon('ei.refresh'))
         self.refresh_button.clicked.connect(self.run_config)
 
     def setup_tree(self):
