@@ -9,8 +9,7 @@ happi
 ipython
 # matplotlib 3.9.1 pulls pyside6, which is too much qt6 for us
 matplotlib<=3.9.0
-# numpy >2 incompatible with xraylib and others
-numpy<2.0.0
+numpy
 ophyd
 pcdsutils>=0.14.1
 pydm

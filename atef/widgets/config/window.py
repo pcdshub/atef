@@ -445,10 +445,10 @@ class LandingPage(DesignerDisplay, QWidget):
 
     def setup_ui(self):
         # icons for buttons
-        self.open_button.setIcon(qtawesome.icon('fa.folder-open-o'))
-        self.exit_button.setIcon(qtawesome.icon('fa.close'))
-        self.new_passive_button.setIcon(qtawesome.icon('fa.file-text-o'))
-        self.new_active_button.setIcon(qtawesome.icon('fa.file-code-o'))
+        self.open_button.setIcon(qtawesome.icon('fa5.folder-open'))
+        self.exit_button.setIcon(qtawesome.icon('mdi.close-thick'))
+        self.new_passive_button.setIcon(qtawesome.icon('mdi.file-document-outline'))
+        self.new_active_button.setIcon(qtawesome.icon('fa5.file-code'))
         # links for buttons... maybe
         self.docs_button.clicked.connect(
             lambda: webbrowser.open('https://confluence.slac.stanford.edu/display/PCDS/atef')
