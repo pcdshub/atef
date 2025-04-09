@@ -261,7 +261,7 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
 
             self.time_plot.addYChannel(
                 y_channel=f'ca://{pv[0]}',
-                name=f'{pv[0]} ({data["meta"].get("EGU","")})',
+                name=f'{pv[0]} ({data["meta"].get("EGU", "")})',
                 symbol=pv[1]['symbol'],
                 color=pv[1]['color'],
                 lineStyle=pv[1]['lineStyle'],
