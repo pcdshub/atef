@@ -1,0 +1,300 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>atef.walk &mdash; atef  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9a2dae69"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            atef
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">ATEF API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../releases.html">Release History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../upcoming_changes.html">Upcoming Changes</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/pcdshub/atef">Github Repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">atef</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">atef.walk</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for atef.walk</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Helpers for walking dataclasses.</span>
+
+<span class="sd">If relying on Prepared dataclass walk methods (walk_groups, walk_comparisons),</span>
+<span class="sd">note that if a configuration fails to prepare, they will be skipped</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.check</span><span class="w"> </span><span class="kn">import</span> <span class="n">Comparison</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedConfiguration</span><span class="p">,</span> <span class="n">Configuration</span><span class="p">,</span>
+                         <span class="n">PreparedComparison</span><span class="p">,</span> <span class="n">PreparedConfiguration</span><span class="p">,</span>
+                         <span class="n">PreparedFile</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.procedure</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedProcedure</span><span class="p">,</span> <span class="n">PreparedProcedureFile</span><span class="p">,</span>
+                            <span class="n">PreparedProcedureStep</span><span class="p">,</span> <span class="n">ProcedureStep</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="walk_config_file">
+<a class="viewcode-back" href="../../generated/generated/atef.walk.walk_config_file.html#atef.walk.walk_config_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">walk_config_file</span><span class="p">(</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedFile</span><span class="p">,</span> <span class="n">PreparedConfiguration</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">],</span>
+    <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">AnyPreparedConfiguration</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">],</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Yields each config and comparison and its depth</span>
+<span class="sd">    Performs a recursive depth-first search</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    config : Union[PreparedFile, PreparedConfiguration, PreparedComparison]</span>
+<span class="sd">        the configuration or comparison to walk</span>
+<span class="sd">    level : int, optional</span>
+<span class="sd">        the current recursion depth, by default 0</span>
+
+<span class="sd">    Yields</span>
+<span class="sd">    ------</span>
+<span class="sd">    Generator[Tuple[Any, int], None, None]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">yield</span> <span class="n">config</span><span class="p">,</span> <span class="n">level</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">PreparedFile</span><span class="p">):</span>
+        <span class="k">yield from</span> <span class="n">walk_config_file</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">PreparedConfiguration</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;configs&#39;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">conf</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">configs</span><span class="p">:</span>
+                <span class="k">yield from</span> <span class="n">walk_config_file</span><span class="p">(</span><span class="n">conf</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;comparisons&#39;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">comparisons</span><span class="p">:</span>
+                <span class="k">yield from</span> <span class="n">walk_config_file</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="walk_procedure_file">
+<a class="viewcode-back" href="../../generated/generated/atef.walk.walk_procedure_file.html#atef.walk.walk_procedure_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">walk_procedure_file</span><span class="p">(</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedProcedureFile</span><span class="p">,</span> <span class="n">PreparedProcedureStep</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">],</span>
+    <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">AnyPreparedProcedure</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">],</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Yields each ProcedureStep / Comparison and its depth</span>
+<span class="sd">    Performs a recursive depth-first search</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    config : Union[PreparedProcedureFile, PreparedProcedureStep,</span>
+<span class="sd">                    PreparedComparison]</span>
+<span class="sd">        the item to yield and walk through</span>
+<span class="sd">    level : int, optional</span>
+<span class="sd">        the current recursion depth, by default 0</span>
+
+<span class="sd">    Yields</span>
+<span class="sd">    ------</span>
+<span class="sd">    Generator[Tuple[Any, int], None, None]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">yield</span> <span class="n">config</span><span class="p">,</span> <span class="n">level</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">PreparedProcedureFile</span><span class="p">):</span>
+        <span class="k">yield from</span> <span class="n">walk_procedure_file</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">PreparedProcedureStep</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">sub_step</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;steps&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">yield from</span> <span class="n">walk_procedure_file</span><span class="p">(</span><span class="n">sub_step</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;walk_comparisons&#39;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">sub_comp</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">walk_comparisons</span><span class="p">():</span>
+                <span class="k">yield from</span> <span class="n">walk_procedure_file</span><span class="p">(</span><span class="n">sub_comp</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="walk_steps">
+<a class="viewcode-back" href="../../generated/generated/atef.walk.walk_steps.html#atef.walk.walk_steps">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">walk_steps</span><span class="p">(</span>
+    <span class="n">step</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">ProcedureStep</span><span class="p">,</span> <span class="n">PreparedProcedureStep</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">ProcedureStep</span><span class="p">,</span> <span class="n">PreparedProcedureStep</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Yield ProedureSteps in ``step``, depth-first.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    step : ProcedureStep</span>
+<span class="sd">        Step to yield ProcedureSteps from</span>
+
+<span class="sd">    Yields</span>
+<span class="sd">    ------</span>
+<span class="sd">    Generator[ProcedureStep, None, None]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">yield</span> <span class="n">step</span>
+    <span class="k">for</span> <span class="n">sub_step</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="s1">&#39;steps&#39;</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="k">yield from</span> <span class="n">walk_steps</span><span class="p">(</span><span class="n">sub_step</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_prepared_step">
+<a class="viewcode-back" href="../../generated/generated/atef.walk.get_prepared_step.html#atef.walk.get_prepared_step">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_prepared_step</span><span class="p">(</span>
+    <span class="n">prepared_file</span><span class="p">:</span> <span class="n">PreparedProcedureFile</span><span class="p">,</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">ProcedureStep</span><span class="p">,</span> <span class="n">Comparison</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PreparedProcedureStep</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Gather all PreparedProcedureStep dataclasses the correspond to the original</span>
+<span class="sd">    ProcedureStep.</span>
+<span class="sd">    If a PreparedProcedureStep also has comparisions, use the walk_comparisons</span>
+<span class="sd">    method to check if the &quot;origin&quot; matches any of thoes comparisons</span>
+
+<span class="sd">    Only relevant for active checkouts.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    prepared_file : PreparedProcedureFile</span>
+<span class="sd">        the PreparedProcedureFile to search through</span>
+<span class="sd">    origin : Union[ProcedureStep, Comparison]</span>
+<span class="sd">        the step / comparison to match</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    List[Union[PreparedProcedureStep, PreparedComparison]]</span>
+<span class="sd">        the PreparedProcedureStep&#39;s or PreparedComparison&#39;s related to ``origin``</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># As of the writing of this docstring, this helper is only expected to return</span>
+    <span class="c1"># lists of length 1.  However in order to match the passive checkout workflow,</span>
+    <span class="c1"># we still return a list of relevant steps or comparisons.</span>
+    <span class="n">matched_steps</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">pstep</span> <span class="ow">in</span> <span class="n">walk_steps</span><span class="p">(</span><span class="n">prepared_file</span><span class="o">.</span><span class="n">root</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">pstep</span><span class="p">,</span> <span class="s1">&#39;origin&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="n">origin</span><span class="p">:</span>
+            <span class="n">matched_steps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pstep</span><span class="p">)</span>
+        <span class="c1"># check PreparedComparisons, which might be included in some steps</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pstep</span><span class="p">,</span> <span class="s1">&#39;walk_comparisons&#39;</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">pstep</span><span class="o">.</span><span class="n">walk_comparisons</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">comp</span><span class="o">.</span><span class="n">comparison</span> <span class="ow">is</span> <span class="n">origin</span><span class="p">:</span>
+                    <span class="n">matched_steps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">comp</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">matched_steps</span></div>
+
+
+
+<div class="viewcode-block" id="get_relevant_configs_comps">
+<a class="viewcode-back" href="../../generated/generated/atef.walk.get_relevant_configs_comps.html#atef.walk.get_relevant_configs_comps">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_relevant_configs_comps</span><span class="p">(</span>
+    <span class="n">prepared_file</span><span class="p">:</span> <span class="n">PreparedFile</span><span class="p">,</span>
+    <span class="n">original_c</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Configuration</span><span class="p">,</span> <span class="n">Comparison</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PreparedConfiguration</span><span class="p">,</span> <span class="n">PreparedComparison</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Gather all the PreparedConfiguration or PreparedComparison dataclasses</span>
+<span class="sd">    that correspond to the original comparison or config.</span>
+
+<span class="sd">    Phrased another way: maps prepared comparisons onto the comparison</span>
+<span class="sd">    seen in the GUI</span>
+
+<span class="sd">    Currently for passive checkout files only</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    prepared_file : PreparedFile</span>
+<span class="sd">        the file containing configs or comparisons to be gathered</span>
+<span class="sd">    original_c : Union[Configuration, Comparison]</span>
+<span class="sd">        the comparison to match PreparedComparison or PreparedConfigurations to</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    List[Union[PreparedConfiguration, PreparedComparison]]:</span>
+<span class="sd">        the configuration or comparison dataclasses related to ``original_c``</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">matched_c</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">config</span> <span class="ow">in</span> <span class="n">prepared_file</span><span class="o">.</span><span class="n">walk_groups</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">config</span> <span class="ow">is</span> <span class="n">original_c</span><span class="p">:</span>
+            <span class="n">matched_c</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">comp</span> <span class="ow">in</span> <span class="n">prepared_file</span><span class="o">.</span><span class="n">walk_comparisons</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">comp</span><span class="o">.</span><span class="n">comparison</span> <span class="ow">is</span> <span class="n">original_c</span><span class="p">:</span>
+            <span class="n">matched_c</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">comp</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">matched_c</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, SLAC National Accelerator Laboratory.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

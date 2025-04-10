@@ -1,0 +1,6 @@
+atef.walk.walk\_steps
+=====================
+
+.. currentmodule:: atef.walk
+
+.. autofunction:: walk_steps

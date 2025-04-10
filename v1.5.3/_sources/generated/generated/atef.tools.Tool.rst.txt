@@ -1,0 +1,21 @@
+atef.tools.Tool
+===============
+
+.. currentmodule:: atef.tools
+
+.. autoclass:: Tool
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: check_result_key
+    .. automethod:: run
+    
+    
+
+    
+    
+    

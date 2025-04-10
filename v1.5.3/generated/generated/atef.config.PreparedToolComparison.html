@@ -1,0 +1,300 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>atef.config.PreparedToolComparison &mdash; atef  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9a2dae69"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="atef.config.PreparedToolConfiguration" href="atef.config.PreparedToolConfiguration.html" />
+    <link rel="prev" title="atef.config.PreparedTemplateConfiguration" href="atef.config.PreparedTemplateConfiguration.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            atef
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../api.html">ATEF API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../../api.html#dataclasses">Dataclasses</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../atef.check.html">atef.check</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="../atef.config.html">atef.config</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="atef.config.get_result_from_comparison.html">atef.config.get_result_from_comparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.run_passive_step.html">atef.config.run_passive_step</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.Configuration.html">atef.config.Configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.ConfigurationFile.html">atef.config.ConfigurationFile</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.ConfigurationGroup.html">atef.config.ConfigurationGroup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.DeviceConfiguration.html">atef.config.DeviceConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.FailedConfiguration.html">atef.config.FailedConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PVConfiguration.html">atef.config.PVConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedComparison.html">atef.config.PreparedComparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedConfiguration.html">atef.config.PreparedConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedDeviceConfiguration.html">atef.config.PreparedDeviceConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedFile.html">atef.config.PreparedFile</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedGroup.html">atef.config.PreparedGroup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedPVConfiguration.html">atef.config.PreparedPVConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedSignalComparison.html">atef.config.PreparedSignalComparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedTemplateConfiguration.html">atef.config.PreparedTemplateConfiguration</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">atef.config.PreparedToolComparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.PreparedToolConfiguration.html">atef.config.PreparedToolConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.TemplateConfiguration.html">atef.config.TemplateConfiguration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.config.ToolConfiguration.html">atef.config.ToolConfiguration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../atef.procedure.html">atef.procedure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../atef.tools.html">atef.tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../atef.walk.html">atef.walk</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../releases.html">Release History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../upcoming_changes.html">Upcoming Changes</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/pcdshub/atef">Github Repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">atef</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../api.html">ATEF API</a></li>
+          <li class="breadcrumb-item"><a href="../atef.config.html">atef.config</a></li>
+      <li class="breadcrumb-item active">atef.config.PreparedToolComparison</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/generated/generated/atef.config.PreparedToolComparison.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="atef-config-preparedtoolcomparison">
+<h1>atef.config.PreparedToolComparison<a class="headerlink" href="#atef-config-preparedtoolcomparison" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">atef.config.</span></span><span class="sig-name descname"><span class="pre">PreparedToolComparison</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cache:</span> <span class="pre">~atef.cache.DataCache</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comparison:</span> <span class="pre">~atef.check.Comparison</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent:</span> <span class="pre">~atef.config.PreparedGroup</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">result:</span> <span class="pre">~atef.result.Result</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tool:</span> <span class="pre">~atef.tools.Tool</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/atef/config.html#PreparedToolComparison"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.config.PreparedToolComparison" title="Link to this definition"></a></dt>
+<dd><p>A unified representation of comparisons for device signals and standalone PVs.</p>
+<p>Each PreparedToolComparison has a single leaf in the configuration tree,
+comprised of:</p>
+<ul class="simple">
+<li><p>A configuration</p></li>
+<li><p>The tool configuration (i.e., a <code class="xref py py-class docutils literal notranslate"><span class="pre">tools.Tool</span></code> instance)</p></li>
+<li><p>Identifiers to compare are dependent on the tool type</p></li>
+<li><dl class="simple">
+<dt>A comparison to run</dt><dd><ul>
+<li><p>For example, a <a class="reference internal" href="atef.tools.Ping.html#atef.tools.Ping" title="atef.tools.Ping"><code class="xref py py-class docutils literal notranslate"><span class="pre">atef.tools.Ping</span></code></a> has keys described in
+<a class="reference internal" href="atef.tools.PingResult.html#atef.tools.PingResult" title="atef.tools.PingResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">PingResult</span></code></a>.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>name</strong></dt><dd></dd>
+<dt><strong>parent</strong></dt><dd></dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#atef.config.PreparedToolComparison.compare" title="atef.config.PreparedToolComparison.compare"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compare</span></code></a>()</p></td>
+<td><p>Run the comparison and return the Result.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#atef.config.PreparedToolComparison.from_tool" title="atef.config.PreparedToolComparison.from_tool"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_tool</span></code></a>(tool, result_key, comparison[, ...])</p></td>
+<td><p>Prepare a tool-based comparison for execution.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#atef.config.PreparedToolComparison.get_data_async" title="atef.config.PreparedToolComparison.get_data_async"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_data_async</span></code></a>()</p></td>
+<td><p>Get the provided tool's result data from the cache.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Methods</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cache:</span> <span class="pre">~atef.cache.DataCache</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">identifier:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comparison:</span> <span class="pre">~atef.check.Comparison</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent:</span> <span class="pre">~atef.config.PreparedGroup</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">result:</span> <span class="pre">~atef.result.Result</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tool:</span> <span class="pre">~atef.tools.Tool</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#atef.config.PreparedToolComparison.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.compare">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">compare</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Result</span></span></span><a class="headerlink" href="#atef.config.PreparedToolComparison.compare" title="Link to this definition"></a></dt>
+<dd><p>Run the comparison and return the Result.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>Result</dt><dd><p>The result of the comparison.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.from_tool">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_tool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tool</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="atef.tools.Tool.html#atef.tools.Tool" title="atef.tools.Tool"><span class="pre">Tool</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">result_key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">comparison</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="atef.check.Comparison.html#atef.check.Comparison" title="atef.check.Comparison"><span class="pre">Comparison</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="atef.config.PreparedToolConfiguration.html#atef.config.PreparedToolConfiguration" title="atef.config.PreparedToolConfiguration"><span class="pre">PreparedToolConfiguration</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataCache</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#atef.config.PreparedToolComparison" title="atef.config.PreparedToolComparison"><span class="pre">PreparedToolComparison</span></a></span></span><a class="reference internal" href="../../_modules/atef/config.html#PreparedToolComparison.from_tool"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.config.PreparedToolComparison.from_tool" title="Link to this definition"></a></dt>
+<dd><p>Prepare a tool-based comparison for execution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>tool</strong><span class="classifier">Tool</span></dt><dd><p>The tool to run.</p>
+</dd>
+<dt><strong>result_key</strong><span class="classifier">str</span></dt><dd><p>The key from the result dictionary to check after running the tool.</p>
+</dd>
+<dt><strong>comparison</strong><span class="classifier">Comparison</span></dt><dd><p>The comparison to perform on the tool’s results (looking at the
+specific result_key).</p>
+</dd>
+<dt><strong>name</strong><span class="classifier">str, optional</span></dt><dd><p>The name of the comparison.</p>
+</dd>
+<dt><strong>cache</strong><span class="classifier">DataCache, optional</span></dt><dd><p>The data cache instance, if available.  If unspecified, a new data
+cache will be instantiated.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>PreparedToolComparison</dt><dd></dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.get_data_async">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_data_async</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><span class="pre">Any</span></a></span></span><a class="reference internal" href="../../_modules/atef/config.html#PreparedToolComparison.get_data_async"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.config.PreparedToolComparison.get_data_async" title="Link to this definition"></a></dt>
+<dd><p>Get the provided tool’s result data from the cache.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>data</strong><span class="classifier">Any</span></dt><dd><p>The acquired data.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<p class="rubric">Attributes</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.identifier">
+<span class="sig-name descname"><span class="pre">identifier</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">''</span></em><a class="headerlink" href="#atef.config.PreparedToolComparison.identifier" title="Link to this definition"></a></dt>
+<dd><p>The identifier used for the comparison.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#atef.config.PreparedToolComparison.name" title="Link to this definition"></a></dt>
+<dd><p>The name of the associated configuration.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.parent">
+<span class="sig-name descname"><span class="pre">parent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="atef.config.PreparedGroup.html#atef.config.PreparedGroup" title="atef.config.PreparedGroup"><span class="pre">PreparedGroup</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#atef.config.PreparedToolComparison.parent" title="Link to this definition"></a></dt>
+<dd><p>The hierarhical parent of this comparison.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.tool">
+<span class="sig-name descname"><span class="pre">tool</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="atef.tools.Tool.html#atef.tools.Tool" title="atef.tools.Tool"><span class="pre">Tool</span></a></em><a class="headerlink" href="#atef.config.PreparedToolComparison.tool" title="Link to this definition"></a></dt>
+<dd><p>The device the comparison applies to, if applicable.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.cache">
+<span class="sig-name descname"><span class="pre">cache</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">DataCache</span></em><a class="headerlink" href="#atef.config.PreparedToolComparison.cache" title="Link to this definition"></a></dt>
+<dd><p>The data cache to use for the preparation step.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.comparison">
+<span class="sig-name descname"><span class="pre">comparison</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="atef.check.Comparison.html#atef.check.Comparison" title="atef.check.Comparison"><span class="pre">Comparison</span></a></em><a class="headerlink" href="#atef.config.PreparedToolComparison.comparison" title="Link to this definition"></a></dt>
+<dd><p>The comparison itself.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.config.PreparedToolComparison.result">
+<span class="sig-name descname"><span class="pre">result</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Result</span></em><a class="headerlink" href="#atef.config.PreparedToolComparison.result" title="Link to this definition"></a></dt>
+<dd><p>The last result of the comparison, if run.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="atef.config.PreparedTemplateConfiguration.html" class="btn btn-neutral float-left" title="atef.config.PreparedTemplateConfiguration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="atef.config.PreparedToolConfiguration.html" class="btn btn-neutral float-right" title="atef.config.PreparedToolConfiguration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, SLAC National Accelerator Laboratory.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
