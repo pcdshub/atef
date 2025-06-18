@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+from datetime import time
 import json
 import logging
 import pathlib
@@ -480,6 +481,7 @@ class PreparedProcedureFile:
         return prep_proc_file
 
     async def run(self) -> Result:
+        print("\nIn PPF run")
         return await self.root.run()
 
 
@@ -523,6 +525,8 @@ class PreparedProcedureStep:
     #: whether or not the step completed successfully
     step_result: Result = field(default_factory=incomplete_result)
 
+    
+
     @property
     def result(self) -> Result:
         """
@@ -561,21 +565,58 @@ class PreparedProcedureStep:
         Run the step.  To be implemented in subclass.
         Returns the step_result
         """
+        
+        # return self.result
         raise NotImplementedError()
 
     async def run(self) -> Result:
+        print("In PPS run")
         """Run the step and return the result"""
+        
+        st = datetime.datetime.now()
+        display_st= st.strftime("%H:%M:%S")
+        
+        print(self.result)
+        print("PPS, started time")
+
+        # print("starting time %s" % display_st)
         try:
             result = await self._run()
+            self.result.startTime = display_st
         except Exception as ex:
+            print("Exception case")
             result = Result(
                 severity=Severity.internal_error,
                 reason=str(ex)
             )
 
         # stash step result
+        print("stashed step")
         self.step_result = result
+
+        print(f"reporting severity: {self.step_result.severity}")
+        if self.step_result.severity is Severity.success:
+            print(f"step {self.name} succeeded")
+        elif self.step_result.severity is Severity.warning:
+            print(f"step {self.name} succeeded with warnings")
+        elif self.step_result.severity is Severity.error:
+            print(f"step {self.name} error")
+        elif self.step_result.severity is Severity.internal_error:
+            print(f"step {self.name} internal error")
+        else:
+            print("something else happened")
+        print("finished checking severity")
+
+
         # return the overall result, including verification
+        # et = datetime.datetime.now()
+        # display_et = et.strftime("%H:%M:%S")
+        # et_us = datetime.datetime.now()
+        # et_us.microsecond / 1000
+        # self.result.startTime=et_us
+        # print("ending time %s" % display_et)
+        # self.result.totalTime = et_us - st_us
+        
         return self.result
 
     @classmethod
@@ -647,7 +688,8 @@ class PreparedProcedureGroup(PreparedProcedureStep):
     steps: List[AnyPreparedProcedure] = field(default_factory=list)
     #: Steps that failed to be prepared
     prepare_failures: List[FailedStep] = field(default_factory=list)
-
+    #: array of top nodes
+    nodeArray = []
     @classmethod
     def from_origin(
         cls,
@@ -671,6 +713,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         prepared = cls(origin=group, parent=parent, steps=[])
 
         for step in group.steps:
+            # print(step)
             prep_step = PreparedProcedureStep.from_origin(
                 step=cast(AnyPreparedProcedure, step),
                 parent=prepared
@@ -681,11 +724,22 @@ class PreparedProcedureGroup(PreparedProcedureStep):
                 prepared.steps.append(prep_step)
 
         return prepared
+    
+    # make _run to handle logic for taking start timestamps and checking severity for end timestamps
+    # async def _run(self) -> Result:
+    #     """
+    #     Run the step.  To be implemented in subclass.
+    #     Returns the step_result
+    #     """
+    #     print("\nIn PPG run")
+    #     return self.result
 
     async def run(self) -> Result:
         """Run all steps and return a combined result"""
+        print("In PPG run")
         results = []
         for step in self.steps:
+            print("PPG, step name %s" % step.name)
             results.append(await step.run())
 
         if self.prepare_failures:
@@ -698,6 +752,10 @@ class PreparedProcedureGroup(PreparedProcedureStep):
             result = Result(severity=severity)
 
         self.step_result = result
+        # print("action array", self.actionArray)
+        # for i, actions in enumerate(self.actionArray):
+        #     print("action %d - start time: %s end time: %s total time: %s" % (i, self.actionArray[i][0],
+        #           self.actionArray[i][1], self.actionArray[i][2]))
         return self.result
 
     @property
@@ -706,6 +764,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         results = []
         for step in self.steps:
             results.append(step.result)
+            # print(step)
 
         if self.prepare_failures:
             result = Result(

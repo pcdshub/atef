@@ -23,6 +23,9 @@ class Result:
     severity: Severity = Severity.success
     reason: Optional[str] = None
     timestamp: datetime = field(default_factory=datetime.utcnow, compare=False)
+    startTime: datetime = field(default_factory=datetime.utcnow, compare=False)
+    endTime: datetime = field(default_factory=datetime.utcnow, compare=False)
+    totalTime: datetime = field(default_factory=datetime.utcnow, compare=False)
 
     @classmethod
     def from_exception(cls, error: Exception) -> Result:
