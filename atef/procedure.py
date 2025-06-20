@@ -565,24 +565,15 @@ class PreparedProcedureStep:
         Run the step.  To be implemented in subclass.
         Returns the step_result
         """
-        
-        # return self.result
         raise NotImplementedError()
 
     async def run(self) -> Result:
         print("In PPS run")
         """Run the step and return the result"""
         
-        st = datetime.datetime.now()
-        display_st= st.strftime("%H:%M:%S")
-        
-        print(self.result)
-        print("PPS, started time")
-
-        # print("starting time %s" % display_st)
         try:
             result = await self._run()
-            self.result.startTime = display_st
+            print(result)
         except Exception as ex:
             print("Exception case")
             result = Result(
@@ -593,30 +584,6 @@ class PreparedProcedureStep:
         # stash step result
         print("stashed step")
         self.step_result = result
-
-        print(f"reporting severity: {self.step_result.severity}")
-        if self.step_result.severity is Severity.success:
-            print(f"step {self.name} succeeded")
-        elif self.step_result.severity is Severity.warning:
-            print(f"step {self.name} succeeded with warnings")
-        elif self.step_result.severity is Severity.error:
-            print(f"step {self.name} error")
-        elif self.step_result.severity is Severity.internal_error:
-            print(f"step {self.name} internal error")
-        else:
-            print("something else happened")
-        print("finished checking severity")
-
-
-        # return the overall result, including verification
-        # et = datetime.datetime.now()
-        # display_et = et.strftime("%H:%M:%S")
-        # et_us = datetime.datetime.now()
-        # et_us.microsecond / 1000
-        # self.result.startTime=et_us
-        # print("ending time %s" % display_et)
-        # self.result.totalTime = et_us - st_us
-        
         return self.result
 
     @classmethod
@@ -887,6 +854,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
         Result
             the step_result for this step
         """
+        startTime=datetime.datetime.utcnow()
         self.origin = cast(SetValueStep, self.origin)
         for prep_action in self.prepared_actions:
             action_result = await prep_action.run()
@@ -908,8 +876,9 @@ class PreparedSetValueStep(PreparedProcedureStep):
 
         severity = _summarize_result_severity(GroupResultMode.all_,
                                               criteria_results + action_results)
+        endTime=datetime.datetime.utcnow()
 
-        return Result(severity=severity)
+        return Result(severity=severity,startTime=startTime,endTime=endTime)
 
     @classmethod
     def from_origin(
@@ -1221,7 +1190,7 @@ class PreparedPlanStep(PreparedProcedureStep):
         # send plan to destination (local, queue server, ...)
         # local -> get global run engine, setup
         # qserver -> send to queueserver
-
+        startTime=datetime.datetime.utcnow()
         if self.origin.require_plan_success and self.prepared_plan_failures:
             return Result(
                 severity=Severity.error,
@@ -1276,7 +1245,8 @@ class PreparedPlanStep(PreparedProcedureStep):
                                               check_results + plan_results)
         reason = (f'{len(plan_results)} plans run, '
                   f'{len(check_results)} checks passed')
-        return Result(severity=severity, reason=reason)
+        endTime=datetime.datetime.utcnow()
+        return Result(severity=severity, reason=reason, startTime=startTime, endTime=endTime)
 
     @classmethod
     def from_origin(
