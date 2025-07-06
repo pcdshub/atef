@@ -22,15 +22,17 @@ from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
-                            QTabWidget, QWidget)
+from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMenu,
+                            QMessageBox, QTabWidget, QWidget)
 
 from atef.cache import DataCache
-from atef.config import ConfigurationFile, PreparedFile, TemplateConfiguration
+from atef.check import Comparison
+from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
+                         PreparedFile, TemplateConfiguration)
 from atef.exceptions import PreparationError
 from atef.procedure import (DescriptionStep, PassiveStep,
-                            PreparedProcedureFile, ProcedureFile, SetValueStep,
-                            TemplateStep)
+                            PreparedProcedureFile, ProcedureFile, ProcedureGroup,
+                            ProcedureStep, SetValueStep, TemplateStep)
 from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.type_hints import AnyDataclass
 from atef.walk import get_prepared_step, get_relevant_configs_comps
@@ -85,6 +87,7 @@ class Window(DesignerDisplay, QMainWindow):
         super().__init__(*args, **kwargs)
         self._partial_slots: list[WeakPartialMethodSlot] = []
         self.cache_size = cache_size
+        self.clipboard = None
         self.setWindowTitle('atef config')
         self.action_welcome_tab.triggered.connect(self.welcome_user)
         self.action_new_file.triggered.connect(self.new_file)
@@ -288,6 +291,8 @@ class Window(DesignerDisplay, QMainWindow):
         """
         widget = DualTree(orig_file=data, full_path=filename,
                           widget_cache_size=self.cache_size)
+        widget.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        widget.tree_view.customContextMenuRequested.connect(self.copypaste_menu)
         self.tab_widget.addTab(widget, self.get_tab_name(filename))
         curr_idx = self.tab_widget.count() - 1
         self.tab_widget.setCurrentIndex(curr_idx)
@@ -295,6 +300,53 @@ class Window(DesignerDisplay, QMainWindow):
         tab_bar = self.tab_widget.tabBar()
         widget.toggle.stateChanged.connect(widget.switch_mode)
         tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.LeftSide, widget.toggle)
+
+    def add_data(self, list_attr, add_attr, add_kw, location=None):
+        current_tree = self.get_current_tree()
+        if location is None:
+            location = current_tree.current_item
+        getattr(location.orig_data, list_attr).append(self.clipboard)
+        if (page := current_tree.maybe_get_widget(location)) is not None:
+            getattr(page, add_attr)(**{add_kw:self.clipboard})
+        else:
+            with current_tree.modifies_tree():
+                TreeItem(data=self.clipboard, tree_parent=location)
+        self.clipboard = deepcopy(self.clipboard)
+
+    def copypaste_menu(self, position):
+        current_tree = self.get_current_tree()
+        item = current_tree.current_item
+        if item is None or current_tree.mode != 'edit':
+            return
+        menu = QMenu(self)
+        copyAction = menu.addAction('Copy')
+        pasteAction = menu.addAction('Paste')
+        action = menu.exec_(current_tree.tree_view.mapToGlobal(position))
+        if action == copyAction:
+            self.clipboard = deepcopy(item.orig_data)
+        elif action == pasteAction:
+            if self.clipboard is None:
+                raise Warning('Nothing copied to paste.')
+            else:
+                paste_location = item
+                if isinstance(self.clipboard, Comparison):
+                    if isinstance(paste_location.orig_data, Comparison):
+                        if paste_location.parent() is not None:
+                            paste_location = paste_location.parent()
+                        else:
+                            raise RuntimeError('Cannot paste into Comparison')
+                    for complist_attr in ['shared', 'success_criteria']:
+                        if hasattr(paste_location.orig_data, complist_attr):
+                            self.add_data(list_attr=complist_attr, add_attr='add_comparison_row', add_kw='comparison', location=paste_location)
+                            return
+                    else:
+                        raise RuntimeError(f'Cannot paste Comparison in {paste_location.orig_data.__class__.__name__}')
+                elif isinstance(paste_location.orig_data, ConfigurationGroup):
+                    self.add_data(list_attr='configs', add_attr='add_config_row', add_kw='config')
+                elif isinstance(paste_location.orig_data, ProcedureGroup):
+                    self.add_data(list_attr='steps', add_attr='add_config_row', add_kw='config')
+                else:
+                    raise RuntimeError(f'Pasting {self.clipboard.__class__.__name__} into {paste_location.orig_data.__class__.__name__} is not supported')
 
     def save(self, *args, **kwargs):
         """
