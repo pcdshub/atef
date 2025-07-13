@@ -271,6 +271,44 @@ def test_open_all_pages(qtbot: QtBot, config: os.PathLike):
     qtbot.addWidget(window)
 
 
+@pytest.mark.parametrize('config', [0, 1, 2], indirect=True)
+def test_copypaste(qtbot: QtBot, config: os.PathLike):
+    """
+    Pass if we can copy and paste TreeItems and correctly update
+    the affect configurations and procedures.
+    """
+    window = Window(show_welcome=False, cache_size=100)
+    window.open_file(filename=str(config))
+
+    # context menu shouldn't block
+    window.context_menu(QtCore.QPoint(0, 0))
+
+    curr_tree = window.get_current_tree()
+    tree_view = curr_tree.tree_view
+    curr_index = tree_view.selectionModel().currentIndex()
+    curr_page = curr_tree.current_widget
+
+    # Assuming we have less than 100 items in test configs
+    for _ in range(100):
+        new_index = tree_view.indexBelow(curr_index)
+        print(curr_tree.model.data(new_index, 0))
+        if curr_tree.model.data(new_index, 0) is None:
+            break
+        tree_view.setCurrentIndex(new_index)
+        qtbot.waitUntil(lambda: curr_page != curr_tree.current_widget)
+        curr_page = curr_tree.current_widget
+        window.copy()
+        assert window.clipboard is not None
+        try:
+            window.paste()
+        except RuntimeError as e:
+            print(e)
+        curr_index = new_index
+
+    # if there are epics calls they may still be going on at test teardown?...
+    qtbot.addWidget(window)
+
+
 def test_open_happi_viewer(qtbot: QtBot, happi_client: happi.Client):
     """
     Pass if HappiDeviceComponentWidget can be created and refreshed without error
