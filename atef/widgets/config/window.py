@@ -12,10 +12,9 @@ import webbrowser
 from collections import OrderedDict
 from contextlib import contextmanager
 from copy import deepcopy
-from operator import attrgetter
 from pathlib import Path
 from pprint import pprint
-from typing import ClassVar, Dict, Generator, Optional, Union, get_args
+from typing import ClassVar, Dict, Generator, Optional
 
 import qtawesome
 from apischema import ValidationError, deserialize, serialize
@@ -27,19 +26,19 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMenu,
                             QMessageBox, QTabWidget, QWidget)
 
 from atef.cache import DataCache
-from atef.check import Comparison
-from atef.config import (ConfigurationFile, ConfigurationGroup, PreparedFile,
-                         TemplateConfiguration)
+from atef.check import AnyComparison, Comparison
+from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
+                         PreparedFile, TemplateConfiguration)
 from atef.exceptions import PreparationError
 from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile,
-                            ProcedureGroup, SetValueStep, TemplateStep)
+                            ProcedureGroup, ProcedureStep, SetValueStep,
+                            TemplateStep)
 from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.type_hints import AnyDataclass
 from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.find_replace import (FillTemplatePage,
                                               FindReplaceWidget)
-from atef.widgets.config.utils import get_comp_field_in_parent
 from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
@@ -314,72 +313,36 @@ class Window(DesignerDisplay, QMainWindow):
             item_data = parent_data.success_criteria[parent_data.children().index(item_data)]
         self.clipboard = (deepcopy(parent_data), deepcopy(item_data))
 
-    def start_pasting(self, list_attr=None, location=None):
-        current_tree = self.get_current_tree()
-        # Make clipboard a deep copy of itself in case the same item is pasted multiple times
-        old_data = self.clipboard[1]
-        self.clipboard = deepcopy(self.clipboard)
-        if location is None:
-            location = current_tree.current_item
-        if list_attr is not None:
-            attrgetter(list_attr)(location.orig_data).append(old_data)
-        # Page not in cache, manually add
-        if (page := current_tree.maybe_get_widget(location)) is None:
-            # ComparisonToTargets are displayed in the tree and page as Comparisons
-            new_comp = old_data.comparison if isinstance(old_data, ComparisonToTarget) else old_data
-            with current_tree.modifies_tree():
-                TreeItem(data=new_comp, tree_parent=location)
-            return old_data
-        # Page in cache, let paste handle how to add it
-        else:
-            return (page, old_data)
-
     def paste(self):
         if self.clipboard is None:
             raise Warning('Nothing copied to paste.')
-        paste_location = self.get_current_tree().current_item
-        if isinstance(self.clipboard[1], get_args(Union[Comparison, ComparisonToTarget])):
-            # if paste_location is Comparison, try pasting into its parent
-            if isinstance(paste_location.orig_data, Comparison):
-                if paste_location.parent() is not None:
-                    paste_location = paste_location.parent()
-                else:
-                    raise RuntimeError('Cannot paste into Comparison')
-            if hasattr(paste_location.orig_data, 'success_criteria'):
-                if isinstance(pageitem := self.start_pasting(location=paste_location), tuple):
-                    page, item = pageitem
-                    page.specific_procedure_widget.checks_table.add_row(data=item)
-                else:
-                    # Only add to list if page is not in cache, add_row handles it so don't duplicate add
-                    paste_location.orig_data.success_criteria.append(pageitem)
-            # Get original location of comparison
-            elif (comp_field := get_comp_field_in_parent(self.clipboard[1], self.clipboard[0])):
-                if hasattr(paste_location, 'by_attr'):
-                    comp_field = f'by_attr.{comp_field}'
-                elif hasattr(paste_location, 'by_pv'):
-                    comp_field = f'by_pv.{comp_field}'
-                # Put into shared if that comp_field isn't in paste_location
-                try:
-                    attrgetter(comp_field)(paste_location.orig_data)
-                except AttributeError:
-                    comp_field = 'shared'
-                if isinstance(pageitem := self.start_pasting(list_attr=comp_field, location=paste_location), tuple):
-                    page, item = pageitem
-                    page.add_comparison_row(comparison=item)
-            else:
-                raise RuntimeError(f'Cannot paste Comparison in {paste_location.orig_data.__class__.__name__}')
-        elif isinstance(paste_location.orig_data, ConfigurationGroup):
-            # Adding non-Comparison to ConfigurationGroup
-            if isinstance(pageitem := self.start_pasting(list_attr='configs'), tuple):
-                page, item = pageitem
-                page.add_config_row(config=item)
-        elif isinstance(paste_location.orig_data, ProcedureGroup):
-            # Adding non-Comparison to ProcedureGroup
-            if isinstance(pageitem := self.start_pasting(list_attr='steps'), tuple):
-                page, item = pageitem
-                page.add_config_row(config=item)
+        paste_item = self.get_current_tree().current_item
+        # Page should always exist for current item, but stop early in case it doesn't
+        # since pasting relies on the page
+        if (page := self.get_current_tree().maybe_get_widget(paste_item)) is None:
+            raise RuntimeError('Paste failed, page not found for current item.')
+        paste_data = paste_item.orig_data
+        # Make another deepcopy in case the data is pasted multiple times
+        old_data = self.clipboard[1]
+        self.clipboard = deepcopy(self.clipboard)
+        if isinstance(paste_data, ConfigurationGroup) and isinstance(self.clipboard[1], Configuration):
+            paste_data.configs.append(old_data)
+            page.add_config_row(config=old_data)
+        elif isinstance(paste_data, ProcedureGroup) and isinstance(self.clipboard[1], ProcedureStep):
+            paste_data.steps.append(old_data)
+            page.add_config_row(config=old_data)
+        elif isinstance(self.clipboard[1], ComparisonToTarget) and isinstance(paste_data, SetValueStep):
+            page.specific_procedure_widget.checks_table.add_row(data=old_data)
+        elif isinstance(self.clipboard[1], Comparison) and isinstance(paste_data, Configuration):
+            paste_data.shared.append(old_data)
+            page.add_comparison_row(comparison=old_data)
+        elif isinstance(self.clipboard[1], Comparison) and isinstance(paste_data, AnyComparison):
+            page.specific_comparison_widget.add_comparison(comparison=old_data)
+            page.specific_comparison_widget.update_comparison_list()
         else:
-            raise RuntimeError(f'Pasting {self.clipboard[1].__class__.__name__} into {paste_location.orig_data.__class__.__name__} is not supported')
+            # Either trying an invalid paste (e.g., ConfigurationGroup into Comparison)
+            # or pasting support was nto added for this type yet
+            raise RuntimeError(f'Pasting {self.clipboard[1].__class__.__name__} into {paste_data.__class__.__name__} is not supported')
 
     def context_menu(self, position):
         """Open context window"""
