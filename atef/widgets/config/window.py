@@ -325,24 +325,24 @@ class Window(DesignerDisplay, QMainWindow):
         # Make another deepcopy in case the data is pasted multiple times
         old_data = self.clipboard[1]
         self.clipboard = deepcopy(self.clipboard)
-        if isinstance(paste_data, ConfigurationGroup) and isinstance(self.clipboard[1], Configuration):
+        if isinstance(paste_data, ConfigurationGroup) and isinstance(old_data, Configuration):
             paste_data.configs.append(old_data)
             page.add_config_row(config=old_data)
-        elif isinstance(paste_data, ProcedureGroup) and isinstance(self.clipboard[1], ProcedureStep):
+        elif isinstance(paste_data, ProcedureGroup) and isinstance(old_data, ProcedureStep):
             paste_data.steps.append(old_data)
             page.add_config_row(config=old_data)
-        elif isinstance(self.clipboard[1], ComparisonToTarget) and isinstance(paste_data, SetValueStep):
+        elif isinstance(old_data, ComparisonToTarget) and isinstance(paste_data, SetValueStep):
             page.specific_procedure_widget.checks_table.add_row(data=old_data)
-        elif isinstance(self.clipboard[1], Comparison) and isinstance(paste_data, Configuration):
+        elif isinstance(old_data, Comparison) and isinstance(paste_data, Configuration):
             paste_data.shared.append(old_data)
             page.add_comparison_row(comparison=old_data)
-        elif isinstance(self.clipboard[1], Comparison) and isinstance(paste_data, AnyComparison):
+        elif isinstance(old_data, Comparison) and isinstance(paste_data, AnyComparison):
             page.specific_comparison_widget.add_comparison(comparison=old_data)
             page.specific_comparison_widget.update_comparison_list()
         else:
             # Either trying an invalid paste (e.g., ConfigurationGroup into Comparison)
             # or pasting support was nto added for this type yet
-            raise RuntimeError(f'Pasting {self.clipboard[1].__class__.__name__} into {paste_data.__class__.__name__} is not supported')
+            raise RuntimeError(f'Pasting {old_data.__class__.__name__} into {paste_data.__class__.__name__} is not supported')
 
     def context_menu(self, position):
         """Open context window"""

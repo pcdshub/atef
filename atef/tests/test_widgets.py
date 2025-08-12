@@ -305,7 +305,6 @@ def test_copypaste(qtbot: QtBot, config: os.PathLike):
             print(e)
         curr_index = new_index
 
-    # if there are epics calls they may still be going on at test teardown?...
     qtbot.addWidget(window)
 
 
