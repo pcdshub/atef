@@ -22,14 +22,17 @@ from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt, QTimer
 from qtpy.QtCore import Signal as QSignal
-from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMessageBox,
-                            QTabWidget, QWidget)
+from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMenu,
+                            QMessageBox, QTabWidget, QWidget)
 
 from atef.cache import DataCache
-from atef.config import ConfigurationFile, PreparedFile, TemplateConfiguration
+from atef.check import AnyComparison, Comparison
+from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
+                         PreparedFile, TemplateConfiguration)
 from atef.exceptions import PreparationError
-from atef.procedure import (DescriptionStep, PassiveStep,
-                            PreparedProcedureFile, ProcedureFile, SetValueStep,
+from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
+                            PreparedProcedureFile, ProcedureFile,
+                            ProcedureGroup, ProcedureStep, SetValueStep,
                             TemplateStep)
 from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.type_hints import AnyDataclass
@@ -85,6 +88,8 @@ class Window(DesignerDisplay, QMainWindow):
         super().__init__(*args, **kwargs)
         self._partial_slots: list[WeakPartialMethodSlot] = []
         self.cache_size = cache_size
+        # tuple of (parent of copied item, copied item)
+        self.clipboard = None
         self.setWindowTitle('atef config')
         self.action_welcome_tab.triggered.connect(self.welcome_user)
         self.action_new_file.triggered.connect(self.new_file)
@@ -294,7 +299,65 @@ class Window(DesignerDisplay, QMainWindow):
         # set up edit-run toggle
         tab_bar = self.tab_widget.tabBar()
         widget.toggle.stateChanged.connect(widget.switch_mode)
+        widget.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        widget.tree_view.customContextMenuRequested.connect(self.context_menu)
         tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.LeftSide, widget.toggle)
+
+    def copy(self):
+        """Copy the currently selected item and its parent to the clipboard"""
+        current_item = self.get_current_tree().current_item
+        parent_data = current_item.parent().orig_data
+        item_data = current_item.orig_data
+        # make deep copies now in case items are modified after copying but before pasting
+        if isinstance(parent_data, SetValueStep):
+            item_data = parent_data.success_criteria[parent_data.children().index(item_data)]
+        self.clipboard = (deepcopy(parent_data), deepcopy(item_data))
+
+    def paste(self):
+        if self.clipboard is None:
+            raise Warning('Nothing copied to paste.')
+        paste_item = self.get_current_tree().current_item
+        # Page should always exist for current item, but stop early in case it doesn't
+        # since pasting relies on the page
+        if (page := self.get_current_tree().maybe_get_widget(paste_item)) is None:
+            raise RuntimeError('Paste failed, page not found for current item.')
+        paste_data = paste_item.orig_data
+        # Make another deepcopy in case the data is pasted multiple times
+        old_data = self.clipboard[1]
+        self.clipboard = deepcopy(self.clipboard)
+        if isinstance(paste_data, ConfigurationGroup) and isinstance(old_data, Configuration):
+            paste_data.configs.append(old_data)
+            page.add_config_row(config=old_data)
+        elif isinstance(paste_data, ProcedureGroup) and isinstance(old_data, ProcedureStep):
+            paste_data.steps.append(old_data)
+            page.add_config_row(config=old_data)
+        elif isinstance(old_data, ComparisonToTarget) and isinstance(paste_data, SetValueStep):
+            page.specific_procedure_widget.checks_table.add_row(data=old_data)
+        elif isinstance(old_data, Comparison) and isinstance(paste_data, Configuration):
+            paste_data.shared.append(old_data)
+            page.add_comparison_row(comparison=old_data)
+        elif isinstance(old_data, Comparison) and isinstance(paste_data, AnyComparison):
+            page.specific_comparison_widget.add_comparison(comparison=old_data)
+            page.specific_comparison_widget.update_comparison_list()
+        else:
+            # Either trying an invalid paste (e.g., ConfigurationGroup into Comparison)
+            # or pasting support was nto added for this type yet
+            raise RuntimeError(f'Pasting {old_data.__class__.__name__} into {paste_data.__class__.__name__} is not supported')
+
+    def context_menu(self, position):
+        """Open context window"""
+        current_tree = self.get_current_tree()
+        item = current_tree.current_item
+        menu = QMenu(self)
+        if item is not None and current_tree.mode == 'edit':
+            menu.addAction('Copy').triggered.connect(self.copy)
+            menu.addAction('Paste').triggered.connect(self.paste)
+        else:
+            # leaving the option to add actions under different conditions in the future
+            # till then, just return
+            return
+        # open context window on cursor
+        menu.popup(current_tree.tree_view.mapToGlobal(position))
 
     def save(self, *args, **kwargs):
         """

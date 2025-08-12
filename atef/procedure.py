@@ -139,7 +139,7 @@ class SetValueStep(ProcedureStep):
     #: Only mark the step_result as successful if all actions have succeeded
     require_action_success: bool = True
 
-    def children(self) -> List[ComparisonToTarget]:
+    def children(self) -> List[Comparison]:
         """Return children of this group, as a tree view might expect"""
         return [crit.comparison for crit in self.success_criteria]
 
