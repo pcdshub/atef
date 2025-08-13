@@ -2,6 +2,19 @@ Release History
 ###############
 
 
+v1.6.0 (2025-08-13)
+===================
+
+Features
+--------
+- Added the ability to copy/paste items in the tree
+
+Contributors
+------------
+- KaushikMalapati
+
+
+
 v1.5.3 (2025-04-09)
 ===================
 
