@@ -1,0 +1,6 @@
+atef.config.get\_result\_from\_comparison
+=========================================
+
+.. currentmodule:: atef.config
+
+.. autofunction:: get_result_from_comparison

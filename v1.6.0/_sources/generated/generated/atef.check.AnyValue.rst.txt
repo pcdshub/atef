@@ -1,0 +1,38 @@
+atef.check.AnyValue
+===================
+
+.. currentmodule:: atef.check
+
+.. autoclass:: AnyValue
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: compare
+    .. automethod:: describe
+    .. automethod:: get_data_for_signal
+    .. automethod:: get_data_for_signal_async
+    .. automethod:: prepare
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: description
+    .. autoattribute:: if_disconnected
+    .. autoattribute:: invert
+    .. autoattribute:: name
+    .. autoattribute:: reduce_method
+    .. autoattribute:: reduce_period
+    .. autoattribute:: severity_on_failure
+    .. autoattribute:: string
+    .. autoattribute:: values
+    .. autoattribute:: values_dynamic
+    
+    

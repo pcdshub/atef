@@ -1,0 +1,6 @@
+atef.walk.walk\_procedure\_file
+===============================
+
+.. currentmodule:: atef.walk
+
+.. autofunction:: walk_procedure_file

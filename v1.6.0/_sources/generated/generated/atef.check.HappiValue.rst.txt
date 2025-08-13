@@ -1,0 +1,31 @@
+atef.check.HappiValue
+=====================
+
+.. currentmodule:: atef.check
+
+.. autoclass:: HappiValue
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: get
+    .. automethod:: prepare
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: device_name
+    .. autoattribute:: reduce_method
+    .. autoattribute:: reduce_period
+    .. autoattribute:: signal_attr
+    .. autoattribute:: string
+    .. autoattribute:: value
+    
+    

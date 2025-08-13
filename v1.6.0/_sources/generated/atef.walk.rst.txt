@@ -1,0 +1,27 @@
+﻿atef.walk
+=========
+
+.. automodule:: atef.walk
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree: generated
+   
+      get_prepared_step
+      get_relevant_configs_comps
+      walk_config_file
+      walk_procedure_file
+      walk_steps
+   
+   
+
+   
+   
+   
+
+   
+   
+   
