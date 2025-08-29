@@ -9,6 +9,7 @@ import yaml
 from pytestqt.qtbot import QtBot
 from qtpy import QtCore, QtWidgets
 
+from atef.widgets.config.utils import MultiInputDialog
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydDeviceTableWidget
 
@@ -337,3 +338,13 @@ def test_device_table(qtbot: QtBot, happi_client: happi.Client):
     otable.device = new_dev
     assert otable.windowTitle() == new_dev.name
     qtbot.addWidget(otable)
+
+
+def test_multiinput_dialog(qtbot: QtBot):
+    info = {
+        "str": "",
+        "float": 5.5,
+        "int": 5,
+    }
+    dialog = MultiInputDialog(init_values=info)
+    qtbot.addWidget(dialog)
