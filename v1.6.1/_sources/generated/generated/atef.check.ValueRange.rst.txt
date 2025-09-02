@@ -1,0 +1,30 @@
+atef.check.ValueRange
+=====================
+
+.. currentmodule:: atef.check
+
+.. autoclass:: ValueRange
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: compare
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: description
+    .. autoattribute:: in_range
+    .. autoattribute:: inclusive
+    .. autoattribute:: severity
+    .. autoattribute:: low
+    .. autoattribute:: high
+    
+    

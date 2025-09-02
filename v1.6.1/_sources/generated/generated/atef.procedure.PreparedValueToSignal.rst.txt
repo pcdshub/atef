@@ -1,0 +1,31 @@
+atef.procedure.PreparedValueToSignal
+====================================
+
+.. currentmodule:: atef.procedure
+
+.. autoclass:: PreparedValueToSignal
+
+    
+    
+    .. rubric:: Methods
+
+    
+    .. automethod:: __init__
+    .. automethod:: from_origin
+    .. automethod:: run
+    
+    
+
+    
+    
+    .. rubric:: Attributes
+
+    
+    .. autoattribute:: parent
+    .. autoattribute:: name
+    .. autoattribute:: signal
+    .. autoattribute:: value
+    .. autoattribute:: origin
+    .. autoattribute:: result
+    
+    
