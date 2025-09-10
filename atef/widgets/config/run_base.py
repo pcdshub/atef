@@ -183,6 +183,7 @@ class RunCheck(DesignerDisplay, QWidget):
     verify_label: QLabel
     verify_run_spacer: QSpacerItem
     run_button: QPushButton
+    abort_button: QPushButton
     run_success_label: QLabel
     run_next_spacer: QSpacerItem
     next_button: QPushButton
@@ -251,31 +252,106 @@ class RunCheck(DesignerDisplay, QWidget):
             self.setup_next_button(next_widget)
 
         self.setup_verify_button()
+        self.abort_button.clicked.connect(self.abort_task)
+        self.reveal_run_or_abort()
+
+    def reveal_run_or_abort(self):
+        try:
+            page_widget = self.get_page_widget()
+        except RuntimeError:
+            logger.debug("Parents not yet setup, default to run button exposed")
+            self.abort_button.hide()
+            self.run_button.show()
+            return
+
+        curr_task = page_widget.full_tree.running_task
+        if curr_task and not curr_task.done():
+            self.abort_button.show()
+            self.run_button.hide()
+        else:
+            self.abort_button.hide()
+            self.run_button.show()
 
     def _make_run_slot(self, configs) -> None:
 
         def run_slot(*args, **kwargs):
             """Slot that runs each step in the config list"""
             for cfg in configs:
+                self.run_button.hide()
+                self.abort_button.show()
+
+                page_widget = self.get_page_widget()
+
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                # create task
                 config_type = infer_step_type(cfg)
                 if config_type == 'active':
-                    asyncio.run(cfg.run())
+                    task = loop.create_task(cfg.run())
                 elif config_type == 'passive':
-                    asyncio.run(cfg.compare())
+                    task = loop.create_task(cfg.compare())
                 else:
                     raise TypeError('incompatible type found: '
                                     f'{config_type}, {cfg}')
 
+                def stop_loop(task):
+                    """
+                    For use in task.add_done_callback, takes and ignores task
+                    Signals loop to stop running
+                    """
+                    if loop.is_running():
+                        loop.stop()
+
+                # stash task in containing DualTree
+                page_widget.full_tree.running_task = task
+
+                task.add_done_callback(stop_loop)
+                loop.run_forever()
+
                 self.results_updated.emit()
                 self.update_all_icons_tooltips()
 
-        # send this to a non-gui thread
-        self.busy_thread = BusyCursorThread(func=run_slot, ignore_events=True)
+                self.run_button.show()
+                self.abort_button.hide()
+
+        # send this to a non-gui thread, non-blocking
+        self.busy_thread = BusyCursorThread(func=run_slot)
 
         def run_thread():
             self.busy_thread.start()
 
         self.run_button.clicked.connect(run_thread)
+
+    def abort_task(self):
+        """
+        Abort the currently running task.  Cancels the task at the tree level,
+        regardless of the page from which this is running
+        """
+        page = self.get_page_widget()
+        task = page.full_tree.running_task
+        if task:
+            task.cancel()
+
+    def get_page_widget(self) -> PageWidget:
+        # we expect page widget at second parent, we start there
+        widget = self.parent()
+        if widget is None:
+            # at initiazation, this does not have a parent
+            raise RuntimeError("RunCheck widget does not yet have a parent, "
+                               "Cannot get the parenting PageWidget")
+
+        for _ in range(5):
+            widget = widget.parent()
+            # needed due to circular imports, TODO refactor pls
+            mro_names = [cls.__name__ for cls in type(widget).__mro__]
+            if "PageWidget" in mro_names:
+                return widget
+
+        raise RuntimeError("Unable to locate parent PageWidget after 5 steps")
 
     def update_icon(self, label: QLabel, results: List[Result]) -> None:
         """Helper method to update icon on ``label`` based on ``results``"""
@@ -339,11 +415,16 @@ class RunCheck(DesignerDisplay, QWidget):
             return None
 
     def setup_next_button(self, next_item: Optional[TreeItem] = None) -> None:
-        """Link RunCheck's next button to the next widget in the tree"""
+        """
+        Link RunCheck's next button to the next widget in the tree
+
+        This must be run after initialization, once the widget has been properly
+        parented inside the containing vlayout
+        """
         if not next_item:
             return
         # rise out of placeholder into containing PageWidget
-        page: PageWidget = self.parent().parent()
+        page = self.get_page_widget()
 
         next_slot = WeakPartialMethodSlot(
             self.next_button, self.next_button.clicked,
@@ -356,7 +437,7 @@ class RunCheck(DesignerDisplay, QWidget):
         from QPushButton.clicked
         """
         # rise out of placeholder into containing PageWidget
-        page: PageWidget = self.parent().parent()
+        page = self.get_page_widget()
         page.full_tree.select_by_item(item)
 
     def setup_verify_button(self) -> None:

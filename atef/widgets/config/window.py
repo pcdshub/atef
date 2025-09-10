@@ -9,6 +9,7 @@ import os
 import os.path
 import traceback
 import webbrowser
+from asyncio import Task
 from collections import OrderedDict
 from contextlib import contextmanager
 from copy import deepcopy
@@ -586,6 +587,8 @@ class DualTree(DesignerDisplay, QWidget):
         self._orig_config = deepcopy(self.last_edit_config)
 
         self.toggle = Toggle()
+
+        self.running_task: Optional[Task] = None
 
     def assemble_tree(self) -> None:
         """init-time tree setup.  Sets the tree into edit mode"""
