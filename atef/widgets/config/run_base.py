@@ -253,19 +253,10 @@ class RunCheck(DesignerDisplay, QWidget):
 
         self.setup_verify_button()
         self.abort_button.clicked.connect(self.abort_task)
-        self.reveal_run_or_abort()
+        self.reveal_run_or_abort(running=False)
 
-    def reveal_run_or_abort(self):
-        try:
-            page_widget = self.get_page_widget()
-        except RuntimeError:
-            logger.debug("Parents not yet setup, default to run button exposed")
-            self.abort_button.hide()
-            self.run_button.show()
-            return
-
-        curr_task = page_widget.full_tree.running_task
-        if curr_task and not curr_task.done():
+    def reveal_run_or_abort(self, running: bool):
+        if running:
             self.abort_button.show()
             self.run_button.hide()
         else:
@@ -303,6 +294,7 @@ class RunCheck(DesignerDisplay, QWidget):
                     For use in task.add_done_callback, takes and ignores task
                     Signals loop to stop running
                     """
+                    logger.debug("task complete, stopping async loop")
                     if loop.is_running():
                         loop.stop()
 
@@ -312,11 +304,13 @@ class RunCheck(DesignerDisplay, QWidget):
                 task.add_done_callback(stop_loop)
                 loop.run_forever()
 
+                # finalize and update when task is complete
+                logger.debug("task complete, updating widgets")
                 self.results_updated.emit()
                 self.update_all_icons_tooltips()
 
-                self.run_button.show()
-                self.abort_button.hide()
+                self.reveal_run_or_abort(running=False)
+                logger.debug("task complete, run_slot finished")
 
         # send this to a non-gui thread, non-blocking
         self.busy_thread = BusyCursorThread(func=run_slot)
@@ -333,7 +327,7 @@ class RunCheck(DesignerDisplay, QWidget):
         """
         page = self.get_page_widget()
         task = page.full_tree.running_task
-        if task:
+        if task and not task.done():
             task.cancel()
 
     def get_page_widget(self) -> PageWidget:

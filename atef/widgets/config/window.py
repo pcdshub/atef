@@ -724,7 +724,7 @@ class DualTree(DesignerDisplay, QWidget):
     def create_widget(self, item: TreeItem, mode: str) -> PageWidget:
         """Create the widget for ``item`` in ``mode``."""
         data = item.orig_data
-
+        logger.debug(f"Begin creation of {mode} widget: {item.data(column=0)}")
         # TODO: Logic could be better, might not have to make edit widget when
         # separate run widget exists
         if mode == 'edit':
@@ -771,6 +771,12 @@ class DualTree(DesignerDisplay, QWidget):
             else:
                 run_widget.run_check.setup_next_button(next_item)
 
+            logger.debug("Created run widget, configuring and connecting "
+                         f"{type(prepared_data[0])}")
+            if self.running_task and not self.running_task.done():
+                run_widget.run_check.reveal_run_or_abort(running=True)
+            else:
+                run_widget.run_check.reveal_run_or_abort(running=False)
             # update all statuses every time a step is run
             run_widget.run_check.results_updated.connect(self.update_statuses)
             # update tree statuses with every result update
@@ -783,9 +789,16 @@ class DualTree(DesignerDisplay, QWidget):
 
     def update_statuses(self) -> None:
         """update every status icon based on stored config result"""
+        logger.debug("updating_statuses for all run widgets")
+        if self.running_task and not self.running_task.done():
+            running = True
+        else:
+            running = False
         for widget in self.run_widget_cache.values():
+            logger.debug(f"update_statuses {running}, {widget}")
             try:
                 widget.run_check.update_all_icons_tooltips()
+                widget.run_check.reveal_run_or_abort(running)
             except AttributeError as ex:
                 logger.debug(f'Run Check widget not properly setup: {ex}')
 
