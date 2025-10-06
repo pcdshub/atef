@@ -36,6 +36,7 @@ def test_abort_basic(
     cache._signal_cache = cache._SignalCache(lambda pv, name: SynSignal(name=pv))
 
     page = make_page(set_value_step)
+    qtbot.addWidget(page)
 
     # prepare for run
     tree: DualTree = page.full_tree

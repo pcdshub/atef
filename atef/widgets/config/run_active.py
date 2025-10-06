@@ -192,10 +192,17 @@ class CheckRowRunWidget(DesignerDisplay, QtWidgets.QWidget):
 
 
 class TemplateRunWidget(DesignerDisplay, DataWidget):
-    """Widget for viewing TemplateConfigurations, either passive or active"""
+    """
+    Widget for viewing TemplateConfigurations, either passive or active
+
+    Has the option to set up as preview-mode, which reveals the reconfigure button
+    instead, and hides status icons.  Preview-mode gets used in edit mode,
+    contrary to the class name.
+    """
     filename = 'template_run_widget.ui'
 
     refresh_button: QtWidgets.QPushButton
+    reconfigure_button: QtWidgets.QPushButton
     tree_view: QtWidgets.QTreeView
     edits_list: QtWidgets.QListWidget
 
@@ -203,10 +210,19 @@ class TemplateRunWidget(DesignerDisplay, DataWidget):
         self,
         *args,
         data: Union[PreparedTemplateConfiguration, PreparedTemplateStep],
+        preview_mode: bool = False,
         **kwargs
     ):
         super().__init__(*args, data=data, **kwargs)
         self._partial_slots: list[WeakPartialMethodSlot] = []
+        self.preview_mode = preview_mode
+        if self.preview_mode:
+            self.reconfigure_button.show()
+            self.refresh_button.hide()
+        else:
+            self.reconfigure_button.hide()
+            self.refresh_button.show()
+
         self.orig_step = getattr(data, 'config', None) or getattr(data, 'origin', None)
         if not self.orig_step.filename:
             logger.warning('no passive step to run')
@@ -242,6 +258,7 @@ class TemplateRunWidget(DesignerDisplay, DataWidget):
         self.tree_view.setModel(model)
 
         self.tree_view.header().swapSections(0, 1)
+        self.tree_view.setColumnHidden(1, self.preview_mode)
         self.tree_view.expandAll()
 
     def setup_edits_list(self):
