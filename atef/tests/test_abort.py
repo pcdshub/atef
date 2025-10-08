@@ -1,3 +1,5 @@
+from asyncio import Task
+from functools import partial
 from typing import Callable
 
 import pytest
@@ -11,6 +13,11 @@ from atef.enums import Severity
 from atef.procedure import PreparedProcedureFile
 from atef.widgets.config.run_base import RunCheck
 from atef.widgets.config.window import DualTree
+
+
+def assert_task_running(tree: DualTree, is_running: bool = True):
+    assert (isinstance(tree.running_task, Task)
+            and tree.running_task.done() != is_running)
 
 
 @pytest.mark.parametrize("click_abort,", [
@@ -43,21 +50,21 @@ def test_abort_basic(
     run_widget = tree.current_widget
     run_check = run_widget.run_check
     assert isinstance(run_check, RunCheck)
-    assert run_check.run_button.isHidden() is False
+    assert not run_check.run_button.isHidden()
 
     assert isinstance(tree.prepared_file.root.steps[0].prepared_actions[0].signal,
                       SynSignal)
 
     qtbot.mouseClick(run_check.run_button, Qt.LeftButton)
-    qtbot.waitUntil(lambda: not run_check.abort_button.isHidden())
+    qtbot.waitUntil(partial(assert_task_running, tree, True))
 
     if click_abort:
         qtbot.mouseClick(run_check.abort_button, Qt.LeftButton)
 
-    qtbot.waitUntil(lambda: not run_check.run_button.isHidden())
+    qtbot.waitUntil(partial(assert_task_running, tree, False))
 
     # check the results
-    assert tree.running_task and tree.running_task.done()
+    assert_task_running(tree, False)
     if click_abort:
         assert tree.prepared_file.root.result.severity != Severity.success
     else:
