@@ -267,10 +267,8 @@ class RunCheck(DesignerDisplay, QWidget):
 
         def run_slot(*args, **kwargs):
             """Slot that runs each step in the config list"""
+            self.reveal_run_or_abort(running=True)
             for cfg in configs:
-                self.run_button.hide()
-                self.abort_button.show()
-
                 page_widget = self.get_page_widget()
 
                 try:
