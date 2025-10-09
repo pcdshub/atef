@@ -443,6 +443,8 @@ class SelectTemplatePage(DesignerDisplay, QtWidgets.QWizardPage):
                 'Loaded checkout is NOT one of the allowed types: '
                 f'{[t.__name__ for t in self.allowed_types]}'
             )
+            return
+
         self.setField("select.file", str(self.fp))
         self.setup_tree_view()
         self.setup_devices_list()
@@ -836,10 +838,12 @@ class FillTemplateWizard(QtWidgets.QWizard):
         *args,
         filepath: Optional[AnyPath] = None,
         window: Optional[Window] = None,
-        allowed_types: Optional[Tuple[Any]] = None,
+        allowed_types: Tuple = (ConfigurationFile, ProcedureFile),
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        self.filepath = filepath
+        self._window = window
 
         self.setPage(0, SelectTemplatePage(filepath=filepath,
                                            allowed_types=allowed_types))
@@ -859,6 +863,9 @@ class FillTemplateWizard(QtWidgets.QWizard):
         self._window = window
 
         self.button(self.FinishButton).clicked.connect(self.on_finish)
+
+        # restart to fix current index reporting
+        self.restart()
 
     def on_finish(self):
         if self.options_page.save_button.isChecked():
