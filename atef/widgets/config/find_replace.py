@@ -318,7 +318,11 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
 
         preview_success = data.apply(target=preview_file)
         if preview_success:
-            post_text = str(get_item_from_path(self.data.path, item=preview_file))
+            if self.data.path[-1][0] == "__dictkey__":
+                # replace this manually, getting item from path isn't possible
+                post_text = self.data.replace_fn(self.data.path[-1][1])
+            else:
+                post_text = str(get_item_from_path(self.data.path, item=preview_file))
         else:
             logger.warning('Unable to generate preview, provided replacement '
                            'text is invalid')
@@ -894,6 +898,7 @@ class FillTemplateWizard(QtWidgets.QWizard):
         self.edits_page.refresh_staged_table()
 
     def get_updated_data(self) -> List[RegexFindReplace]:
+        self.filepath = self.field("select.file")
         staged_list = self.edits_page.staged_list
         edits = []
         for idx in range(staged_list.count()):

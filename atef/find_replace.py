@@ -181,6 +181,10 @@ def get_item_from_path(
     Item is expected to be top-level object, if provided.
     (i.e. analagous to path[0][0]).
 
+    If the final segment of the path is __dictkey__, this will simply return
+    the value of the key from the path.  It's not possible to grab a corresponding
+    key from an arbitrary item if it has been renamed.
+
     Parameters
     ----------
     path : List[Tuple[Any, Any]]
