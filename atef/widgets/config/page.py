@@ -1491,12 +1491,17 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
         else:
             raise ValueError("incompatible file found")
 
-        # get parent for current
+        # get parent for template data
         parent_data = None
         for curr_data in getattr(orig_file, walk_method)():
-            if curr_data == self.data:
+            if (hasattr(curr_data, group_field) and
+                    self.data in getattr(curr_data, group_field)):
+                parent_data = curr_data
                 break
-            parent_data = curr_data
+
+        if not parent_data:
+            raise RuntimeError("Failure locating this template configuration "
+                               "in the originating tree...")
 
         with self.full_tree.modifies_tree():
             group_list = getattr(parent_data, group_field)
