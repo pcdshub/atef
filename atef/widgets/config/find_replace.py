@@ -567,6 +567,7 @@ class ConfigureEditsPage(DesignerDisplay, QtWidgets.QWizardPage):
         self.orig_file = None
 
         self.validate_button.clicked.connect(self.validate_changes)
+        self.stage_all_button.clicked.connect(self.stage_all)
 
     def initializePage(self) -> None:
         self.reset_page()
