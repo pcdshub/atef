@@ -8,8 +8,8 @@ import os
 import re
 from functools import partial
 from pathlib import Path
-from typing import (TYPE_CHECKING, Any, ClassVar, Iterable, List, Optional,
-                    Tuple, Union)
+from typing import (TYPE_CHECKING, Any, ClassVar, Dict, Iterable, List,
+                    Optional, Tuple, Union)
 
 import happi
 import qtawesome as qta
@@ -820,11 +820,48 @@ class ApplyOptionPage(DesignerDisplay, QtWidgets.QWizardPage):
     save_button: QtWidgets.QRadioButton
     button_group: QtWidgets.QButtonGroup
 
+    MATCHING_TYPE_MAP: ClassVar[Dict[Any, Any]] = {
+        TemplateConfiguration: ConfigurationFile,
+        TemplateStep: ProcedureFile
+    }
+
     filename = "apply_option_wizard_page.ui"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        parent_type: type[Union[TemplateConfiguration, TemplateStep]],
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.button_group.buttonClicked.connect(self.completeChanged.emit)
+        self.parent_type = parent_type
+
+    def initializePage(self) -> None:
+        self.load_file(self.field("select.file"))
+        self.update_insertability()
+
+    def load_file(self, filepath: str) -> None:
+        try:
+            data = load_file(filepath)
+        except (TypeError, ValueError):
+            data = None
+            self.fp = None
+            self.orig_file = None
+            return
+
+        self.orig_file = data
+
+    def update_insertability(self):
+        if isinstance(self.orig_file, self.MATCHING_TYPE_MAP[self.parent_type]):
+            # enable
+            self.insert_button.setDisabled(False)
+            return
+        else:
+            # disable edit
+            # provide explanation
+            self.insert_button.setDisabled(True)
+            return
 
     def isComplete(self) -> bool:
         return self.button_group.checkedId() != -1  # -1 means no button checked
@@ -838,22 +875,28 @@ class FillTemplateWizard(QtWidgets.QWizard):
     insert_requested: ClassVar[QtCore.Signal] = QSignal()
     save_requested: ClassVar[QtCore.Signal] = QSignal()
 
+    ALLOWED_TYPE_MAP: ClassVar[Dict[Any, Tuple[Any, ...]]] = {
+        TemplateConfiguration: (ConfigurationFile,),
+        TemplateStep: (ConfigurationFile, ProcedureFile)
+    }
+
     def __init__(
         self,
         *args,
         filepath: Optional[AnyPath] = None,
         window: Optional[Window] = None,
-        allowed_types: Tuple = (ConfigurationFile, ProcedureFile),
+        parent_type: Union[type[TemplateConfiguration], type[TemplateStep]],
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.filepath = filepath
         self._window = window
 
-        self.setPage(0, SelectTemplatePage(filepath=filepath,
-                                           allowed_types=allowed_types))
+        self.setPage(0, SelectTemplatePage(
+            filepath=filepath, allowed_types=self.ALLOWED_TYPE_MAP[parent_type])
+        )
         self.setPage(1, ConfigureEditsPage())
-        self.setPage(2, ApplyOptionPage())
+        self.setPage(2, ApplyOptionPage(parent_type=parent_type))
         self.setStartId(0)
 
         # stash the pages for easier access
@@ -868,6 +911,8 @@ class FillTemplateWizard(QtWidgets.QWizard):
         self._window = window
 
         self.button(self.FinishButton).clicked.connect(self.on_finish)
+        # Don't cancel and remove wizard prematurely
+        self.setButtonLayout([self.BackButton, self.NextButton, self.FinishButton])
 
         # restart to fix current index reporting
         self.restart()

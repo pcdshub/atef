@@ -1417,10 +1417,6 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
     template_page_placeholder: QWidget
 
     data: Union[TemplateConfiguration, TemplateStep]
-    ALLOWED_TYPE_MAP: ClassVar[Dict[Any, Tuple[Any, ...]]] = {
-        TemplateConfiguration: (ConfigurationFile,),
-        TemplateStep: (ConfigurationFile, ProcedureFile)
-    }
 
     def __init__(self, data: Union[TemplateConfiguration, TemplateStep], **kwargs):
         super().__init__(data=data, **kwargs)
@@ -1431,7 +1427,7 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
     def setup_template_widget_init(self) -> None:
         self.template_page_wizard = FillTemplateWizard(
             filepath=self.data.filename,
-            allowed_types=self.ALLOWED_TYPE_MAP[type(self.data)]
+            parent_type=type(self.data)
         )
 
         self.template_page_wizard.initialize_from_data(self.data)
