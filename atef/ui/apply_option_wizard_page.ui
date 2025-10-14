@@ -35,6 +35,16 @@
         </widget>
        </item>
        <item>
+        <widget class="QLabel" name="cannot_insert_label">
+         <property name="text">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Tempated file cannot be inserted because it is of a different type than the parent checkout. (Passive checkouts steps cannot be inserted into Active checkouts)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QRadioButton" name="insert_button">
          <property name="text">
           <string>Apply and Insert</string>

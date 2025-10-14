@@ -820,6 +820,9 @@ class ApplyOptionPage(DesignerDisplay, QtWidgets.QWizardPage):
     save_button: QtWidgets.QRadioButton
     button_group: QtWidgets.QButtonGroup
 
+    cannot_insert_label: QtWidgets.QLabel
+    insert_label: QtWidgets.QLabel
+
     MATCHING_TYPE_MAP: ClassVar[Dict[Any, Any]] = {
         TemplateConfiguration: ConfigurationFile,
         TemplateStep: ProcedureFile
@@ -856,12 +859,14 @@ class ApplyOptionPage(DesignerDisplay, QtWidgets.QWizardPage):
         if isinstance(self.orig_file, self.MATCHING_TYPE_MAP[self.parent_type]):
             # enable
             self.insert_button.setDisabled(False)
-            return
+            self.insert_label.show()
+            self.cannot_insert_label.hide()
         else:
             # disable edit
             # provide explanation
+            self.insert_label.hide()
+            self.cannot_insert_label.show()
             self.insert_button.setDisabled(True)
-            return
 
     def isComplete(self) -> bool:
         return self.button_group.checkedId() != -1  # -1 means no button checked
