@@ -34,6 +34,16 @@
     </widget>
    </item>
    <item>
+    <widget class="QToolButton" name="details_button">
+     <property name="text">
+      <string>details...</string>
+     </property>
+     <property name="popupMode">
+      <enum>QToolButton::InstantPopup</enum>
+     </property>
+    </widget>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="horizontalLayout_3">
      <item>
       <widget class="QLabel" name="dclass_label">
@@ -98,16 +108,6 @@
       </widget>
      </item>
     </layout>
-   </item>
-   <item>
-    <widget class="QToolButton" name="details_button">
-     <property name="text">
-      <string>details...</string>
-     </property>
-     <property name="popupMode">
-      <enum>QToolButton::InstantPopup</enum>
-     </property>
-    </widget>
    </item>
    <item>
     <spacer name="horizontal_spacer">
