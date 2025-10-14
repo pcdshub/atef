@@ -5,7 +5,9 @@ import pytest
 from pytestqt.qtbot import QtBot
 from qtpy import QtCore, QtWidgets
 
-from atef.config import TemplateConfiguration
+from atef import load_file
+from atef.config import ConfigurationFile, TemplateConfiguration
+from atef.procedure import TemplateStep
 from atef.type_hints import AnyDataclass
 from atef.widgets.config.find_replace import (ApplyOptionPage,
                                               ConfigureEditsPage,
@@ -216,7 +218,12 @@ def test_template_wizard_flow(
     qtbot: QtBot,
     all_config_path: Path
 ):
-    wizard = FillTemplateWizard()
+    template_file = load_file(all_config_path)
+    if isinstance(template_file, ConfigurationFile):
+        parent_type = TemplateConfiguration
+    else:
+        parent_type = TemplateStep
+    wizard = FillTemplateWizard(parent_type=parent_type)
     qtbot.addWidget(wizard)
 
     # Start from selection
