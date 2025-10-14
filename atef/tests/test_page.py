@@ -216,8 +216,10 @@ def test_template_page(
 
 def test_template_wizard_flow(
     qtbot: QtBot,
-    all_config_path: Path
+    all_config_path: Path,
+    mock_ophyd_cache
 ):
+    print("flow", all_config_path)
     template_file = load_file(all_config_path)
     if isinstance(template_file, ConfigurationFile):
         parent_type = TemplateConfiguration
@@ -264,3 +266,56 @@ def test_template_wizard_flow(
     options_page.insert_button.setChecked(True)
     options_page.completeChanged.emit()
     assert wizard.button(wizard.FinishButton).isEnabled()
+
+
+def test_template_type_compat_passive(
+    qtbot: QtBot,
+    passive_config_path: Path,
+    active_config_path: Path,
+    mock_ophyd_cache,
+    monkeypatch,
+):
+    print("compat_passive", passive_config_path, active_config_path)
+    wizard = FillTemplateWizard(parent_type=TemplateConfiguration)
+    qtbot.addWidget(wizard)
+    monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                        lambda *args, **kwargs: QtWidgets.QMessageBox.Yes)
+    wizard.select_page.load_file(active_config_path)
+    wizard.select_page.finish_setup()
+    assert wizard.select_page.fp is None
+    assert wizard.currentId() == 0
+    assert not wizard.button(wizard.NextButton).isEnabled()
+
+    wizard.select_page.load_file(passive_config_path)
+    assert wizard.select_page.fp is not None
+
+    # Switch wizard to apply options page to re-initialize
+    wizard.next()
+    wizard.next()
+
+    assert wizard.options_page.insert_button.isEnabled()
+
+
+def test_template_type_compat_active(
+    qtbot: QtBot,
+    all_config_path: Path,
+    mock_ophyd_cache,
+):
+    print(all_config_path)
+    wizard = FillTemplateWizard(parent_type=TemplateStep)
+    qtbot.addWidget(wizard)
+
+    wizard.select_page.load_file(all_config_path)
+    wizard.select_page.finish_setup()
+    assert wizard.select_page.fp is not None
+    assert wizard.currentId() == 0
+    assert wizard.button(wizard.NextButton).isEnabled()
+
+    # Switch wizard to apply options page to re-initialize
+    wizard.next()
+    wizard.next()
+
+    if isinstance(wizard.select_page.orig_file, ConfigurationFile):
+        assert not wizard.options_page.insert_button.isEnabled()
+    else:
+        assert wizard.options_page.insert_button.isEnabled()

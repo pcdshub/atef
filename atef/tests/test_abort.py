@@ -3,12 +3,10 @@ from functools import partial
 from typing import Callable
 
 import pytest
-from ophyd.signal import EpicsSignal
 from ophyd.sim import SynSignal
 from pytestqt.qtbot import QtBot
 from qtpy.QtCore import Qt
 
-from atef import cache
 from atef.enums import Severity
 from atef.procedure import PreparedProcedureFile
 from atef.widgets.config.run_base import RunCheck
@@ -29,11 +27,11 @@ def test_abort_basic(
     make_page: Callable,
     set_value_step,
     click_abort: bool,
+    mock_ophyd_cache
 ):
     """ensure widgets appear and operate as expected"""
     # monkeypatch cache to use a simple dummy signal
     # forgive me for my typing sins
-    cache._signal_cache = cache._SignalCache(lambda pv, name: SynSignal(name=pv))
 
     page = make_page(set_value_step)
     qtbot.addWidget(page)
@@ -70,6 +68,3 @@ def test_abort_basic(
         assert tree.prepared_file.root.result.severity != Severity.success
     else:
         assert tree.prepared_file.root.result.severity == Severity.success
-
-    # reset signal cache
-    cache._signal_cache = cache._SignalCache(EpicsSignal)
