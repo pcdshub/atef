@@ -438,5 +438,8 @@ class FindReplaceAction:
 
     def same_path(self, path: List[Tuple[Any, Any]]) -> bool:
         """Checks if this FindReplaceAction's path matches ``path``, ignoring objects"""
-        return all([own_step[1] == other_step[1]
-                    for own_step, other_step in zip(self.path, path)])
+        if len(path) != len(self.path):
+            return False
+        else:
+            return all([own_step[1] == other_step[1]
+                        for own_step, other_step in zip(self.path, path)])

@@ -8,7 +8,8 @@ from atef.check import Equals, GreaterOrEqual
 from atef.config import (ConfigurationGroup, DeviceConfiguration,
                          PreparedDeviceConfiguration)
 from atef.enums import Severity
-from atef.find_replace import (get_deepest_dataclass_in_path,
+from atef.find_replace import (FindReplaceAction,
+                               get_deepest_dataclass_in_path,
                                get_item_from_path, replace_item_from_path,
                                walk_find_match)
 
@@ -169,6 +170,40 @@ def test_deepest_dclass(configuration_group):
     deepest_copy = get_deepest_dataclass_in_path(path, item=copy_group)
 
     assert deepest_orig == deepest_copy
+
+
+@pytest.mark.parametrize(
+    "l_path,r_path,is_match",
+    [
+        (
+            [(DeviceConfiguration, 'devices'), ("__list__", 0)],
+            [(DeviceConfiguration, 'devices'), ("__list__", 0)],
+            True
+        ),
+        (
+            [(DeviceConfiguration, 'devices'), ("__list__", 1)],
+            [(DeviceConfiguration, 'devices'), ("__list__", 0)],
+            False
+        ),
+        (
+            [(DeviceConfiguration, 'devices'), ("__list__", 0), ("EQALS", "hello")],
+            [(DeviceConfiguration, 'devices'), ("__list__", 0)],
+            False
+        ),
+        (
+            [(DeviceConfiguration, 'devices')],
+            [(DeviceConfiguration, 'devices'), ("__list__", 0)],
+            False
+        )
+    ]
+)
+def test_same_path(
+    l_path: List[Tuple[Any, Any]],
+    r_path: List[Tuple[Any, Any]],
+    is_match: bool,
+):
+    action = FindReplaceAction(path=l_path, replace_fn=lambda x: "no-op")
+    assert action.same_path(r_path) is is_match
 
 # Add test for switching files
 # add test from widget side (instantiate widget from file, populate change_list)
