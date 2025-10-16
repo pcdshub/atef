@@ -839,7 +839,6 @@ class PreparedSetValueStep(PreparedProcedureStep):
                     severity=Severity.warning,
                     reason="Step aborted, will not continue with additional actions"
                 )
-
             try:
                 action_result = await prep_action.run()
             except CancelledError:
@@ -876,6 +875,9 @@ class PreparedSetValueStep(PreparedProcedureStep):
 
         severity = _summarize_result_severity(GroupResultMode.all_,
                                               criteria_results + action_results)
+        if cancelled:
+            raise CancelledError()
+
         return Result(severity=severity)
 
     @classmethod
