@@ -1,13 +1,12 @@
 import logging
 import tempfile
-from io import TextIOWrapper
 from typing import Dict
 from uuid import UUID
 
 from qtpy.QtCore import QObject
 from qtpy.QtCore import Signal as QSignal
 
-STATUS_OUTPUT_TEMPFILE_CACHE: Dict[UUID, TextIOWrapper] = {}
+STATUS_OUTPUT_TEMPFILE_CACHE: Dict[UUID, tempfile._TemporaryFileWrapper] = {}
 
 
 def configure_and_get_status_logger(uuid: UUID) -> logging.Logger:
@@ -30,10 +29,14 @@ def configure_and_get_status_logger(uuid: UUID) -> logging.Logger:
 
 
 def cleanup_status_logger(uuid: UUID):
+    if uuid not in STATUS_OUTPUT_TEMPFILE_CACHE:
+        return
+
     # remove handlers
     logger = logging.getLogger(str(uuid))
     for handler in logger.handlers:
         logger.removeHandler(handler)
+
     # clean up file
     temp_logging_file = STATUS_OUTPUT_TEMPFILE_CACHE.pop(uuid)
     temp_logging_file.close()
