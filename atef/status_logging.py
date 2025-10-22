@@ -1,0 +1,63 @@
+import logging
+import tempfile
+from io import TextIOWrapper
+from typing import Dict
+from uuid import UUID
+
+from qtpy.QtCore import QObject
+from qtpy.QtCore import Signal as QSignal
+
+STATUS_OUTPUT_TEMPFILE_CACHE: Dict[UUID, TextIOWrapper] = {}
+
+
+def configure_and_get_status_logger(uuid: UUID) -> logging.Logger:
+    """setup / initialize a logging file for a specific checkout"""
+    if uuid in STATUS_OUTPUT_TEMPFILE_CACHE:
+        # logger has been configured already, just return the logger
+        return logging.getLogger(str(uuid))
+    # create a tempfile for the uuid
+    temp_logging_file = tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8")
+
+    # configure the logger
+    logger = logging.getLogger(str(uuid))
+    handler = logging.StreamHandler(temp_logging_file)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+    # add to the tempfile cache last, in case something errors out
+    STATUS_OUTPUT_TEMPFILE_CACHE[uuid] = temp_logging_file
+    return logger
+
+
+def cleanup_status_logger(uuid: UUID):
+    # remove handlers
+    logger = logging.getLogger(str(uuid))
+    for handler in logger.handlers:
+        logger.removeHandler(handler)
+    # clean up file
+    temp_logging_file = STATUS_OUTPUT_TEMPFILE_CACHE.pop(uuid)
+    temp_logging_file.close()
+
+
+class Stream(QObject):
+    """QObject handler to emit logging messages to the Qt main thread"""
+    new_message = QSignal(str)
+
+    def write(self, message: str):
+        self.new_message.emit(message)
+
+    def flush(self):
+        ...
+
+
+class QtLogHandler(logging.Handler):
+    """
+    Logging handler that writes to Qt Stream object
+    """
+    def __init__(self, stream: Stream, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.stream = stream
+
+    def emit(self, record: logging.LogRecord):
+        msg = self.format(record)
+        self.stream.write(msg)
