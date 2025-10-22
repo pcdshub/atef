@@ -24,6 +24,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
                     Tuple, Union, cast)
+from uuid import UUID, uuid4
 
 import apischema
 import ophyd
@@ -451,6 +452,8 @@ class PreparedProcedureFile:
     file: ProcedureFile
     #: Procedure steps defined in the top-level file
     root: PreparedProcedureGroup
+    #: UUID for instance tracking
+    uuid: UUID = field(default_factory=uuid4)
 
     @classmethod
     def from_origin(
