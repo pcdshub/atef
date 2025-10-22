@@ -13,6 +13,7 @@ import pathlib
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
                     Tuple, Union, cast, get_args)
+from uuid import UUID, uuid4
 
 import apischema
 import happi
@@ -451,6 +452,8 @@ class PreparedFile:
     client: happi.Client
     #: The comparisons defined in the top-level file.
     root: PreparedGroup
+    #: UUID for instance tracking
+    uuid: UUID = field(default_factory=uuid4)
 
     @classmethod
     def from_config(
