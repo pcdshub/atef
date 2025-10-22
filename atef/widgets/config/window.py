@@ -37,6 +37,8 @@ from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             ProcedureGroup, ProcedureStep, SetValueStep,
                             TemplateStep)
 from atef.report import ActiveAtefReport, PassiveAtefReport
+from atef.status_logging import (QtLogHandler, Stream, cleanup_status_logger,
+                                 configure_and_get_status_logger)
 from atef.type_hints import AnyDataclass
 from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.find_replace import (FillTemplatePage,
@@ -119,6 +121,7 @@ class Window(DesignerDisplay, QMainWindow):
         self.tab_widget.tabCloseRequested.connect(
             self.tab_widget.removeTab
         )
+        self.tab_widget.currentChanged.connect(self.connect_status_logger)
 
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
@@ -216,6 +219,24 @@ class Window(DesignerDisplay, QMainWindow):
         """
         return self.tab_widget.currentWidget()
 
+    def connect_status_logger(self) -> None:
+        current_tree = self.get_current_tree()
+
+        if not isinstance(current_tree, DualTree) or current_tree.prepared_file is None:
+            return
+
+        log_stream = current_tree.log_stream
+        # TODO Figure out how to disconnect here. want to disconnect on tab switch
+        # Currently inactive tabs can run.  Perhaps we just disable this
+        try:
+            log_stream.new_message.disconnect()
+        except TypeError:
+            pass
+
+        logger.debug(f"connected logger {current_tree.status_logger}, "
+                     f"{current_tree.log_stream}")
+        log_stream.new_message.connect(self.statusBar().showMessage)
+
     def new_file(self, *args, checkout_type: Optional[str] = None, **kwargs):
         """
         Create and populate a new edit tab.
@@ -298,6 +319,9 @@ class Window(DesignerDisplay, QMainWindow):
         widget.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
         widget.tree_view.customContextMenuRequested.connect(self.context_menu)
         tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.LeftSide, widget.toggle)
+
+        # configure status logging
+        widget.model_refreshed.connect(self.connect_status_logger)
 
     def copy(self):
         """Copy the currently selected item and its parent to the clipboard"""
@@ -540,6 +564,7 @@ class DualTree(DesignerDisplay, QWidget):
     results_button: QtWidgets.QPushButton
 
     mode_switch_finished: ClassVar[QSignal] = QSignal()
+    model_refreshed: ClassVar[QSignal] = QSignal()
 
     built_widgets: OrderedDict
 
@@ -604,11 +629,24 @@ class DualTree(DesignerDisplay, QWidget):
         Refreshes the stored Prepared file (passive or active).
         Alone, this does not update the TreeView or ConfigTreeModel.
         """
+        # Clean up old temp files
+        if self.prepared_file is not None:
+            cleanup_status_logger(self.prepared_file.uuid)
+
         if isinstance(self.orig_file, ConfigurationFile):
             self.prepared_file = PreparedFile.from_config(self.orig_file,
                                                           cache=DataCache())
         if isinstance(self.orig_file, ProcedureFile):
             self.prepared_file = PreparedProcedureFile.from_origin(self.orig_file)
+
+        self.status_logger = configure_and_get_status_logger(
+            self.prepared_file.uuid
+        )
+
+        # set up logging
+        self.log_stream = Stream(parent=self)
+        self.log_handler = QtLogHandler(self.log_stream)
+        self.status_logger.addHandler(self.log_handler)
 
     def refresh_model(self) -> None:
         """
@@ -640,6 +678,7 @@ class DualTree(DesignerDisplay, QWidget):
 
         # select top level root
         self.tree_view.setCurrentIndex(self.model.index(0, 0, QtCore.QModelIndex()))
+        self.model_refreshed.emit()
 
     def select_by_item(self, item: TreeItem) -> None:
         """Select desired TreeItem(and show corresponding page) in TreeView"""
