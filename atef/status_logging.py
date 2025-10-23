@@ -44,10 +44,6 @@ def cleanup_status_logger(uuid: UUID):
 
     # clean up file
     temp_logging_file = STATUS_OUTPUT_TEMPFILE_CACHE.pop(uuid)
-    # DEBUG prints
-    with open(temp_logging_file.name) as fp:
-        for line in fp:
-            print(line)
     temp_logging_file.close()
 
 
