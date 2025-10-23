@@ -1440,8 +1440,6 @@ class PreparedComparison:
         Get the status logger for this step.
         """
         top_file = get_parent_file(self)
-        # TODO: fix for active checkouts, where parents aren't assigned properly
-        # Perhaps compare with how the passive checkouts are generated
         file_id = getattr(top_file, "uuid", "status_logger")
         if isinstance(file_id, UUID):
             return configure_and_get_status_logger(file_id)
