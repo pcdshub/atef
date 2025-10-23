@@ -30,7 +30,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>22</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -52,6 +52,7 @@
     </property>
     <addaction name="action_print_dataclass"/>
     <addaction name="action_print_serialized"/>
+    <addaction name="action_open_log_viewer"/>
    </widget>
    <widget class="QMenu" name="menuUtilities">
     <property name="title">
@@ -125,6 +126,11 @@
   <action name="action_welcome_tab">
    <property name="text">
     <string>Welcome Tab</string>
+   </property>
+  </action>
+  <action name="action_open_log_viewer">
+   <property name="text">
+    <string>Open Status Log Viewer</string>
    </property>
   </action>
  </widget>
