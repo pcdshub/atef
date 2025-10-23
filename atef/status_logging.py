@@ -7,6 +7,9 @@ from qtpy.QtCore import QObject
 from qtpy.QtCore import Signal as QSignal
 
 STATUS_OUTPUT_TEMPFILE_CACHE: Dict[UUID, tempfile._TemporaryFileWrapper] = {}
+_SIMPLE_FORMATTER = logging.Formatter("%(asctime)s -- %(message)s",
+                                      datefmt="%Y-%m-%d %H:%M:%S")
+_DETAILED_FORMATTER = logging.Formatter("[%(name).8s, %(asctime)s] -- %(message)s")
 
 
 def configure_and_get_status_logger(uuid: UUID) -> logging.Logger:
@@ -20,8 +23,10 @@ def configure_and_get_status_logger(uuid: UUID) -> logging.Logger:
     # configure the logger
     logger = logging.getLogger(str(uuid))
     handler = logging.StreamHandler(temp_logging_file)
+    handler.setFormatter(_DETAILED_FORMATTER)
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
+    logger.propagate = False  # Prevent prints to console
 
     # add to the tempfile cache last, in case something errors out
     STATUS_OUTPUT_TEMPFILE_CACHE[uuid] = temp_logging_file
@@ -39,10 +44,14 @@ def cleanup_status_logger(uuid: UUID):
 
     # clean up file
     temp_logging_file = STATUS_OUTPUT_TEMPFILE_CACHE.pop(uuid)
+    # DEBUG prints
+    with open(temp_logging_file.name) as fp:
+        for line in fp:
+            print(line)
     temp_logging_file.close()
 
 
-class Stream(QObject):
+class QtLoggingStream(QObject):
     """QObject handler to emit logging messages to the Qt main thread"""
     new_message = QSignal(str)
 
@@ -57,8 +66,9 @@ class QtLogHandler(logging.Handler):
     """
     Logging handler that writes to Qt Stream object
     """
-    def __init__(self, stream: Stream, *args, **kwargs):
+    def __init__(self, stream: QtLoggingStream, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.setFormatter(_SIMPLE_FORMATTER)
         self.stream = stream
 
     def emit(self, record: logging.LogRecord):

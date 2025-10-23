@@ -37,7 +37,8 @@ from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             ProcedureGroup, ProcedureStep, SetValueStep,
                             TemplateStep)
 from atef.report import ActiveAtefReport, PassiveAtefReport
-from atef.status_logging import (QtLogHandler, Stream, cleanup_status_logger,
+from atef.status_logging import (QtLoggingStream, QtLogHandler,
+                                 cleanup_status_logger,
                                  configure_and_get_status_logger)
 from atef.type_hints import AnyDataclass
 from atef.walk import get_prepared_step, get_relevant_configs_comps
@@ -644,7 +645,7 @@ class DualTree(DesignerDisplay, QWidget):
         )
 
         # set up logging
-        self.log_stream = Stream(parent=self)
+        self.log_stream = QtLoggingStream(parent=self)
         self.log_handler = QtLogHandler(self.log_stream)
         self.status_logger.addHandler(self.log_handler)
 
