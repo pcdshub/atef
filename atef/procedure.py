@@ -956,7 +956,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
                 return FailedStep(parent=parent, origin=step, exception=ex)
 
         for comp_to_target in step.success_criteria:
-            res = create_prepared_comparison(comp_to_target)
+            res = create_prepared_comparison(comp_to_target, parent=prep_step)
             if isinstance(res, Exception):
                 return FailedStep(parent=parent, origin=step, exception=res)
             else:
