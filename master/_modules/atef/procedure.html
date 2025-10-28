@@ -98,6 +98,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">asyncio</span><span class="w"> </span><span class="kn">import</span> <span class="n">CancelledError</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">deepcopy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span>
@@ -795,7 +796,7 @@
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">step</span><span class="p">:</span> <span class="n">AnyProcedure</span><span class="p">,</span>
         <span class="n">parent</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PreparedProcedureGroup</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PreparedProcedureStep</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">PreparedProcedureStep</span><span class="p">,</span> <span class="n">FailedStep</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Prepare a ProcedureStep for running.  If the creation of the prepared step</span>
 <span class="sd">        fails for any reason, a FailedStep is returned.</span>
@@ -1071,27 +1072,62 @@
 <span class="sd">        Result</span>
 <span class="sd">            the step_result for this step</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cancelled</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">origin</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">SetValueStep</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">)</span>
+
+        <span class="c1"># Actions</span>
         <span class="k">for</span> <span class="n">prep_action</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_actions</span><span class="p">:</span>
-            <span class="n">action_result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">prep_action</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">cancelled</span><span class="p">:</span>
+                <span class="n">prep_action</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">warning</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;Step aborted, action skipped&quot;</span>
+                <span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">action_result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">prep_action</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+            <span class="k">except</span> <span class="n">CancelledError</span><span class="p">:</span>
+                <span class="n">cancelled</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">prep_action</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">warning</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;Step aborted, will not continue with additional actions&quot;</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
             <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">halt_on_fail</span> <span class="ow">and</span> <span class="n">action_result</span><span class="o">.</span><span class="n">severity</span> <span class="o">&gt;</span> <span class="n">Severity</span><span class="o">.</span><span class="n">success</span><span class="p">):</span>
+                <span class="c1"># TODO Is this really necessary? super().run() stashes the step result already...</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">step_result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
                     <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">error</span><span class="p">,</span>
                     <span class="n">reason</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;action failed (</span><span class="si">{</span><span class="n">prep_action</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">), step halted&#39;</span>
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_result</span>
-        <span class="k">for</span> <span class="n">prep_criteria</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_criteria</span><span class="p">:</span>
-            <span class="k">await</span> <span class="n">prep_criteria</span><span class="o">.</span><span class="n">compare</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">require_action_success</span><span class="p">:</span>
             <span class="n">action_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">action</span><span class="o">.</span><span class="n">result</span> <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_actions</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">action_results</span> <span class="o">=</span> <span class="p">[]</span>
 
+        <span class="c1"># Checks</span>
+        <span class="k">for</span> <span class="n">prep_criteria</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_criteria</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">cancelled</span><span class="p">:</span>
+                <span class="n">prep_criteria</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">warning</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;Step aborted, check skipped&quot;</span>
+                <span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">await</span> <span class="n">prep_criteria</span><span class="o">.</span><span class="n">compare</span><span class="p">()</span>
+            <span class="k">except</span> <span class="n">CancelledError</span><span class="p">:</span>
+                <span class="c1"># These should be fast but let&#39;s catch it anyway</span>
+                <span class="n">cancelled</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">prep_criteria</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="p">(</span>
+                    <span class="n">severity</span><span class="o">=</span><span class="n">Severity</span><span class="o">.</span><span class="n">warning</span><span class="p">,</span>
+                    <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;Step aborted, skipping remaining checks&quot;</span>
+                <span class="p">)</span>
+
         <span class="n">criteria_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">crit</span><span class="o">.</span><span class="n">result</span> <span class="k">for</span> <span class="n">crit</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prepared_criteria</span><span class="p">]</span>
 
         <span class="n">severity</span> <span class="o">=</span> <span class="n">_summarize_result_severity</span><span class="p">(</span><span class="n">GroupResultMode</span><span class="o">.</span><span class="n">all_</span><span class="p">,</span>
                                               <span class="n">criteria_results</span> <span class="o">+</span> <span class="n">action_results</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">cancelled</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">CancelledError</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">Result</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="n">severity</span><span class="p">)</span>
 
