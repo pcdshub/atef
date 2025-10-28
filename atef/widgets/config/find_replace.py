@@ -19,9 +19,9 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Property as QProperty
 from qtpy.QtCore import Signal as QSignal
 
-from atef import load_file
 from atef.cache import get_signal_cache
 from atef.config import ConfigurationFile, PreparedFile, TemplateConfiguration
+from atef.config_dclass_helpers import load_file
 from atef.find_replace import (FindReplaceAction, MatchFunction,
                                RegexFindReplace, ReplaceFunction,
                                get_deepest_dataclass_in_path,

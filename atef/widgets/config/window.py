@@ -26,11 +26,11 @@ from qtpy.QtCore import Signal as QSignal
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMenu,
                             QMessageBox, QTabWidget, QWidget)
 
-from atef import load_file
 from atef.cache import DataCache
 from atef.check import AnyComparison, Comparison
 from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
                          PreparedFile, TemplateConfiguration)
+from atef.config_dclass_helpers import load_file
 from atef.exceptions import PreparationError
 from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile,
