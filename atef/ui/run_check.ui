@@ -118,6 +118,22 @@
     </widget>
    </item>
    <item>
+    <widget class="QPushButton" name="abort_button">
+     <property name="font">
+      <font>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color: rgb(255, 0, 0);</string>
+     </property>
+     <property name="text">
+      <string>ABORT</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QLabel" name="run_success_label">
      <property name="text">
       <string>?</string>

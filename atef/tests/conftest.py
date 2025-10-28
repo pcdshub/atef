@@ -23,7 +23,8 @@ from atef.config import (AnyConfiguration, ConfigurationFile,
                          PVConfiguration, TemplateConfiguration,
                          ToolConfiguration)
 from atef.find_replace import RegexFindReplace
-from atef.procedure import AnyProcedure, ProcedureFile
+from atef.procedure import (AnyProcedure, ComparisonToTarget, ProcedureFile,
+                            SetValueStep, ValueToTarget)
 from atef.tools import Ping
 from atef.type_hints import AnyDataclass
 from atef.util import ophyd_cleanup
@@ -399,6 +400,29 @@ def template_configuration():
         edits=[replace_title_edit],
     )
     return group
+
+
+@pytest.fixture
+def set_value_step():
+    action = ValueToTarget(
+        name="set to 1", pv="MY:PREFIX:dt", value=1.0,
+        timeout=2.0, settle_time=2.0
+    )
+
+    check = ComparisonToTarget(
+        pv="MY:PREFIX:dt",
+        comparison=Equals(
+            name="eq_check",
+            description="simple verify",
+            value=1.0,
+        )
+    )
+    step = SetValueStep(
+        actions=[action],
+        success_criteria=[check],
+    )
+
+    return step
 
 
 @pytest.fixture

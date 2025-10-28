@@ -19,6 +19,7 @@ import datetime
 import json
 import logging
 import pathlib
+from asyncio import CancelledError
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
@@ -583,7 +584,7 @@ class PreparedProcedureStep:
         cls,
         step: AnyProcedure,
         parent: Optional[PreparedProcedureGroup] = None
-    ) -> PreparedProcedureStep:
+    ) -> Union[PreparedProcedureStep, FailedStep]:
         """
         Prepare a ProcedureStep for running.  If the creation of the prepared step
         fails for any reason, a FailedStep is returned.
@@ -828,27 +829,62 @@ class PreparedSetValueStep(PreparedProcedureStep):
         Result
             the step_result for this step
         """
+        cancelled = False
         self.origin = cast(SetValueStep, self.origin)
+
+        # Actions
         for prep_action in self.prepared_actions:
-            action_result = await prep_action.run()
+            if cancelled:
+                prep_action.result = Result(
+                    severity=Severity.warning,
+                    reason="Step aborted, action skipped"
+                )
+            try:
+                action_result = await prep_action.run()
+            except CancelledError:
+                cancelled = True
+                prep_action.result = Result(
+                    severity=Severity.warning,
+                    reason="Step aborted, will not continue with additional actions"
+                )
+                continue
+
             if (self.origin.halt_on_fail and action_result.severity > Severity.success):
+                # TODO Is this really necessary? super().run() stashes the step result already...
                 self.step_result = Result(
                     severity=Severity.error,
                     reason=f'action failed ({prep_action.name}), step halted'
                 )
                 return self.step_result
-        for prep_criteria in self.prepared_criteria:
-            await prep_criteria.compare()
 
         if self.origin.require_action_success:
             action_results = [action.result for action in self.prepared_actions]
         else:
             action_results = []
 
+        # Checks
+        for prep_criteria in self.prepared_criteria:
+            if cancelled:
+                prep_criteria.result = Result(
+                    severity=Severity.warning,
+                    reason="Step aborted, check skipped"
+                )
+            try:
+                await prep_criteria.compare()
+            except CancelledError:
+                # These should be fast but let's catch it anyway
+                cancelled = True
+                prep_criteria.result = Result(
+                    severity=Severity.warning,
+                    reason="Step aborted, skipping remaining checks"
+                )
+
         criteria_results = [crit.result for crit in self.prepared_criteria]
 
         severity = _summarize_result_severity(GroupResultMode.all_,
                                               criteria_results + action_results)
+        if cancelled:
+            raise CancelledError()
 
         return Result(severity=severity)
 
