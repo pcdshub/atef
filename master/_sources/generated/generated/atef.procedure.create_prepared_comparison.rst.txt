@@ -1,6 +1,0 @@
-atef.procedure.create\_prepared\_comparison
-===========================================
-
-.. currentmodule:: atef.procedure
-
-.. autofunction:: create_prepared_comparison

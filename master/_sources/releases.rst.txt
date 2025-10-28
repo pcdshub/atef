@@ -2,6 +2,41 @@ Release History
 ###############
 
 
+v1.6.2 (2025-11-18)
+===================
+
+Features
+--------
+- Adds `FindReplaceWizard` that guides users through the templating process.
+- Uses `FindReplaceWizard` in config GUI for `TemplateStep` and `TemplateConfiguration`.
+- Allows the inclusion of templated checkouts into parent checkouts, as either:
+
+  - A reference to the original template and staged edits.
+  - A version of the template with edits applied, inserted directly into the parent checkout.
+
+- Adds ability to abort a running checkout.
+- Adds bespoke abort handling to `SetValueStep` (via `PreparedSetValueStep._run`).
+- Add additional per-prepared-file logging stream for capturing checkout progress.
+- Add status output to window bottom status bar for displaying checkout status.
+- Add separate viewer widget for viewing past logs for checkouts.
+
+Bugfixes
+--------
+- Adjusts spinbox maximum limit to avoid overflow
+
+Maintenance
+-----------
+- Move dataclasses into dedicated submodule: config_model
+    - Adjust "config" -> "passive", "procedure" -> "active", to better reflect the distinction between the two
+    - Adds helper functions to "tree_manipulation" sub-sub-module (naming things is hard)
+    - Adjusts the AnyDataclass type hint, apparently Pylance only picks up __dataclass_fields_ as a ClassVar
+
+Contributors
+------------
+- tangkong
+
+
+
 v1.6.0 (2025-08-13)
 ===================
 

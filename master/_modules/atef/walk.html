@@ -88,11 +88,12 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">atef.check</span><span class="w"> </span><span class="kn">import</span> <span class="n">Comparison</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">atef.config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedConfiguration</span><span class="p">,</span> <span class="n">Configuration</span><span class="p">,</span>
-                         <span class="n">PreparedComparison</span><span class="p">,</span> <span class="n">PreparedConfiguration</span><span class="p">,</span>
-                         <span class="n">PreparedFile</span><span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">atef.procedure</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedProcedure</span><span class="p">,</span> <span class="n">PreparedProcedureFile</span><span class="p">,</span>
-                            <span class="n">PreparedProcedureStep</span><span class="p">,</span> <span class="n">ProcedureStep</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.config_model.active</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedProcedure</span><span class="p">,</span>
+                                      <span class="n">PreparedProcedureFile</span><span class="p">,</span>
+                                      <span class="n">PreparedProcedureStep</span><span class="p">,</span> <span class="n">ProcedureStep</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">atef.config_model.passive</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AnyPreparedConfiguration</span><span class="p">,</span> <span class="n">Configuration</span><span class="p">,</span>
+                                       <span class="n">PreparedComparison</span><span class="p">,</span>
+                                       <span class="n">PreparedConfiguration</span><span class="p">,</span> <span class="n">PreparedFile</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="walk_config_file">
