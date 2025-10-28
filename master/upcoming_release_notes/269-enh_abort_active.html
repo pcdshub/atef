@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>268 bug_spinbox_max &mdash; atef  documentation</title>
+  <title>269 enh_abort_active &mdash; atef  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
@@ -21,8 +21,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="269 enh_abort_active" href="269-enh_abort_active.html" />
-    <link rel="prev" title="Upcoming Changes" href="../upcoming_changes.html" /> 
+    <link rel="next" title="270 enh_ref_template" href="270-enh_ref_template.html" />
+    <link rel="prev" title="268 bug_spinbox_max" href="268-bug_spinbox_max.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -49,7 +49,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../api.html">ATEF API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../releases.html">Release History</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../upcoming_changes.html">Upcoming Changes</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">268 bug_spinbox_max</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="268-bug_spinbox_max.html">268 bug_spinbox_max</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">269 enh_abort_active</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#api-breaks">API Breaks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#features">Features</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#bugfixes">Bugfixes</a></li>
@@ -57,7 +58,6 @@
 <li class="toctree-l3"><a class="reference internal" href="#contributors">Contributors</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="269-enh_abort_active.html">269 enh_abort_active</a></li>
 <li class="toctree-l2"><a class="reference internal" href="270-enh_ref_template.html">270 enh_ref_template</a></li>
 <li class="toctree-l2"><a class="reference internal" href="272-enh_status_output.html">272 enh_status_output</a></li>
 <li class="toctree-l2"><a class="reference internal" href="273-ref_dclass_submodule.html">273 ref_dclass_submodule</a></li>
@@ -84,9 +84,9 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../upcoming_changes.html">Upcoming Changes</a></li>
-      <li class="breadcrumb-item active">268 bug_spinbox_max</li>
+      <li class="breadcrumb-item active">269 enh_abort_active</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/upcoming_release_notes/268-bug_spinbox_max.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/upcoming_release_notes/269-enh_abort_active.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -94,8 +94,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="bug-spinbox-max">
-<h1>268 bug_spinbox_max<a class="headerlink" href="#bug-spinbox-max" title="Link to this heading"></a></h1>
+  <section id="enh-abort-active">
+<h1>269 enh_abort_active<a class="headerlink" href="#enh-abort-active" title="Link to this heading"></a></h1>
 <section id="api-breaks">
 <h2>API Breaks<a class="headerlink" href="#api-breaks" title="Link to this heading"></a></h2>
 <ul class="simple">
@@ -105,13 +105,14 @@
 <section id="features">
 <h2>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>N/A</p></li>
+<li><p>Adds ability to abort a running checkout</p></li>
+<li><p>Adds abort handling to <code class="xref any docutils literal notranslate"><span class="pre">SetValueStep</span></code> (via <code class="xref any docutils literal notranslate"><span class="pre">PreparedSetValueStep._run</span></code>)</p></li>
 </ul>
 </section>
 <section id="bugfixes">
 <h2>Bugfixes<a class="headerlink" href="#bugfixes" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p>Adjusts spinbox maximum limit to avoid overflow</p></li>
+<li><p>N/A</p></li>
 </ul>
 </section>
 <section id="maintenance">
@@ -132,8 +133,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../upcoming_changes.html" class="btn btn-neutral float-left" title="Upcoming Changes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="269-enh_abort_active.html" class="btn btn-neutral float-right" title="269 enh_abort_active" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="268-bug_spinbox_max.html" class="btn btn-neutral float-left" title="268 bug_spinbox_max" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="270-enh_ref_template.html" class="btn btn-neutral float-right" title="270 enh_ref_template" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -1,6 +1,0 @@
-atef.procedure.get\_bs\_state
-=============================
-
-.. currentmodule:: atef.procedure
-
-.. autofunction:: get_bs_state

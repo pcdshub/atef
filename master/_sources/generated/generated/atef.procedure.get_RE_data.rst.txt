@@ -1,6 +1,0 @@
-atef.procedure.get\_RE\_data
-============================
-
-.. currentmodule:: atef.procedure
-
-.. autofunction:: get_RE_data
