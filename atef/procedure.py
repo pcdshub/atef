@@ -837,12 +837,16 @@ class PreparedSetValueStep(PreparedProcedureStep):
             if cancelled:
                 prep_action.result = Result(
                     severity=Severity.warning,
-                    reason="Step aborted, will not continue with additional actions"
+                    reason="Step aborted, action skipped"
                 )
             try:
                 action_result = await prep_action.run()
             except CancelledError:
                 cancelled = True
+                prep_action.result = Result(
+                    severity=Severity.warning,
+                    reason="Step aborted, will not continue with additional actions"
+                )
                 continue
 
             if (self.origin.halt_on_fail and action_result.severity > Severity.success):
@@ -863,13 +867,17 @@ class PreparedSetValueStep(PreparedProcedureStep):
             if cancelled:
                 prep_criteria.result = Result(
                     severity=Severity.warning,
-                    reason="Step halted, skipping checks"
+                    reason="Step aborted, check skipped"
                 )
             try:
                 await prep_criteria.compare()
             except CancelledError:
                 # These should be fast but let's catch it anyway
                 cancelled = True
+                prep_criteria.result = Result(
+                    severity=Severity.warning,
+                    reason="Step aborted, skipping remaining checks"
+                )
 
         criteria_results = [crit.result for crit in self.prepared_criteria]
 
