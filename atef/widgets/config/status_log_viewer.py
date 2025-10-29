@@ -5,7 +5,7 @@ from uuid import UUID
 
 from qtpy import QtCore, QtWidgets
 
-from atef.status_logging import STATUS_OUTPUT_TEMPFILE_CACHE
+from atef.status_logging import get_status_tempfile_cache
 from atef.widgets.core import DesignerDisplay
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,8 @@ class StatusLogWidget(DesignerDisplay, QtWidgets.QWidget):
             caption='Save log file as',
             filter='Text Files (*.txt)',
         )
-
+        if not filename:
+            return
         try:
             shutil.copyfile(viewer.fp, filename)
         except OSError:
@@ -65,7 +66,7 @@ class StatusLogViewer(DesignerDisplay, QtWidgets.QWidget):
     def __init__(self, *args, uuid: UUID, **kwargs):
         # grab the filehandle from the cache
         super().__init__(*args, **kwargs)
-        tempfile = STATUS_OUTPUT_TEMPFILE_CACHE[uuid]
+        tempfile = get_status_tempfile_cache()[uuid]
         self.fp = tempfile.name
         self.watcher = QtCore.QFileSystemWatcher(self)
         self.watcher.addPath(self.fp)
