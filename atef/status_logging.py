@@ -1,20 +1,30 @@
 import logging
 import tempfile
-from typing import Dict
+from typing import Dict, Optional
 from uuid import UUID
 
 from qtpy.QtCore import QObject
 from qtpy.QtCore import Signal as QSignal
 
-STATUS_OUTPUT_TEMPFILE_CACHE: Dict[UUID, tempfile._TemporaryFileWrapper] = {}
+TempfileCache = Dict[UUID, tempfile._TemporaryFileWrapper]
+
+STATUS_OUTPUT_TEMPFILE_CACHE: Optional[TempfileCache] = None
 _SIMPLE_FORMATTER = logging.Formatter("%(asctime)s -- %(message)s",
                                       datefmt="%Y-%m-%d %H:%M:%S")
 _DETAILED_FORMATTER = logging.Formatter("[%(name).8s, %(asctime)s] -- %(message)s")
 
 
+def get_status_tempfile_cache() -> TempfileCache:
+    global STATUS_OUTPUT_TEMPFILE_CACHE
+    if STATUS_OUTPUT_TEMPFILE_CACHE is None:
+        STATUS_OUTPUT_TEMPFILE_CACHE = {}
+    return STATUS_OUTPUT_TEMPFILE_CACHE
+
+
 def configure_and_get_status_logger(uuid: UUID) -> logging.Logger:
     """setup / initialize a logging file for a specific checkout"""
-    if uuid in STATUS_OUTPUT_TEMPFILE_CACHE:
+    _tempfile_cache = get_status_tempfile_cache()
+    if uuid in _tempfile_cache:
         # logger has been configured already, just return the logger
         return logging.getLogger(str(uuid))
     # create a tempfile for the uuid
@@ -29,12 +39,13 @@ def configure_and_get_status_logger(uuid: UUID) -> logging.Logger:
     logger.propagate = False  # Prevent prints to console
 
     # add to the tempfile cache last, in case something errors out
-    STATUS_OUTPUT_TEMPFILE_CACHE[uuid] = temp_logging_file
+    _tempfile_cache[uuid] = temp_logging_file
     return logger
 
 
 def cleanup_status_logger(uuid: UUID):
-    if uuid not in STATUS_OUTPUT_TEMPFILE_CACHE:
+    _tempfile_cache = get_status_tempfile_cache()
+    if uuid not in _tempfile_cache:
         return
 
     # remove handlers
@@ -43,7 +54,7 @@ def cleanup_status_logger(uuid: UUID):
         logger.removeHandler(handler)
 
     # clean up file
-    temp_logging_file = STATUS_OUTPUT_TEMPFILE_CACHE.pop(uuid)
+    temp_logging_file = _tempfile_cache.pop(uuid)
     temp_logging_file.close()
 
 
