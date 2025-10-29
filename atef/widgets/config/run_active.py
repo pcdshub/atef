@@ -202,6 +202,9 @@ class TemplateRunWidget(DesignerDisplay, DataWidget):
     filename = 'template_run_widget.ui'
 
     refresh_button: QtWidgets.QPushButton
+    # A button made available for downstream pages to use if they like.
+    # This is not subscribed to by this widget alone, since it requires additional
+    # context
     reconfigure_button: QtWidgets.QPushButton
     tree_view: QtWidgets.QTreeView
     edits_list: QtWidgets.QListWidget
