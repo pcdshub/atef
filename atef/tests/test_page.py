@@ -282,12 +282,12 @@ def test_template_type_compat_passive(
                         lambda *args, **kwargs: QtWidgets.QMessageBox.Yes)
     wizard.select_page.load_file(active_config_path)
     wizard.select_page.finish_setup()
-    assert wizard.select_page.fp is None
+    assert not wizard.select_page.fp
     assert wizard.currentId() == 0
     assert not wizard.button(wizard.NextButton).isEnabled()
 
     wizard.select_page.load_file(passive_config_path)
-    assert wizard.select_page.fp is not None
+    assert wizard.select_page.fp
 
     # Switch wizard to apply options page to re-initialize
     wizard.next()

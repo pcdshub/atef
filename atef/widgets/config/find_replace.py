@@ -454,9 +454,13 @@ class SelectTemplatePage(DesignerDisplay, QtWidgets.QWizardPage):
                 'Choose a checkout with one of the allowed types: '
                 f'{[t.__name__ for t in self.allowed_types]}'
             )
-            return
+            # if None, below methods will reset page
+            filepath = self.fp
+        else:
+            # cast to string to be certain of qt type
+            filepath = str(self.fp)
 
-        self.setField("select.file", str(self.fp))
+        self.setField("select.file", filepath)
         self.setup_tree_view()
         self.setup_devices_list()
         self.update_title()
@@ -475,6 +479,7 @@ class SelectTemplatePage(DesignerDisplay, QtWidgets.QWizardPage):
         if self.allowed_types and not isinstance(data, self.allowed_types):
             logger.error("loaded checkout is of a disallowed type: "
                          f"({type(data)})")
+            data = None
             self.fp = None
             self.orig_file = None
             return
