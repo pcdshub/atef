@@ -934,6 +934,10 @@ class FillTemplateWizard(QtWidgets.QWizard):
         # restart to fix current index reporting
         self.restart()
 
+    def reject(self) -> None:
+        # don't allow user to close this wizard prematurely
+        return
+
     def on_finish(self):
         if self.options_page.save_button.isChecked():
             self.save_requested.emit()
