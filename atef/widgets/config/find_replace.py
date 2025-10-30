@@ -399,7 +399,12 @@ class SelectTemplatePage(DesignerDisplay, QtWidgets.QWizardPage):
     ):
         super().__init__(*args, **kwargs)
         self.fp = filepath
-        self.allowed_types = allowed_types
+        self.allowed_types = allowed_types or tuple()
+        if len(self.allowed_types) == 1:
+            self.disallowed_types = (ProcedureFile,)
+        else:
+            self.disallowed_types = tuple()
+
         self.open_button.clicked.connect(self.open_file)
         self.registerField("select.file", self, "filepath")
         if self.fp:
@@ -444,7 +449,9 @@ class SelectTemplatePage(DesignerDisplay, QtWidgets.QWizardPage):
             QtWidgets.QMessageBox.warning(
                 self,
                 'Template Checkout type error',
-                'Loaded checkout is NOT one of the allowed types: '
+                'Loaded checkout is of disallowed type: '
+                f'{[t.__name__ for t in self.disallowed_types]} '
+                'Choose a checkout with one of the allowed types: '
                 f'{[t.__name__ for t in self.allowed_types]}'
             )
             return
