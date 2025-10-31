@@ -7,10 +7,11 @@ import pytest
 
 from .. import cache, check, reduce, util
 from ..check import Comparison, Severity
-from ..config import (ConfigurationFile, ConfigurationGroup,
-                      DeviceConfiguration, PreparedDeviceConfiguration,
-                      PreparedFile, PreparedPVConfiguration, PVConfiguration,
-                      get_result_from_comparison)
+from ..config_model.passive import (ConfigurationFile, ConfigurationGroup,
+                                    DeviceConfiguration,
+                                    PreparedDeviceConfiguration, PreparedFile,
+                                    PreparedPVConfiguration, PVConfiguration,
+                                    get_result_from_comparison)
 from ..exceptions import PreparedComparisonException
 from ..result import Result
 

@@ -5,9 +5,9 @@ import pytest
 from pytestqt.qtbot import QtBot
 from qtpy import QtCore, QtWidgets
 
-from atef.config import ConfigurationFile, TemplateConfiguration
-from atef.config_dclass_helpers import load_file
-from atef.procedure import TemplateStep
+from atef.config_model import load_file
+from atef.config_model.active import TemplateStep
+from atef.config_model.passive import ConfigurationFile, TemplateConfiguration
 from atef.type_hints import AnyDataclass
 from atef.widgets.config.find_replace import (ApplyOptionPage,
                                               ConfigureEditsPage,

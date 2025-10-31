@@ -21,13 +21,14 @@ import atef
 from atef import cache
 from atef.cache import get_signal_cache
 from atef.check import Equals, Greater, GreaterOrEqual, LessOrEqual, NotEquals
-from atef.config import (AnyConfiguration, ConfigurationFile,
-                         ConfigurationGroup, DeviceConfiguration,
-                         PVConfiguration, TemplateConfiguration,
-                         ToolConfiguration)
+from atef.config_model.active import (AnyProcedure, ComparisonToTarget,
+                                      ProcedureFile, SetValueStep,
+                                      ValueToTarget)
+from atef.config_model.passive import (AnyConfiguration, ConfigurationFile,
+                                       ConfigurationGroup, DeviceConfiguration,
+                                       PVConfiguration, TemplateConfiguration,
+                                       ToolConfiguration)
 from atef.find_replace import RegexFindReplace
-from atef.procedure import (AnyProcedure, ComparisonToTarget, ProcedureFile,
-                            SetValueStep, ValueToTarget)
 from atef.tools import Ping
 from atef.type_hints import AnyDataclass
 from atef.util import ophyd_cleanup

@@ -2,9 +2,10 @@ import pathlib
 
 import pytest
 
-from atef.config import (ConfigurationFile, DeviceConfiguration, PreparedFile,
-                         PreparedTemplateConfiguration, PVConfiguration,
-                         TemplateConfiguration)
+from atef.config_model.passive import (ConfigurationFile, DeviceConfiguration,
+                                       PreparedFile,
+                                       PreparedTemplateConfiguration,
+                                       PVConfiguration, TemplateConfiguration)
 from atef.enums import Severity
 from atef.type_hints import AnyDataclass
 from atef.widgets.config.utils import get_relevant_pvs

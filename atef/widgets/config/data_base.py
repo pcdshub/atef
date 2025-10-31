@@ -12,8 +12,8 @@ from qtpy.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
                             QVBoxLayout, QWidget)
 
 from atef.check import Comparison
-from atef.config import Configuration, ToolConfiguration
-from atef.procedure import ProcedureStep
+from atef.config_model.active import ProcedureStep
+from atef.config_model.passive import Configuration, ToolConfiguration
 from atef.qt_helpers import QDataclassBridge, QDataclassList
 from atef.type_hints import AnyDataclass
 from atef.widgets.archive_viewer import get_archive_viewer

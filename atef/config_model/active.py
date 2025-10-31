@@ -36,8 +36,9 @@ from bluesky_queueserver.manager.profile_ops import (
 from atef import util
 from atef.cache import DataCache, _SignalCache, get_signal_cache
 from atef.check import Comparison
-from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
-                         PreparedSignalComparison, run_passive_step)
+from atef.config_model.passive import (ConfigurationFile, PreparedComparison,
+                                       PreparedFile, PreparedSignalComparison,
+                                       run_passive_step)
 from atef.dataclass_helpers import get_parent_file
 from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparationError, PreparedComparisonException
@@ -51,7 +52,7 @@ from atef.status_logging import configure_and_get_status_logger
 from atef.type_hints import AnyDataclass, AnyPath, Number, PrimitiveType
 from atef.yaml_support import init_yaml_support
 
-from . import serialization
+from .. import serialization
 
 logger = logging.getLogger(__name__)
 

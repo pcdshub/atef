@@ -34,17 +34,20 @@ from atef import util
 from atef.check import (ALL_COMPARISONS, AnyComparison, AnyValue, Comparison,
                         Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
                         NotEquals, Range, ValueSet)
-from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
-                         DeviceConfiguration, PreparedConfiguration,
-                         PreparedGroup, PreparedTemplateConfiguration,
-                         PVConfiguration, TemplateConfiguration,
-                         ToolConfiguration)
-from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
-                            PreparedDescriptionStep, PreparedPassiveStep,
-                            PreparedProcedureStep, PreparedSetValueStep,
-                            PreparedTemplateStep, ProcedureFile,
-                            ProcedureGroup, ProcedureStep, SetValueStep,
-                            TemplateStep)
+from atef.config_model.active import (ComparisonToTarget, DescriptionStep,
+                                      PassiveStep, PreparedDescriptionStep,
+                                      PreparedPassiveStep,
+                                      PreparedProcedureStep,
+                                      PreparedSetValueStep,
+                                      PreparedTemplateStep, ProcedureFile,
+                                      ProcedureGroup, ProcedureStep,
+                                      SetValueStep, TemplateStep)
+from atef.config_model.passive import (Configuration, ConfigurationFile,
+                                       ConfigurationGroup, DeviceConfiguration,
+                                       PreparedConfiguration, PreparedGroup,
+                                       PreparedTemplateConfiguration,
+                                       PVConfiguration, TemplateConfiguration,
+                                       ToolConfiguration)
 from atef.tools import Ping, PingResult, Tool, ToolResult
 from atef.type_hints import AnyDataclass
 from atef.widgets.config.data_active import (CheckRowWidget,

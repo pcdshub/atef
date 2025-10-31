@@ -5,9 +5,11 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple
 import apischema
 import pytest
 
-from .. import check, config, tools
+from .. import check, tools
 from ..cache import DataCache
-from ..config import Comparison, PreparedToolConfiguration, ToolConfiguration
+from ..config_model import passive
+from ..config_model.passive import (Comparison, PreparedToolConfiguration,
+                                    ToolConfiguration)
 from ..enums import Severity
 from ..result import Result
 
@@ -46,7 +48,7 @@ async def check_tool(
 
     overall = await prepared.compare()
     results = [
-        config.get_result_from_comparison(comparison)[1]
+        passive.get_result_from_comparison(comparison)[1]
         for comparison in prepared.comparisons
     ]
     return overall.severity, results

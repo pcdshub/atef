@@ -15,7 +15,7 @@ import apischema
 import yaml
 
 import atef
-import atef.config
+import atef.config_model.passive
 from atef import serialization, tools
 from atef.check import Comparison
 from atef.type_hints import AnyPath
@@ -180,7 +180,7 @@ def _split_shared_checklist(
     return shared, by_identifier
 
 
-def convert_configuration(config: AnyConfiguration) -> atef.config.AnyConfiguration:
+def convert_configuration(config: AnyConfiguration) -> atef.config_model.passive.AnyConfiguration:
     """
     Convert a prototype Configuration to a supported one.
 
@@ -199,7 +199,7 @@ def convert_configuration(config: AnyConfiguration) -> atef.config.AnyConfigurat
 
     shared, by_identifier = _split_shared_checklist(config.checklist)
     if isinstance(config, DeviceConfiguration):
-        return atef.config.DeviceConfiguration(
+        return atef.config_model.passive.DeviceConfiguration(
             name=config.name,
             description=config.description,
             tags=config.tags,
@@ -209,7 +209,7 @@ def convert_configuration(config: AnyConfiguration) -> atef.config.AnyConfigurat
         )
 
     if isinstance(config, PVConfiguration):
-        return atef.config.PVConfiguration(
+        return atef.config_model.passive.PVConfiguration(
             name=config.name,
             description=config.description,
             tags=config.tags,
@@ -218,7 +218,7 @@ def convert_configuration(config: AnyConfiguration) -> atef.config.AnyConfigurat
         )
 
     if isinstance(config, ToolConfiguration):
-        return atef.config.ToolConfiguration(
+        return atef.config_model.passive.ToolConfiguration(
             name=config.name,
             description=config.description,
             tags=config.tags,
@@ -228,7 +228,7 @@ def convert_configuration(config: AnyConfiguration) -> atef.config.AnyConfigurat
         )
 
 
-def load(filename: AnyPath) -> atef.config.ConfigurationFile:
+def load(filename: AnyPath) -> atef.config_model.passive.ConfigurationFile:
     """
     Load the provided prototype atef configuration file to the latest
     supported (and numbered) version.
@@ -244,7 +244,7 @@ def load(filename: AnyPath) -> atef.config.ConfigurationFile:
         The converted configuration file.
     """
     old = PrototypeConfigurationFile.from_file(filename)
-    new = atef.config.ConfigurationFile()
+    new = atef.config_model.passive.ConfigurationFile()
     for config in old.configs:
         config = cast(AnyConfiguration, config)
         new.root.configs.append(convert_configuration(config))

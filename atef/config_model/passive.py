@@ -26,14 +26,14 @@ from atef.find_replace import RegexFindReplace
 from atef.result import _summarize_result_severity
 from atef.status_logging import configure_and_get_status_logger
 
-from . import serialization, tools, util
-from .cache import DataCache
-from .check import Comparison
-from .enums import GroupResultMode, Severity
-from .exceptions import PreparationError, PreparedComparisonException
-from .result import Result, incomplete_result
-from .type_hints import AnyPath
-from .yaml_support import init_yaml_support
+from .. import serialization, tools, util
+from ..cache import DataCache
+from ..check import Comparison
+from ..enums import GroupResultMode, Severity
+from ..exceptions import PreparationError, PreparedComparisonException
+from ..result import Result, incomplete_result
+from ..type_hints import AnyPath
+from ..yaml_support import init_yaml_support
 
 logger = logging.getLogger(__name__)
 

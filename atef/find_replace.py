@@ -14,8 +14,8 @@ import happi
 from atef.cache import DataCache
 
 if TYPE_CHECKING:
-    from atef.config import ConfigurationFile
-    from atef.procedure import ProcedureFile
+    from atef.config_model.passive import ConfigurationFile
+    from atef.config_model.active import ProcedureFile
 
 from atef.type_hints import PrimitiveType
 

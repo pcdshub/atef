@@ -2,8 +2,8 @@
 
 import pytest
 
-from atef.config import ConfigurationFile, PreparedFile
-from atef.procedure import PreparedProcedureFile, ProcedureFile
+from atef.config_model.active import PreparedProcedureFile, ProcedureFile
+from atef.config_model.passive import ConfigurationFile, PreparedFile
 from atef.tests.conftest import (active_checkout_configs,
                                  passive_checkout_configs)
 from atef.walk import walk_config_file, walk_procedure_file

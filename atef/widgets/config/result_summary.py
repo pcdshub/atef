@@ -10,9 +10,9 @@ from typing import Any, List, Optional, Set, Union
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
 
-from atef.config import PreparedFile
+from atef.config_model.active import PreparedProcedureFile
+from atef.config_model.passive import PreparedFile
 from atef.enums import Severity
-from atef.procedure import PreparedProcedureFile
 from atef.type_hints import AnyDataclass
 from atef.walk import walk_config_file, walk_procedure_file
 from atef.widgets.core import DesignerDisplay

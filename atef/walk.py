@@ -9,11 +9,12 @@ from __future__ import annotations
 from typing import Generator, List, Tuple, Union
 
 from atef.check import Comparison
-from atef.config import (AnyPreparedConfiguration, Configuration,
-                         PreparedComparison, PreparedConfiguration,
-                         PreparedFile)
-from atef.procedure import (AnyPreparedProcedure, PreparedProcedureFile,
-                            PreparedProcedureStep, ProcedureStep)
+from atef.config_model.active import (AnyPreparedProcedure,
+                                      PreparedProcedureFile,
+                                      PreparedProcedureStep, ProcedureStep)
+from atef.config_model.passive import (AnyPreparedConfiguration, Configuration,
+                                       PreparedComparison,
+                                       PreparedConfiguration, PreparedFile)
 
 
 def walk_config_file(

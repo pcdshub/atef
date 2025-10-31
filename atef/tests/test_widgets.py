@@ -13,8 +13,9 @@ from atef.widgets.config.utils import MultiInputDialog
 from atef.widgets.happi import HappiDeviceComponentWidget
 from atef.widgets.ophyd import OphydDeviceTableWidget
 
-from ..procedure import (DescriptionStep, DisplayOptions, ProcedureGroup,
-                         PydmDisplayStep, TyphosDisplayStep)
+from ..config_model.active import (DescriptionStep, DisplayOptions,
+                                   ProcedureGroup, PydmDisplayStep,
+                                   TyphosDisplayStep)
 from ..widgets.config.window import Window
 
 logger = logging.getLogger(__name__)

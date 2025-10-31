@@ -4,13 +4,15 @@ import apischema
 import pytest
 
 from atef.check import Equals
-from atef.config import ConfigurationFile, ConfigurationGroup
+from atef.config_model.active import (ComparisonToPlanData, DescriptionStep,
+                                      PlanOptions, PlanStep, PreparedPlanStep,
+                                      PreparedProcedureFile,
+                                      PreparedProcedureStep,
+                                      PreparedTemplateStep, ProcedureFile,
+                                      ProcedureGroup, TemplateStep)
+from atef.config_model.passive import ConfigurationFile, ConfigurationGroup
 from atef.enums import Severity
 from atef.find_replace import RegexFindReplace
-from atef.procedure import (ComparisonToPlanData, DescriptionStep, PlanOptions,
-                            PlanStep, PreparedPlanStep, PreparedProcedureFile,
-                            PreparedProcedureStep, PreparedTemplateStep,
-                            ProcedureFile, ProcedureGroup, TemplateStep)
 from atef.result import Result
 
 pass_result = Result()

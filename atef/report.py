@@ -25,16 +25,22 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 from atef.check import (Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
                         NotEquals, Range)
-from atef.config import (PreparedComparison, PreparedConfiguration,
-                         PreparedDeviceConfiguration, PreparedFile,
-                         PreparedGroup, PreparedPVConfiguration,
-                         PreparedSignalComparison,
-                         PreparedTemplateConfiguration, PreparedToolComparison,
-                         PreparedToolConfiguration)
+from atef.config_model.active import (PreparedPassiveStep,
+                                      PreparedProcedureFile,
+                                      PreparedProcedureGroup,
+                                      PreparedProcedureStep,
+                                      PreparedSetValueStep,
+                                      PreparedTemplateStep)
+from atef.config_model.passive import (PreparedComparison,
+                                       PreparedConfiguration,
+                                       PreparedDeviceConfiguration,
+                                       PreparedFile, PreparedGroup,
+                                       PreparedPVConfiguration,
+                                       PreparedSignalComparison,
+                                       PreparedTemplateConfiguration,
+                                       PreparedToolComparison,
+                                       PreparedToolConfiguration)
 from atef.enums import Severity
-from atef.procedure import (PreparedPassiveStep, PreparedProcedureFile,
-                            PreparedProcedureGroup, PreparedProcedureStep,
-                            PreparedSetValueStep, PreparedTemplateStep)
 from atef.result import Result
 from atef.type_hints import AnyDataclass
 from atef.walk import walk_config_file, walk_procedure_file

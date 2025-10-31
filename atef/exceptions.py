@@ -7,7 +7,7 @@ from .enums import Severity
 
 if typing.TYPE_CHECKING:
     from .check import Comparison
-    from .config import AnyConfiguration, PreparedConfiguration
+    from .config_model.passive import AnyConfiguration, PreparedConfiguration
 
 
 class ConfigFileLoadError(Exception):

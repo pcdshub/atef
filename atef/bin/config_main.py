@@ -1,15 +1,17 @@
 """
 `atef config` opens up a graphical config file editor.
 """
+import cProfile
 import logging
+import pstats
 import sys
 from typing import List, Optional
 
 from pydm import exception
 from qtpy.QtWidgets import QApplication
 
-from ..type_hints import AnyPath
-from ..widgets.config.window import Window
+from atef.type_hints import AnyPath
+from atef.widgets.config.window import Window
 
 logger = logging.getLogger(__name__)
 
@@ -29,3 +31,17 @@ def main(cache_size: int, filenames: Optional[List[AnyPath]] = None, **kwargs):
             )
 
     app.exec()
+
+
+if __name__ == "__main__":
+    profiler = cProfile.Profile()
+
+    profiler.enable()
+    main(100, filenames=["/cds/home/r/roberttk/devrepos/atef/test_template_cxi.json"])
+    profiler.disable()
+
+    stats = pstats.Stats(profiler)
+    stats.sort_stats("cumulative")
+    stats.print_stats(10)
+
+    stats.dump_stats("profile_resutls.prof")
