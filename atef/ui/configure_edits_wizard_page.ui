@@ -108,7 +108,11 @@
            </widget>
           </item>
           <item>
-           <widget class="QListWidget" name="details_list"/>
+           <widget class="QListWidget" name="details_list">
+            <property name="horizontalScrollBarPolicy">
+             <enum>Qt::ScrollBarAlwaysOn</enum>
+            </property>
+           </widget>
           </item>
          </layout>
         </item>
@@ -175,7 +179,14 @@
          </widget>
         </item>
         <item>
-         <widget class="QListWidget" name="staged_list"/>
+         <widget class="QListWidget" name="staged_list">
+          <property name="horizontalScrollBarPolicy">
+           <enum>Qt::ScrollBarAlwaysOn</enum>
+          </property>
+          <property name="horizontalScrollMode">
+           <enum>QAbstractItemView::ScrollPerPixel</enum>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="validate_button">
