@@ -1,12 +1,12 @@
 """
 Non-core utilities. Primarily dynamic styling tools.
 """
-from typing import ClassVar, Generator, Optional
+from typing import ClassVar, Generator, Optional, Union
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import QEvent, QObject, QRegularExpression, Qt
 from qtpy.QtGui import QPalette, QRegularExpressionValidator
-from qtpy.QtWidgets import QLineEdit
+from qtpy.QtWidgets import QLabel, QLineEdit
 
 PV_regexp = QRegularExpression(r'.*')
 PV_validator = QRegularExpressionValidator(PV_regexp)
@@ -69,7 +69,7 @@ class FrameOnEditFilter(QObject):
 
 
 def match_line_edit_text_width(
-    line_edit: QLineEdit,
+    line_edit: Union[QLineEdit, QLabel],
     text: Optional[str] = None,
     minimum: int = 40,
     buffer: int = 10,

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>WizardPage</class>
+ <widget class="QWizardPage" name="WizardPage">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>565</width>
+    <height>444</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>ApplyOptionPage</string>
+  </property>
+  <property name="title">
+   <string>Apply and insert or save as edits</string>
+  </property>
+  <property name="subTitle">
+   <string>Choose whether to insert a modified copy into the checkout or save as edits and reference to parent checkout</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_3">
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QLabel" name="insert_label">
+         <property name="text">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Apply edits and insert into checkout&lt;/p&gt;&lt;p&gt;This will apply the proposed edits and insert the modified checkout into this checkout.&lt;/p&gt;&lt;p&gt;- Freezes the state of modified checkout after applying changes&lt;/p&gt;&lt;p&gt;- Displays steps as native members of the parent (this) checkout&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="cannot_insert_label">
+         <property name="text">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Templated file cannot be inserted because it is of a different type than the parent checkout. (Passive checkouts steps cannot be inserted into Active checkouts)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="insert_button">
+         <property name="text">
+          <string>Apply and Insert</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">button_group</string>
+         </attribute>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <widget class="QLabel" name="save_label">
+         <property name="text">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Save as edits and parent checkout separately&lt;/p&gt;&lt;p&gt;This will save the staged edits and a reference to the modified checkout.&lt;/p&gt;&lt;p&gt;- Future edits to the modified checkout will be reflected before the staged edits are applied&lt;/p&gt;&lt;p&gt;- Child checkout steps are bundled into a single step&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QRadioButton" name="save_button">
+         <property name="text">
+          <string>Save as edits</string>
+         </property>
+         <attribute name="buttonGroup">
+          <string notr="true">button_group</string>
+         </attribute>
+        </widget>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+ <buttongroups>
+  <buttongroup name="button_group"/>
+ </buttongroups>
+</ui>
