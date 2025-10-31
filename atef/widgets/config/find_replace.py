@@ -739,7 +739,7 @@ class ConfigureEditsPage(DesignerDisplay, QtWidgets.QWizardPage):
             )
             self._partial_slots.append(stage_slot)
 
-            # reveal tree when deails selected
+            # reveal tree when details selected
             reveal_slot = WeakPartialMethodSlot(
                 row_widget, row_widget.details_button.pressed,
                 self.reveal_tree_item, self.details_list, action=row_widget.data
@@ -805,7 +805,7 @@ class ConfigureEditsPage(DesignerDisplay, QtWidgets.QWizardPage):
             )
             self._partial_slots.append(remove_slot)
 
-            # reveal tree when deails selected
+            # reveal tree when details selected
             reveal_slot = WeakPartialMethodSlot(
                 row_widget, row_widget.details_button.pressed,
                 self.reveal_tree_item, self.staged_list, action=row_widget.data
