@@ -18,7 +18,7 @@ from pprint import pprint
 from typing import ClassVar, Dict, Generator, Optional
 
 import qtawesome
-from apischema import ValidationError, deserialize, serialize
+from apischema import serialize
 from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt, QTimer
@@ -30,6 +30,7 @@ from atef.cache import DataCache
 from atef.check import AnyComparison, Comparison
 from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
                          PreparedFile, TemplateConfiguration)
+from atef.config_dclass_helpers import load_file
 from atef.exceptions import PreparationError
 from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             PreparedProcedureFile, ProcedureFile,
@@ -252,26 +253,20 @@ class Window(DesignerDisplay, QMainWindow):
             )
         if not filename:
             return
-        with open(filename, 'r') as fd:
-            serialized = json.load(fd)
 
-        # TODO: Consider adding submenus for user to choose
         try:
-            data = deserialize(ConfigurationFile, serialized)
-        except ValidationError:
-            logger.debug('failed to open as passive checkout')
-            try:
-                data = deserialize(ProcedureFile, serialized)
-            except ValidationError:
-                logger.error('failed to open file as either active '
-                             'or passive checkout')
-                msg = QtWidgets.QMessageBox(parent=self)
-                msg.setIcon(QtWidgets.QMessageBox.Critical)
-                msg.setText('Failed to open file as either an active or passive '
-                            'checkout.  The file may be corrupted or malformed.')
-                msg.setWindowTitle('Could not open file')
-                msg.exec_()
-                return
+            data = load_file(filename)
+        except ValueError:
+            logger.error('failed to open file as either active '
+                         'or passive checkout')
+            msg = QtWidgets.QMessageBox(parent=self)
+            msg.setIcon(QtWidgets.QMessageBox.Critical)
+            msg.setText('Failed to open file as either an active or passive '
+                        'checkout.  The file may be corrupted or malformed.')
+            msg.setWindowTitle('Could not open file')
+            msg.exec_()
+            return
+
         self._new_tab(data=data, filename=filename)
 
     def _new_tab(
@@ -746,9 +741,11 @@ class DualTree(DesignerDisplay, QWidget):
             if type(data) in EDIT_TO_RUN_PAGE:
                 if len(prepared_data) != 1:
                     run_widget = FailPage(
-                        reason=f'Found ({len(prepared_data)}) matching dataclasses'
-                               ', failed to set up run step.  Check to make sure'
-                               ' configuration is correct.'
+                        reason=RuntimeError(
+                            f'Found ({len(prepared_data)}) matching dataclasses'
+                            ', failed to set up run step.  Check to make sure'
+                            ' configuration is correct.'
+                        )
                     )
                     return run_widget
                 else:
