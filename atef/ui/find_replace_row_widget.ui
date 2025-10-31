@@ -6,13 +6,25 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>568</width>
+    <width>641</width>
     <height>50</height>
    </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
   </property>
   <property name="minimumSize">
    <size>
     <width>75</width>
+    <height>50</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>16777215</width>
     <height>50</height>
    </size>
   </property>
@@ -44,16 +56,37 @@
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_3">
+    <layout class="QHBoxLayout" name="label_layout">
      <item>
       <widget class="QLabel" name="dclass_label">
        <property name="text">
         <string>DataclassName</string>
        </property>
+       <property name="textFormat">
+        <enum>Qt::PlainText</enum>
+       </property>
       </widget>
      </item>
      <item>
       <widget class="Line" name="line">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Maximum">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>30</height>
+        </size>
+       </property>
+       <property name="baseSize">
+        <size>
+         <width>0</width>
+         <height>30</height>
+        </size>
+       </property>
        <property name="frameShadow">
         <enum>QFrame::Plain</enum>
        </property>
@@ -67,12 +100,6 @@
      </item>
      <item>
       <widget class="QLabel" name="pre_label">
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>0</height>
-        </size>
-       </property>
        <property name="text">
         <string>Pre-data</string>
        </property>
@@ -88,7 +115,7 @@
        </property>
        <property name="maximumSize">
         <size>
-         <width>500</width>
+         <width>60</width>
          <height>16777215</height>
         </size>
        </property>
@@ -119,7 +146,7 @@
      </property>
      <property name="sizeHint" stdset="0">
       <size>
-       <width>150</width>
+       <width>10</width>
        <height>20</height>
       </size>
      </property>

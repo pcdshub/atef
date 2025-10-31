@@ -35,7 +35,8 @@ from atef.widgets.config.run_base import create_tree_from_file
 from atef.widgets.config.utils import (ConfigTreeModel, TableWidgetWithAddRow,
                                        walk_tree_items)
 from atef.widgets.core import DesignerDisplay
-from atef.widgets.utils import BusyCursorThread, insert_widget
+from atef.widgets.utils import (BusyCursorThread, insert_widget,
+                                match_line_edit_text_width)
 
 if TYPE_CHECKING:
     from .window import Window
@@ -312,7 +313,7 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
 
         pre_text = str(get_item_from_path(self.data.path, item=self.data.target))
         # html wrapping to get some line wrapping
-        self.pre_label.setText(f'<font>{pre_text}</font>')
+        self.pre_label.setText(f'{pre_text}')
         self.pre_label.setToolTip(f'<font>{pre_text}</font>')
         preview_file = copy.deepcopy(self.data.target)
 
@@ -327,8 +328,13 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
             logger.warning('Unable to generate preview, provided replacement '
                            'text is invalid')
             post_text = '[INVALID]'
-        self.post_label.setText(f'<font>{post_text}</font>')
+        self.post_label.setText(f'{post_text}')
         self.post_label.setToolTip(f'<font>{post_text}</font>')
+
+        # adjust label sizes to match text
+        match_line_edit_text_width(self.dclass_label)
+        match_line_edit_text_width(self.pre_label)
+        match_line_edit_text_width(self.post_label)
 
         ok_button = self.button_box.button(QtWidgets.QDialogButtonBox.Ok)
         ok_button.setText('')
@@ -362,6 +368,8 @@ class FindReplaceRow(DesignerDisplay, QtWidgets.QWidget):
 
         self.button_box.accepted.connect(self.apply_action)
         self.button_box.rejected.connect(self.reject_action)
+
+        self.adjustSize()
 
     def apply_action(self) -> None:
         success = self.data.apply()
@@ -698,13 +706,13 @@ class ConfigureEditsPage(DesignerDisplay, QtWidgets.QWizardPage):
         if not isinstance(edit_row_widget, TemplateEditRowWidget):
             # placeholder text if nothing is selected
             l_item = QtWidgets.QListWidgetItem("Select an edit or click an edit's "
-                                               "refresh button to show details.")
+                                               "\nrefresh button to show details.")
             self.details_list.addItem(l_item)
             return
         elif not edit_row_widget.get_details_rows():
             l_item = QtWidgets.QListWidgetItem(
                 'Provide search and replace text to show details.\n'
-                'If nothing appears after clicking the refresh button,\nthere'
+                'If nothing appears after clicking the refresh button,\n there'
                 'are no matches.'
             )
             self.details_list.addItem(l_item)
