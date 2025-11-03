@@ -4,8 +4,9 @@ class, as well as accompanying helper functions
 """
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass, field
-from datetime import datetime
+from functools import partial
 from typing import List, Optional, Union
 
 from atef import exceptions, util
@@ -22,7 +23,10 @@ class Result:
     """
     severity: Severity = Severity.success
     reason: Optional[str] = None
-    timestamp: datetime = field(default_factory=datetime.utcnow, compare=False)
+    timestamp: datetime.datetime = field(
+        default_factory=partial(datetime.datetime.now, datetime.UTC),
+        compare=False
+    )
 
     @classmethod
     def from_exception(cls, error: Exception) -> Result:

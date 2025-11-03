@@ -1,12 +1,21 @@
+from pathlib import Path
 from typing import Any, Callable
 
 import pytest
 from pytestqt.qtbot import QtBot
 from qtpy import QtCore, QtWidgets
 
-from atef.config import TemplateConfiguration
+from atef.config import ConfigurationFile, TemplateConfiguration
+from atef.config_dclass_helpers import load_file
+from atef.procedure import TemplateStep
 from atef.type_hints import AnyDataclass
-from atef.widgets.config.page import ComparisonPage, ConfigurationGroupPage
+from atef.widgets.config.find_replace import (ApplyOptionPage,
+                                              ConfigureEditsPage,
+                                              FillTemplateWizard,
+                                              SelectTemplatePage)
+from atef.widgets.config.page import (ComparisonPage, ConfigurationGroupPage,
+                                      TemplateConfigurationPage)
+from atef.widgets.config.utils import ConfigTreeModel
 
 
 def gather_comparisons(cfg: AnyDataclass):
@@ -187,10 +196,11 @@ def test_template_page(
     make_page: Callable,
 ):
     group_page = make_page(template_configuration)
+    assert isinstance(group_page, TemplateConfigurationPage)
 
     # Does the configuration initialize properly?
     qtbot.wait_until(
-        lambda: group_page.template_page_widget.staged_list.count() == 1
+        lambda: group_page.template_page_wizard.page(1).staged_list.count() == 1
     )
 
     # test preparation
@@ -199,6 +209,113 @@ def test_template_page(
 
     qtbot.wait_signal(group_page.full_tree.mode_switch_finished)
     qtbot.wait_until(
-        lambda: group_page.template_page_widget.staged_list.count() == 1
+        lambda: group_page.template_page_wizard.page(1).staged_list.count() == 1
     )
     qtbot.addWidget(group_page)
+
+
+def test_template_wizard_flow(
+    qtbot: QtBot,
+    all_config_path: Path,
+    mock_ophyd_cache
+):
+    print("flow", all_config_path)
+    template_file = load_file(all_config_path)
+    if isinstance(template_file, ConfigurationFile):
+        parent_type = TemplateConfiguration
+    else:
+        parent_type = TemplateStep
+    wizard = FillTemplateWizard(parent_type=parent_type)
+    qtbot.addWidget(wizard)
+
+    # Start from selection
+    assert wizard.currentId() == 0
+    select_file_page = wizard.currentPage()
+    assert isinstance(select_file_page, SelectTemplatePage)
+    # no filepath yet, cannot continue
+    assert not wizard.button(wizard.NextButton).isEnabled()
+    assert select_file_page.tree_view.model() is None
+
+    # load a filepath, we can continue now
+    select_file_page.load_file(all_config_path)
+    select_file_page.finish_setup()
+    assert wizard.button(wizard.NextButton).isEnabled()
+    assert isinstance(select_file_page.tree_view.model(), ConfigTreeModel)
+
+    wizard.next()
+
+    # on to edits configuration
+    assert wizard.currentId() == 1
+    config_edits_page = wizard.currentPage()
+    assert isinstance(config_edits_page, ConfigureEditsPage)
+    # we can continue without any edits
+    assert wizard.button(wizard.NextButton).isEnabled()
+    assert isinstance(select_file_page.tree_view.model(), ConfigTreeModel)
+
+    wizard.next()
+
+    assert wizard.currentId() == 2
+    options_page = wizard.currentPage()
+    assert isinstance(options_page, ApplyOptionPage)
+    # cannot continue until an option is chosen
+    assert not wizard.button(wizard.FinishButton).isEnabled()
+    # for some reason qtbot.mouseClick does not trigger the button_group callbacks
+    qtbot.mouseClick(
+        options_page.insert_button, QtCore.Qt.LeftButton
+    )
+    options_page.insert_button.setChecked(True)
+    options_page.completeChanged.emit()
+    assert wizard.button(wizard.FinishButton).isEnabled()
+
+
+def test_template_type_compat_passive(
+    qtbot: QtBot,
+    passive_config_path: Path,
+    active_config_path: Path,
+    mock_ophyd_cache,
+    monkeypatch,
+):
+    print("compat_passive", passive_config_path, active_config_path)
+    wizard = FillTemplateWizard(parent_type=TemplateConfiguration)
+    qtbot.addWidget(wizard)
+    monkeypatch.setattr(QtWidgets.QMessageBox, 'warning',
+                        lambda *args, **kwargs: QtWidgets.QMessageBox.Yes)
+    wizard.select_page.load_file(active_config_path)
+    wizard.select_page.finish_setup()
+    assert not wizard.select_page.fp
+    assert wizard.currentId() == 0
+    assert not wizard.button(wizard.NextButton).isEnabled()
+
+    wizard.select_page.load_file(passive_config_path)
+    assert wizard.select_page.fp
+
+    # Switch wizard to apply options page to re-initialize
+    wizard.next()
+    wizard.next()
+
+    assert wizard.options_page.insert_button.isEnabled()
+
+
+def test_template_type_compat_active(
+    qtbot: QtBot,
+    all_config_path: Path,
+    mock_ophyd_cache,
+):
+    print(all_config_path)
+    wizard = FillTemplateWizard(parent_type=TemplateStep)
+    qtbot.addWidget(wizard)
+
+    wizard.select_page.load_file(all_config_path)
+    wizard.select_page.finish_setup()
+    assert wizard.select_page.fp is not None
+    assert wizard.currentId() == 0
+    assert wizard.button(wizard.NextButton).isEnabled()
+
+    # Switch wizard to apply options page to re-initialize
+    wizard.next()
+    wizard.next()
+
+    if isinstance(wizard.select_page.orig_file, ConfigurationFile):
+        assert not wizard.options_page.insert_button.isEnabled()
+    else:
+        assert wizard.options_page.insert_button.isEnabled()

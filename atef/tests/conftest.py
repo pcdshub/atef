@@ -13,9 +13,12 @@ import pydm.exception
 import pytest
 import simplejson
 from apischema import ValidationError, deserialize
+from ophyd.signal import EpicsSignal
+from ophyd.sim import SynSignal
 from qtpy import QtWidgets
 
 import atef
+from atef import cache
 from atef.cache import get_signal_cache
 from atef.check import Equals, Greater, GreaterOrEqual, LessOrEqual, NotEquals
 from atef.config import (AnyConfiguration, ConfigurationFile,
@@ -309,6 +312,18 @@ def mock_pv(monkeypatch: Any):
     monkeypatch.setattr(signal, 'read', lambda: {
         'MY:PV': {'value': 1, 'timestamp': datetime.datetime.now().timestamp()}
     })
+
+
+@pytest.fixture(scope="function")
+def mock_ophyd_cache():
+    """
+    Replace the default signal cache with one using fake signals,
+    preventing failed attempts to get PVs in the test suite
+    """
+    cache._signal_cache = cache._SignalCache(lambda pv, name: SynSignal(name=pv))
+    yield
+    # reset signal cache
+    cache._signal_cache = cache._SignalCache(EpicsSignal)
 
 
 @pytest.fixture

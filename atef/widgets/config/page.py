@@ -30,6 +30,7 @@ from qtpy.QtWidgets import (QComboBox, QFrame, QLabel, QMessageBox,
                             QPushButton, QSizePolicy, QStyle, QTableWidget,
                             QToolButton, QTreeWidgetItem, QVBoxLayout, QWidget)
 
+from atef import util
 from atef.check import (ALL_COMPARISONS, AnyComparison, AnyValue, Comparison,
                         Equals, Greater, GreaterOrEqual, Less, LessOrEqual,
                         NotEquals, Range, ValueSet)
@@ -50,7 +51,7 @@ from atef.widgets.config.data_active import (CheckRowWidget,
                                              GeneralProcedureWidget,
                                              PassiveEditWidget,
                                              SetValueEditWidget)
-from atef.widgets.config.find_replace import FillTemplatePage
+from atef.widgets.config.find_replace import FillTemplateWizard
 from atef.widgets.config.paged_table import SETUP_SLOT_ROLE, PagedTableWidget
 from atef.widgets.config.run_active import (DescriptionRunWidget,
                                             PassiveRunWidget,
@@ -1412,14 +1413,10 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
     """Widget for configuring Templated checkouts within other checkouts"""
     filename = "template_group_page.ui"
 
-    template_page_widget: FillTemplatePage
+    template_page_wizard: FillTemplateWizard
     template_page_placeholder: QWidget
 
     data: Union[TemplateConfiguration, TemplateStep]
-    ALLOWED_TYPE_MAP: ClassVar[Dict[Any, Tuple[Any, ...]]] = {
-        TemplateConfiguration: (ConfigurationFile,),
-        TemplateStep: (ConfigurationFile, ProcedureFile)
-    }
 
     def __init__(self, data: Union[TemplateConfiguration, TemplateStep], **kwargs):
         super().__init__(data=data, **kwargs)
@@ -1428,45 +1425,88 @@ class TemplateConfigurationPage(DesignerDisplay, PageWidget):
         self.post_tree_setup()
 
     def setup_template_widget_init(self) -> None:
-        self.template_page_widget = FillTemplatePage(
-            allowed_types=self.ALLOWED_TYPE_MAP[type(self.data)]
+        self.template_page_wizard = FillTemplateWizard(
+            filepath=self.data.filename,
+            parent_type=type(self.data)
         )
 
-        def finish_widget_setup(*args, **kwargs):
-            # only run this once, when we're loading an existing template checkout
-            # subsequent opening of files do not populate staged list
-            self.template_page_widget.data_updated.disconnect(finish_widget_setup)
+        self.template_page_wizard.initialize_from_data(self.data)
+        self.template_page_wizard.finished.connect(self.update_data)
+        self.template_page_wizard.save_requested.connect(self.show_finalized_widget)
+        self.template_page_wizard.insert_requested.connect(self.insert_and_refresh)
+        self.template_page_wizard.button(
+            self.template_page_wizard.CancelButton
+        ).hide()
 
-            target = getattr(self.template_page_widget, 'orig_file', None)
-            if target is not None:
-                for regexFR in self.data.edits:
-                    action = regexFR.to_action(target=target)
-                    self.template_page_widget.stage_edit(action)
-                self.template_page_widget.refresh_staged_table()
+        self.insert_widget(self.template_page_wizard, self.template_page_placeholder)
 
-            # setup update data with each change to staged, new file
-            self.template_page_widget.data_updated.connect(self.update_data)
-
-        self.template_page_widget.data_updated.connect(finish_widget_setup)
-        self.template_page_widget.open_file(filename=self.data.filename)
-
-        # remove save as button
-        self.template_page_widget.save_button.hide()
-
-        self.insert_widget(self.template_page_widget, self.template_page_placeholder)
+        if self.data.edits:
+            self.show_finalized_widget()
 
     def update_data(self) -> None:
         """Update the dataclass with information from the FillTemplatePage widget"""
         # FillTemplatePage is not a normal datawidget, and does not have a bridge.
         # Luckily there isn't much to track, via children, so we can do it manually
-        self.data.filename = self.template_page_widget.fp
-        staged_list = self.template_page_widget.staged_list
-        edits = []
-        for idx in range(staged_list.count()):
-            row_data = staged_list.itemWidget(staged_list.item(idx)).data
-            edits.append(row_data.origin)
+        self.data.filename = self.template_page_wizard.filepath or ""
+        self.data.edits = self.template_page_wizard.get_updated_data()
 
-        self.data.edits = edits
+    def show_finalized_widget(self):
+        # Add new widget to same layout as wizard, after closing the wizard will
+        # be hidden
+        self.update_data()
+        if isinstance(self.data, TemplateStep):
+            prep_data = PreparedTemplateStep.from_origin(self.data)
+        elif isinstance(self.data, TemplateConfiguration):
+            prep_data = PreparedTemplateConfiguration.from_config(self.data)
+        else:
+            raise ValueError("Data incorrect")
+
+        self.template_page_wizard.hide()
+        self.temp_run_widget = TemplateRunWidget(data=prep_data, preview_mode=True)
+        self.template_page_placeholder.layout().addWidget(self.temp_run_widget)
+        self.temp_run_widget.reconfigure_button.clicked.connect(self.start_reconfigure)
+        self.temp_run_widget.show()
+
+    def start_reconfigure(self):
+        """Re-display wizard, remove preview widget"""
+        self.template_page_wizard.show()
+        self.template_page_placeholder.layout().removeWidget(self.temp_run_widget)
+        if self.temp_run_widget is not None:
+            self.temp_run_widget.deleteLater()
+        self.temp_run_widget = None
+
+    def insert_and_refresh(self):
+        edited_file = self.template_page_wizard.get_edited_file()
+        orig_file = self.full_tree.orig_file
+        if isinstance(orig_file, ConfigurationFile):
+            walk_method = "walk_configs"
+            group_field = "configs"
+        elif isinstance(orig_file, ProcedureFile):
+            walk_method = "walk_steps"
+            group_field = "steps"
+        else:
+            raise ValueError("incompatible file found")
+
+        # get parent for template data
+        parent_data = None
+        for curr_data in getattr(orig_file, walk_method)():
+            if (hasattr(curr_data, group_field) and
+                    self.data in getattr(curr_data, group_field)):
+                parent_data = curr_data
+                break
+
+        if not parent_data:
+            raise RuntimeError("Failure locating this template configuration "
+                               "in the originating tree...")
+
+        with self.full_tree.modifies_tree():
+            group_list = getattr(parent_data, group_field)
+            util.replace_in_list(
+                old=self.data,
+                new=edited_file.root,
+                item_list=group_list,
+            )
+            self.full_tree.refresh_model()
 
     def post_tree_setup(self) -> None:
         super().post_tree_setup()
