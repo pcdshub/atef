@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Union
+from typing import Callable, Union
 from uuid import uuid4
 
 import pytest
@@ -28,14 +28,23 @@ def is_file_empty(filepath):
     return os.path.getsize(filepath) == 0
 
 
-@pytest.mark.parametrize("prepared_file,", [
-    PreparedFile.from_config(ConfigurationFile()),
-    PreparedProcedureFile.from_origin(ProcedureFile()),
+def create_blank_prep_passive():
+    return PreparedFile.from_config(ConfigurationFile())
+
+
+def create_blank_prep_active():
+    return PreparedProcedureFile.from_origin(ProcedureFile())
+
+
+@pytest.mark.parametrize("prepared_file_fn,", [
+    create_blank_prep_passive, create_blank_prep_active
+
 ])
 def test_status_tempfile_creation(
-    prepared_file: Union[PreparedFile, PreparedProcedureFile]
+    prepared_file_fn: Callable[[], Union[PreparedFile, PreparedProcedureFile]]
 ):
     tempfile_cache = atef.status_logging.get_status_tempfile_cache()
+    prepared_file = prepared_file_fn()
 
     assert prepared_file.uuid not in tempfile_cache
     status_logger = configure_and_get_status_logger(prepared_file.uuid)
@@ -52,15 +61,15 @@ def test_status_tempfile_creation(
     assert prepared_file.uuid not in tempfile_cache
 
 
-@pytest.mark.parametrize("prepared_file,", [
-    PreparedFile.from_config(ConfigurationFile()),
-    PreparedProcedureFile.from_origin(ProcedureFile()),
+@pytest.mark.parametrize("prepared_file_fn,", [
+    create_blank_prep_passive, create_blank_prep_active
 ])
 def test_logging_stream(
-    prepared_file: Union[PreparedFile, PreparedProcedureFile],
+    prepared_file_fn: Callable[[], Union[PreparedFile, PreparedProcedureFile]],
     qtbot: QtBot
 ):
     # set up logging
+    prepared_file = prepared_file_fn()
     status_logger = configure_and_get_status_logger(prepared_file.uuid)
     log_stream = atef.status_logging.QtLoggingStream()
     log_handler = atef.status_logging.QtLogHandler(log_stream)
