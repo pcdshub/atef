@@ -11,7 +11,6 @@ import json
 import logging
 import pathlib
 from dataclasses import dataclass, field
-from operator import attrgetter
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
                     Tuple, Union, cast, get_args)
 from uuid import UUID, uuid4
@@ -708,7 +707,7 @@ class PreparedConfiguration:
         status_logger = self.get_status_logger()
         results = []
         try:
-            cfg_name = attrgetter("config.name")(self)
+            cfg_name = self.config.name
         except AttributeError:
             cfg_name = "???"
 
