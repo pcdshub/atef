@@ -82,6 +82,9 @@ class StatusLogViewer(DesignerDisplay, QtWidgets.QWidget):
             self.text_edit.setPlainText("Log file cannot be found, please refresh")
 
         self.datetime_edit.setDateTime(datetime.datetime.now())
+        self.text_edit.verticalScrollBar().setValue(
+            self.text_edit.verticalScrollBar().maximum()
+        )
 
     def close(self) -> bool:
         self.watcher.removePaths(self.watcher.files())
