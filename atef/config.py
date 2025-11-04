@@ -713,7 +713,7 @@ class PreparedConfiguration:
             cfg_name = "???"
 
         status_logger.info(
-            f"Starting config: '{cfg_name}' ({type(self).__name__}, {id(self)})"
+            f"Starting config: '{cfg_name}' ({type(self).__name__})"
         )
         for config in self.comparisons:
             if isinstance(config, PreparedComparison):
@@ -730,7 +730,7 @@ class PreparedConfiguration:
 
         self.combined_result = result
         status_logger.info(
-            f"Finished config: '{cfg_name}' ({type(self).__name__}, {id(self)})"
+            f"Finished config: '{cfg_name}' ({type(self).__name__})"
         )
         return result
 
@@ -1520,7 +1520,7 @@ class PreparedComparison:
         status_logger.info(
             f"Finished Comparison: '{self.comparison.name}' "
             f"({type(self.comparison).__name__} on {self.identifier}). "
-            f"Result: {self.result.severity.name})"
+            f"Result: {self.result.severity.name}"
         )
         return result
 
