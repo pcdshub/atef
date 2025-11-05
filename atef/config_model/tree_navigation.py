@@ -1,5 +1,3 @@
-"""Utility functions for main configuration dataclasses (both active anc pasive)"""
-
 from atef.type_hints import AnyDataclass
 
 

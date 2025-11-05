@@ -39,7 +39,7 @@ from atef.check import Comparison
 from atef.config_model.passive import (ConfigurationFile, PreparedComparison,
                                        PreparedFile, PreparedSignalComparison,
                                        run_passive_step)
-from atef.dataclass_helpers import get_parent_file
+from atef.config_model.tree_navigation import get_parent_file
 from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparationError, PreparedComparisonException
 from atef.find_replace import RegexFindReplace

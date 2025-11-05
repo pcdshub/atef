@@ -21,7 +21,7 @@ import ophyd
 import yaml
 from ophyd.signal import ConnectionTimeoutError
 
-from atef.dataclass_helpers import get_parent_file
+from atef.config_model.tree_navigation import get_parent_file
 from atef.find_replace import RegexFindReplace
 from atef.result import _summarize_result_severity
 from atef.status_logging import configure_and_get_status_logger
