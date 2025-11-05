@@ -39,7 +39,7 @@ from atef.check import Comparison
 from atef.config_model.passive import (ConfigurationFile, PreparedComparison,
                                        PreparedFile, PreparedSignalComparison,
                                        run_passive_step)
-from atef.config_model.tree_navigation import get_parent_file
+from atef.config_model.tree_manipulation import get_status_logger
 from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparationError, PreparedComparisonException
 from atef.find_replace import RegexFindReplace
@@ -48,7 +48,6 @@ from atef.plan_utils import (BlueskyState, GlobalRunEngine,
                              run_in_local_RE)
 from atef.reduce import ReduceMethod
 from atef.result import Result, _summarize_result_severity, incomplete_result
-from atef.status_logging import configure_and_get_status_logger
 from atef.type_hints import AnyDataclass, AnyPath, Number, PrimitiveType
 from atef.yaml_support import init_yaml_support
 
@@ -563,17 +562,6 @@ class PreparedProcedureStep:
         self.combined_result = Result(severity=severity, reason=reason)
         return self.combined_result
 
-    def get_status_logger(self) -> logging.Logger:
-        """
-        Get the status logger for this step.
-        """
-        top_file = get_parent_file(self)
-        file_id = getattr(top_file, "uuid", "status_logger")
-        if isinstance(file_id, UUID):
-            return configure_and_get_status_logger(file_id)
-        else:
-            return logging.getLogger(file_id)
-
     async def _run(self) -> Result:
         """
         Run the step.  To be implemented in subclass.
@@ -583,7 +571,7 @@ class PreparedProcedureStep:
 
     async def run(self) -> Result:
         """Run the step and return the result"""
-        status_logger = self.get_status_logger()
+        status_logger = get_status_logger(self)
         status_logger.info(
             f"Starting step: '{self.name}' ({type(self).__name__})"
         )
@@ -856,7 +844,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
         """
         cancelled = False
         self.origin = cast(SetValueStep, self.origin)
-        status_logger = self.get_status_logger()
+        status_logger = get_status_logger(self)
 
         # Actions
         for prep_action in self.prepared_actions:

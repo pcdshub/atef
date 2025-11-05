@@ -21,10 +21,9 @@ import ophyd
 import yaml
 from ophyd.signal import ConnectionTimeoutError
 
-from atef.config_model.tree_navigation import get_parent_file
+from atef.config_model.tree_manipulation import get_status_logger
 from atef.find_replace import RegexFindReplace
 from atef.result import _summarize_result_severity
-from atef.status_logging import configure_and_get_status_logger
 
 from .. import serialization, tools, util
 from ..cache import DataCache
@@ -691,20 +690,9 @@ class PreparedConfiguration:
         """Walk through the prepared comparisons."""
         yield from self.comparisons
 
-    def get_status_logger(self) -> logging.Logger:
-        """
-        Get the status logger for this step.
-        """
-        top_file = get_parent_file(self)
-        file_id = getattr(top_file, "uuid", "status_logger")
-        if isinstance(file_id, UUID):
-            return configure_and_get_status_logger(file_id)
-        else:
-            return logging.getLogger(file_id)
-
     async def compare(self) -> Result:
         """Run all comparisons and return a combined result."""
-        status_logger = self.get_status_logger()
+        status_logger = get_status_logger(self)
         results = []
         try:
             cfg_name = self.config.name
@@ -1434,17 +1422,6 @@ class PreparedComparison:
         """
         raise NotImplementedError()
 
-    def get_status_logger(self) -> logging.Logger:
-        """
-        Get the status logger for this step.
-        """
-        top_file = get_parent_file(self)
-        file_id = getattr(top_file, "uuid", "status_logger")
-        if isinstance(file_id, UUID):
-            return configure_and_get_status_logger(file_id)
-        else:
-            return logging.getLogger(file_id)
-
     async def compare(self) -> Result:
         """
         Run the comparison and return the Result.
@@ -1454,7 +1431,7 @@ class PreparedComparison:
         Result
             The result of the comparison.
         """
-        status_logger = self.get_status_logger()
+        status_logger = get_status_logger(self)
 
         status_logger.info(
             f"Starting Comparison: '{self.comparison.name}' "
