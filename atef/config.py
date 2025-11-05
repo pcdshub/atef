@@ -13,6 +13,7 @@ import pathlib
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
                     Tuple, Union, cast, get_args)
+from uuid import UUID, uuid4
 
 import apischema
 import happi
@@ -20,8 +21,10 @@ import ophyd
 import yaml
 from ophyd.signal import ConnectionTimeoutError
 
+from atef.dataclass_helpers import get_parent_file
 from atef.find_replace import RegexFindReplace
 from atef.result import _summarize_result_severity
+from atef.status_logging import configure_and_get_status_logger
 
 from . import serialization, tools, util
 from .cache import DataCache
@@ -451,6 +454,8 @@ class PreparedFile:
     client: happi.Client
     #: The comparisons defined in the top-level file.
     root: PreparedGroup
+    #: UUID for instance tracking
+    uuid: UUID = field(default_factory=uuid4)
 
     @classmethod
     def from_config(
@@ -686,9 +691,29 @@ class PreparedConfiguration:
         """Walk through the prepared comparisons."""
         yield from self.comparisons
 
+    def get_status_logger(self) -> logging.Logger:
+        """
+        Get the status logger for this step.
+        """
+        top_file = get_parent_file(self)
+        file_id = getattr(top_file, "uuid", "status_logger")
+        if isinstance(file_id, UUID):
+            return configure_and_get_status_logger(file_id)
+        else:
+            return logging.getLogger(file_id)
+
     async def compare(self) -> Result:
         """Run all comparisons and return a combined result."""
+        status_logger = self.get_status_logger()
         results = []
+        try:
+            cfg_name = self.config.name
+        except AttributeError:
+            cfg_name = "???"
+
+        status_logger.info(
+            f"Starting config: '{cfg_name}' ({type(self).__name__})"
+        )
         for config in self.comparisons:
             if isinstance(config, PreparedComparison):
                 results.append(await config.compare())
@@ -703,6 +728,9 @@ class PreparedConfiguration:
             result = Result(severity=severity)
 
         self.combined_result = result
+        status_logger.info(
+            f"Finished config: '{cfg_name}' ({type(self).__name__})"
+        )
         return result
 
     @property
@@ -1406,6 +1434,17 @@ class PreparedComparison:
         """
         raise NotImplementedError()
 
+    def get_status_logger(self) -> logging.Logger:
+        """
+        Get the status logger for this step.
+        """
+        top_file = get_parent_file(self)
+        file_id = getattr(top_file, "uuid", "status_logger")
+        if isinstance(file_id, UUID):
+            return configure_and_get_status_logger(file_id)
+        else:
+            return logging.getLogger(file_id)
+
     async def compare(self) -> Result:
         """
         Run the comparison and return the Result.
@@ -1415,6 +1454,12 @@ class PreparedComparison:
         Result
             The result of the comparison.
         """
+        status_logger = self.get_status_logger()
+
+        status_logger.info(
+            f"Starting Comparison: '{self.comparison.name}' "
+            f"({type(self.comparison).__name__} on {self.identifier})"
+        )
         try:
             if hasattr(self.comparison, 'prepare'):
                 await self.comparison.prepare(self.cache)
@@ -1471,6 +1516,11 @@ class PreparedComparison:
             )
 
         self.result = result
+        status_logger.info(
+            f"Finished Comparison: '{self.comparison.name}' "
+            f"({type(self.comparison).__name__} on {self.identifier}). "
+            f"Result: {self.result.severity.name}"
+        )
         return result
 
 

@@ -24,6 +24,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import (Any, Dict, Generator, List, Literal, Optional, Sequence,
                     Tuple, Union, cast)
+from uuid import UUID, uuid4
 
 import apischema
 import ophyd
@@ -37,6 +38,7 @@ from atef.cache import DataCache, _SignalCache, get_signal_cache
 from atef.check import Comparison
 from atef.config import (ConfigurationFile, PreparedComparison, PreparedFile,
                          PreparedSignalComparison, run_passive_step)
+from atef.dataclass_helpers import get_parent_file
 from atef.enums import GroupResultMode, PlanDestination, Severity
 from atef.exceptions import PreparationError, PreparedComparisonException
 from atef.find_replace import RegexFindReplace
@@ -45,6 +47,7 @@ from atef.plan_utils import (BlueskyState, GlobalRunEngine,
                              run_in_local_RE)
 from atef.reduce import ReduceMethod
 from atef.result import Result, _summarize_result_severity, incomplete_result
+from atef.status_logging import configure_and_get_status_logger
 from atef.type_hints import AnyDataclass, AnyPath, Number, PrimitiveType
 from atef.yaml_support import init_yaml_support
 
@@ -451,6 +454,8 @@ class PreparedProcedureFile:
     file: ProcedureFile
     #: Procedure steps defined in the top-level file
     root: PreparedProcedureGroup
+    #: UUID for instance tracking
+    uuid: UUID = field(default_factory=uuid4)
 
     @classmethod
     def from_origin(
@@ -557,6 +562,17 @@ class PreparedProcedureStep:
         self.combined_result = Result(severity=severity, reason=reason)
         return self.combined_result
 
+    def get_status_logger(self) -> logging.Logger:
+        """
+        Get the status logger for this step.
+        """
+        top_file = get_parent_file(self)
+        file_id = getattr(top_file, "uuid", "status_logger")
+        if isinstance(file_id, UUID):
+            return configure_and_get_status_logger(file_id)
+        else:
+            return logging.getLogger(file_id)
+
     async def _run(self) -> Result:
         """
         Run the step.  To be implemented in subclass.
@@ -566,6 +582,10 @@ class PreparedProcedureStep:
 
     async def run(self) -> Result:
         """Run the step and return the result"""
+        status_logger = self.get_status_logger()
+        status_logger.info(
+            f"Starting step: '{self.name}' ({type(self).__name__})"
+        )
         try:
             result = await self._run()
         except Exception as ex:
@@ -577,6 +597,10 @@ class PreparedProcedureStep:
         # stash step result
         self.step_result = result
         # return the overall result, including verification
+        status_logger.info(
+            f"Finished step: '{self.name}' ({type(self).__name__}). "
+            f"Result: {self.result.severity.name}"
+        )
         return self.result
 
     @classmethod
@@ -831,6 +855,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
         """
         cancelled = False
         self.origin = cast(SetValueStep, self.origin)
+        status_logger = self.get_status_logger()
 
         # Actions
         for prep_action in self.prepared_actions:
@@ -840,7 +865,9 @@ class PreparedSetValueStep(PreparedProcedureStep):
                     reason="Step aborted, action skipped"
                 )
             try:
+                status_logger.info(f" > Starting Action: '{prep_action.name}'")
                 action_result = await prep_action.run()
+                status_logger.info(f" > Finished Action: '{prep_action.name}'")
             except CancelledError:
                 cancelled = True
                 prep_action.result = Result(
@@ -870,7 +897,9 @@ class PreparedSetValueStep(PreparedProcedureStep):
                     reason="Step aborted, check skipped"
                 )
             try:
+                status_logger.info(f"> Starting Comparison: '{prep_criteria.name}'")
                 await prep_criteria.compare()
+                status_logger.info(f"> Finished Comparison: '{prep_criteria.name}'")
             except CancelledError:
                 # These should be fast but let's catch it anyway
                 cancelled = True
@@ -927,7 +956,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
                 return FailedStep(parent=parent, origin=step, exception=ex)
 
         for comp_to_target in step.success_criteria:
-            res = create_prepared_comparison(comp_to_target)
+            res = create_prepared_comparison(comp_to_target, parent=prep_step)
             if isinstance(res, Exception):
                 return FailedStep(parent=parent, origin=step, exception=res)
             else:

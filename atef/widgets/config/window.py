@@ -20,7 +20,7 @@ from typing import ClassVar, Dict, Generator, Optional
 import qtawesome
 from apischema import serialize
 from pcdsutils.qt.callbacks import WeakPartialMethodSlot
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt, QTimer
 from qtpy.QtCore import Signal as QSignal
 from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMenu,
@@ -37,10 +37,14 @@ from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
                             ProcedureGroup, ProcedureStep, SetValueStep,
                             TemplateStep)
 from atef.report import ActiveAtefReport, PassiveAtefReport
+from atef.status_logging import (QtLoggingStream, QtLogHandler,
+                                 cleanup_status_logger,
+                                 configure_and_get_status_logger)
 from atef.type_hints import AnyDataclass
 from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.find_replace import (FillTemplatePage,
                                               FindReplaceWidget)
+from atef.widgets.config.status_log_viewer import StatusLogWidget
 from atef.widgets.utils import reset_cursor, set_wait_cursor
 
 from ..archive_viewer import get_archive_viewer
@@ -79,6 +83,9 @@ class Window(DesignerDisplay, QMainWindow):
     action_print_report: QAction
     action_clear_results: QAction
     action_find_replace: QAction
+    action_open_log_viewer: QAction
+
+    _status_log_viewer: StatusLogWidget
 
     def __init__(
         self,
@@ -106,6 +113,7 @@ class Window(DesignerDisplay, QMainWindow):
         self.action_print_report.triggered.connect(self.print_report)
         self.action_clear_results.triggered.connect(self.clear_results)
         self.action_find_replace.triggered.connect(self.find_replace)
+        self.action_open_log_viewer.triggered.connect(self.open_status_log_viewer)
 
         tab_bar = self.tab_widget.tabBar()
         # always use scroll area and never truncate file names
@@ -119,6 +127,10 @@ class Window(DesignerDisplay, QMainWindow):
         self.tab_widget.tabCloseRequested.connect(
             self.tab_widget.removeTab
         )
+        self.tab_widget.currentChanged.connect(self.connect_status_logger)
+
+        self._status_log_viewer = StatusLogWidget()
+        self._status_log_viewer.setWindowTitle("Status Log Viewer")
 
         if show_welcome:
             QTimer.singleShot(0, self.welcome_user)
@@ -163,6 +175,14 @@ class Window(DesignerDisplay, QMainWindow):
 
         widget.open_button.clicked.connect(self.open_file)
         widget.exit_button.clicked.connect(self.close_all)
+
+    def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
+        self._status_log_viewer.close()
+        # Send close event to all the tabs so they clean up their children
+        for idx in range(self.tab_widget.count()):
+            self.tab_widget.widget(idx).close()
+
+        return super().closeEvent(a0)
 
     def close_all(self):
         qapp = QtWidgets.QApplication.instance()
@@ -215,6 +235,24 @@ class Window(DesignerDisplay, QMainWindow):
         Return the DualTree widget for the current open tab.
         """
         return self.tab_widget.currentWidget()
+
+    def connect_status_logger(self) -> None:
+        current_tree = self.get_current_tree()
+
+        if not isinstance(current_tree, DualTree) or current_tree.prepared_file is None:
+            return
+
+        log_stream = current_tree.log_stream
+        # TODO Figure out how to disconnect here. want to disconnect on tab switch
+        # Currently inactive tabs can run.  Perhaps we just disable this
+        try:
+            log_stream.new_message.disconnect()
+        except TypeError:
+            pass
+
+        logger.debug(f"connected logger {current_tree.status_logger}, "
+                     f"{current_tree.log_stream}")
+        log_stream.new_message.connect(self.statusBar().showMessage)
 
     def new_file(self, *args, checkout_type: Optional[str] = None, **kwargs):
         """
@@ -298,6 +336,10 @@ class Window(DesignerDisplay, QMainWindow):
         widget.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
         widget.tree_view.customContextMenuRequested.connect(self.context_menu)
         tab_bar.setTabButton(curr_idx, QtWidgets.QTabBar.LeftSide, widget.toggle)
+
+        # configure status logging
+        widget.model_refreshed.connect(self.connect_status_logger)
+        widget.model_refreshed.connect(self._update_log_viewer)
 
     def copy(self):
         """Copy the currently selected item and its parent to the clipboard"""
@@ -482,6 +524,29 @@ class Window(DesignerDisplay, QMainWindow):
         curr_idx = self.tab_widget.count() - 1
         self.tab_widget.setCurrentIndex(curr_idx)
 
+    def open_status_log_viewer(self):
+        self._update_log_viewer()
+        self._status_log_viewer.show()
+
+    def _update_log_viewer(self):
+        # clean up exising tabs
+        self._status_log_viewer.clear_tabs()
+
+        # initialize new tabs
+        for tab_idx in range(self.tab_widget.count()):
+            dual_tree = self.tab_widget.widget(tab_idx)
+
+            if not isinstance(dual_tree, DualTree):
+                continue
+
+            if dual_tree.prepared_file is None:
+                continue
+
+            name = self.tab_widget.tabText(tab_idx)
+            uuid = dual_tree.prepared_file.uuid
+
+            self._status_log_viewer.add_tab(name=name, uuid=uuid)
+
 
 class LandingPage(DesignerDisplay, QWidget):
     """Landing Page for selecting a subsequent action"""
@@ -540,6 +605,7 @@ class DualTree(DesignerDisplay, QWidget):
     results_button: QtWidgets.QPushButton
 
     mode_switch_finished: ClassVar[QSignal] = QSignal()
+    model_refreshed: ClassVar[QSignal] = QSignal()
 
     built_widgets: OrderedDict
 
@@ -604,11 +670,24 @@ class DualTree(DesignerDisplay, QWidget):
         Refreshes the stored Prepared file (passive or active).
         Alone, this does not update the TreeView or ConfigTreeModel.
         """
+        # Clean up old temp files
+        if self.prepared_file is not None:
+            cleanup_status_logger(self.prepared_file.uuid)
+
         if isinstance(self.orig_file, ConfigurationFile):
             self.prepared_file = PreparedFile.from_config(self.orig_file,
                                                           cache=DataCache())
         if isinstance(self.orig_file, ProcedureFile):
             self.prepared_file = PreparedProcedureFile.from_origin(self.orig_file)
+
+        self.status_logger = configure_and_get_status_logger(
+            self.prepared_file.uuid
+        )
+
+        # set up logging
+        self.log_stream = QtLoggingStream(parent=self)
+        self.log_handler = QtLogHandler(self.log_stream)
+        self.status_logger.addHandler(self.log_handler)
 
     def refresh_model(self) -> None:
         """
@@ -640,6 +719,7 @@ class DualTree(DesignerDisplay, QWidget):
 
         # select top level root
         self.tree_view.setCurrentIndex(self.model.index(0, 0, QtCore.QModelIndex()))
+        self.model_refreshed.emit()
 
     def select_by_item(self, item: TreeItem) -> None:
         """Select desired TreeItem(and show corresponding page) in TreeView"""
@@ -957,3 +1037,8 @@ class DualTree(DesignerDisplay, QWidget):
         self._summary_widget = ResultsSummaryWidget(file=self.prepared_file)
         self._summary_widget.setWindowTitle('Results Summary')
         self._summary_widget.show()
+
+    def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
+        if self._summary_widget:
+            self._summary_widget.close()
+        return super().closeEvent(a0)
