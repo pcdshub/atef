@@ -33,7 +33,7 @@ from qtpy.QtWidgets import QDialogButtonBox
 from atef import util
 from atef.cache import get_signal_cache
 from atef.check import Equals
-from atef.config import ConfigurationFile
+from atef.config_model.passive import ConfigurationFile
 from atef.qt_helpers import QDataclassElem
 from atef.result import Result, incomplete_result
 from atef.widgets.config.data_base import DataWidget, SimpleRowWidget
@@ -47,10 +47,11 @@ from atef.widgets.utils import (BusyCursorThread, ExpandableFrame,
                                 PV_validator, _create_vbox_layout,
                                 insert_widget, match_line_edit_text_width)
 
-from ...procedure import (ComparisonToTarget, DescriptionStep, DisplayOptions,
-                          PassiveStep, PlanOptions, PlanStep, ProcedureGroup,
-                          ProcedureStep, PydmDisplayStep, SetValueStep, Target,
-                          TyphosDisplayStep, ValueToTarget)
+from ...config_model.active import (ComparisonToTarget, DescriptionStep,
+                                    DisplayOptions, PassiveStep, PlanOptions,
+                                    PlanStep, ProcedureGroup, ProcedureStep,
+                                    PydmDisplayStep, SetValueStep, Target,
+                                    TyphosDisplayStep, ValueToTarget)
 
 # TODO:  CodeStep, ConfigurationCheckStep,
 

@@ -15,12 +15,14 @@ from qtpy.QtWidgets import (QDialogButtonBox, QLabel, QLineEdit, QMenu,
                             QPushButton, QSpacerItem, QStyle, QToolButton,
                             QVBoxLayout, QWidget, QWidgetAction)
 
-from atef.config import (AnyPreparedConfiguration, ConfigurationFile,
-                         PreparedComparison, PreparedFile)
+from atef.config_model.active import (PreparedProcedureFile,
+                                      PreparedProcedureGroup,
+                                      PreparedProcedureStep, ProcedureFile,
+                                      ProcedureStep)
+from atef.config_model.passive import (AnyPreparedConfiguration,
+                                       ConfigurationFile, PreparedComparison,
+                                       PreparedFile)
 from atef.enums import Severity
-from atef.procedure import (PreparedProcedureFile, PreparedProcedureGroup,
-                            PreparedProcedureStep, ProcedureFile,
-                            ProcedureStep)
 from atef.result import Result, combine_results
 from atef.walk import get_prepared_step, get_relevant_configs_comps
 from atef.widgets.config.utils import TreeItem, disable_widget

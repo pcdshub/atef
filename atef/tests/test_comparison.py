@@ -4,7 +4,7 @@ import happi
 import pytest
 
 from atef.cache import DataCache
-from atef.config import PreparedSignalComparison
+from atef.config_model.passive import PreparedSignalComparison
 
 from .. import check
 from ..check import Comparison, Equals, NotEquals, PrimitiveType, Severity

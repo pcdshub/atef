@@ -13,14 +13,17 @@ import qtawesome
 from pcdsutils.qt.callbacks import WeakPartialMethodSlot
 from qtpy import QtCore, QtWidgets
 
-from atef.config import (ConfigurationFile, PreparedFile,
-                         PreparedSignalComparison,
-                         PreparedTemplateConfiguration, run_passive_step)
+from atef.config_model.active import (PreparedDescriptionStep,
+                                      PreparedPassiveStep,
+                                      PreparedProcedureFile,
+                                      PreparedSetValueStep,
+                                      PreparedTemplateStep,
+                                      PreparedValueToSignal, ProcedureFile)
+from atef.config_model.passive import (ConfigurationFile, PreparedFile,
+                                       PreparedSignalComparison,
+                                       PreparedTemplateConfiguration,
+                                       run_passive_step)
 from atef.find_replace import FindReplaceAction
-from atef.procedure import (PreparedDescriptionStep, PreparedPassiveStep,
-                            PreparedProcedureFile, PreparedSetValueStep,
-                            PreparedTemplateStep, PreparedValueToSignal,
-                            ProcedureFile)
 from atef.widgets.config.data_base import DataWidget
 from atef.widgets.config.find_replace import FindReplaceRow
 from atef.widgets.config.run_base import ResultStatus, create_tree_from_file

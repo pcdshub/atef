@@ -7,8 +7,8 @@ from ophyd.sim import SynSignal
 from pytestqt.qtbot import QtBot
 from qtpy.QtCore import Qt
 
+from atef.config_model.active import PreparedProcedureFile
 from atef.enums import Severity
-from atef.procedure import PreparedProcedureFile
 from atef.widgets.config.run_base import RunCheck
 from atef.widgets.config.window import DualTree
 

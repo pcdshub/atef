@@ -7,8 +7,8 @@ import pytest
 from pytestqt.qtbot import QtBot
 
 import atef.status_logging
-from atef.config import ConfigurationFile, PreparedFile
-from atef.procedure import PreparedProcedureFile, ProcedureFile
+from atef.config_model.active import PreparedProcedureFile, ProcedureFile
+from atef.config_model.passive import ConfigurationFile, PreparedFile
 from atef.status_logging import configure_and_get_status_logger
 from atef.widgets.config.status_log_viewer import (StatusLogViewer,
                                                    StatusLogWidget)

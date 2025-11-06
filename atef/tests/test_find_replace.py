@@ -5,8 +5,8 @@ from typing import Any, List, Tuple
 import pytest
 
 from atef.check import Equals, GreaterOrEqual
-from atef.config import (ConfigurationGroup, DeviceConfiguration,
-                         PreparedDeviceConfiguration)
+from atef.config_model.passive import (ConfigurationGroup, DeviceConfiguration,
+                                       PreparedDeviceConfiguration)
 from atef.enums import Severity
 from atef.find_replace import (FindReplaceAction,
                                get_deepest_dataclass_in_path,

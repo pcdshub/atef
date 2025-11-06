@@ -1,8 +1,8 @@
 import pytest
 
+from atef.config_model.active import register_run_identifier
 from atef.enums import PlanDestination
 from atef.plan_utils import BlueskyState, GlobalRunEngine, run_in_local_RE
-from atef.procedure import register_run_identifier
 
 
 def test_run_identifier():

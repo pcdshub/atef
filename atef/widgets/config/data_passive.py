@@ -15,8 +15,9 @@ from qtpy.QtWidgets import (QCheckBox, QComboBox, QFrame, QLabel, QLineEdit,
                             QVBoxLayout, QWidget)
 
 from atef.check import Comparison, Equals, Value
-from atef.config import (Configuration, ConfigurationGroup,
-                         DeviceConfiguration, GroupResultMode, PVConfiguration)
+from atef.config_model.passive import (Configuration, ConfigurationGroup,
+                                       DeviceConfiguration, GroupResultMode,
+                                       PVConfiguration)
 from atef.enums import Severity
 from atef.qt_helpers import QDataclassList
 from atef.reduce import ReduceMethod

@@ -14,7 +14,8 @@ import apischema
 from pmgr import pmgrAPI
 
 from atef.check import Equals
-from atef.config import ConfigurationFile, ConfigurationGroup, PVConfiguration
+from atef.config_model.passive import (ConfigurationFile, ConfigurationGroup,
+                                       PVConfiguration)
 
 DESCRIPTION = __doc__
 logger = logging.getLogger()

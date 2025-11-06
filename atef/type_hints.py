@@ -1,5 +1,5 @@
 import pathlib
-from typing import Dict, Protocol, Union
+from typing import ClassVar, Dict, Protocol, Union
 
 AnyPath = Union[str, pathlib.Path]
 Number = Union[int, float]
@@ -10,4 +10,4 @@ class AnyDataclass(Protocol):
     """
     Protocol stub shamelessly lifted from stackoverflow to hint at dataclass
     """
-    __dataclass_fields__: Dict
+    __dataclass_fields__: ClassVar[Dict]

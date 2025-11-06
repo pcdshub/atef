@@ -30,12 +30,13 @@ from qtpy.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QInputDialog,
 from atef import util
 from atef.cache import DataCache, get_signal_cache
 from atef.check import Comparison, EpicsValue, Equals, HappiValue, Range
-from atef.config import (Configuration, DeviceConfiguration,
-                         PreparedComparison, PreparedConfiguration,
-                         PVConfiguration, ToolConfiguration)
+from atef.config_model.active import ProcedureStep, SetValueStep
+from atef.config_model.passive import (Configuration, DeviceConfiguration,
+                                       PreparedComparison,
+                                       PreparedConfiguration, PVConfiguration,
+                                       ToolConfiguration)
 from atef.enums import Severity
 from atef.exceptions import DynamicValueError, MissingHappiDeviceError
-from atef.procedure import ProcedureStep, SetValueStep
 from atef.qt_helpers import (QDataclassBridge, QDataclassList, QDataclassValue,
                              ThreadWorker)
 from atef.result import combine_results

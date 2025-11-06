@@ -20,15 +20,17 @@ from qtpy.QtCore import Property as QProperty
 from qtpy.QtCore import Signal as QSignal
 
 from atef.cache import get_signal_cache
-from atef.config import ConfigurationFile, PreparedFile, TemplateConfiguration
-from atef.config_dclass_helpers import load_file
+from atef.config_model import load_file
+from atef.config_model.active import (PreparedProcedureFile, ProcedureFile,
+                                      TemplateStep)
+from atef.config_model.passive import (ConfigurationFile, PreparedFile,
+                                       TemplateConfiguration)
 from atef.find_replace import (FindReplaceAction, MatchFunction,
                                RegexFindReplace, ReplaceFunction,
                                get_deepest_dataclass_in_path,
                                get_default_match_fn, get_default_replace_fn,
                                get_item_from_path, patch_client_cache,
                                simplify_path, walk_find_match)
-from atef.procedure import PreparedProcedureFile, ProcedureFile, TemplateStep
 from atef.type_hints import AnyPath
 from atef.util import get_happi_client
 from atef.widgets.config.run_base import create_tree_from_file

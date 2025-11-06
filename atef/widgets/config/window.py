@@ -28,14 +28,16 @@ from qtpy.QtWidgets import (QAction, QFileDialog, QMainWindow, QMenu,
 
 from atef.cache import DataCache
 from atef.check import AnyComparison, Comparison
-from atef.config import (Configuration, ConfigurationFile, ConfigurationGroup,
-                         PreparedFile, TemplateConfiguration)
-from atef.config_dclass_helpers import load_file
+from atef.config_model import load_file
+from atef.config_model.active import (ComparisonToTarget, DescriptionStep,
+                                      PassiveStep, PreparedProcedureFile,
+                                      ProcedureFile, ProcedureGroup,
+                                      ProcedureStep, SetValueStep,
+                                      TemplateStep)
+from atef.config_model.passive import (Configuration, ConfigurationFile,
+                                       ConfigurationGroup, PreparedFile,
+                                       TemplateConfiguration)
 from atef.exceptions import PreparationError
-from atef.procedure import (ComparisonToTarget, DescriptionStep, PassiveStep,
-                            PreparedProcedureFile, ProcedureFile,
-                            ProcedureGroup, ProcedureStep, SetValueStep,
-                            TemplateStep)
 from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.status_logging import (QtLoggingStream, QtLogHandler,
                                  cleanup_status_logger,

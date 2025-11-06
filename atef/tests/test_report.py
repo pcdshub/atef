@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from atef.cache import get_signal_cache
-from atef.config import ConfigurationFile, PreparedFile
-from atef.procedure import PreparedProcedureFile, ProcedureFile
+from atef.config_model.active import PreparedProcedureFile, ProcedureFile
+from atef.config_model.passive import ConfigurationFile, PreparedFile
 from atef.report import ActiveAtefReport, PassiveAtefReport
 from atef.type_hints import AnyDataclass
 

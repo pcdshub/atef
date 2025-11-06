@@ -2,8 +2,8 @@ from typing import Union
 
 from apischema import ValidationError
 
-from atef.config import ConfigurationFile
-from atef.procedure import ProcedureFile
+from atef.config_model.active import ProcedureFile
+from atef.config_model.passive import ConfigurationFile
 from atef.type_hints import AnyPath
 
 

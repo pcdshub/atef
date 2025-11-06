@@ -8,8 +8,8 @@ from typing import List, Optional
 from pydm import exception
 from qtpy.QtWidgets import QApplication
 
-from ..type_hints import AnyPath
-from ..widgets.config.window import Window
+from atef.type_hints import AnyPath
+from atef.widgets.config.window import Window
 
 logger = logging.getLogger(__name__)
 
