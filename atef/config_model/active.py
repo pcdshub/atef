@@ -682,7 +682,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         -------
         PreparedProcedureGroup
         """
-        prepared = cls(origin=group, parent=parent, steps=[], name = group.name)
+        prepared = cls(origin=group, parent=parent, steps=[], name=group.name)
 
         for step in group.steps:
             prep_step = PreparedProcedureStep.from_origin(
