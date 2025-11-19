@@ -571,9 +571,12 @@ class PreparedProcedureStep:
 
     async def run(self) -> Result:
         """Run the step and return the result"""
+
+        self.parent.name = getattr(self.parent, "name", "(no parent)")
+
         status_logger = get_status_logger(self)
         status_logger.info(
-            f"Starting step: '{self.name}' ({type(self).__name__})"
+            f"Parent step: {self.parent.name}, Starting step: '{self.name}' ({type(self).__name__})"
         )
         try:
             result = await self._run()
@@ -587,7 +590,7 @@ class PreparedProcedureStep:
         self.step_result = result
         # return the overall result, including verification
         status_logger.info(
-            f"Finished step: '{self.name}' ({type(self).__name__}). "
+            f"Parent step: {self.parent.name}, Finished step: '{self.name}' ({type(self).__name__}). "
             f"Result: {self.result.severity.name}"
         )
         return self.result
@@ -682,7 +685,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         -------
         PreparedProcedureGroup
         """
-        prepared = cls(origin=group, parent=parent, steps=[])
+        prepared = cls(origin=group, parent=parent, steps=[], name=group.name)
 
         for step in group.steps:
             prep_step = PreparedProcedureStep.from_origin(
@@ -854,9 +857,9 @@ class PreparedSetValueStep(PreparedProcedureStep):
                     reason="Step aborted, action skipped"
                 )
             try:
-                status_logger.info(f" > Starting Action: '{prep_action.name}'")
+                status_logger.info(f" > Starting Action: Group: '{prep_action.parent.name}', Step: '{prep_action.name}'")
                 action_result = await prep_action.run()
-                status_logger.info(f" > Finished Action: '{prep_action.name}'")
+                status_logger.info(f" > Finished Action: Group: '{prep_action.parent.name}', Step: '{prep_action.name}'")
             except CancelledError:
                 cancelled = True
                 prep_action.result = Result(
@@ -869,7 +872,7 @@ class PreparedSetValueStep(PreparedProcedureStep):
                 # TODO Is this really necessary? super().run() stashes the step result already...
                 self.step_result = Result(
                     severity=Severity.error,
-                    reason=f'action failed ({prep_action.name}), step halted'
+                    reason=f'action failed Group: ({prep_action.parent.name}), Step: ({prep_action.name}), step halted'
                 )
                 return self.step_result
 
