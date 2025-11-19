@@ -1,0 +1,221 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>atef.check.DynamicValue &mdash; atef  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/docs-versions-menu.js?v=3d6a1aea"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="atef.check.EpicsValue" href="atef.check.EpicsValue.html" />
+    <link rel="prev" title="atef.check.Comparison" href="atef.check.Comparison.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            atef
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../../api.html">ATEF API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../../api.html#dataclasses">Dataclasses</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="../atef.check.html">atef.check</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="atef.check.AnyComparison.html">atef.check.AnyComparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.AnyValue.html">atef.check.AnyValue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.BasicDynamic.html">atef.check.BasicDynamic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.Comparison.html">atef.check.Comparison</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">atef.check.DynamicValue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.EpicsValue.html">atef.check.EpicsValue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.Equals.html">atef.check.Equals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.Greater.html">atef.check.Greater</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.GreaterOrEqual.html">atef.check.GreaterOrEqual</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.HappiValue.html">atef.check.HappiValue</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.Less.html">atef.check.Less</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.LessOrEqual.html">atef.check.LessOrEqual</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.NotEquals.html">atef.check.NotEquals</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.Range.html">atef.check.Range</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.Value.html">atef.check.Value</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.ValueRange.html">atef.check.ValueRange</a></li>
+<li class="toctree-l4"><a class="reference internal" href="atef.check.ValueSet.html">atef.check.ValueSet</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../atef.tools.html">atef.tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../atef.walk.html">atef.walk</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../releases.html">Release History</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../upcoming_changes.html">Upcoming Changes</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Links</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/pcdshub/atef">Github Repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">atef</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../api.html">ATEF API</a></li>
+          <li class="breadcrumb-item"><a href="../atef.check.html">atef.check</a></li>
+      <li class="breadcrumb-item active">atef.check.DynamicValue</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/generated/generated/atef.check.DynamicValue.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="atef-check-dynamicvalue">
+<h1>atef.check.DynamicValue<a class="headerlink" href="#atef-check-dynamicvalue" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="atef.check.DynamicValue">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">atef.check.</span></span><span class="sig-name descname"><span class="pre">DynamicValue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduce_period</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduce_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ReduceMethod</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">ReduceMethod.average</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/atef/check.html#DynamicValue"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.check.DynamicValue" title="Link to this definition"></a></dt>
+<dd><p>A primitive value from an external source that may change over time.
+This necessarily picks up a runtime performance cost and getting
+the value is not guaranteed to be successful. If unsuccessful,
+this will raise a DynamicValueError from the original exception.</p>
+<p>Includes settings for reduction of multiple samples.</p>
+<p>Value will be cached on preparation, and this value used for comparisons</p>
+<dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>reduce_period</strong></dt><dd></dd>
+<dt><strong>string</strong></dt><dd></dd>
+<dt><strong>value</strong></dt><dd></dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#atef.check.DynamicValue.get" title="atef.check.DynamicValue.get"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get</span></code></a>()</p></td>
+<td><p>Return the cached value from <a class="reference internal" href="#atef.check.DynamicValue.prepare" title="atef.check.DynamicValue.prepare"><code class="xref any py py-meth docutils literal notranslate"><span class="pre">prepare</span></code></a>, or raise a <code class="xref any docutils literal notranslate"><span class="pre">DynamicValueError</span></code> if there is no such value.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#atef.check.DynamicValue.prepare" title="atef.check.DynamicValue.prepare"><code class="xref py py-obj docutils literal notranslate"><span class="pre">prepare</span></code></a>(cache)</p></td>
+<td><p>Implement in child class to get the current value from source.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Methods</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.check.DynamicValue.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduce_period</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduce_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ReduceMethod</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">ReduceMethod.average</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#atef.check.DynamicValue.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.check.DynamicValue.get">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="reference internal" href="../../_modules/atef/check.html#DynamicValue.get"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.check.DynamicValue.get" title="Link to this definition"></a></dt>
+<dd><p>Return the cached value from <a class="reference internal" href="#atef.check.DynamicValue.prepare" title="atef.check.DynamicValue.prepare"><code class="xref any py py-meth docutils literal notranslate"><span class="pre">prepare</span></code></a>, or raise a <code class="xref any docutils literal notranslate"><span class="pre">DynamicValueError</span></code> if there is no such value.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="atef.check.DynamicValue.prepare">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">prepare</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cache</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataCache</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../../_modules/atef/check.html#DynamicValue.prepare"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#atef.check.DynamicValue.prepare" title="Link to this definition"></a></dt>
+<dd><p>Implement in child class to get the current value from source.
+Should set the self.value</p>
+</dd></dl>
+
+<p class="rubric">Attributes</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.check.DynamicValue.reduce_method">
+<span class="sig-name descname"><span class="pre">reduce_method</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ReduceMethod</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'average'</span></em><a class="headerlink" href="#atef.check.DynamicValue.reduce_method" title="Link to this definition"></a></dt>
+<dd><p>Reduce collected samples by this reduce method</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.check.DynamicValue.reduce_period">
+<span class="sig-name descname"><span class="pre">reduce_period</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#atef.check.DynamicValue.reduce_period" title="Link to this definition"></a></dt>
+<dd><p>Period over which the value will be read</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.check.DynamicValue.string">
+<span class="sig-name descname"><span class="pre">string</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#atef.check.DynamicValue.string" title="Link to this definition"></a></dt>
+<dd><p>If applicable, request and compare string values rather than the default</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="atef.check.DynamicValue.value">
+<span class="sig-name descname"><span class="pre">value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#atef.check.DynamicValue.value" title="Link to this definition"></a></dt>
+<dd><p>Value is now optional, and will be filled in when prepared</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="atef.check.Comparison.html" class="btn btn-neutral float-left" title="atef.check.Comparison" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="atef.check.EpicsValue.html" class="btn btn-neutral float-right" title="atef.check.EpicsValue" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, SLAC National Accelerator Laboratory.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

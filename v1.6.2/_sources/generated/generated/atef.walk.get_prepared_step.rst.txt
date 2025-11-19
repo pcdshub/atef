@@ -1,0 +1,6 @@
+atef.walk.get\_prepared\_step
+=============================
+
+.. currentmodule:: atef.walk
+
+.. autofunction:: get_prepared_step
