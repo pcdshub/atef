@@ -31,7 +31,6 @@ systems.
 
    api.rst
    releases.rst
-   upcoming_changes.rst
 
 .. toctree::
    :maxdepth: 1
