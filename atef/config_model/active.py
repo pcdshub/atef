@@ -456,6 +456,10 @@ class PreparedProcedureFile:
     root: PreparedProcedureGroup
     #: UUID for instance tracking
     uuid: UUID = field(default_factory=uuid4)
+    #: Time when this active checkout started running.
+    start_timestamp: Optional[datetime.datetime] = None
+    #: Time when this active checkout finished running.
+    end_timestamp: Optional[datetime.datetime] = None
 
     @classmethod
     def from_origin(
@@ -486,7 +490,11 @@ class PreparedProcedureFile:
         return prep_proc_file
 
     async def run(self) -> Result:
-        return await self.root.run()
+        self.start_timestamp = datetime.datetime.now(datetime.UTC)
+        try:
+            return await self.root.run()
+        finally:
+            self.end_timestamp = datetime.datetime.now(datetime.UTC)
 
 
 @dataclass
@@ -528,6 +536,10 @@ class PreparedProcedureStep:
     verify_result: Result = field(default_factory=incomplete_result)
     #: whether or not the step completed successfully
     step_result: Result = field(default_factory=incomplete_result)
+    #: Time when this step started running.
+    start_timestamp: Optional[datetime.datetime] = None
+    #: Time when this step finished running.
+    end_timestamp: Optional[datetime.datetime] = None
 
     @property
     def result(self) -> Result:
@@ -571,6 +583,7 @@ class PreparedProcedureStep:
 
     async def run(self) -> Result:
         """Run the step and return the result"""
+        self.start_timestamp = datetime.datetime.now(datetime.UTC)
         status_logger = get_status_logger(self)
         status_logger.info(
             f"Parent step: {self.parent.name}, Starting step: '{self.name}' ({type(self).__name__})"
@@ -590,6 +603,7 @@ class PreparedProcedureStep:
             f"Parent step: {self.parent.name}, Finished step: '{self.name}' ({type(self).__name__}). "
             f"Result: {self.result.severity.name}"
         )
+        self.end_timestamp = datetime.datetime.now(datetime.UTC)
         return self.result
 
     @classmethod
@@ -682,7 +696,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         -------
         PreparedProcedureGroup
         """
-        prepared = cls(origin=group, parent=parent, steps=[], name = group.name)
+        prepared = cls(origin=group, parent=parent, steps=[], name=group.name)
 
         for step in group.steps:
             prep_step = PreparedProcedureStep.from_origin(
