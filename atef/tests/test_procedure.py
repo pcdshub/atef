@@ -84,6 +84,39 @@ async def test_prepared_procedure(active_config_path):
 
 
 @pytest.mark.asyncio
+async def test_prepared_procedure_timestamps(active_config_path):
+    procedure_file = ProcedureFile.from_filename(filename=active_config_path)
+    ppf = PreparedProcedureFile.from_origin(file=procedure_file)
+
+    assert ppf.start_timestamp is None
+    assert ppf.end_timestamp is None
+
+    await ppf.run()
+
+    assert ppf.start_timestamp is not None
+    assert ppf.end_timestamp is not None
+    assert ppf.start_timestamp <= ppf.end_timestamp
+
+
+@pytest.mark.asyncio
+async def test_prepared_procedure_timestamps_when_run_fails(active_config_path, monkeypatch):
+    procedure_file = ProcedureFile.from_filename(filename=active_config_path)
+    ppf = PreparedProcedureFile.from_origin(file=procedure_file)
+
+    async def raises():
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(ppf.root, "run", raises)
+
+    with pytest.raises(RuntimeError):
+        await ppf.run()
+
+    assert ppf.start_timestamp is not None
+    assert ppf.end_timestamp is not None
+    assert ppf.start_timestamp <= ppf.end_timestamp
+
+
+@pytest.mark.asyncio
 async def test_plan_step():
     """Pass if a PlanStep can be prepared and run in isolation"""
     # Note: this is not the standard way of using these plan steps.
@@ -178,3 +211,18 @@ async def test_template_step_passive_target(tmp_path):
 
     result = await pts.run()
     assert result.severity == Severity.success
+
+
+@pytest.mark.asyncio
+async def test_prepared_step_timestamps():
+    desc_step = DescriptionStep()
+    prep_desc_step = PreparedProcedureStep.from_origin(desc_step)
+
+    assert prep_desc_step.start_timestamp is None
+    assert prep_desc_step.end_timestamp is None
+
+    await prep_desc_step.run()
+
+    assert prep_desc_step.start_timestamp is not None
+    assert prep_desc_step.end_timestamp is not None
+    assert prep_desc_step.start_timestamp <= prep_desc_step.end_timestamp
