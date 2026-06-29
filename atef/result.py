@@ -24,7 +24,7 @@ class Result:
     severity: Severity = Severity.success
     reason: Optional[str] = None
     timestamp: datetime.datetime = field(
-        default_factory=partial(datetime.datetime.now, datetime.UTC),
+        default_factory=partial(datetime.datetime.now, datetime.timezone.utc),
         compare=False
     )
 

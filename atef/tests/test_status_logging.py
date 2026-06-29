@@ -36,7 +36,7 @@ def create_blank_prep_active():
     return PreparedProcedureFile.from_origin(ProcedureFile())
 
 
-@pytest.mark.parametrize("prepared_file_fn,", [
+@pytest.mark.parametrize("prepared_file_fn", [
     create_blank_prep_passive, create_blank_prep_active
 
 ])
@@ -61,7 +61,7 @@ def test_status_tempfile_creation(
     assert prepared_file.uuid not in tempfile_cache
 
 
-@pytest.mark.parametrize("prepared_file_fn,", [
+@pytest.mark.parametrize("prepared_file_fn", [
     create_blank_prep_passive, create_blank_prep_active
 ])
 def test_logging_stream(

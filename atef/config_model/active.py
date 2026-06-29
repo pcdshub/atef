@@ -490,11 +490,11 @@ class PreparedProcedureFile:
         return prep_proc_file
 
     async def run(self) -> Result:
-        self.start_timestamp = datetime.datetime.now(datetime.UTC)
+        self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
         try:
             return await self.root.run()
         finally:
-            self.end_timestamp = datetime.datetime.now(datetime.UTC)
+            self.end_timestamp = datetime.datetime.now(datetime.timezone.utc)
 
 
 @dataclass
@@ -583,10 +583,10 @@ class PreparedProcedureStep:
 
     async def run(self) -> Result:
         """Run the step and return the result"""
-        self.start_timestamp = datetime.datetime.now(datetime.UTC)
+        self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
         status_logger = get_status_logger(self)
         status_logger.info(
-            f"Parent step: {self.parent.name}, Starting step: '{self.name}' ({type(self).__name__})"
+            f"Starting step: '{self.name}' ({type(self).__name__})"
         )
         try:
             result = await self._run()
@@ -600,10 +600,10 @@ class PreparedProcedureStep:
         self.step_result = result
         # return the overall result, including verification
         status_logger.info(
-            f"Parent step: {self.parent.name}, Finished step: '{self.name}' ({type(self).__name__}). "
+            f"Finished step: '{self.name}' ({type(self).__name__}). "
             f"Result: {self.result.severity.name}"
         )
-        self.end_timestamp = datetime.datetime.now(datetime.UTC)
+        self.end_timestamp = datetime.datetime.now(datetime.timezone.utc)
         return self.result
 
     @classmethod
@@ -868,7 +868,6 @@ class PreparedSetValueStep(PreparedProcedureStep):
                     reason="Step aborted, action skipped"
                 )
             try:
-                # NEED TO ADD PARENT STEP
                 status_logger.info(f" > Starting Action: Group: '{prep_action.parent.name}', Step: '{prep_action.name}'")
                 action_result = await prep_action.run()
                 status_logger.info(f" > Finished Action: Group: '{prep_action.parent.name}', Step: '{prep_action.name}'")
