@@ -13,6 +13,9 @@ from atef import exceptions, util
 from atef.enums import GroupResultMode, Severity
 from atef.exceptions import PreparedComparisonException
 
+# Python 3.11+ exposes datetime.UTC; older versions use datetime.timezone.utc.
+UTC = getattr(datetime, 'UTC', datetime.timezone.utc)
+
 
 @dataclass(frozen=True)
 class Result:
@@ -24,7 +27,7 @@ class Result:
     severity: Severity = Severity.success
     reason: Optional[str] = None
     timestamp: datetime.datetime = field(
-        default_factory=partial(datetime.datetime.now, datetime.timezone.utc),
+        default_factory=partial(datetime.datetime.now, UTC),
         compare=False
     )
 

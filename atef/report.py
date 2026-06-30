@@ -154,14 +154,18 @@ def build_passive_summary_table(story: List[Flowable], prep_file: PreparedFile):
 
 def build_active_summary_table(story: List[Flowable], prep_file: PreparedProcedureFile):
     """
-    Build active summary table for checkout
+    Build an active procedure summary table including timing details.
+
+    Adds a checkout timing section with overall start time, end time, and
+    duration (when available). Also adds the per-step summary table with
+    vertically stacked start/end timestamps alongside the result.
 
     Parameters
     ----------
     story : List[Flowable]
         List of story objects that compose a reportlab PDF
-    prep_file : PreparedFile
-        A prepared (and preferably run) passive checkout
+    prep_file : PreparedProcedureFile
+        A prepared (and preferably run) active procedure checkout.
     """
     # Add checkout timing information
     story.append(Paragraph('Checkout Timing', h2))
@@ -193,7 +197,7 @@ def build_active_summary_table(story: List[Flowable], prep_file: PreparedProcedu
 
     # table with results
     lines = walk_procedure_file(prep_file.root)
-    table_data = [['Step Name', 'Start Time', 'End Time', 'Result']]
+    table_data = [['Step Name', 'Timing', 'Result']]
     style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
              ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
              ('BOX', (0, 0), (-1, -1), 1, colors.black),
@@ -202,16 +206,19 @@ def build_active_summary_table(story: List[Flowable], prep_file: PreparedProcedu
     for i, (item, level) in enumerate(lines):
         # content
         prefix = '    ' * level
+        name = None
         if isinstance(item, PreparedProcedureStep):
             name = item.origin.name
         elif isinstance(item, PreparedComparison):
             name = str(item.comparison.name) + ' - ' + str(item.identifier)
         name = name or type(item).__name__
+        start_ts = format_timestamp(getattr(item, 'start_timestamp', None))
+        end_ts = format_timestamp(getattr(item, 'end_timestamp', None))
+        timing = Paragraph(f'Start: {start_ts}<br/>Stop: {end_ts}')
         table_data.append(
             [
                 prefix + f'{name}',
-                format_timestamp(getattr(item, 'start_timestamp', None)),
-                format_timestamp(getattr(item, 'end_timestamp', None)),
+                timing,
                 get_result_text(item.result)
             ]
         )

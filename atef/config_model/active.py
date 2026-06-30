@@ -448,7 +448,10 @@ class ProcedureFile:
 class PreparedProcedureFile:
     """
     A Prepared Procedure file.  Constructs prepared dataclasses for steps
-    in the root ProcedureGroup
+    in the root ProcedureGroup.
+
+    Timestamps are captured when run() is called, providing the overall
+    start and end times for the entire procedure execution.
     """
     #: Corresponding ProcedureFile information
     file: ProcedureFile
@@ -490,6 +493,18 @@ class PreparedProcedureFile:
         return prep_proc_file
 
     async def run(self) -> Result:
+        """
+        Run the entire procedure file.
+
+        This method executes the file-level root group and captures execution
+        timestamps for the full procedure. These timestamps are used for reporting
+        the overall file duration.
+
+        Returns
+        -------
+        Result
+            The combined result from running the root procedure group.
+        """
         self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
         try:
             return await self.root.run()
@@ -522,6 +537,10 @@ class FailedStep:
 class PreparedProcedureStep:
     """
     Base class for a ProcedureStep that has been prepared to run.
+
+    Timestamps are captured when run() is called, providing the start and end
+    times for the step execution, which are used in reporting to display step
+    duration and timing information.
     """
     #: name of this comparison
     name: Optional[str] = None
@@ -582,7 +601,19 @@ class PreparedProcedureStep:
         raise NotImplementedError()
 
     async def run(self) -> Result:
-        """Run the step and return the result"""
+        """
+        Run the step and return the result.
+
+        This method captures execution timestamps (start_timestamp and end_timestamp)
+        for this step, which are used in reporting to show step duration and timing.
+        The overall combined result includes the step result and verification result
+        based on the step's configuration.
+
+        Returns
+        -------
+        Result
+            The combined result from running the step, including verification.
+        """
         self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
         status_logger = get_status_logger(self)
         status_logger.info(
@@ -667,6 +698,13 @@ class PreparedProcedureStep:
 
 @dataclass
 class PreparedProcedureGroup(PreparedProcedureStep):
+    """
+    A group of prepared procedure steps to be executed together.
+
+    Timestamps are captured when run() is called, capturing the overall start
+    and end times for executing all steps in the group, which are used in
+    reporting to show group duration.
+    """
     #: hierarchical parent of this step
     parent: Optional[Union[PreparedProcedureFile, PreparedProcedureGroup]] = field(
         default=None, repr=False
@@ -711,22 +749,38 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         return prepared
 
     async def run(self) -> Result:
-        """Run all steps and return a combined result"""
-        results = []
-        for step in self.steps:
-            results.append(await step.run())
+        """
+        Run all steps and return a combined result.
 
-        if self.prepare_failures:
-            result = Result(
-                severity=Severity.error,
-                reason='At least one step failed to initialize'
-            )
-        else:
-            severity = _summarize_result_severity(GroupResultMode.all_, results)
-            result = Result(severity=severity)
+        This method executes all child steps sequentially and captures execution
+        timestamps (start_timestamp and end_timestamp) for the group. The group result
+        is computed from all child step results, accounting for any preparation failures.
+        Group timestamps are used in reporting to show the duration of the entire group.
 
-        self.step_result = result
-        return self.result
+        Returns
+        -------
+        Result
+            The combined result of all steps in this group.
+        """
+        self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
+        try:
+            results = []
+            for step in self.steps:
+                results.append(await step.run())
+
+            if self.prepare_failures:
+                result = Result(
+                    severity=Severity.error,
+                    reason='At least one step failed to initialize'
+                )
+            else:
+                severity = _summarize_result_severity(GroupResultMode.all_, results)
+                result = Result(severity=severity)
+
+            self.step_result = result
+            return self.result
+        finally:
+            self.end_timestamp = datetime.datetime.now(datetime.timezone.utc)
 
     @property
     def result(self) -> Result:
