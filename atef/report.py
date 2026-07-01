@@ -156,10 +156,6 @@ def build_active_summary_table(story: List[Flowable], prep_file: PreparedProcedu
     """
     Build an active procedure summary table including timing details.
 
-    Adds a checkout timing section with overall start time, end time, and
-    duration (when available). Also adds the per-step summary table with
-    vertically stacked start/end timestamps alongside the result.
-
     Parameters
     ----------
     story : List[Flowable]

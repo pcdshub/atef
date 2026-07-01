@@ -267,12 +267,7 @@ class RunCheck(DesignerDisplay, QWidget):
 
     def _make_run_slot(self, configs) -> None:
         """
-        Create and return a slot function to execute configurations.
-
-        This method creates a slot that runs each configuration in the provided list.
-        For active configurations at the root procedure group level, it detects when
-        the root group is selected and runs the parent PreparedProcedureFile instead,
-        ensuring that file-level timestamps are properly captured for reporting.
+        Create and return a slot function to execute configurations, if the root is detected it will create the file-level timestamps.
 
         Parameters
         ----------

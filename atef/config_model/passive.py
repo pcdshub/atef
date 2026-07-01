@@ -1427,14 +1427,80 @@ class PreparedComparison:
         """
         raise NotImplementedError()
 
+    async def _run_comparison(self) -> Result:
+        """Run the comparison workflow with error handling and logging."""
+        status_logger = get_status_logger(self)
+
+        status_logger.info(
+            f"Starting Comparison: '{self.comparison.name}' "
+            f"({type(self.comparison).__name__} on {self.identifier})"
+        )
+        try:
+            if hasattr(self.comparison, 'prepare'):
+                await self.comparison.prepare(self.cache)
+        except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
+            result = Result(
+                severity=self.comparison.if_disconnected,
+                reason=("Unable to read dynamic value for the comparison: "
+                        f"{self.identifier}")
+            )
+            self.result = result
+            return result
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Reading dynamic value for {self.identifier!r} comparison "
+                    f"{self.comparison} raised {ex.__class__.__name__}: {ex}"
+                ),
+            )
+            self.result = result
+            return result
+
+        try:
+            data = await self.get_data_async()
+        except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
+            result = Result(
+                severity=self.comparison.if_disconnected,
+                reason=f"Unable to retrieve data for comparison: {self.identifier}"
+            )
+            self.result = result
+            return result
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Getting data for {self.identifier!r} comparison "
+                    f"{self.comparison} raised {ex.__class__.__name__}: {ex}"
+                ),
+            )
+            self.result = result
+            return result
+
+        self.data = data
+
+        try:
+            result = await self._compare(data)
+        except Exception as ex:
+            result = Result(
+                severity=Severity.internal_error,
+                reason=(
+                    f"Failed to run {self.identifier!r} comparison "
+                    f"{self.comparison} raised {ex.__class__.__name__}: {ex} "
+                ),
+            )
+
+        self.result = result
+        status_logger.info(
+            f"Finished Comparison: '{self.comparison.name}' "
+            f"({type(self.comparison).__name__} on {self.identifier}). "
+            f"Result: {self.result.severity.name}"
+        )
+        return result
+
     async def compare(self) -> Result:
         """
-        Run the comparison and return the Result.
-
-        This method captures execution timestamps (start_timestamp and end_timestamp)
-        for this comparison, which are used in reporting to show comparison duration
-        and timing. The comparison may involve data preparation, retrieval, and
-        comparison execution, with appropriate error handling for each phase.
+        Attempt to run the comparison and return the Result. With each stemp also include timestamps.
 
         Returns
         -------
@@ -1443,74 +1509,7 @@ class PreparedComparison:
         """
         self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
         try:
-            status_logger = get_status_logger(self)
-
-            status_logger.info(
-                f"Starting Comparison: '{self.comparison.name}' "
-                f"({type(self.comparison).__name__} on {self.identifier})"
-            )
-            try:
-                if hasattr(self.comparison, 'prepare'):
-                    await self.comparison.prepare(self.cache)
-            except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
-                result = Result(
-                    severity=self.comparison.if_disconnected,
-                    reason=("Unable to read dynamic value for the comparison: "
-                            f"{self.identifier}")
-                )
-                self.result = result
-                return result
-            except Exception as ex:
-                result = Result(
-                    severity=Severity.internal_error,
-                    reason=(
-                        f"Reading dynamic value for {self.identifier!r} comparison "
-                        f"{self.comparison} raised {ex.__class__.__name__}: {ex}"
-                    ),
-                )
-                self.result = result
-                return result
-
-            try:
-                data = await self.get_data_async()
-            except (TimeoutError, asyncio.TimeoutError, ConnectionTimeoutError):
-                result = Result(
-                    severity=self.comparison.if_disconnected,
-                    reason=f"Unable to retrieve data for comparison: {self.identifier}"
-                )
-                self.result = result
-                return result
-            except Exception as ex:
-                result = Result(
-                    severity=Severity.internal_error,
-                    reason=(
-                        f"Getting data for {self.identifier!r} comparison "
-                        f"{self.comparison} raised {ex.__class__.__name__}: {ex}"
-                    ),
-                )
-                self.result = result
-                return result
-
-            self.data = data
-
-            try:
-                result = await self._compare(data)
-            except Exception as ex:
-                result = Result(
-                    severity=Severity.internal_error,
-                    reason=(
-                        f"Failed to run {self.identifier!r} comparison "
-                        f"{self.comparison} raised {ex.__class__.__name__}: {ex} "
-                    ),
-                )
-
-            self.result = result
-            status_logger.info(
-                f"Finished Comparison: '{self.comparison.name}' "
-                f"({type(self.comparison).__name__} on {self.identifier}). "
-                f"Result: {self.result.severity.name}"
-            )
-            return result
+            return await self._run_comparison()
         finally:
             self.end_timestamp = datetime.datetime.now(datetime.timezone.utc)
 

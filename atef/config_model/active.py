@@ -602,12 +602,7 @@ class PreparedProcedureStep:
 
     async def run(self) -> Result:
         """
-        Run the step and return the result.
-
-        This method captures execution timestamps (start_timestamp and end_timestamp)
-        for this step, which are used in reporting to show step duration and timing.
-        The overall combined result includes the step result and verification result
-        based on the step's configuration.
+        Run the step and return the result with timestamp.
 
         Returns
         -------
@@ -701,9 +696,6 @@ class PreparedProcedureGroup(PreparedProcedureStep):
     """
     A group of prepared procedure steps to be executed together.
 
-    Timestamps are captured when run() is called, capturing the overall start
-    and end times for executing all steps in the group, which are used in
-    reporting to show group duration.
     """
     #: hierarchical parent of this step
     parent: Optional[Union[PreparedProcedureFile, PreparedProcedureGroup]] = field(
@@ -750,12 +742,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
 
     async def run(self) -> Result:
         """
-        Run all steps and return a combined result.
-
-        This method executes all child steps sequentially and captures execution
-        timestamps (start_timestamp and end_timestamp) for the group. The group result
-        is computed from all child step results, accounting for any preparation failures.
-        Group timestamps are used in reporting to show the duration of the entire group.
+        Run all steps and return a combined result. Also attaches a timestamp.
 
         Returns
         -------
