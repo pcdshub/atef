@@ -7,6 +7,7 @@ which link ``Comparisons`` to specific identifiers and hold ``Result`` objects.
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import logging
 import pathlib
@@ -1400,6 +1401,10 @@ class PreparedComparison:
     parent: Optional[PreparedGroup] = field(default=None, repr=False)
     #: The last result of the comparison, if run.
     result: Result = field(default_factory=incomplete_result)
+    #: Time when this comparison started running.
+    start_timestamp: Optional[datetime.datetime] = None
+    #: Time when this comparison finished running.
+    end_timestamp: Optional[datetime.datetime] = None
 
     async def get_data_async(self) -> Any:
         """
@@ -1422,15 +1427,8 @@ class PreparedComparison:
         """
         raise NotImplementedError()
 
-    async def compare(self) -> Result:
-        """
-        Run the comparison and return the Result.
-
-        Returns
-        -------
-        Result
-            The result of the comparison.
-        """
+    async def _run_comparison(self) -> Result:
+        """Run the comparison workflow with error handling and logging."""
         status_logger = get_status_logger(self)
 
         status_logger.info(
@@ -1499,6 +1497,21 @@ class PreparedComparison:
             f"Result: {self.result.severity.name}"
         )
         return result
+
+    async def compare(self) -> Result:
+        """
+        Attempt to run the comparison and return the Result. With each stemp also include timestamps.
+
+        Returns
+        -------
+        Result
+            The result of the comparison.
+        """
+        self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
+        try:
+            return await self._run_comparison()
+        finally:
+            self.end_timestamp = datetime.datetime.now(datetime.timezone.utc)
 
 
 @dataclass

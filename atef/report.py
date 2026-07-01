@@ -93,6 +93,13 @@ def get_result_text(result: Result) -> Paragraph:
     return para
 
 
+def format_timestamp(timestamp: Optional[datetime]) -> str:
+    """Format timestamps consistently for report display."""
+    if timestamp is None:
+        return '-'
+    return timestamp.isoformat(sep=' ', timespec='seconds')
+
+
 def build_passive_summary_table(story: List[Flowable], prep_file: PreparedFile):
     """
     Build a table summarizing that passive checkout described in ``prep_file``.
@@ -147,34 +154,67 @@ def build_passive_summary_table(story: List[Flowable], prep_file: PreparedFile):
 
 def build_active_summary_table(story: List[Flowable], prep_file: PreparedProcedureFile):
     """
-    Build active summary table for checkout
+    Build an active procedure summary table including timing details.
 
     Parameters
     ----------
     story : List[Flowable]
         List of story objects that compose a reportlab PDF
-    prep_file : PreparedFile
-        A prepared (and preferably run) passive checkout
+    prep_file : PreparedProcedureFile
+        A prepared (and preferably run) active procedure checkout.
     """
+    # Add checkout timing information
+    story.append(Paragraph('Checkout Timing', h2))
+
+    start_time = format_timestamp(prep_file.start_timestamp)
+    end_time = format_timestamp(prep_file.end_timestamp)
+
+    # Calculate duration if both timestamps are available
+    duration_str = '-'
+    if prep_file.start_timestamp and prep_file.end_timestamp:
+        duration = prep_file.end_timestamp - prep_file.start_timestamp
+        duration_str = f'{duration.total_seconds():.1f}s'
+
+    run_data = [
+        ['Start Time:', start_time],
+        ['End Time:', end_time],
+        ['Duration:', duration_str],
+    ]
+    run_table = platypus.Table(
+        run_data,
+        colWidths=[2.5*cm, 6.5*cm],
+        style=[('GRID', (0, 0), (-1, -1), 1, colors.black),
+               ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+               ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+               ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey)]
+    )
+    story.append(run_table)
+    story.append(platypus.Spacer(width=0, height=.5*cm))
+
     # table with results
     lines = walk_procedure_file(prep_file.root)
-    table_data = [['Step Name', 'Result']]
+    table_data = [['Step Name', 'Timing', 'Result']]
     style = [('VALIGN', (0, 0), (-1, -1), 'TOP'),
-             ('ALIGN', (0, 0), (1, 0), 'CENTER'),
+             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
              ('BOX', (0, 0), (-1, -1), 1, colors.black),
              ('BOX', (0, 0), (0, -1), 1, colors.black)]
 
     for i, (item, level) in enumerate(lines):
         # content
         prefix = '    ' * level
+        name = None
         if isinstance(item, PreparedProcedureStep):
             name = item.origin.name
         elif isinstance(item, PreparedComparison):
             name = str(item.comparison.name) + ' - ' + str(item.identifier)
         name = name or type(item).__name__
+        start_ts = format_timestamp(getattr(item, 'start_timestamp', None))
+        end_ts = format_timestamp(getattr(item, 'end_timestamp', None))
+        timing = Paragraph(f'Start: {start_ts}<br/>Stop: {end_ts}')
         table_data.append(
             [
                 prefix + f'{name}',
+                timing,
                 get_result_text(item.result)
             ]
         )

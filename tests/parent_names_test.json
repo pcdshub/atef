@@ -68,8 +68,51 @@
               }
             }
           ],
-          "halt_on_fail": false,
-          "require_action_success": false
+          "halt_on_fail": true,
+          "require_action_success": true
+        }
+      },
+      {
+        "ProcedureGroup": {
+          "name": "test_group",
+          "description": null,
+          "parent": null,
+          "verify_required": true,
+          "step_success_required": true,
+          "steps": [
+            {
+              "SetValueStep": {
+                "name": "test_step_1",
+                "description": null,
+                "parent": null,
+                "verify_required": true,
+                "step_success_required": true,
+                "actions": [
+                  {
+                    "name": null,
+                    "device": null,
+                    "attr": null,
+                    "pv": "MY:PREFIX:dt",
+                    "value": 1.0,
+                    "timeout": null,
+                    "settle_time": null
+                  }
+                ],
+                "success_criteria": [],
+                "halt_on_fail": true,
+                "require_action_success": true
+              }
+            }
+          ]
+        }
+      },
+      {
+        "DescriptionStep": {
+          "name": "test_desc",
+          "description": "testing",
+          "parent": null,
+          "verify_required": true,
+          "step_success_required": true
         }
       }
     ]
