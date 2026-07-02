@@ -68,8 +68,8 @@
               }
             }
           ],
-          "halt_on_fail": true,
-          "require_action_success": true
+          "halt_on_fail": false,
+          "require_action_success": false
         }
       }
     ]

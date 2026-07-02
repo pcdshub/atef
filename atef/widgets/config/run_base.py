@@ -266,6 +266,14 @@ class RunCheck(DesignerDisplay, QWidget):
             self.run_button.show()
 
     def _make_run_slot(self, configs) -> None:
+        """
+        Create and return a slot function to execute configurations, if the root is detected it will create the file-level timestamps.
+
+        Parameters
+        ----------
+        configs : list
+            List of configurations to run when the slot is invoked.
+        """
 
         def run_slot(*args, **kwargs):
             """Slot that runs each step in the config list"""
@@ -281,8 +289,19 @@ class RunCheck(DesignerDisplay, QWidget):
 
                 # create task
                 config_type = infer_step_type(cfg)
+
+                # If running the root PreparedProcedureGroup, run the parent file instead
+                # to ensure file-level timestamps are set
+                config_to_run = cfg
+                if (
+                    config_type == 'active' and
+                    isinstance(cfg, PreparedProcedureGroup) and
+                    isinstance(cfg.parent, PreparedProcedureFile)
+                ):
+                    config_to_run = cfg.parent
+
                 if config_type == 'active':
-                    task = loop.create_task(cfg.run())
+                    task = loop.create_task(config_to_run.run())
                 elif config_type == 'passive':
                     task = loop.create_task(cfg.compare())
                 else:

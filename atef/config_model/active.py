@@ -448,7 +448,10 @@ class ProcedureFile:
 class PreparedProcedureFile:
     """
     A Prepared Procedure file.  Constructs prepared dataclasses for steps
-    in the root ProcedureGroup
+    in the root ProcedureGroup.
+
+    Timestamps are captured when run() is called, providing the overall
+    start and end times for the entire procedure execution.
     """
     #: Corresponding ProcedureFile information
     file: ProcedureFile
@@ -456,6 +459,10 @@ class PreparedProcedureFile:
     root: PreparedProcedureGroup
     #: UUID for instance tracking
     uuid: UUID = field(default_factory=uuid4)
+    #: Time when this active checkout started running.
+    start_timestamp: Optional[datetime.datetime] = None
+    #: Time when this active checkout finished running.
+    end_timestamp: Optional[datetime.datetime] = None
 
     @classmethod
     def from_origin(
@@ -486,7 +493,23 @@ class PreparedProcedureFile:
         return prep_proc_file
 
     async def run(self) -> Result:
-        return await self.root.run()
+        """
+        Run the entire procedure file.
+
+        This method executes the file-level root group and captures execution
+        timestamps for the full procedure. These timestamps are used for reporting
+        the overall file duration.
+
+        Returns
+        -------
+        Result
+            The combined result from running the root procedure group.
+        """
+        self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
+        try:
+            return await self.root.run()
+        finally:
+            self.end_timestamp = datetime.datetime.now(datetime.timezone.utc)
 
 
 @dataclass
@@ -514,6 +537,10 @@ class FailedStep:
 class PreparedProcedureStep:
     """
     Base class for a ProcedureStep that has been prepared to run.
+
+    Timestamps are captured when run() is called, providing the start and end
+    times for the step execution, which are used in reporting to display step
+    duration and timing information.
     """
     #: name of this comparison
     name: Optional[str] = None
@@ -528,6 +555,10 @@ class PreparedProcedureStep:
     verify_result: Result = field(default_factory=incomplete_result)
     #: whether or not the step completed successfully
     step_result: Result = field(default_factory=incomplete_result)
+    #: Time when this step started running.
+    start_timestamp: Optional[datetime.datetime] = None
+    #: Time when this step finished running.
+    end_timestamp: Optional[datetime.datetime] = None
 
     @property
     def result(self) -> Result:
@@ -570,7 +601,15 @@ class PreparedProcedureStep:
         raise NotImplementedError()
 
     async def run(self) -> Result:
-        """Run the step and return the result"""
+        """
+        Run the step and return the result with timestamp.
+
+        Returns
+        -------
+        Result
+            The combined result from running the step, including verification.
+        """
+        self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
         status_logger = get_status_logger(self)
         status_logger.info(
             f"Starting step: '{self.name}' ({type(self).__name__})"
@@ -590,6 +629,7 @@ class PreparedProcedureStep:
             f"Finished step: '{self.name}' ({type(self).__name__}). "
             f"Result: {self.result.severity.name}"
         )
+        self.end_timestamp = datetime.datetime.now(datetime.timezone.utc)
         return self.result
 
     @classmethod
@@ -653,6 +693,10 @@ class PreparedProcedureStep:
 
 @dataclass
 class PreparedProcedureGroup(PreparedProcedureStep):
+    """
+    A group of prepared procedure steps to be executed together.
+
+    """
     #: hierarchical parent of this step
     parent: Optional[Union[PreparedProcedureFile, PreparedProcedureGroup]] = field(
         default=None, repr=False
@@ -682,7 +726,7 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         -------
         PreparedProcedureGroup
         """
-        prepared = cls(origin=group, parent=parent, steps=[])
+        prepared = cls(origin=group, parent=parent, steps=[], name=group.name)
 
         for step in group.steps:
             prep_step = PreparedProcedureStep.from_origin(
@@ -697,22 +741,33 @@ class PreparedProcedureGroup(PreparedProcedureStep):
         return prepared
 
     async def run(self) -> Result:
-        """Run all steps and return a combined result"""
-        results = []
-        for step in self.steps:
-            results.append(await step.run())
+        """
+        Run all steps and return a combined result. Also attaches a timestamp.
 
-        if self.prepare_failures:
-            result = Result(
-                severity=Severity.error,
-                reason='At least one step failed to initialize'
-            )
-        else:
-            severity = _summarize_result_severity(GroupResultMode.all_, results)
-            result = Result(severity=severity)
+        Returns
+        -------
+        Result
+            The combined result of all steps in this group.
+        """
+        self.start_timestamp = datetime.datetime.now(datetime.timezone.utc)
+        try:
+            results = []
+            for step in self.steps:
+                results.append(await step.run())
 
-        self.step_result = result
-        return self.result
+            if self.prepare_failures:
+                result = Result(
+                    severity=Severity.error,
+                    reason='At least one step failed to initialize'
+                )
+            else:
+                severity = _summarize_result_severity(GroupResultMode.all_, results)
+                result = Result(severity=severity)
+
+            self.step_result = result
+            return self.result
+        finally:
+            self.end_timestamp = datetime.datetime.now(datetime.timezone.utc)
 
     @property
     def result(self) -> Result:
@@ -854,9 +909,9 @@ class PreparedSetValueStep(PreparedProcedureStep):
                     reason="Step aborted, action skipped"
                 )
             try:
-                status_logger.info(f" > Starting Action: '{prep_action.name}'")
+                status_logger.info(f" > Starting Action: Group: '{prep_action.parent.name}', Step: '{prep_action.name}'")
                 action_result = await prep_action.run()
-                status_logger.info(f" > Finished Action: '{prep_action.name}'")
+                status_logger.info(f" > Finished Action: Group: '{prep_action.parent.name}', Step: '{prep_action.name}'")
             except CancelledError:
                 cancelled = True
                 prep_action.result = Result(
