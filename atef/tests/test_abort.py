@@ -18,7 +18,7 @@ def assert_task_running(tree: DualTree, is_running: bool = True):
             and tree.running_task.done() != is_running)
 
 
-@pytest.mark.parametrize("click_abort,", [
+@pytest.mark.parametrize("click_abort", [
     (True,),
     (False,),
 ])
