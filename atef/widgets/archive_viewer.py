@@ -24,8 +24,7 @@ from atef.widgets.utils import PV_validator
 
 logger = logging.getLogger(__name__)
 archive_viewer_singleton = None
-ARCHIVER_URLS = ['http://pscaa01.slac.stanford.edu',
-                 'http://pscaa02.slac.stanford.edu']
+ARCHIVER_URLS = ['http://psctlws01.pcdsn',]
 symbol_map = {'None': None, 'circle': 'o', 'square': 's',
               'cross': '+', 'star': 'star'}
 style_map = {'solid': Qt.SolidLine,
@@ -133,23 +132,23 @@ class ArchiverViewerWidget(DesignerDisplay, QWidget):
             # need to set environment variable for archiver data plugin
             logger.debug(f'setting archiver url to: {archiver_url}')
             # pydm requires the port to be added
-            os.environ['PYDM_ARCHIVER_URL'] = archiver_url + ':17668'
+            os.environ['PYDM_ARCHIVER_URL'] = archiver_url + ':8329'
         else:
             archiver_url = os.environ['PYDM_ARCHIVER_URL']
             # ensure the port has been added for pydm
             # this handling needs work, but should suffice for now
-            if not archiver_url.endswith(':17668'):
+            if not archiver_url.endswith(':8329'):
                 port_re = re.search(r'(:\d+)$', archiver_url)
-                if port_re and (port_re[0] != ':17668'):
+                if port_re and (port_re[0] != ':8329'):
                     logger.warning(f'PYDM_ARCHIVER_URL ({archiver_url}) does '
-                                   'not end with port 17668, replacing port')
-                    archiver_url = archiver_url.replace(port_re[0], ':17668')
+                                   'not end with port 8329, replacing port')
+                    archiver_url = archiver_url.replace(port_re[0], ':8329')
                 else:
-                    archiver_url += ':17668'
+                    archiver_url += ':8329'
                 os.environ['PYDM_ARCHIVER_URL'] = archiver_url
 
         # EpicsArchive wants a stripped down url
-        url_core = archiver_url.removeprefix('http://').removesuffix(':17668')
+        url_core = archiver_url.removeprefix('http://').removesuffix(':8329')
         self.archapp = EpicsArchive(url_core)
 
         self._pv_list = pvs

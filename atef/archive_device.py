@@ -401,8 +401,8 @@ class ArchiverHelper:
     def add_appliance(
         self,
         host: str,
-        data_port: int = 17668,
-        management_port: int = 17665
+        data_port: int = 8329,
+        management_port: int = 8329
     ) -> archapp.EpicsArchive:
         """
         Add an archiver appliance to check.  Multiple may be added and will be
